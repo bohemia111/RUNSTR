@@ -165,24 +165,70 @@ export const EventJoinRequestsSection: React.FC<EventJoinRequestsSectionProps> =
       const currentList = await listService.getList(captainHexPubkey, dTag);
 
       if (!currentList) {
-        // Create initial list if it doesn't exist
-        const listData = {
-          name: `${eventName} Participants`,
-          description: `Participants for ${eventName}`,
-          members: [requesterPubkey],
-          dTag,
-          listType: 'people' as const,
-        };
+        // ⚠️ Participant list is missing - this shouldn't happen!
+        // Show confirmation dialog explaining the issue
+        Alert.alert(
+          'Participant List Missing',
+          `The participant list for "${eventName}" was not found. This might have happened if event creation was interrupted.\n\nWould you like to create the participant list now and approve this request?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => {
+                console.log('❌ Captain cancelled participant list creation');
+              }
+            },
+            {
+              text: 'Create & Approve',
+              onPress: async () => {
+                try {
+                  console.log('🔧 Creating missing participant list for event:', eventId);
 
-        const eventTemplate = listService.prepareListCreation(listData, captainHexPubkey);
+                  // Create initial list with the requester
+                  const listData = {
+                    name: `${eventName} Participants`,
+                    description: `Participants for ${eventName}`,
+                    members: [requesterPubkey],
+                    dTag,
+                    listType: 'people' as const,
+                  };
 
-        // Sign and publish
-        const g = globalThis as any;
-        const ndk = g.__RUNSTR_NDK_INSTANCE__;
-        const signer = new NDKPrivateKeySigner(privateKeyHex);
-        const ndkEvent = new NDKEvent(ndk, eventTemplate);
-        await ndkEvent.sign(signer);
-        await ndkEvent.publish();
+                  const eventTemplate = listService.prepareListCreation(listData, captainHexPubkey);
+
+                  // Sign and publish
+                  const g = globalThis as any;
+                  const ndk = g.__RUNSTR_NDK_INSTANCE__;
+                  const signer = new NDKPrivateKeySigner(privateKeyHex);
+                  const ndkEvent = new NDKEvent(ndk, eventTemplate);
+                  await ndkEvent.sign(signer);
+                  await ndkEvent.publish();
+
+                  console.log('✅ Participant list created successfully');
+
+                  // Remove request from UI
+                  setGroupedRequests((prev) => {
+                    const updated = [...prev];
+                    const eventGroup = updated.find(g => g.eventId === eventId);
+                    if (eventGroup) {
+                      eventGroup.requests = eventGroup.requests.filter(r => r.id !== requestId);
+                      if (eventGroup.requests.length === 0) {
+                        return updated.filter(g => g.eventId !== eventId);
+                      }
+                    }
+                    return updated;
+                  });
+
+                  onMemberApproved?.(eventId, requesterPubkey);
+                  Alert.alert('Success', 'Participant list created and user approved');
+                } catch (createError) {
+                  console.error('❌ Failed to create participant list:', createError);
+                  Alert.alert('Error', 'Failed to create participant list. Please try again.');
+                }
+              }
+            }
+          ]
+        );
+        return; // Exit early - wait for captain's decision
       } else {
         // Add to existing list
         const eventTemplate = listService.prepareAddMember(

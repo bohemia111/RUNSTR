@@ -104,7 +104,7 @@ type AuthenticatedStackParamList = {
   Onboarding: { nsec?: string };
   TeamCreation: undefined;
   EnhancedTeamScreen: { team: any; userIsMember?: boolean; currentUserNpub?: string; userIsCaptain?: boolean };
-  EventDetail: { eventId: string };
+  EventDetail: { eventId: string; eventData?: any }; // Fixed: Added optional eventData parameter
   EventCaptainDashboard: { eventId: string; eventData: any };
   LeagueDetail: { leagueId: string; leagueData?: any };
   ChallengeDetail: { challengeId: string };
@@ -406,9 +406,22 @@ const AppContent: React.FC = () => {
                     });
                   }}
                   onAddChallenge={() => console.log('Add challenge')}
-                  onEventPress={(eventId, eventData) => navigation.navigate('EventDetail', { eventId, eventData })}
-                  onLeaguePress={(leagueId, leagueData) => navigation.navigate('LeagueDetail', { leagueId, leagueData })}
-                  onChallengePress={(challengeId) => navigation.navigate('ChallengeDetail', { challengeId })}
+                  onEventPress={(eventId, eventData) => {
+                    console.log('📍 Navigation: Team → Event Detail');
+                    console.log('  eventId:', eventId);
+                    console.log('  eventData:', eventData ? 'provided' : 'not provided');
+                    navigation.navigate('EventDetail', { eventId, eventData });
+                  }}
+                  onLeaguePress={(leagueId, leagueData) => {
+                    console.log('📍 Navigation: Team → League Detail');
+                    console.log('  leagueId:', leagueId);
+                    navigation.navigate('LeagueDetail', { leagueId, leagueData });
+                  }}
+                  onChallengePress={(challengeId) => {
+                    console.log('📍 Navigation: Team → Challenge Detail');
+                    console.log('  challengeId:', challengeId);
+                    navigation.navigate('ChallengeDetail', { challengeId });
+                  }}
                   showJoinButton={!userIsMember}
                   userIsMemberProp={userIsMember}
                   currentUserNpub={currentUserNpub}

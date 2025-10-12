@@ -23,6 +23,8 @@ import { useUserStore } from '../../store/userStore';
 import { getAuthenticationData } from '../../utils/nostrAuth';
 import { DirectNostrProfileService } from '../../services/user/directNostrProfileService';
 import unifiedSigningService from '../../services/auth/UnifiedSigningService';
+import { GlobalNDKService } from '../../services/nostr/GlobalNDKService';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 import type {
   NostrActivityType,
   NostrEventCompetitionType,
@@ -263,37 +265,67 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
       if (result.success) {
         console.log('✅ Event created successfully:', result.competitionId);
 
+        // Track participant list creation status
+        let participantListCreated = false;
+        let participantListError = '';
+
         // Create empty participant list for opt-in participation
         if (result.competitionId) {
-          console.log('📋 Creating empty participant list for event (opt-in)');
-          const listService = NostrListService.getInstance();
+          try {
+            console.log('📋 Creating empty participant list for event (opt-in)');
+            const listService = NostrListService.getInstance();
 
-          // Get captain's hex pubkey from npub
-          const captainHexPubkey = npubToHex(authData.npub);
+            // Get captain's hex pubkey from npub
+            const captainHexPubkey = npubToHex(authData.npub);
 
-          // Prepare empty participant list (kind 30000)
-          const participantListData = {
-            name: `${eventData.eventName} Participants`,
-            description: `Participants for ${eventData.eventName}`,
-            members: [], // Start with empty list - fully opt-in
-            dTag: `event-${result.competitionId}-participants`,
-            listType: 'people' as const,
-          };
+            // Prepare empty participant list (kind 30000)
+            const participantListData = {
+              name: `${eventData.eventName} Participants`,
+              description: `Participants for ${eventData.eventName}`,
+              members: [], // Start with empty list - fully opt-in
+              dTag: `event-${result.competitionId}-participants`,
+              listType: 'people' as const,
+            };
 
-          // Create the participant list event template
-          const listEventTemplate = listService.prepareListCreation(
-            participantListData,
-            captainHexPubkey
-          );
+            // Create the participant list event template
+            const listEventTemplate = listService.prepareListCreation(
+              participantListData,
+              captainHexPubkey
+            );
 
-          // Sign and publish the list (you'll need to add signing logic)
-          // For now, log that we've prepared it
-          console.log('✅ Prepared empty participant list for event:', participantListData.dTag);
+            console.log('🔐 Signing participant list...');
+
+            // Get global NDK instance
+            const ndk = await GlobalNDKService.getInstance();
+
+            // Create NDK event and sign it
+            const ndkEvent = new NDKEvent(ndk, listEventTemplate);
+            await ndkEvent.sign(signer);
+
+            console.log('📤 Publishing participant list to Nostr...');
+
+            // Publish to relays
+            await ndkEvent.publish();
+
+            participantListCreated = true;
+            console.log('✅ Participant list created and published:', participantListData.dTag);
+          } catch (listError) {
+            console.error('⚠️ Failed to create participant list:', listError);
+            participantListError = listError instanceof Error ? listError.message : 'Unknown error';
+            // Don't block event creation, just log the error
+          }
         }
+
+        // Show success message with participant list status
+        const successMessage = participantListCreated
+          ? `Event "${eventData.eventName}" has been created and published to Nostr relays.\n\n✅ Participant list created successfully.`
+          : participantListError
+          ? `Event "${eventData.eventName}" has been created, but participant list creation failed.\n\n⚠️ ${participantListError}\n\nYou may need to create the participant list manually from the Captain Dashboard.`
+          : `Event "${eventData.eventName}" has been created and published to Nostr relays.`;
 
         Alert.alert(
           'Success!',
-          `Event "${eventData.eventName}" has been created and published to Nostr relays.`,
+          successMessage,
           [{ text: 'OK', onPress: () => {
             onEventCreated(eventData);
             onClose();
