@@ -15,6 +15,8 @@ import type { Workout } from '../../types/workout';
 import type { WorkoutType } from '../../types/workout';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import { CacheInvalidationService } from '../cache/CacheInvalidationService';
+import { DailyRewardService } from '../rewards/DailyRewardService';
+import { FEATURES } from '../../config/features';
 
 // Extended workout interface for publishing (simplified from UnifiedWorkout)
 export interface PublishableWorkout extends Workout {
@@ -36,6 +38,8 @@ export interface WorkoutPublishResult {
   error?: string;
   publishedToRelays?: number;
   failedRelays?: string[];
+  rewardEarned?: boolean;
+  rewardAmount?: number;
 }
 
 export interface SocialPostOptions {
@@ -134,9 +138,29 @@ export class WorkoutPublishingService {
         console.warn('⚠️ Cache invalidation failed (non-blocking):', err);
       });
 
+      // 🎁 Check if user earned daily workout reward
+      let rewardEarned = false;
+      let rewardAmount: number | undefined;
+
+      if (FEATURES.ENABLE_DAILY_REWARDS) {
+        try {
+          const rewardResult = await DailyRewardService.sendReward(pubkey);
+          if (rewardResult.success) {
+            rewardEarned = true;
+            rewardAmount = rewardResult.amount;
+            console.log(`🎉 User earned ${rewardAmount} sats reward!`);
+          }
+        } catch (error) {
+          // Silent failure - reward system should never block workout publishing
+          console.log('[WorkoutPublishing] Reward check failed (silent):', error);
+        }
+      }
+
       return {
         success: true,
         eventId: ndkEvent.id,
+        rewardEarned,
+        rewardAmount,
       };
     } catch (error) {
       console.error('❌ Error saving workout to Nostr:', error);

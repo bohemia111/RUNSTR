@@ -25,6 +25,7 @@ import LocalWorkoutStorageService from '../../services/fitness/LocalWorkoutStora
 import { activityMetricsService } from '../../services/activity/ActivityMetricsService';
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import { CustomAlert } from '../ui/CustomAlert';
+import { RewardEarnedModal } from '../rewards/RewardEarnedModal';
 
 interface WorkoutSummaryProps {
   visible: boolean;
@@ -54,6 +55,10 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
   const [saved, setSaved] = useState(false);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Reward modal state
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [rewardAmount, setRewardAmount] = useState(0);
 
   const [alertState, setAlertState] = useState<{
     visible: boolean;
@@ -295,11 +300,21 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
           }
         }
 
-        setAlertState({
-          visible: true,
-          title: 'Competing! ✅',
-          message: 'Your workout has been entered into competitions!',
-        });
+        // 🎁 Check if user earned daily reward
+        if (result.rewardEarned && result.rewardAmount) {
+          // Show reward modal first
+          setRewardAmount(result.rewardAmount);
+          setShowRewardModal(true);
+
+          // Success message will show after reward modal is closed
+        } else {
+          // No reward, show success message immediately
+          setAlertState({
+            visible: true,
+            title: 'Competing! ✅',
+            message: 'Your workout has been entered into competitions!',
+          });
+        }
       } else {
         setAlertState({
           visible: true,
@@ -554,6 +569,21 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
         visible={showSocialModal}
         onClose={() => setShowSocialModal(false)}
         onSelectPlatform={handlePostToFeed}
+      />
+
+      {/* Reward Earned Modal */}
+      <RewardEarnedModal
+        visible={showRewardModal}
+        amount={rewardAmount}
+        onClose={() => {
+          setShowRewardModal(false);
+          // Show success message after reward modal is closed
+          setAlertState({
+            visible: true,
+            title: 'Competing! ✅',
+            message: 'Your workout has been entered into competitions!',
+          });
+        }}
       />
 
       <CustomAlert
