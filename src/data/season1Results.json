@@ -1,194 +1,263 @@
 {
-  "lastUpdated": "2025-10-09T23:59:59Z",
+  "lastUpdated": "2025-10-13T23:24:06.683Z",
   "season": {
     "name": "RUNSTR Season 1",
     "startDate": "2025-07-11T00:00:00Z",
     "endDate": "2025-10-09T23:59:59Z",
     "prizePool": 200000,
-    "totalParticipants": 127
+    "totalParticipants": 14
   },
   "leaderboards": {
     "running": {
       "activityType": "running",
-      "totalParticipants": 89,
-      "lastUpdated": 1728518399000,
+      "totalParticipants": 9,
+      "lastUpdated": 1760397846683,
       "participants": [
         {
           "rank": 1,
-          "pubkey": "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9",
-          "npub": "npub1qnyh2m77achk37762zystnhr3g5xnlvszxfygtjwd43r0haan2snhh6qv",
-          "name": "Sarah Runner",
-          "picture": "https://nostr.build/av/runner1.jpg",
-          "totalDistance": 1523400,
-          "workoutCount": 142,
-          "lastActivityDate": "2025-10-09T18:45:00Z",
-          "prize": 66667
+          "pubkey": "dc65ebf157156d5d4f4bc9496fab27d031717502d7525a5f4aa37e13774b5156",
+          "npub": "npub1m3j7hu2hz4k46n6te9ykl2e86qchzagz6af95h625dlpxa6t29tqwyzt6f",
+          "name": "gnilma",
+          "picture": "https://nostr.build/i/p/nostr.build_cea73e9c439a3be5ea79754dd51ddf7a3ef5de34d8187770fe6295fb392687b3.jpg",
+          "totalDistance": 522850,
+          "workoutCount": 44,
+          "lastActivityDate": "2025-10-09T06:14:11.000Z",
+          "prize": 22222
         },
         {
           "rank": 2,
-          "pubkey": "6b0530c6d5141d90748ae1b2ee8c3d209f83b3b2c73151b14c256a60dcbbe5db",
-          "npub": "npub1dv7fcxdvzgxqla2a5yek3npjpx0rk0ft9uc43hpvyknxph97ehdskekszs",
-          "name": "Mike Marathon",
-          "picture": "https://nostr.build/av/runner2.jpg",
-          "totalDistance": 1421000,
-          "workoutCount": 118,
-          "lastActivityDate": "2025-10-09T20:15:00Z",
-          "prize": 33333
+          "pubkey": "ea28488b659ab6433167cd024eb72e01a375ac17ce54a1cdc6e5dce2f6d93923",
+          "npub": "npub1ag5y3zm9n2myxvt8e5pyadewqx3httqhee22rnwxuhww9ake8y3slsekr3",
+          "name": "johnny9",
+          "picture": "https://avatars.githubusercontent.com/u/985648?v=4",
+          "totalDistance": 481388,
+          "workoutCount": 45,
+          "lastActivityDate": "2025-10-08T20:35:31.000Z",
+          "prize": 11111
         },
         {
           "rank": 3,
-          "pubkey": "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
-          "npub": "npub1sg2flgut6a7x6kf8hjnep226v6u0f9hn27lggsfln25gl77w0fqc87jdh",
-          "name": "Jessica Jogger",
-          "picture": "https://nostr.build/av/runner3.jpg",
-          "totalDistance": 1356200,
-          "workoutCount": 134,
-          "lastActivityDate": "2025-10-08T19:30:00Z",
-          "prize": 16667
+          "pubkey": "14750bfc26cd1ec855e4daaa855dae1483f5fec5ea8322bb9dfa8f56f3231a6f",
+          "npub": "npub1z36shlpxe50vs40ym24g2hdwzjpltlk9a2pj9wual284duerrfhswp3j7z",
+          "name": "steven8rown 👊",
+          "picture": "https://blossom.primal.net/f9c8a4f59e93d75344fcade94e97a2d793533e3d14e8014dfa4a54e91f7c74fd.png",
+          "totalDistance": 306290,
+          "workoutCount": 28,
+          "lastActivityDate": "2025-09-20T09:03:06.000Z",
+          "prize": 5555
         },
         {
           "rank": 4,
-          "pubkey": "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
-          "npub": "npub180vvl2ktlx6klj3c7al6e0c25qlkpcnxyhr5xj7dxx4djl3rqcksu3mfke",
-          "name": "David Distance",
-          "totalDistance": 1298500,
-          "workoutCount": 125,
-          "lastActivityDate": "2025-10-09T21:00:00Z"
+          "pubkey": "745eb529d0e42d2fa6c904bbc2c10702deae964b4dd3079803ab8b43536dda12",
+          "npub": "npub1w30t22wsuskjlfkfqjau9sg8qt02a9jtfhfs0xqr4w95x5mdmgfqghvnqu",
+          "name": "guy",
+          "picture": "https://i.ibb.co/tykKfq5/360-F-1030875797-1-Fmro-Dfu0g-DKB1-Tu32-Eti-My8-LVq-Uw-Un9.webp",
+          "totalDistance": 200360,
+          "workoutCount": 44,
+          "lastActivityDate": "2025-10-09T16:38:33.000Z"
         },
         {
           "rank": 5,
-          "pubkey": "7cca3f3870a5cd610d5380fa4eb9d99f826e21e1b066338c373e88c38eb3b5e9",
-          "npub": "npub10n98a0rs45hgzj5crjfxwx8fn4qndse7wp5r3fnn0r2wnrex0c5sh3e0p3",
-          "name": "Emma Endurance",
-          "totalDistance": 1245600,
-          "workoutCount": 108,
-          "lastActivityDate": "2025-10-09T16:45:00Z"
+          "pubkey": "9358c67695d9e78bde2bf3ce1eb0a5059553687632a177e7d25deeff9f2912fc",
+          "npub": "npub1jdvvva54m8nchh3t708pav99qk24x6rkx2sh0e7jthh0l8efzt7q9y7jlj",
+          "name": "Kamo Weasel",
+          "picture": "https://m.primal.net/QZXK.png",
+          "totalDistance": 138000,
+          "workoutCount": 23,
+          "lastActivityDate": "2025-10-07T22:54:06.000Z"
+        },
+        {
+          "rank": 6,
+          "pubkey": "30ceb64e73197a05958c8bd92ab079c815bb44fbfbb3eb5d9766c5207f08bdf5",
+          "npub": "npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum",
+          "name": "TheWildHustle",
+          "picture": "https://m.primal.net/MgUN.png",
+          "totalDistance": 104644,
+          "workoutCount": 22,
+          "lastActivityDate": "2025-10-04T23:22:09.000Z"
+        },
+        {
+          "rank": 7,
+          "pubkey": "7c8489be0946cf10cefd55e12fa00f8de4fe683b702f2bf9eee747edef23df73",
+          "npub": "npub10jzgn0sfgm83pnha2hsjlgq03hj0u6pmwqhjh70wuar7mmermaesgxar98",
+          "name": "SenditMike",
+          "picture": "https://image.nostr.build/c415f67f0b4822f5f675716945efd9c8bbbe2e7511fa37c071964085792d570c.gif",
+          "totalDistance": 98918,
+          "workoutCount": 27,
+          "lastActivityDate": "2025-09-24T16:17:58.000Z"
+        },
+        {
+          "rank": 8,
+          "pubkey": "1c6b3be353041dd9e09bb568a4a92344e240b39ef5eb390f5e9e821273f0ae6f",
+          "npub": "npub1r34nhc6nqswancymk452f2frgn3ypvu77h4njr67n6ppyuls4ehs44gv0h",
+          "name": "JohnOnchain",
+          "picture": "https://inosta.cc/images/d602c9375df92328f5494887e2cebbab6726b457faf020d568615af8fe0b831c/xxdmko3yn7r1678030697659koncpxlfrh.png",
+          "totalDistance": 6800,
+          "workoutCount": 4,
+          "lastActivityDate": "2025-10-08T06:37:35.000Z"
+        },
+        {
+          "rank": 9,
+          "pubkey": "f79c4b410929be501f8ac6227e66a585feb84a0a9162f54159aa752658622fad",
+          "npub": "npub177wyksgf9xl9q8u2cc38ue49shltsjs2j9302s2e4f6jvkrz97ks3s25zh",
+          "name": "Judith ⚡️S⚡️",
+          "picture": "https://m.primal.net/Hckf.jpg",
+          "totalDistance": 5430,
+          "workoutCount": 1,
+          "lastActivityDate": "2025-10-09T16:31:05.000Z"
         }
       ]
     },
     "cycling": {
       "activityType": "cycling",
-      "totalParticipants": 67,
-      "lastUpdated": 1728518399000,
+      "totalParticipants": 3,
+      "lastUpdated": 1760397846683,
       "participants": [
         {
           "rank": 1,
-          "pubkey": "f62d350e69ec2ce7236ad0533ee66e6e82d72ef58d0c0c50dd68a0045e550a44",
-          "npub": "npub17ckn2r5fas8uy4d26xan6cuwqhdd04ntnswx2cx6s5qyhk252zqz54fpx",
-          "name": "Chris Cyclist",
-          "picture": "https://nostr.build/av/cyclist1.jpg",
-          "totalDistance": 3845200,
-          "workoutCount": 98,
-          "lastActivityDate": "2025-10-09T17:30:00Z",
-          "prize": 66667
+          "pubkey": "b17fccdf07ba2387f038b34426720cd68d112df923bca2bed8f8c309b7211155",
+          "npub": "npub1k9luehc8hg3c0upckdzzvusv66x3zt0eyw7290kclrpsndepz92sfcpp63",
+          "name": "⚡️2FakTor⚡️",
+          "picture": "https://blossom.minibolt.info/76d6b4124c868a8494fde896ca5113550b03583ea0eeffdbaecdb141d47d3211.png",
+          "totalDistance": 302280,
+          "workoutCount": 15,
+          "lastActivityDate": "2025-09-30T18:03:59.000Z",
+          "prize": 22222
         },
         {
           "rank": 2,
-          "pubkey": "5959de5e479c8f64e2c5f2af2c3e6e2da40315e0e2c8e6d5df4ff4fb5c88d28e",
-          "npub": "npub1t9vaulj8nrmy7u0272eyuehz2qryxhswct8vmt05l48khe5xz28sd0pnmg",
-          "name": "Laura Lance",
-          "picture": "https://nostr.build/av/cyclist2.jpg",
-          "totalDistance": 3562300,
-          "workoutCount": 87,
-          "lastActivityDate": "2025-10-09T19:15:00Z",
-          "prize": 33333
+          "pubkey": "623ed218de81311783656783d6ce690b521a89c4dc09f28962e5bfd4fa549249",
+          "npub": "npub1vgldyxx7syc30qm9v7padnnfpdfp4zwymsyl9ztzuklaf7j5jfyspk36wu",
+          "name": "pup",
+          "picture": "https://m.primal.net/QhdP.png",
+          "totalDistance": 232325,
+          "workoutCount": 10,
+          "lastActivityDate": "2025-09-23T23:14:07.000Z",
+          "prize": 11111
         },
         {
           "rank": 3,
-          "pubkey": "e88a0e3e3bcf99a93f96ae8beebdc87f6d4e63c9d5d475fb4f4b6f3fa3f1c6ba",
-          "npub": "npub1az0qpcln78dzwmlxmuyaawd3fa2xc6wf2h28tdz0fdmr73hnxasqxc77gn",
-          "name": "Tom TourDeFrance",
-          "totalDistance": 3421800,
-          "workoutCount": 92,
-          "lastActivityDate": "2025-10-08T20:45:00Z",
-          "prize": 16667
-        },
-        {
-          "rank": 4,
-          "pubkey": "8d4e7c88e7bf3abc5edfc5d5c0a3e8dc9cfbd2df4dc6a72b5f3b1e2b1e9a8f67",
-          "npub": "npub134r8ex370n7mc9dh7w4cpslphje0cldnhz6vthz0vhzm85dgajsqyc6sx5",
-          "name": "Amy Altitude",
-          "totalDistance": 3198600,
-          "workoutCount": 85,
-          "lastActivityDate": "2025-10-09T18:00:00Z"
-        },
-        {
-          "rank": 5,
-          "pubkey": "b69ff43e8b5355e61dd9e3a96b5a9e0c8e9c7fa5b3c9e2a5d8f4a6e9c3f5b8d7",
-          "npub": "npub1k63lgls4xd27xhveuwttdk0d6e8jujlatwhaw32m3axnx0aax4cqhmvzrh",
-          "name": "Brad Bikelife",
-          "totalDistance": 3087400,
-          "workoutCount": 79,
-          "lastActivityDate": "2025-10-09T21:30:00Z"
+          "pubkey": "1c6b3be353041dd9e09bb568a4a92344e240b39ef5eb390f5e9e821273f0ae6f",
+          "npub": "npub1r34nhc6nqswancymk452f2frgn3ypvu77h4njr67n6ppyuls4ehs44gv0h",
+          "name": "JohnOnchain",
+          "picture": "https://inosta.cc/images/d602c9375df92328f5494887e2cebbab6726b457faf020d568615af8fe0b831c/xxdmko3yn7r1678030697659koncpxlfrh.png",
+          "totalDistance": 95450,
+          "workoutCount": 24,
+          "lastActivityDate": "2025-10-08T06:37:35.000Z",
+          "prize": 5555
         }
       ]
     },
     "walking": {
       "activityType": "walking",
-      "totalParticipants": 45,
-      "lastUpdated": 1728518399000,
+      "totalParticipants": 9,
+      "lastUpdated": 1760397846683,
       "participants": [
         {
           "rank": 1,
-          "pubkey": "a8e5e7d8c9b6a5d4f3e2d1c0b9a8e7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0",
-          "npub": "npub14rj708xfk6jasulz68qtxrl8u0jatn29c88s8q80fdulhqm2svqqh8qsa8",
-          "name": "Wendy Walker",
-          "picture": "https://nostr.build/av/walker1.jpg",
-          "totalDistance": 856300,
-          "workoutCount": 178,
-          "lastActivityDate": "2025-10-09T20:00:00Z",
-          "prize": 66667
+          "pubkey": "9069532ce6a87223367bfb049b58216646a8415a88b546539d6ffaa2eeb21a9a",
+          "npub": "npub1jp54xt8x4pezxdnmlvzfkkppver2ss263z65v5uadla29m4jr2dqj7xcra",
+          "name": "Michael ⚡️S⚡️",
+          "picture": "https://image.nostr.build/8cce04a086b7d0053323a1e6a787ab456bcb9975d4901315da2f6b645184394f.jpg",
+          "totalDistance": 564960,
+          "workoutCount": 96,
+          "lastActivityDate": "2025-10-09T16:32:17.000Z",
+          "prize": 22222
         },
         {
           "rank": 2,
-          "pubkey": "d7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9e8d7c6b5a4f3e2d1c0b9a8e7",
-          "npub": "npub16lmwt4xrkg3lpm5ccakg90wy957rv7qahx2nt40lyzz8sxn4r9cs7xn7ka",
-          "name": "Paul Pacer",
-          "totalDistance": 798200,
-          "workoutCount": 165,
-          "lastActivityDate": "2025-10-09T18:30:00Z",
-          "prize": 33333
+          "pubkey": "f79c4b410929be501f8ac6227e66a585feb84a0a9162f54159aa752658622fad",
+          "npub": "npub177wyksgf9xl9q8u2cc38ue49shltsjs2j9302s2e4f6jvkrz97ks3s25zh",
+          "name": "Judith ⚡️S⚡️",
+          "picture": "https://m.primal.net/Hckf.jpg",
+          "totalDistance": 510920,
+          "workoutCount": 92,
+          "lastActivityDate": "2025-10-09T16:31:05.000Z",
+          "prize": 11111
         },
         {
           "rank": 3,
-          "pubkey": "b5a4f3e2d1c0b9a8e7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9e8d7c6b5",
-          "npub": "npub1kknfhcx3p2fsnrldw42v82lp7exd3gg6a7vvaaj0fxrhgrt8xdqqykxyq6",
-          "name": "Helen Hiker",
-          "totalDistance": 745600,
-          "workoutCount": 152,
-          "lastActivityDate": "2025-10-09T19:45:00Z",
-          "prize": 16667
+          "pubkey": "dc65ebf157156d5d4f4bc9496fab27d031717502d7525a5f4aa37e13774b5156",
+          "npub": "npub1m3j7hu2hz4k46n6te9ykl2e86qchzagz6af95h625dlpxa6t29tqwyzt6f",
+          "name": "gnilma",
+          "picture": "https://nostr.build/i/p/nostr.build_cea73e9c439a3be5ea79754dd51ddf7a3ef5de34d8187770fe6295fb392687b3.jpg",
+          "totalDistance": 82650,
+          "workoutCount": 36,
+          "lastActivityDate": "2025-10-09T06:14:11.000Z",
+          "prize": 5555
         },
         {
           "rank": 4,
-          "pubkey": "c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8e7f6e5d4",
-          "npub": "npub1cjeh9u7spm8t0ynhe4x89xdql8546r4kzw8s9jzal7jarnl8xgxq53w3zj",
-          "name": "Steve Steps",
-          "totalDistance": 689400,
-          "workoutCount": 143,
-          "lastActivityDate": "2025-10-08T21:15:00Z"
+          "pubkey": "745eb529d0e42d2fa6c904bbc2c10702deae964b4dd3079803ab8b43536dda12",
+          "npub": "npub1w30t22wsuskjlfkfqjau9sg8qt02a9jtfhfs0xqr4w95x5mdmgfqghvnqu",
+          "name": "guy",
+          "picture": "https://i.ibb.co/tykKfq5/360-F-1030875797-1-Fmro-Dfu0g-DKB1-Tu32-Eti-My8-LVq-Uw-Un9.webp",
+          "totalDistance": 73190,
+          "workoutCount": 36,
+          "lastActivityDate": "2025-10-09T16:38:33.000Z"
         },
         {
           "rank": 5,
-          "pubkey": "a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9e8d7c6b5a4f3",
-          "npub": "npub150jw6sx7rwh5ldu5cxaj5chpgrnm7xm67tdz6zf7klpdxa3l20ns5dzx9v",
-          "name": "Nancy Nordic",
-          "totalDistance": 634200,
-          "workoutCount": 138,
-          "lastActivityDate": "2025-10-09T17:00:00Z"
+          "pubkey": "d151af47460c3097432110aec0b4a696d2dd455b35dc1626cacf54191a2be219",
+          "npub": "npub169g6736xpscfwsepzzhvpd9xjmfd632mxhwpvfk2ea2pjx3tugvswfudm7",
+          "name": "The Orange Ostrich",
+          "picture": "https://image.nostr.build/17be0f759f914baf6e591b40d4a19802df3e6b205646c51d90a4a49faf6618a0.gif",
+          "totalDistance": 43275,
+          "workoutCount": 44,
+          "lastActivityDate": "2025-09-25T21:52:30.000Z"
+        },
+        {
+          "rank": 6,
+          "pubkey": "1c197b12ca9ce0415b70e7405b9770f0ec6bccfb59b32b63aafd42cb242e1642",
+          "npub": "npub1rsvhkyk2nnsyzkmsuaq9h9ms7rkxhn8mtxejkca2l4pvkfpwzepql3vmtf",
+          "name": "DeAllen Young",
+          "picture": "https://image.nostr.build/1d738392bd1d97405d31860df13a66e28172f5b00cc11b74a952cfd331d73e06.gif",
+          "totalDistance": 41280,
+          "workoutCount": 13,
+          "lastActivityDate": "2025-09-16T19:54:36.000Z"
+        },
+        {
+          "rank": 7,
+          "pubkey": "1c6b3be353041dd9e09bb568a4a92344e240b39ef5eb390f5e9e821273f0ae6f",
+          "npub": "npub1r34nhc6nqswancymk452f2frgn3ypvu77h4njr67n6ppyuls4ehs44gv0h",
+          "name": "JohnOnchain",
+          "picture": "https://inosta.cc/images/d602c9375df92328f5494887e2cebbab6726b457faf020d568615af8fe0b831c/xxdmko3yn7r1678030697659koncpxlfrh.png",
+          "totalDistance": 9290,
+          "workoutCount": 7,
+          "lastActivityDate": "2025-10-08T06:37:35.000Z"
+        },
+        {
+          "rank": 8,
+          "pubkey": "30ceb64e73197a05958c8bd92ab079c815bb44fbfbb3eb5d9766c5207f08bdf5",
+          "npub": "npub1xr8tvnnnr9aqt9vv30vj4vreeq2mk38mlwe7khvhvmzjqlcghh6sr85uum",
+          "name": "TheWildHustle",
+          "picture": "https://m.primal.net/MgUN.png",
+          "totalDistance": 6486,
+          "workoutCount": 8,
+          "lastActivityDate": "2025-10-04T23:22:09.000Z"
+        },
+        {
+          "rank": 9,
+          "pubkey": "7c8489be0946cf10cefd55e12fa00f8de4fe683b702f2bf9eee747edef23df73",
+          "npub": "npub10jzgn0sfgm83pnha2hsjlgq03hj0u6pmwqhjh70wuar7mmermaesgxar98",
+          "name": "SenditMike",
+          "picture": "https://image.nostr.build/c415f67f0b4822f5f675716945efd9c8bbbe2e7511fa37c071964085792d570c.gif",
+          "totalDistance": 370,
+          "workoutCount": 1,
+          "lastActivityDate": "2025-09-24T16:17:58.000Z"
         }
       ]
     }
   },
   "summary": {
-    "totalParticipants": 127,
-    "totalWorkouts": 2834,
-    "totalDistance": 45678900,
-    "prizesAwarded": 500001,
+    "totalParticipants": 14,
+    "totalWorkouts": 622,
+    "totalDistance": 3827157,
+    "prizesAwarded": 200000,
     "winners": {
-      "running": "Sarah Runner",
-      "cycling": "Chris Cyclist",
-      "walking": "Wendy Walker"
+      "running": "gnilma",
+      "cycling": "⚡️2FakTor⚡️",
+      "walking": "Michael ⚡️S⚡️"
     }
   }
 }
