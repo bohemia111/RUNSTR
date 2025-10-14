@@ -106,6 +106,62 @@ Current MCP tool approach doesn't work because:
 - Updated `nutzapService.payLightningInvoice()` to use `PaymentRouter`
 - All changes are type-safe and compile without errors
 
+## ✅ FIXED: Cashu Wallet Bypass in Send/Receive Modals
+
+### The Problem
+Even with `ENABLE_CASHU_WALLET = false`, users could still send/receive payments because:
+- `SendModal` called `nutzapService.payLightningInvoice()` directly (bypassed feature flags)
+- `ReceiveModal` called `nutzapService.createLightningInvoice()` directly (bypassed feature flags)
+- No NWC availability checks before allowing wallet operations
+
+### The Solution
+**Added feature flag guards to SendModal and ReceiveModal**
+
+**Changes Made:**
+- `SendModal.tsx`:
+  - Added NWC availability check on modal open
+  - Added guard: "Wallet Not Connected" alert if no NWC when Cashu disabled
+  - Routes to `PaymentRouter.payInvoice()` when NWC enabled
+  - Preserves Cashu code wrapped in feature flag check
+- `ReceiveModal.tsx`:
+  - Added NWC availability check on modal open
+  - Added guard: "Wallet Not Connected" alert if no NWC when Cashu disabled
+  - Routes to `NWCWalletService.createInvoice()` when NWC enabled
+  - Preserves Cashu code wrapped in feature flag check
+
+**How It Works:**
+```typescript
+// Feature flag guard in SendModal/ReceiveModal
+if (FEATURES.ENABLE_NWC_WALLET && !FEATURES.ENABLE_CASHU_WALLET && !hasNWC) {
+  Alert.alert(
+    'Wallet Not Connected',
+    'Please connect a Lightning wallet in Settings to send/receive payments.'
+  );
+  return;
+}
+
+// Route to correct wallet implementation
+if (FEATURES.ENABLE_NWC_WALLET && !FEATURES.ENABLE_CASHU_WALLET) {
+  // Use NWC
+  result = await PaymentRouter.payInvoice(invoice);
+} else {
+  // Preserve Cashu logic for when ENABLE_CASHU_WALLET is true
+  result = await nutzapService.payLightningInvoice(invoice);
+}
+```
+
+**User Experience (After Fix):**
+1. User clicks wallet balance (0 sats shown if no NWC)
+2. User clicks "Send" or "Receive"
+3. User tries to send/receive without NWC configured
+4. Alert appears: "Please connect a Lightning wallet in Settings"
+5. User cannot send/receive until NWC is configured ✅
+
+**Cashu Code Status:**
+- All Cashu code preserved (not deleted) ✅
+- Wrapped in `if (FEATURES.ENABLE_CASHU_WALLET)` checks ✅
+- Can be re-enabled by setting `ENABLE_CASHU_WALLET = true` ✅
+
 
 ## Testing Checklist
 

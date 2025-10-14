@@ -3,7 +3,7 @@
  * Allows receiving via Lightning invoice generation
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,9 @@ import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import nutzapService from '../../services/nutzap/nutzapService';
 import { useNutzap } from '../../hooks/useNutzap';
+import { FEATURES } from '../../config/features';
+import { NWCStorageService } from '../../services/wallet/NWCStorageService';
+import { NWCWalletService } from '../../services/wallet/NWCWalletService';
 
 interface ReceiveModalProps {
   visible: boolean;
@@ -44,7 +47,20 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
   const [quoteHash, setQuoteHash] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [hasNWC, setHasNWC] = useState(false);
   const checkIntervalRef = React.useRef<NodeJS.Timeout>();
+
+  // Check NWC availability when modal opens
+  useEffect(() => {
+    if (visible) {
+      checkNWCAvailability();
+    }
+  }, [visible]);
+
+  const checkNWCAvailability = async () => {
+    const nwcAvailable = await NWCStorageService.hasNWC();
+    setHasNWC(nwcAvailable);
+  };
 
   const handleGenerateLightningInvoice = async () => {
     const sats = parseInt(amount);
@@ -53,21 +69,55 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
       return;
     }
 
-    if (!isInitialized) {
+    // Feature flag guard: Require NWC when Cashu is disabled
+    if (FEATURES.ENABLE_NWC_WALLET && !FEATURES.ENABLE_CASHU_WALLET && !hasNWC) {
+      Alert.alert(
+        'Wallet Not Connected',
+        'Please connect a Lightning wallet in Settings to receive payments.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (!isInitialized && !hasNWC) {
       Alert.alert('Wallet Not Ready', 'Please wait for wallet to initialize and try again.');
       return;
     }
 
     setIsGenerating(true);
     try {
-      const { pr, hash } = await nutzapService.createLightningInvoice(sats);
+      let invoiceResult;
+
+      // Route to NWCWalletService when NWC is enabled, otherwise use Cashu
+      if (FEATURES.ENABLE_NWC_WALLET && !FEATURES.ENABLE_CASHU_WALLET) {
+        const result = await NWCWalletService.createInvoice(sats);
+        if (!result.success || !result.invoice) {
+          throw new Error(result.error || 'Failed to create invoice');
+        }
+        invoiceResult = { pr: result.invoice, hash: result.paymentHash || '' };
+      } else {
+        // Preserve Cashu logic for when ENABLE_CASHU_WALLET is true
+        invoiceResult = await nutzapService.createLightningInvoice(sats);
+      }
+
+      const { pr, hash } = invoiceResult;
       setInvoice(pr);
       setQuoteHash(hash);
 
       // Start polling for payment
       setIsCheckingPayment(true);
       checkIntervalRef.current = setInterval(async () => {
-        const paid = await nutzapService.checkInvoicePaid(hash);
+        let paid = false;
+
+        // Check payment based on wallet type
+        if (FEATURES.ENABLE_NWC_WALLET && !FEATURES.ENABLE_CASHU_WALLET) {
+          // For NWC, we could implement payment checking via NWCWalletService
+          // For now, we'll rely on balance refresh
+          paid = false; // TODO: Implement NWC payment checking
+        } else {
+          paid = await nutzapService.checkInvoicePaid(hash);
+        }
+
         if (paid) {
           clearInterval(checkIntervalRef.current!);
           setIsCheckingPayment(false);

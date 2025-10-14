@@ -3,7 +3,7 @@
  * Allows sending via Lightning invoice or Lightning address
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,9 @@ import { theme } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import nutzapService from '../../services/nutzap/nutzapService';
 import { nip19 } from 'nostr-tools';
+import { FEATURES } from '../../config/features';
+import { NWCStorageService } from '../../services/wallet/NWCStorageService';
+import { PaymentRouter } from '../../services/wallet/PaymentRouter';
 
 interface SendModalProps {
   visible: boolean;
@@ -46,6 +49,19 @@ export const SendModal: React.FC<SendModalProps> = ({
   const [paymentType, setPaymentType] = useState<'invoice' | 'address' | 'unknown'>('unknown');
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [hasNWC, setHasNWC] = useState(false);
+
+  // Check NWC availability when modal opens
+  useEffect(() => {
+    if (visible) {
+      checkNWCAvailability();
+    }
+  }, [visible]);
+
+  const checkNWCAvailability = async () => {
+    const nwcAvailable = await NWCStorageService.hasNWC();
+    setHasNWC(nwcAvailable);
+  };
 
   // Handle recipient input changes
   const handleRecipientChange = (text: string) => {
@@ -55,6 +71,16 @@ export const SendModal: React.FC<SendModalProps> = ({
 
   const handleSend = async () => {
     if (sendMethod === 'lightning') {
+      // Feature flag guard: Require NWC when Cashu is disabled
+      if (FEATURES.ENABLE_NWC_WALLET && !FEATURES.ENABLE_CASHU_WALLET && !hasNWC) {
+        Alert.alert(
+          'Wallet Not Connected',
+          'Please connect a Lightning wallet in Settings to send payments.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       const type = detectPaymentType(recipient);
 
       if (type === 'unknown') {
@@ -80,7 +106,15 @@ export const SendModal: React.FC<SendModalProps> = ({
 
       try {
         const sats = parseInt(amount) || 0;
-        const result = await nutzapService.payLightningInvoice(recipient, sats > 0 ? sats : undefined);
+
+        // Route to PaymentRouter when NWC is enabled, otherwise use Cashu
+        let result;
+        if (FEATURES.ENABLE_NWC_WALLET && !FEATURES.ENABLE_CASHU_WALLET) {
+          result = await PaymentRouter.payInvoice(recipient, sats > 0 ? sats : undefined);
+        } else {
+          // Preserve Cashu logic for when ENABLE_CASHU_WALLET is true
+          result = await nutzapService.payLightningInvoice(recipient, sats > 0 ? sats : undefined);
+        }
 
         if (result.success) {
           Alert.alert(
