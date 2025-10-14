@@ -3,7 +3,7 @@
 name: RUNSTR
 identifier: com.anonymous.runstr.project
 summary: Bitcoin-powered fitness competitions on Nostr
-description: Fitness teams and competitions powered by Nostr and eCash.
+description: Teams/Competitions/Workouts powered by Bitcoin and Nostr
 
 repository: https://github.com/dakotabrown/runstr.project
 homepage: https://runstr.app
