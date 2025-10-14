@@ -10,6 +10,7 @@ import WalletCore, { Transaction } from './WalletCore';
 import WalletSync from './WalletSync';
 import { NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
 import UnifiedSigningService from '../auth/UnifiedSigningService';
+import { PaymentRouter } from '../wallet/PaymentRouter';
 
 const STORAGE_KEYS = {
   USER_NSEC: '@runstr:user_nsec',
@@ -349,6 +350,7 @@ class NutzapService {
 
   /**
    * Pay Lightning invoice
+   * Routes to NWC or Cashu based on feature flags
    */
   async payLightningInvoice(invoice: string): Promise<{ success: boolean; fee?: number; error?: string }> {
     try {
@@ -356,7 +358,8 @@ class NutzapService {
         return { success: false, error: 'Wallet not initialized' };
       }
 
-      return await WalletCore.payLightningInvoice(invoice);
+      // Use PaymentRouter to automatically route to correct wallet
+      return await PaymentRouter.payInvoice(invoice);
 
     } catch (error: any) {
       console.error('[NutZap] Payment error:', error);

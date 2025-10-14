@@ -7,7 +7,7 @@
 import { GlobalNDKService } from '../nostr/GlobalNDKService';
 import { NostrProfileService } from '../nostr/NostrProfileService';
 import { UnifiedSigningService } from '../auth/UnifiedSigningService';
-import { WalletCore } from './WalletCore';
+import { PaymentRouter } from '../wallet/PaymentRouter';
 import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -95,9 +95,9 @@ class LightningZapService {
 
       console.log('[LightningZap] Invoice received:', invoice.slice(0, 40) + '...');
 
-      // Step 5: Pay Lightning invoice
-      const walletCore = WalletCore.getInstance();
-      const paymentResult = await walletCore.payLightningInvoice(invoice);
+      // Step 5: Pay Lightning invoice using PaymentRouter
+      // PaymentRouter automatically routes to NWC or Cashu based on feature flags
+      const paymentResult = await PaymentRouter.payInvoice(invoice);
 
       if (paymentResult.success) {
         console.log(`[LightningZap] ✅ Successfully sent ${amount} sats via Lightning`);
