@@ -310,6 +310,16 @@ export class NostrCompetitionService {
         [nostrFilter],
         (event: Event, relayUrl: string) => {
           try {
+            // ✅ RUNSTR event validation: Check for required tags BEFORE parsing
+            const hasRequiredTags = event.tags.some(t => t[0] === 'team') &&
+                                   event.tags.some(t => t[0] === 'activity_type') &&
+                                   event.tags.some(t => t[0] === 'name');
+
+            if (!hasRequiredTags) {
+              // Skip non-RUNSTR events silently (no error logging)
+              return;
+            }
+
             if (event.kind === 30100) {
               // Parse league
               const leagueData = JSON.parse(event.content) as NostrLeagueDefinition;
@@ -320,8 +330,8 @@ export class NostrCompetitionService {
               events.push(eventData);
             }
           } catch (error) {
-            console.error(`Failed to parse competition event ${event.id}:`, error);
-            errors.push(`Failed to parse competition event: ${error}`);
+            // Silently skip malformed events (non-RUNSTR format)
+            errors.push(`Skipped incompatible event ${event.id}`);
           }
         }
       );
@@ -332,7 +342,8 @@ export class NostrCompetitionService {
       // Clean up subscription
       this.relayManager.unsubscribe(subscriptionId);
 
-      console.log(`✅ Found ${leagues.length} leagues and ${events.length} events`);
+      const skippedCount = errors.length;
+      console.log(`✅ Found ${leagues.length} leagues and ${events.length} RUNSTR events (skipped ${skippedCount} non-RUNSTR events)`);
 
       return {
         leagues,
