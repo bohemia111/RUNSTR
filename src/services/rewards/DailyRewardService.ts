@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REWARD_CONFIG, REWARD_STORAGE_KEYS } from '../../config/rewards';
 import { NWCStorageService } from '../wallet/NWCStorageService';
 import { NWCWalletService } from '../wallet/NWCWalletService';
+import { RewardSenderWallet } from './RewardSenderWallet';
 
 export interface RewardResult {
   success: boolean;
@@ -179,12 +180,11 @@ class DailyRewardServiceClass {
         };
       }
 
-      // Send payment using hardcoded sender NWC
-      // NOTE: In production, configure Alby MCP to use REWARD_CONFIG.SENDER_NWC
-      // For now, this will use whatever NWC is configured in the app
-      console.log('[Reward] Sending payment...');
+      // Send payment using dedicated reward sender wallet
+      // Uses REWARD_SENDER_NWC from environment via RewardSenderWallet service
+      console.log('[Reward] Sending payment from reward wallet...');
 
-      const paymentResult = await NWCWalletService.sendPayment(userInvoice);
+      const paymentResult = await RewardSenderWallet.sendRewardPayment(userInvoice);
 
       if (paymentResult.success) {
         // Record reward

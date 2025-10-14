@@ -99,6 +99,111 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
   };
 
   /**
+   * Handle posting a HealthKit workout to Nostr as kind 1301 competition entry
+   */
+  const handleCompeteHealthKit = async (workout: any) => {
+    try {
+      console.log(`[WorkoutHistory] Entering HealthKit workout ${workout.id} into competition...`);
+
+      if (!signer) {
+        Alert.alert('Error', 'No signer available. Please log in again.');
+        return;
+      }
+
+      // Convert HealthKit workout to PublishableWorkout format
+      const publishableWorkout = {
+        id: workout.id,
+        userId: userId,
+        source: 'healthkit' as const,
+        type: workout.type || 'other',
+        duration: workout.duration, // Already in seconds from HealthKit
+        distance: workout.distance || 0,
+        calories: workout.calories || 0,
+        startTime: workout.startTime,
+        endTime: workout.endTime,
+        syncedAt: new Date().toISOString(),
+        metadata: {
+          sourceApp: 'Apple Health',
+        },
+      };
+
+      // Publish to Nostr as kind 1301 competition entry
+      const result = await publishingService.saveWorkoutToNostr(
+        publishableWorkout,
+        signer,
+        userId
+      );
+
+      if (result.success && result.eventId) {
+        console.log(`[WorkoutHistory] ✅ HealthKit workout entered as kind 1301: ${result.eventId}`);
+
+        // Show reward earned notification if applicable
+        if (result.rewardEarned && result.rewardAmount) {
+          Alert.alert(
+            '🎉 Reward Earned!',
+            `You earned ${result.rewardAmount} sats for today's workout!`
+          );
+        } else {
+          Alert.alert('Success', 'Workout entered into competition!');
+        }
+      } else {
+        throw new Error(result.error || 'Failed to publish workout');
+      }
+    } catch (error) {
+      console.error('[WorkoutHistory] ❌ Competition entry failed:', error);
+      Alert.alert('Error', 'Failed to enter workout into competition. Please try again.');
+    }
+  };
+
+  /**
+   * Handle posting a HealthKit workout to social feeds as kind 1
+   */
+  const handleSocialShareHealthKit = async (workout: any) => {
+    try {
+      console.log(`[WorkoutHistory] Sharing HealthKit workout ${workout.id} to social feeds...`);
+
+      if (!signer) {
+        Alert.alert('Error', 'No signer available. Please log in again.');
+        return;
+      }
+
+      // Convert HealthKit workout to PublishableWorkout format
+      const publishableWorkout = {
+        id: workout.id,
+        userId: userId,
+        source: 'healthkit' as const,
+        type: workout.type || 'other',
+        duration: workout.duration, // Already in seconds from HealthKit
+        distance: workout.distance || 0,
+        calories: workout.calories || 0,
+        startTime: workout.startTime,
+        endTime: workout.endTime,
+        syncedAt: new Date().toISOString(),
+        metadata: {
+          sourceApp: 'Apple Health',
+        },
+      };
+
+      // Publish to Nostr as kind 1 social event
+      const result = await publishingService.postWorkoutToSocial(
+        publishableWorkout,
+        signer,
+        userId
+      );
+
+      if (result.success && result.eventId) {
+        console.log(`[WorkoutHistory] ✅ HealthKit workout shared as kind 1: ${result.eventId}`);
+        Alert.alert('Success', 'Workout shared to social feeds!');
+      } else {
+        throw new Error(result.error || 'Failed to publish workout');
+      }
+    } catch (error) {
+      console.error('[WorkoutHistory] ❌ Social share failed:', error);
+      Alert.alert('Error', 'Failed to share workout. Please try again.');
+    }
+  };
+
+  /**
    * Handle posting a local workout to Nostr as kind 1 social event
    * Creates social post with workout card
    */
@@ -257,12 +362,14 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* Two-Tab Workout Navigator */}
+      {/* Three-Tab Workout Navigator */}
       <WorkoutTabNavigator
         userId={userId}
         pubkey={pubkey}
         onPostToNostr={handlePostToNostr}
         onPostToSocial={handlePostToSocial}
+        onCompeteHealthKit={handleCompeteHealthKit}
+        onSocialShareHealthKit={handleSocialShareHealthKit}
       />
     </SafeAreaView>
   );

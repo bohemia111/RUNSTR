@@ -1,7 +1,8 @@
 /**
- * WorkoutTabNavigator - Simple tab switcher between Public and Private workouts
+ * WorkoutTabNavigator - Simple tab switcher between Public, Private, and Apple workouts
  * Public: 1301 notes from Nostr (cache-first instant display)
  * Private: Local Activity Tracker workouts (zero loading time)
+ * Apple: HealthKit workouts with post buttons
  */
 
 import React, { useState } from 'react';
@@ -9,9 +10,10 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { theme } from '../../styles/theme';
 import { PublicWorkoutsTab } from './tabs/PublicWorkoutsTab';
 import { PrivateWorkoutsTab } from './tabs/PrivateWorkoutsTab';
+import { AppleHealthTab } from './tabs/AppleHealthTab';
 import type { LocalWorkout } from '../../services/fitness/LocalWorkoutStorageService';
 
-export type WorkoutTabType = 'public' | 'private';
+export type WorkoutTabType = 'public' | 'private' | 'apple';
 
 interface WorkoutTabNavigatorProps {
   userId: string;
@@ -20,6 +22,8 @@ interface WorkoutTabNavigatorProps {
   onRefresh?: () => void;
   onPostToNostr?: (workout: LocalWorkout) => Promise<void>;
   onPostToSocial?: (workout: LocalWorkout) => Promise<void>;
+  onCompeteHealthKit?: (workout: any) => Promise<void>;
+  onSocialShareHealthKit?: (workout: any) => Promise<void>;
 }
 
 export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
@@ -29,6 +33,8 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
   onRefresh,
   onPostToNostr,
   onPostToSocial,
+  onCompeteHealthKit,
+  onSocialShareHealthKit,
 }) => {
   const [activeTab, setActiveTab] = useState<WorkoutTabType>(initialTab);
 
@@ -57,6 +63,17 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
           </Text>
           {activeTab === 'private' && <View style={styles.tabIndicator} />}
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'apple' && styles.tabActive]}
+          onPress={() => setActiveTab('apple')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'apple' && styles.tabTextActive]}>
+            Apple
+          </Text>
+          {activeTab === 'apple' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
       </View>
 
       {/* Tab Content */}
@@ -67,13 +84,19 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
             pubkey={pubkey}
             onRefresh={onRefresh}
           />
-        ) : (
+        ) : activeTab === 'private' ? (
           <PrivateWorkoutsTab
             userId={userId}
             pubkey={pubkey}
             onRefresh={onRefresh}
             onPostToNostr={onPostToNostr}
             onPostToSocial={onPostToSocial}
+          />
+        ) : (
+          <AppleHealthTab
+            userId={userId}
+            onCompete={onCompeteHealthKit}
+            onSocialShare={onSocialShareHealthKit}
           />
         )}
       </View>

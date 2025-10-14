@@ -15,12 +15,14 @@ import type { Workout } from '../../../types/workout';
 
 interface AppleHealthTabProps {
   userId: string;
-  onPostToNostr?: (workout: Workout) => void;
+  onCompete?: (workout: Workout) => Promise<void>;
+  onSocialShare?: (workout: Workout) => Promise<void>;
 }
 
 const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
   userId,
-  onPostToNostr,
+  onCompete,
+  onSocialShare,
 }) => {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,28 +186,52 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
     }
   };
 
-  const handlePostToNostr = async (workout: Workout) => {
-    if (!onPostToNostr) {
-      Alert.alert('Error', 'Post to Nostr functionality not available');
+  const handleCompete = async (workout: Workout) => {
+    if (!onCompete) {
+      Alert.alert('Error', 'Competition entry functionality not available');
       return;
     }
 
     try {
-      await onPostToNostr(workout);
+      await onCompete(workout);
+      Alert.alert('Success', 'Workout entered into competition!');
     } catch (error) {
-      console.error('Post to Nostr failed:', error);
-      Alert.alert('Error', 'Failed to post workout to Nostr');
+      console.error('Competition entry failed:', error);
+      Alert.alert('Error', 'Failed to enter workout into competition');
+    }
+  };
+
+  const handleSocialShare = async (workout: Workout) => {
+    if (!onSocialShare) {
+      Alert.alert('Error', 'Social sharing functionality not available');
+      return;
+    }
+
+    try {
+      await onSocialShare(workout);
+      Alert.alert('Success', 'Workout shared to social feeds!');
+    } catch (error) {
+      console.error('Social share failed:', error);
+      Alert.alert('Error', 'Failed to share workout');
     }
   };
 
   const renderWorkout = ({ item }: { item: Workout }) => (
     <WorkoutCard workout={item}>
-      <TouchableOpacity
-        style={styles.postButton}
-        onPress={() => handlePostToNostr(item)}
-      >
-        <Text style={styles.postButtonText}>📤 Post to Nostr</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.postButton, styles.competeButton]}
+          onPress={() => handleCompete(item)}
+        >
+          <Text style={styles.postButtonText}>🏆 Enter Competition</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.postButton, styles.socialButton]}
+          onPress={() => handleSocialShare(item)}
+        >
+          <Text style={styles.postButtonText}>📱 Share Socially</Text>
+        </TouchableOpacity>
+      </View>
     </WorkoutCard>
   );
 
@@ -289,13 +315,23 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 100,
   },
-  postButton: {
+  buttonContainer: {
+    flexDirection: 'row',
     marginTop: 12,
-    backgroundColor: theme.colors.accent,
+    gap: 8,
+  },
+  postButton: {
+    flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    alignItems: 'center',
+  },
+  competeButton: {
+    backgroundColor: theme.colors.accent,
+  },
+  socialButton: {
+    backgroundColor: theme.colors.primary,
   },
   postButtonText: {
     color: theme.colors.accentText,

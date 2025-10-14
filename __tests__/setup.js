@@ -1,3 +1,6 @@
+// Load environment variables from .env for testing
+require('dotenv').config();
+
 import 'react-native-gesture-handler/jestSetup';
 
 jest.mock('react-native-reanimated', () => {
