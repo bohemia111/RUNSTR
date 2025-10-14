@@ -19,6 +19,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
 import SimpleCompetitionService from '../services/competition/SimpleCompetitionService';
+import { CharitySection } from '../components/team/CharitySection';
+import { CharityZapService } from '../services/charity/CharityZapService';
 
 interface SimpleTeamScreenProps {
   data: {
@@ -109,6 +111,21 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
     }
   }, [team?.id]);
 
+  // Handle charity zap
+  const handleCharityZap = useCallback(async (charityId: string, charityName: string) => {
+    console.log('[SimpleTeamScreen] ⚡ Initiating charity zap:', charityName);
+    try {
+      const result = await CharityZapService.zapCharity(charityId, charityName);
+      if (result.success) {
+        console.log('[SimpleTeamScreen] ✅ Charity zap successful:', result.amount, 'sats');
+      } else {
+        console.error('[SimpleTeamScreen] ❌ Charity zap failed:', result.error);
+      }
+    } catch (error) {
+      console.error('[SimpleTeamScreen] ❌ Charity zap error:', error);
+    }
+  }, []);
+
   // Safety check
   if (!team) {
     return (
@@ -166,6 +183,14 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
               <Text style={styles.sectionLabel}>About</Text>
               <Text style={styles.description}>{team.description}</Text>
             </View>
+          )}
+
+          {/* Charity Section - Display team's supported charity */}
+          {team.charityId && (
+            <CharitySection
+              charityId={team.charityId}
+              onZapCharity={handleCharityZap}
+            />
           )}
 
           {/* REMOVED: Team Stats - teams are bookmarks, no membership count or status needed */}
