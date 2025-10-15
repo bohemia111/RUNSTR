@@ -6,6 +6,144 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2025-10-14
+
+### Added
+- **⚡ Universal Lightning Payments**: Complete LNURL integration for all payment types
+  - **Event Tickets**: Paid events accept ANY Lightning wallet (Cash App, Strike, Alby, Wallet of Satoshi, etc.)
+    - EventPaymentModal with QR code display for universal wallet support
+    - Lightning address field in event creation wizard
+    - LNURL-pay protocol implementation (LUD-16)
+    - Payment proof system via kind 1105 join request tags
+    - Manual invoice copying for desktop wallets
+  - **Charity Donations**: Support team charities with any Lightning wallet
+    - CharityPaymentModal component with QR code display
+    - LNURL invoice generation from charity Lightning addresses
+    - Manual payment confirmation with "I Paid" button
+    - No wallet connection required to donate
+- **💡 Educational Lightning Content**: Clear explanations throughout the app
+  - Lightning address helper text in ProfileEditScreen (explains receiving payments)
+  - NWC explanation box in WalletConfigModal (explains sending payments)
+  - CompactWallet shows "Connect Wallet to Send Bitcoin" with clear distinction
+  - Tooltips guide users: NWC for sending, Lightning address for receiving
+- **Charity Integration**: Full charity support on team pages
+  - CharitySection component displays team's supported charity
+  - OpenSats, HRF, and other organizations supported
+  - Integrated into team detail screens
+
+### Changed
+- **🎯 1v1 Challenges Enabled**: Bitcoin-wagered challenges now available to all users
+  - Feature flag `ENABLE_1V1_CHALLENGES` set to `true`
+  - Members can challenge each other with sats on the line
+  - Automatic escrow and winner payout system active
+  - Complete dual-path challenge system (Nostr requests + QR codes)
+- **🔄 BREAKING: Replaced NIP-60/61 (Cashu) with NWC (Nostr Wallet Connect)**
+  - Migrated from Cashu ecash to direct Lightning payments
+  - Integrated Alby SDK (@getalby/sdk) for wallet operations
+  - Simpler, more reliable payment infrastructure
+  - Better compatibility with existing Lightning ecosystem
+  - CompactWallet now uses NWC instead of Cashu tokens
+  - All zaps and rewards use native Lightning
+- **Event Payment Flow**: Replaced NWC-only with universal LNURL system
+  - EventDetailScreen displays payment modal with QR code
+  - EventJoinService generates LNURL invoices from captain's Lightning address
+  - Payment confirmation flow with join request after payment
+  - ENABLE_EVENT_TICKETS feature flag enabled
+- **🔓 Removed NWC Requirements**:
+  - Charity donations no longer require wallet connection
+  - Event payments work with any Lightning wallet
+  - Improved accessibility for mainstream Bitcoin users
+
+### Technical
+- **LNURL Protocol Integration**: Full LNURL-pay implementation
+  - `src/utils/lnurl.ts`: Complete LNURL utility with invoice generation
+  - `fetchLNURLPayDetails()`: Fetches payment details from Lightning addresses
+  - `requestInvoiceFromLNURL()`: Generates invoices via LNURL callback
+  - `getInvoiceFromLightningAddress()`: Convenience function for full flow
+  - `isValidLightningAddress()`: Lightning address validation
+- **Event Metadata Enhancement**:
+  - Added `lightningAddress` field to NostrEventDefinition type
+  - Lightning address stored in kind 30101 event tags
+  - Payment invoice included in kind 1105 join requests as proof
+- **NWC Services**:
+  - RewardSenderWallet service using Alby SDK's NWCClient
+  - Daily workout reward system with NWC support
+  - Dedicated reward sender wallet configuration
+  - Comprehensive test coverage for NWC operations
+- **UI Components**:
+  - EventPaymentModal: Full-screen payment interface with QR code
+  - CharityPaymentModal: Donation modal with QR code and instructions
+  - Step-by-step payment instructions for both modals
+  - Real-time copy feedback for invoice strings
+
+### Improved
+- **Wallet UX Clarity**: Better distinction between sending and receiving Bitcoin
+  - NWC wallet clearly labeled as "for sending payments"
+  - Lightning address clearly labeled as "for receiving payments"
+  - Educational tooltips guide users to correct setup
+  - Reduced confusion for new Bitcoin users
+- **Performance**: Major optimizations with Season 1 hard-coding and prefetch
+  - Dramatically reduced load times for Season 1 leaderboard
+  - Better prefetching strategy during app initialization
+  - Improved overall app responsiveness
+- **Global NDK Service**: Migrated remaining services from NostrRelayManager
+  - Eliminated duplicate WebSocket connections
+  - Better connection stability and reliability
+  - More efficient Nostr operations throughout the app
+- **Workout Posting**: Enhanced reliability using UnifiedSigningService for kind 1 events
+  - More reliable kind 1 workout posting to Nostr
+  - Better signing coordination across the app
+- **Lightning Zaps**: Automatic balance refresh after successful NWC payments
+  - Real-time balance updates post-transaction
+  - Better user feedback on payment success
+
+### Fixed
+- **MVP Readiness**: Fixed 29 critical TypeScript errors (reduced from 81 to 52)
+  - Critical JSX/React type errors in App.tsx
+  - Theme property errors across 6 files
+  - Null safety checks for npubToHex conversions
+  - Missing props in event join request components
+- **Theme Consistency**: Achieved 100% orange/black brand compliance
+  - Replaced all white text with theme.colors.text (4 instances)
+  - Updated gray text to theme colors (40+ instances)
+  - 20 files updated for consistent brand identity
+- **Critical Distance Tracking Freeze**: Eliminated 2-minute distance freeze bug
+  - Fixed stale closure issue in ActivityTrackerScreen
+  - Distance updates reliably throughout entire workout
+  - Accurate tracking for long-duration activities
+- **Event Creation and Join Approvals**: Critical fixes for competition functionality
+  - More reliable event creation workflow
+  - Better join request approval handling
+- **Android Background Distance Tracking**: Improved reliability during backgrounded workouts
+  - Better background location processing
+  - More accurate distance updates when app is backgrounded
+- **Profile Screen Layout**: Restored proper layout after adding ScrollView
+- **Wallet Balance Sync**: Synchronized NWC balance with available funds before zapping
+- **Event Loading Race Condition**: Resolved using useFocusEffect
+  - Events load reliably on screen focus
+  - Eliminated inconsistent event display
+
+### Documentation
+- **Project Organization**: Reorganized docs and scripts into dedicated folders
+  - Cleaner project structure
+  - Easier navigation for documentation
+- **NWC Integration**: Added comprehensive technical documentation
+  - Detailed architecture overview
+  - Integration patterns and best practices
+
+### User Experience
+- **Captain Workflow**: Add Lightning address during event creation → Receive payments directly
+- **Participant Workflow**: Join paid event → See QR code → Pay from any wallet → Confirm → Join request sent
+- **Charity Donations**: Tap zap button → Enter amount → See QR code → Pay → Confirm donation
+- **Wallet Flexibility**: No longer requires app-specific NWC setup for payments
+- **Better Accessibility**: Works with mainstream wallets like Cash App and Strike
+
+### Removed
+- **Nutzap/Cashu Infrastructure**: Phased out in favor of native Lightning via NWC
+  - Removed Cashu mint dependencies
+  - Removed ecash proof management
+  - Simplified wallet architecture with direct Lightning payments
+
 ## [0.2.5] - 2025-10-14
 
 ### Added
