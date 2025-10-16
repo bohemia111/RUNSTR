@@ -25,7 +25,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2.5</string>
+    <string>0.2.6</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -39,7 +39,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>25</string>
+    <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>LSRequiresIPhoneOS</key>
@@ -51,8 +51,6 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
-    <key>NSCameraUsageDescription</key>
-    <string>RUNSTR needs camera access to take profile pictures and scan QR codes for team invitations. For example, you can scan a team's QR code to instantly join competitions.</string>
     <key>NSHealthShareUsageDescription</key>
     <string>RUNSTR needs access to your workout data to automatically sync your fitness activities and calculate team rankings for Bitcoin rewards.</string>
     <key>NSHealthUpdateUsageDescription</key>
@@ -63,10 +61,6 @@
     <string>RUNSTR needs location access to continue tracking your workout when the app is in the background.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>RUNSTR needs location access to track your running, walking, and cycling activities.</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>RUNSTR needs photo library access to select a profile picture for your fitness account. Your profile picture helps teammates identify you in competitions and leaderboards.</string>
     <key>UIBackgroundModes</key>
     <array>
       <string>location</string>
