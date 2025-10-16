@@ -80,6 +80,7 @@ export class WalletSync {
 
   /**
    * Connect to GlobalNDK asynchronously
+   * ✅ UPDATED: Removed retry loop - GlobalNDK handles connection management automatically
    */
   private async connectAsync(): Promise<void> {
     try {
@@ -93,25 +94,21 @@ export class WalletSync {
         this.ndk.signer = this.signer;
       }
 
-      // Check if connected
+      // Update connection status
       this.isConnected = GlobalNDKService.isConnected();
 
-      if (this.isConnected) {
-        const status = GlobalNDKService.getStatus();
-        console.log(`[WalletSync] Using GlobalNDK with ${status.connectedRelays} relay(s)`);
+      const status = GlobalNDKService.getStatus();
+      console.log(`[WalletSync] Connected to GlobalNDK (${status.connectedRelays}/${status.relayCount} relays)`);
 
-        // Start background tasks
-        this.startBackgroundTasks();
-      } else {
-        console.log('[WalletSync] GlobalNDK not yet connected, will retry');
-        // Retry after a delay
-        setTimeout(() => this.connectAsync(), 5000);
-      }
+      // Start background tasks immediately
+      // GlobalNDK's connection monitoring will handle reconnections automatically
+      this.startBackgroundTasks();
+
+      console.log('[WalletSync] ✅ Initialized successfully - GlobalNDK will maintain connections');
 
     } catch (error) {
-      console.log('[WalletSync] Connection failed, will retry later:', error);
-      // Retry after a delay
-      setTimeout(() => this.connectAsync(), 5000);
+      console.warn('[WalletSync] Initialization error:', error);
+      // Don't retry - GlobalNDK will handle reconnection
     }
   }
 
@@ -181,9 +178,10 @@ export class WalletSync {
   /**
    * Publish wallet info event with deterministic d-tag
    * ✅ NEW: Uses RUNSTR-specific d-tag for deterministic wallet identity
+   * ✅ UPDATED: Checks GlobalNDK connection status dynamically
    */
   async publishWalletInfo(dTag: string, name: string, balance: number, mintUrl: string): Promise<boolean> {
-    if (!this.ndk || !this.isConnected) {
+    if (!this.ndk || !GlobalNDKService.isConnected()) {
       console.log('[WalletSync] Not connected, cannot publish wallet info');
       return false;
     }
@@ -228,10 +226,10 @@ export class WalletSync {
 
   /**
    * Sync wallet to Nostr (backup)
-   * ✅ UPDATED: Uses RUNSTR d-tag
+   * ✅ UPDATED: Uses RUNSTR d-tag and dynamic connection checking
    */
   async syncWalletToNostr(): Promise<void> {
-    if (!this.ndk || !this.isConnected) {
+    if (!this.ndk || !GlobalNDKService.isConnected()) {
       console.log('[WalletSync] Not connected, skipping sync');
       return;
     }
@@ -255,9 +253,10 @@ export class WalletSync {
 
   /**
    * Publish nutzap event to Nostr
+   * ✅ UPDATED: Dynamic connection checking
    */
   async publishNutzap(recipientPubkey: string, amount: number, token: string, memo: string = ''): Promise<boolean> {
-    if (!this.ndk || !this.isConnected) {
+    if (!this.ndk || !GlobalNDKService.isConnected()) {
       console.log('[WalletSync] Not connected, cannot publish nutzap');
       return false;
     }
@@ -285,15 +284,11 @@ export class WalletSync {
 
   /**
    * Claim incoming nutzaps from Nostr
-   * Includes retry logic for connection failures
+   * ✅ UPDATED: Dynamic connection checking, removed retry logic (GlobalNDK handles it)
    */
   async claimNutzaps(retryCount: number = 3): Promise<{ claimed: number; total: number }> {
-    if (!this.ndk || !this.isConnected) {
-      if (retryCount > 0) {
-        console.log(`[WalletSync] Not connected, retrying in 2s (${retryCount} retries left)...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return this.claimNutzaps(retryCount - 1);
-      }
+    if (!this.ndk || !GlobalNDKService.isConnected()) {
+      console.log('[WalletSync] Not connected, skipping claim');
       return { claimed: 0, total: 0 };
     }
 
@@ -374,9 +369,10 @@ export class WalletSync {
   /**
    * Publish token event (kind 7375) - NIP-60 compliance
    * Called after every proof-changing operation (send, receive, mint)
+   * ✅ UPDATED: Dynamic connection checking
    */
   async publishTokenEvent(proofs: Proof[], mintUrl: string): Promise<boolean> {
-    if (!this.ndk || !this.isConnected) {
+    if (!this.ndk || !GlobalNDKService.isConnected()) {
       console.log('[WalletSync] Not connected, skipping token event publish');
       return false;
     }
@@ -416,9 +412,10 @@ export class WalletSync {
   /**
    * Restore proofs from Nostr token events
    * Returns all proofs found across all mints
+   * ✅ UPDATED: Dynamic connection checking
    */
   async restoreProofsFromNostr(): Promise<{ proofs: Proof[]; mintUrl: string } | null> {
-    if (!this.ndk || !this.isConnected) {
+    if (!this.ndk || !GlobalNDKService.isConnected()) {
       console.log('[WalletSync] Not connected, cannot restore from Nostr');
       return null;
     }
@@ -488,9 +485,10 @@ export class WalletSync {
 
   /**
    * Restore wallet from Nostr (for new device)
+   * ✅ UPDATED: Dynamic connection checking
    */
   async restoreFromNostr(): Promise<{ balance: number; restored: boolean }> {
-    if (!this.ndk || !this.isConnected) {
+    if (!this.ndk || !GlobalNDKService.isConnected()) {
       console.log('[WalletSync] Not connected, cannot restore');
       return { balance: 0, restored: false };
     }
@@ -554,9 +552,10 @@ export class WalletSync {
 
   /**
    * Get connection status
+   * ✅ UPDATED: Returns live connection status from GlobalNDKService
    */
   isNostrConnected(): boolean {
-    return this.isConnected;
+    return GlobalNDKService.isConnected();
   }
 }
 

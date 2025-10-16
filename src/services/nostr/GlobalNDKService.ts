@@ -19,8 +19,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export class GlobalNDKService {
   private static instance: NDK | null = null;
-  private static initPromise: Promise<NDK> | null = null;
+  private static initPromise: Promise<void> | null = null;
   private static isInitialized = false;
+  private static lastReconnectAttempt: number = 0;
+  private static keepaliveTimer: NodeJS.Timeout | null = null;
+  private static isMonitoringConnections = false;
 
   /**
    * Default relay configuration
@@ -99,6 +102,9 @@ export class GlobalNDKService {
 
       if (connectedCount > 0) {
         console.log(`✅ GlobalNDK: Background connection successful - ${connectedCount} relays connected`);
+        // ✅ NEW: Setup connection monitoring after successful connection
+        this.setupConnectionMonitoring();
+        this.startKeepalive();
       } else {
         console.warn('⚠️ GlobalNDK: Background connection failed - no relays connected');
         // Schedule retry
@@ -110,6 +116,99 @@ export class GlobalNDKService {
       setTimeout(() => this.retryConnection(3), 5000); // Retry after 5s
     } finally {
       this.initPromise = null;
+    }
+  }
+
+  /**
+   * ✅ NEW: Setup connection event monitoring
+   * Listens to relay connect/disconnect events to track connection state in real-time
+   */
+  private static setupConnectionMonitoring(): void {
+    if (this.isMonitoringConnections || !this.instance) {
+      return;
+    }
+
+    console.log('👁️ GlobalNDK: Setting up connection event monitoring...');
+    this.isMonitoringConnections = true;
+
+    // Listen to each relay's connection events
+    for (const relay of this.instance.pool.relays.values()) {
+      // Track when relay connects
+      relay.on('connect', () => {
+        const status = this.getStatus();
+        console.log(`✅ GlobalNDK: Relay connected - ${relay.url} (${status.connectedRelays}/${status.relayCount} total)`);
+      });
+
+      // Track when relay disconnects
+      relay.on('disconnect', () => {
+        const status = this.getStatus();
+        console.log(`❌ GlobalNDK: Relay disconnected - ${relay.url} (${status.connectedRelays}/${status.relayCount} remaining)`);
+
+        // Auto-reconnect if we drop below 2 relays (with debouncing)
+        if (status.connectedRelays < 2) {
+          this.debouncedReconnect();
+        }
+      });
+
+      // Track relay notices (connection issues, auth requirements, etc.)
+      relay.on('notice', (notice: string) => {
+        console.log(`⚠️ GlobalNDK: Relay notice from ${relay.url}: ${notice}`);
+      });
+    }
+
+    console.log('✅ GlobalNDK: Connection monitoring active');
+  }
+
+  /**
+   * ✅ NEW: Start keepalive heartbeat to maintain connections
+   * Prevents WebSocket timeout by periodically checking connection health
+   */
+  private static startKeepalive(): void {
+    // Clear any existing keepalive timer
+    if (this.keepaliveTimer) {
+      clearInterval(this.keepaliveTimer);
+    }
+
+    console.log('💓 GlobalNDK: Starting connection keepalive (30s interval)...');
+
+    this.keepaliveTimer = setInterval(() => {
+      if (!this.instance) {
+        return;
+      }
+
+      const status = this.getStatus();
+
+      // Log keepalive heartbeat
+      console.log(`💓 GlobalNDK: Keepalive check - ${status.connectedRelays}/${status.relayCount} relays alive`);
+
+      // If connections dropped significantly, trigger reconnection
+      if (status.connectedRelays < 2) {
+        console.warn('⚠️ GlobalNDK: Keepalive detected connection loss - triggering reconnection');
+        this.debouncedReconnect();
+      }
+    }, 30000); // Check every 30 seconds
+  }
+
+  /**
+   * ✅ NEW: Debounced reconnection to prevent rapid reconnection attempts
+   * Only allows one reconnection attempt per 10 seconds
+   */
+  private static debouncedReconnect(): void {
+    const now = Date.now();
+    const minInterval = 10000; // 10 seconds minimum between reconnections
+
+    // Check if we're within the debounce window
+    if (now - this.lastReconnectAttempt < minInterval) {
+      console.log('🔄 GlobalNDK: Reconnection request debounced (too soon since last attempt)');
+      return;
+    }
+
+    this.lastReconnectAttempt = now;
+    console.log('🔄 GlobalNDK: Debounced reconnection triggered');
+
+    // Trigger background reconnection (non-blocking)
+    if (!this.initPromise) {
+      this.initPromise = this.connectInBackground();
     }
   }
 
@@ -196,6 +295,14 @@ export class GlobalNDKService {
       }
 
       await this.instance.connect(2000);
+
+      // ✅ NEW: Re-setup monitoring and keepalive after reconnection
+      const status = this.getStatus();
+      if (status.connectedRelays > 0) {
+        this.setupConnectionMonitoring();
+        this.startKeepalive();
+      }
+
       console.log('✅ GlobalNDK: Reconnected successfully');
     } catch (error) {
       console.error('❌ GlobalNDK: Reconnection failed:', error);
@@ -205,6 +312,7 @@ export class GlobalNDKService {
 
   /**
    * Get connection status
+   * ✅ UPDATED: Uses pool stats for accurate real-time connection count
    */
   static getStatus(): {
     isInitialized: boolean;
@@ -219,11 +327,14 @@ export class GlobalNDKService {
       };
     }
 
-    const relays = Array.from(this.instance.pool.relays.values());
+    // Use pool stats for accurate connection count (faster than checking individual relays)
+    const stats = this.instance.pool?.stats();
+    const totalRelays = this.instance.pool?.relays?.size || 0;
+
     return {
       isInitialized: this.isInitialized,
-      relayCount: relays.length,
-      connectedRelays: relays.filter(r => r.connectivity.status === 1).length, // 1 = connected
+      relayCount: totalRelays,
+      connectedRelays: stats?.connected || 0,
     };
   }
 
@@ -236,6 +347,13 @@ export class GlobalNDKService {
 
     console.log('🔌 GlobalNDK: Disconnecting from all relays...');
 
+    // ✅ NEW: Stop keepalive timer
+    if (this.keepaliveTimer) {
+      clearInterval(this.keepaliveTimer);
+      this.keepaliveTimer = null;
+    }
+
+    // Disconnect all relays
     for (const relay of this.instance.pool.relays.values()) {
       relay.disconnect();
     }
@@ -243,26 +361,24 @@ export class GlobalNDKService {
     this.instance = null;
     this.isInitialized = false;
     this.initPromise = null;
+    this.isMonitoringConnections = false;
+    this.lastReconnectAttempt = 0;
 
     console.log('✅ GlobalNDK: Cleanup complete');
   }
 
   /**
    * Check if instance exists and is connected
+   * ✅ UPDATED: Uses pool stats for accurate connection check
    */
   static isConnected(): boolean {
     if (!this.instance || !this.isInitialized) {
       return false;
     }
 
-    // Check if at least one relay is connected
-    for (const relay of this.instance.pool.relays.values()) {
-      if (relay.connectivity.status === 1) {
-        return true;
-      }
-    }
-
-    return false;
+    // Use pool stats for accurate connection check (faster and more reliable)
+    const stats = this.instance.pool?.stats();
+    return (stats?.connected || 0) > 0;
   }
 
   /**
