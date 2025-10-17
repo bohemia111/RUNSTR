@@ -1,6 +1,6 @@
 /**
- * NutzapLightningButton Component
- * Lightning bolt button for quick zapping with tap (21 sats) or hold (custom amount)
+ * NWCLightningButton Component
+ * Lightning bolt button for quick zapping via NWC to Lightning addresses
  * Visual feedback: black bolt turns yellow after successful zap
  * Accepts both npub and hex pubkey formats
  */
@@ -12,23 +12,19 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  GestureResponderEvent,
   View,
   Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../../styles/theme';
-import { useNutzap } from '../../hooks/useNutzap';
-import { EnhancedZapModal } from './EnhancedZapModal';
-import { ExternalZapModal } from './ExternalZapModal';
+import { useNWCZap } from '../../hooks/useNWCZap';
 import { npubToHex } from '../../utils/ndkConversion';
-import LightningZapService from '../../services/nutzap/LightningZapService';
 
 const DEFAULT_ZAP_AMOUNT = 21;
 const LONG_PRESS_DURATION = 500; // ms to trigger long press
 
-interface NutzapLightningButtonProps {
+interface NWCLightningButtonProps {
   recipientNpub: string;
   recipientName?: string;
   size?: 'small' | 'medium' | 'large' | 'rectangular';
@@ -38,7 +34,7 @@ interface NutzapLightningButtonProps {
   customLabel?: string;
 }
 
-export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
+export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
   recipientNpub,
   recipientName = 'User',
   size = 'medium',
@@ -47,13 +43,10 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
   disabled = false,
   customLabel,
 }) => {
-  const { balance, sendNutzap, isInitialized, refreshBalance } = useNutzap();
+  const { balance, sendZap, isInitialized, hasWallet, refreshBalance, error } = useNWCZap();
   const [isZapped, setIsZapped] = useState(false);
   const [isZapping, setIsZapping] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [showExternalModal, setShowExternalModal] = useState(false);
-  const [externalZapAmount, setExternalZapAmount] = useState(0);
-  const [externalZapMemo, setExternalZapMemo] = useState('');
   const [defaultAmount, setDefaultAmount] = useState(DEFAULT_ZAP_AMOUNT);
 
   // Animation for the zap effect
@@ -66,15 +59,15 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
   const recipientHex = React.useMemo(() => {
     const normalized = npubToHex(recipientNpub);
     if (!normalized) {
-      console.warn('[NutzapLightningButton] Invalid recipient pubkey:', recipientNpub.slice(0, 20));
-      return null; // Return null instead of invalid value
+      console.warn('[NWCLightningButton] Invalid recipient pubkey:', recipientNpub.slice(0, 20));
+      return null;
     }
     return normalized;
   }, [recipientNpub]);
 
   // Don't render if recipient is invalid
   if (!recipientHex) {
-    console.log('[NutzapLightningButton] Skipping render - invalid recipient');
+    console.log('[NWCLightningButton] Skipping render - invalid recipient');
     return null;
   }
 
@@ -92,16 +85,6 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
       }
     };
   }, []);
-
-  // Log wallet initialization state for debugging
-  useEffect(() => {
-    console.log('[NutzapButton] Wallet state changed:', {
-      isInitialized,
-      balance,
-      disabled,
-      recipientName
-    });
-  }, [isInitialized, balance, disabled, recipientName]);
 
   const loadZapState = async () => {
     try {
@@ -165,48 +148,45 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
   };
 
   const handlePressIn = () => {
-    console.log('[NutzapButton] Press detected, checking state...');
+    console.log('[NWCLightningButton] Press detected, checking state...');
 
     if (disabled) {
-      console.log('[NutzapButton] Button is disabled');
+      console.log('[NWCLightningButton] Button is disabled');
       return;
     }
 
-    if (!isInitialized) {
-      console.log('[NutzapButton] Wallet not initialized, showing alert');
+    if (!isInitialized || !hasWallet) {
+      console.log('[NWCLightningButton] Wallet not ready');
       Alert.alert(
-        'Wallet Not Ready',
-        'Your wallet is still initializing. Please pull down to refresh in Settings, or wait a moment and try again.',
+        'Wallet Not Connected',
+        'Please connect your NWC wallet in settings to send zaps.',
         [{ text: 'OK' }]
       );
       return;
     }
 
-    // Start long press timer (no balance refresh to avoid re-renders)
-    console.log('[NutzapButton] Starting long press timer...');
+    // Start long press timer for custom amount
+    console.log('[NWCLightningButton] Starting long press timer...');
     longPressTimer.current = setTimeout(() => {
-      console.log('[NutzapButton] ⏰ TIMER FIRED - Long press detected, opening modal');
+      console.log('[NWCLightningButton] Long press detected, would open modal for custom amount');
+      // For now, we'll just use default amount
+      // In future, you can implement a custom amount modal here
       setShowModal(true);
       longPressTimer.current = null;
     }, LONG_PRESS_DURATION);
-
-    // Debug: verify timer was set
-    console.log('[NutzapButton] Timer set:', longPressTimer.current !== null);
   };
 
   const handlePressOut = async () => {
-    console.log('[NutzapButton] 🖐️ PRESS OUT - Timer active:', longPressTimer.current !== null);
+    console.log('[NWCLightningButton] Press out - Timer active:', longPressTimer.current !== null);
 
     if (longPressTimer.current) {
       // Timer still active = quick tap (not long press)
-      console.log('[NutzapButton] Quick tap detected, clearing timer and performing zap');
+      console.log('[NWCLightningButton] Quick tap detected, performing zap');
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
 
       // Quick zap with default amount
       await performQuickZap();
-    } else {
-      console.log('[NutzapButton] Press out after long press, ignoring');
     }
   };
 
@@ -246,30 +226,12 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
 
     try {
       const memo = `⚡ Quick zap from RUNSTR!`;
-      let success = false;
 
-      // Try Lightning first
-      console.log('[NutzapButton] Attempting Lightning zap...');
-      const lightningResult = await LightningZapService.sendLightningZap(
-        recipientHex,
-        defaultAmount,
-        memo
-      );
-
-      if (lightningResult.success) {
-        console.log('[NutzapButton] ✅ Lightning zap successful');
-        success = true;
-      } else {
-        // Fallback to nutzap
-        console.log('[NutzapButton] Lightning failed, falling back to nutzap...');
-        success = await sendNutzap(recipientHex, defaultAmount, memo);
-        if (success) {
-          console.log('[NutzapButton] ✅ Nutzap successful');
-        }
-      }
+      console.log('[NWCLightningButton] Sending zap via NWC...');
+      const success = await sendZap(recipientHex, defaultAmount, memo);
 
       if (success) {
-        // Refresh balance from proofs (handles both Lightning and Nutzap sends)
+        // Refresh balance
         await refreshBalance();
 
         // Set zapped state for color change
@@ -285,7 +247,8 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
           { cancelable: true }
         );
       } else {
-        Alert.alert('Failed', 'Unable to send zap. Please try again.');
+        const errorMessage = error || 'Unable to send zap. Please try again.';
+        Alert.alert('Failed', errorMessage);
       }
     } catch (error) {
       console.error('Quick zap error:', error);
@@ -293,30 +256,6 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
     } finally {
       setIsZapping(false);
     }
-  };
-
-  const handleModalSuccess = async () => {
-    // Set zapped state for color change
-    setIsZapped(true);
-    await saveZapState();
-    setShowModal(false);
-    onZapSuccess?.();
-  };
-
-  const handleShowExternalWallet = (amount: number, memo: string) => {
-    console.log('[NutzapButton] Showing external wallet modal for', amount, 'sats');
-    setExternalZapAmount(amount);
-    setExternalZapMemo(memo);
-    setShowModal(false);
-    setShowExternalModal(true);
-  };
-
-  const handleExternalZapSuccess = async () => {
-    // Set zapped state for color change
-    setIsZapped(true);
-    await saveZapState();
-    setShowExternalModal(false);
-    onZapSuccess?.();
   };
 
   const handleDefaultAmountChange = async (newDefault: number) => {
@@ -336,51 +275,50 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
     small: { icon: 16, button: 28 },
     medium: { icon: 20, button: 36 },
     large: { icon: 24, button: 44 },
-    rectangular: { icon: 16, button: 26, width: customLabel ? 120 : 70 }, // Wider if custom label
+    rectangular: { icon: 16, button: 26, width: customLabel ? 120 : 70 },
   };
 
-  const config = sizeConfig[size] || sizeConfig.medium; // Fallback to medium if undefined
+  const config = sizeConfig[size] || sizeConfig.medium;
   const isRectangular = size === 'rectangular';
 
-  // Always show button, but disable if not initialized
-  const isDisabled = disabled || !isInitialized;
+  // Always show button, but disable if not ready
+  const isDisabled = disabled || !isInitialized || !hasWallet;
 
   return (
-    <>
-      <View
-        onStartShouldSetResponder={() => true}
-        onResponderGrant={() => {}}
+    <View
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={() => {}}
+    >
+      <Animated.View
+        style={[
+          {
+            transform: [{ scale: scaleAnimation }],
+          },
+        ]}
       >
-        <Animated.View
+        <TouchableOpacity
           style={[
-            {
-              transform: [{ scale: scaleAnimation }],
+            styles.button,
+            isRectangular ? {
+              width: 'width' in config ? config.width : 70,
+              height: config.button,
+              borderRadius: 4,
+              flexDirection: 'row',
+              paddingHorizontal: 8,
+            } : {
+              width: config.button,
+              height: config.button,
+              borderRadius: config.button / 2,
             },
+            isZapped && styles.buttonZapped,
+            isDisabled && styles.buttonDisabled,
+            style,
           ]}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          disabled={isDisabled || isZapping}
+          activeOpacity={0.7}
         >
-          <TouchableOpacity
-            style={[
-              styles.button,
-              isRectangular ? {
-                width: 'width' in config ? config.width : 70,
-                height: config.button,
-                borderRadius: 4,
-                flexDirection: 'row',
-                paddingHorizontal: 8,
-              } : {
-                width: config.button,
-                height: config.button,
-                borderRadius: config.button / 2,
-              },
-              isZapped && styles.buttonZapped,
-              isDisabled && styles.buttonDisabled,
-              style,
-            ]}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            disabled={isDisabled || isZapping}
-            activeOpacity={0.7}
-          >
           {isZapping ? (
             <ActivityIndicator size="small" color={theme.colors.primary} />
           ) : (
@@ -390,7 +328,7 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
                   name="flash-outline"
                   size={config.icon}
                   color={
-                    !isInitialized
+                    !isInitialized || !hasWallet
                       ? theme.colors.textMuted
                       : isZapped
                         ? theme.colors.background
@@ -407,41 +345,17 @@ export const NutzapLightningButton: React.FC<NutzapLightningButtonProps> = ({
           )}
         </TouchableOpacity>
       </Animated.View>
-      </View>
-
-      <EnhancedZapModal
-        visible={showModal}
-        recipientNpub={recipientHex}
-        recipientName={recipientName}
-        defaultAmount={defaultAmount}
-        balance={balance}
-        onClose={() => setShowModal(false)}
-        onSuccess={handleModalSuccess}
-        onDefaultAmountChange={handleDefaultAmountChange}
-        onShowExternalWallet={handleShowExternalWallet}
-      />
-
-      <ExternalZapModal
-        visible={showExternalModal}
-        recipientNpub={recipientHex}
-        recipientName={recipientName}
-        amount={externalZapAmount}
-        memo={externalZapMemo}
-        onClose={() => setShowExternalModal(false)}
-        onSuccess={handleExternalZapSuccess}
-      />
-    </>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#1a1a1a', // Lighter than card background for visibility
+    backgroundColor: '#1a1a1a',
     borderWidth: 1,
-    borderColor: theme.colors.orangeDeep, // Orange border
+    borderColor: theme.colors.orangeDeep,
     alignItems: 'center',
     justifyContent: 'center',
-    // Add subtle shadow for better visibility
     shadowColor: theme.colors.orangeBright,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
@@ -451,12 +365,12 @@ const styles = StyleSheet.create({
 
   buttonZapped: {
     borderColor: theme.colors.orangeBright,
-    backgroundColor: 'rgba(255, 157, 66, 0.3)', // Orange glow when zapped
+    backgroundColor: 'rgba(255, 157, 66, 0.3)',
   },
 
   buttonDisabled: {
-    opacity: 0.4, // More obvious disabled state
-    backgroundColor: '#0f0f0f', // Darker when disabled
+    opacity: 0.4,
+    backgroundColor: '#0f0f0f',
   },
 
   uninitializedIcon: {

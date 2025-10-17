@@ -33,6 +33,7 @@ interface EnhancedZapModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   onDefaultAmountChange?: (amount: number) => void;
+  onShowExternalWallet?: (amount: number, memo: string) => void;
 }
 
 export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
@@ -44,6 +45,7 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
   onClose,
   onSuccess,
   onDefaultAmountChange,
+  onShowExternalWallet,
 }) => {
   const { sendNutzap, refreshBalance } = useNutzap();
   const [selectedAmount, setSelectedAmount] = useState<number>(defaultAmount);
@@ -51,6 +53,7 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [setAsDefault, setSetAsDefault] = useState(false);
   const [memo, setMemo] = useState('');
+  const [useExternalWallet, setUseExternalWallet] = useState(false);
 
   // Normalize recipient pubkey to hex for sending, and npub for display
   const recipientHex = React.useMemo(() => {
@@ -82,6 +85,7 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
       setCustomAmount('');
       setSetAsDefault(false);
       setMemo('');
+      setUseExternalWallet(false);
     }
   }, [visible, defaultAmount]);
 
@@ -102,11 +106,31 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
       return;
     }
 
-    if (amount > balance) {
+    // For external wallet, no balance check needed
+    if (!useExternalWallet && amount > balance) {
       Alert.alert(
         'Insufficient Balance',
         `You need ${amount} sats but only have ${balance} sats`
       );
+      return;
+    }
+
+    // If using external wallet, generate invoice and show QR
+    if (useExternalWallet) {
+      const zapMemo = memo || `⚡ Zap from RUNSTR - ${amount} sats!`;
+
+      // Update default if requested
+      if (setAsDefault && onDefaultAmountChange) {
+        onDefaultAmountChange(amount);
+      }
+
+      // Pass to external wallet handler
+      if (onShowExternalWallet) {
+        onShowExternalWallet(amount, zapMemo);
+        onClose();
+      } else {
+        Alert.alert('Error', 'External wallet feature not available');
+      }
       return;
     }
 
@@ -184,7 +208,9 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
   };
 
   const displayAmount = customAmount ? parseInt(customAmount) : selectedAmount;
-  const canSend = displayAmount > 0 && displayAmount <= balance;
+  const canSend = useExternalWallet
+    ? displayAmount > 0
+    : displayAmount > 0 && displayAmount <= balance;
 
   return (
     <Modal
@@ -220,28 +246,80 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
               </Text>
             </View>
 
-            {/* Balance Display */}
-            <View style={styles.balanceSection}>
-              <View style={styles.balanceRow}>
-                <Text style={styles.balanceLabel}>Your Balance:</Text>
-                <Text style={styles.balanceAmount}>
-                  {balance.toLocaleString()} sats
-                </Text>
-              </View>
-              {displayAmount > 0 && (
-                <View style={styles.balanceRow}>
-                  <Text style={styles.balanceLabel}>After Zap:</Text>
+            {/* Wallet Selection */}
+            <View style={styles.walletSection}>
+              <Text style={styles.sectionLabel}>Pay With</Text>
+              <View style={styles.walletOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.walletOption,
+                    !useExternalWallet && styles.walletOptionActive,
+                  ]}
+                  onPress={() => setUseExternalWallet(false)}
+                >
+                  <Ionicons
+                    name="wallet"
+                    size={20}
+                    color={!useExternalWallet ? theme.colors.background : theme.colors.text}
+                  />
                   <Text
                     style={[
-                      styles.balanceAmount,
-                      displayAmount > balance && styles.balanceError,
+                      styles.walletOptionText,
+                      !useExternalWallet && styles.walletOptionTextActive,
                     ]}
                   >
-                    {(balance - displayAmount).toLocaleString()} sats
+                    App Wallet
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.walletOption,
+                    useExternalWallet && styles.walletOptionActive,
+                  ]}
+                  onPress={() => setUseExternalWallet(true)}
+                >
+                  <Ionicons
+                    name="qr-code"
+                    size={20}
+                    color={useExternalWallet ? theme.colors.background : theme.colors.text}
+                  />
+                  <Text
+                    style={[
+                      styles.walletOptionText,
+                      useExternalWallet && styles.walletOptionTextActive,
+                    ]}
+                  >
+                    External Wallet
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Balance Display - Only show for app wallet */}
+            {!useExternalWallet && (
+              <View style={styles.balanceSection}>
+                <View style={styles.balanceRow}>
+                  <Text style={styles.balanceLabel}>Your Balance:</Text>
+                  <Text style={styles.balanceAmount}>
+                    {balance.toLocaleString()} sats
                   </Text>
                 </View>
-              )}
-            </View>
+                {displayAmount > 0 && (
+                  <View style={styles.balanceRow}>
+                    <Text style={styles.balanceLabel}>After Zap:</Text>
+                    <Text
+                      style={[
+                        styles.balanceAmount,
+                        displayAmount > balance && styles.balanceError,
+                      ]}
+                    >
+                      {(balance - displayAmount).toLocaleString()} sats
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Amount Selection */}
             <View style={styles.amountSection}>
@@ -345,12 +423,15 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
               ) : (
                 <>
                   <Ionicons
-                    name="flash"
+                    name={useExternalWallet ? 'qr-code' : 'flash'}
                     size={20}
                     color={theme.colors.background}
                   />
                   <Text style={styles.sendButtonText}>
-                    Send {displayAmount > 0 ? `${displayAmount} sats` : 'Zap'}
+                    {useExternalWallet
+                      ? `Generate ${displayAmount > 0 ? `${displayAmount} sats` : ''} Invoice`
+                      : `Send ${displayAmount > 0 ? `${displayAmount} sats` : 'Zap'}`
+                    }
                   </Text>
                 </>
               )}
@@ -472,6 +553,44 @@ const styles = StyleSheet.create({
 
   balanceError: {
     color: theme.colors.error,
+  },
+
+  walletSection: {
+    marginBottom: 12,
+  },
+
+  walletOptions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  walletOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.medium,
+    backgroundColor: theme.colors.cardBackground,
+  },
+
+  walletOptionActive: {
+    backgroundColor: theme.colors.text,
+    borderColor: theme.colors.text,
+  },
+
+  walletOptionText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: theme.typography.weights.medium,
+  },
+
+  walletOptionTextActive: {
+    color: theme.colors.background,
+    fontWeight: theme.typography.weights.bold,
   },
 
   amountSection: {

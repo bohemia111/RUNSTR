@@ -262,6 +262,19 @@ export class EnhancedLocationTrackingService {
         this.stateMachine.send({ type: 'PERMISSIONS_GRANTED' });
       }
 
+      // Android 14+ battery optimization check
+      // Request exemption to prevent Doze Mode from stopping background tracking
+      if (Platform.OS === 'android' && Platform.Version >= 14) {
+        console.log('🔋 [ANDROID 14+] Checking battery optimization exemption...');
+        const hasBatteryExemption = await this.batteryService.requestBatteryOptimizationExemption();
+        if (!hasBatteryExemption) {
+          console.warn('⚠️ Battery optimization not exempted - tracking may pause when using other apps');
+          // Continue with tracking but user was warned
+        } else {
+          console.log('✅ Battery optimization exemption granted or already configured');
+        }
+      }
+
       // Create session
       const sessionId = `session_${Date.now()}`;
       const startTime = Date.now();

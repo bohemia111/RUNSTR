@@ -22,13 +22,16 @@ import { npubToHex } from '../../utils/ndkConversion';
 import { useUserStore } from '../../store/userStore';
 import { getAuthenticationData } from '../../utils/nostrAuth';
 import { DirectNostrProfileService } from '../../services/user/directNostrProfileService';
-import unifiedSigningService from '../../services/auth/UnifiedSigningService';
+import UnifiedSigningService from '../../services/auth/UnifiedSigningService';
 import { GlobalNDKService } from '../../services/nostr/GlobalNDKService';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import type {
   NostrActivityType,
   NostrEventCompetitionType,
 } from '../../types/nostrCompetition';
+import { getCharityById } from '../../constants/charities';
+import nostrTeamService from '../../services/nostr/NostrTeamService';
+import { ProfileService } from '../../services/user/profileService';
 
 // Activity types and their specific competition options
 const ACTIVITY_COMPETITION_MAP = {
@@ -90,7 +93,8 @@ interface EventData {
   targetValue?: number;
   targetUnit?: string;
   prizePoolSats: number | undefined; // Prize pool amount in sats
-  lightningAddress?: string; // Captain's Lightning address for receiving payments
+  lightningAddress?: string; // Lightning address for receiving payments
+  paymentDestination: 'captain' | 'charity'; // Where entry fees go
 }
 
 interface EventCreationWizardProps {
@@ -111,6 +115,8 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
   const user = useUserStore((state) => state.user);
+  const [teamCharityId, setTeamCharityId] = useState<string | undefined>();
+  const [captainLightningAddress, setCaptainLightningAddress] = useState<string>('');
   const [eventData, setEventData] = useState<EventData>({
     activityType: null,
     competitionType: null,
@@ -122,9 +128,10 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
     description: '',
     prizePoolSats: undefined,
     lightningAddress: '',
+    paymentDestination: 'captain',
   });
 
-  // Reset wizard when opened
+  // Reset wizard when opened and fetch team/captain data
   useEffect(() => {
     if (visible) {
       setCurrentStep(0);
@@ -139,9 +146,25 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
         description: '',
         prizePoolSats: undefined,
         lightningAddress: '',
+        paymentDestination: 'captain',
+      });
+
+      // Fetch team charity info
+      const team = nostrTeamService.getTeamById(teamId);
+      if (team?.charityId) {
+        setTeamCharityId(team.charityId);
+      }
+
+      // Fetch captain's Lightning address from their profile
+      ProfileService.getUserProfile(captainPubkey).then((profile) => {
+        if (profile?.lud16) {
+          setCaptainLightningAddress(profile.lud16);
+          // Set as default if captain has Lightning address
+          setEventData((prev) => ({ ...prev, lightningAddress: profile.lud16 }));
+        }
       });
     }
-  }, [visible]);
+  }, [visible, teamId, captainPubkey]);
 
   // Wizard steps configuration
   const steps: WizardStep[] = [
@@ -234,7 +257,8 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
       console.log('✅ Retrieved auth data for:', authData.npub.slice(0, 20) + '...');
 
       // Get signer (works for both nsec and Amber)
-      const signer = await unifiedSigningService.getSigner();
+      const signingService = UnifiedSigningService.getInstance();
+      const signer = await signingService.getSigner();
       if (!signer) {
         Alert.alert('Error', 'No authentication found. Please login first.');
         setIsCreating(false);
@@ -256,6 +280,11 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
         targetUnit: eventData.targetUnit,
         prizePoolSats: eventData.prizePoolSats,
         lightningAddress: eventData.lightningAddress,
+        paymentDestination: eventData.paymentDestination,
+        paymentRecipientName:
+          eventData.paymentDestination === 'charity'
+            ? getCharityById(teamCharityId)?.name
+            : currentUser?.name || 'Team Captain',
       };
 
       console.log('🎯 Creating event:', eventCreationData);
@@ -634,27 +663,106 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
                       placeholderTextColor={theme.colors.textMuted}
                       keyboardType="numeric"
                     />
-                    <Text style={styles.formHelper}>
-                      💰 You'll receive {eventData.entryFeesSats} sats per participant
-                    </Text>
 
-                    {/* Lightning Address Input */}
+                    {/* Payment Destination Dropdown */}
                     <Text style={[styles.formLabel, { marginTop: 16 }]}>
-                      Lightning Address (Required for Payment)
+                      Entry Fees Go To:
                     </Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={eventData.lightningAddress}
-                      onChangeText={(text) => updateSettings('lightningAddress', text)}
-                      placeholder="captain@getalby.com"
-                      placeholderTextColor={theme.colors.textMuted}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    <Text style={styles.formHelper}>
-                      ⚡ Participants will pay this Lightning address from any wallet (Cash App, Strike, Alby, etc.)
-                    </Text>
+                    <View style={styles.destinationOptions}>
+                      <TouchableOpacity
+                        style={[
+                          styles.destinationOption,
+                          eventData.paymentDestination === 'captain' &&
+                            styles.destinationOptionSelected,
+                        ]}
+                        onPress={() => {
+                          updateSettings('paymentDestination', 'captain');
+                          updateSettings('lightningAddress', captainLightningAddress);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.destinationOptionText,
+                            eventData.paymentDestination === 'captain' &&
+                              styles.destinationOptionTextSelected,
+                          ]}
+                        >
+                          Captain's Wallet
+                        </Text>
+                      </TouchableOpacity>
+
+                      {teamCharityId && (
+                        <TouchableOpacity
+                          style={[
+                            styles.destinationOption,
+                            eventData.paymentDestination === 'charity' &&
+                              styles.destinationOptionSelected,
+                          ]}
+                          onPress={() => {
+                            const charity = getCharityById(teamCharityId);
+                            if (charity) {
+                              updateSettings('paymentDestination', 'charity');
+                              updateSettings('lightningAddress', charity.lightningAddress);
+                            }
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.destinationOptionText,
+                              eventData.paymentDestination === 'charity' &&
+                                styles.destinationOptionTextSelected,
+                            ]}
+                          >
+                            Team Charity
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Show selected destination info */}
+                    {eventData.paymentDestination === 'captain' ? (
+                      <>
+                        <Text style={styles.formHelper}>
+                          💰 You'll receive {eventData.entryFeesSats} sats per participant
+                        </Text>
+                        {!captainLightningAddress && (
+                          <>
+                            <Text style={[styles.formLabel, { marginTop: 16 }]}>
+                              Your Lightning Address (Required)
+                            </Text>
+                            <TextInput
+                              style={styles.textInput}
+                              value={eventData.lightningAddress}
+                              onChangeText={(text) => updateSettings('lightningAddress', text)}
+                              placeholder="captain@getalby.com"
+                              placeholderTextColor={theme.colors.textMuted}
+                              keyboardType="email-address"
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                            />
+                            <Text style={styles.formHelper}>
+                              ⚡ Add a Lightning address to your profile to receive payments
+                            </Text>
+                          </>
+                        )}
+                        {captainLightningAddress && (
+                          <Text style={styles.formHelper}>
+                            ⚡ Payments will go to: {captainLightningAddress}
+                          </Text>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.formHelper}>
+                          💝 All entry fees will be donated to {getCharityById(teamCharityId)?.name}
+                        </Text>
+                        <Text style={styles.formHelper}>
+                          ⚡ Payments will go to: {getCharityById(teamCharityId)?.lightningAddress}
+                        </Text>
+                      </>
+                    )}
                   </>
                 )}
               </View>
@@ -1019,5 +1127,37 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     marginTop: 4,
     lineHeight: 16,
+  },
+
+  destinationOptions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+
+  destinationOption: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: theme.colors.cardBackground,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+
+  destinationOptionSelected: {
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.accent + '20',
+  },
+
+  destinationOptionText: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text,
+  },
+
+  destinationOptionTextSelected: {
+    color: theme.colors.accent,
   },
 });

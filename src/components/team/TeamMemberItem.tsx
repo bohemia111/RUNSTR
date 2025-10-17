@@ -7,7 +7,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../styles/theme';
 import { MemberAvatar } from '../ui/MemberAvatar';
-import { NutzapLightningButton } from '../nutzap/NutzapLightningButton';
+import { NWCLightningButton } from '../lightning/NWCLightningButton';
 
 interface TeamMember {
   id: string;
@@ -65,7 +65,7 @@ export const TeamMemberItem: React.FC<TeamMemberItemProps> = ({
       </View>
       <View style={styles.memberActions}>
         {member.npub && (
-          <NutzapLightningButton
+          <NWCLightningButton
             recipientNpub={member.npub}
             recipientName={member.name}
             size="small"

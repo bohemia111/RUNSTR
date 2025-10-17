@@ -526,6 +526,8 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         eventName={eventData?.name || ''}
         amountSats={eventData?.entryFeesSats || 0}
         invoice={paymentInvoice}
+        paymentDestination={eventData?.paymentDestination}
+        paymentRecipientName={eventData?.paymentRecipientName}
         onPaid={handlePaymentConfirmed}
         onCancel={() => {
           setShowPaymentModal(false);

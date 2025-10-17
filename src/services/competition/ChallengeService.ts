@@ -201,16 +201,22 @@ export class ChallengeService {
   /**
    * Update challenge status
    */
-  async updateChallengeStatus(challengeId: string, status: ChallengeStatus): Promise<void> {
+  async updateChallengeStatus(challengeId: string, status: ChallengeStatus, winnerId?: string): Promise<void> {
     const challenge = await this.getChallenge(challengeId);
     if (!challenge) {
       throw new Error('Challenge not found');
     }
 
     challenge.status = status;
+
+    // If this is a completion with a winner, store the winner ID
+    if (winnerId && status === ChallengeStatus.COMPLETED) {
+      challenge.winnerId = winnerId;
+    }
+
     await this.storeChallengeLocally(challenge);
 
-    console.log(`✅ Updated challenge ${challengeId} status to ${status}`);
+    console.log(`✅ Updated challenge ${challengeId} status to ${status}${winnerId ? ` (winner: ${winnerId.slice(0, 8)}...)` : ''}`);
   }
 
   /**
@@ -405,6 +411,35 @@ export class ChallengeService {
     });
 
     return lists.map(list => this.reconstructChallengeFromList(list));
+  }
+
+  /**
+   * Get all active challenges that haven't expired yet
+   * Used by ChallengeCompletionService for monitoring
+   */
+  async getActiveChallenges(): Promise<ChallengeMetadata[]> {
+    try {
+      const userIdentifiers = await getUserNostrIdentifiers();
+      if (!userIdentifiers?.hexPubkey) {
+        console.log('No user authenticated, returning empty active challenges');
+        return [];
+      }
+
+      // Get all challenges the user is involved in
+      const allChallenges = await this.getUserChallenges(userIdentifiers.hexPubkey);
+
+      // Filter for active/pending challenges only
+      const activeChallenges = allChallenges.filter(challenge =>
+        challenge.status === ChallengeStatus.ACTIVE ||
+        challenge.status === ChallengeStatus.PENDING
+      );
+
+      console.log(`Found ${activeChallenges.length} active challenges for user`);
+      return activeChallenges;
+    } catch (error) {
+      console.error('Error getting active challenges:', error);
+      return [];
+    }
   }
 }
 

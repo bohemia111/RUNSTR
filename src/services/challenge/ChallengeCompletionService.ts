@@ -6,10 +6,9 @@
  * NEW: Uses Lightning addresses for direct payment flow (no escrow)
  */
 
-import { challengeService } from '../competition/ChallengeService';
+import challengeService from '../competition/ChallengeService';
 import { challengePaymentService } from './ChallengePaymentService';
-import type { ChallengeMetadata } from '../../types/challenge';
-import type { LeaderboardEntry } from '../competition/ChallengeService';
+import type { ChallengeMetadata, ChallengeParticipant } from '../../types/challenge';
 
 export interface CompletionResult {
   success: boolean;
@@ -89,11 +88,11 @@ export class ChallengeCompletionService {
           // Check if expired
           const expiresAt = challenge.expiresAt * 1000; // Convert to milliseconds
           if (now >= expiresAt) {
-            console.log(`⏰ Challenge expired: ${challenge.challengeId}`);
-            await this.completeChallenge(challenge.challengeId);
+            console.log(`⏰ Challenge expired: ${challenge.id}`);
+            await this.completeChallenge(challenge.id);
           }
         } catch (error) {
-          console.error(`Error checking challenge ${challenge.challengeId}:`, error);
+          console.error(`Error checking challenge ${challenge.id}:`, error);
         }
       }
     } catch (error) {
@@ -158,12 +157,12 @@ export class ChallengeCompletionService {
 
       console.log(`💰 Generating payout invoice from loser to winner...`);
       console.log(`   Winner: ${winnerLightningAddress}`);
-      console.log(`   Loser pays: ${challenge.wagerAmount * 2} sats`);
+      console.log(`   Loser pays: ${challenge.wager * 2} sats`);
 
       // Generate payout invoice (loser pays winner the full pot)
       const payoutResult = await challengePaymentService.generatePayoutInvoice(
         winnerLightningAddress,
-        challenge.wagerAmount * 2, // Winner takes all
+        challenge.wager * 2, // Winner takes all
         challengeId
       );
 
@@ -207,19 +206,21 @@ export class ChallengeCompletionService {
       // Get leaderboard
       const leaderboard = await challengeService.getChallengeLeaderboard(challengeId);
 
-      if (!leaderboard || leaderboard.length === 0) {
+      if (!leaderboard || !leaderboard.participants || leaderboard.participants.length === 0) {
         console.log('No workouts found for challenge');
         return null;
       }
 
-      if (leaderboard.length === 1) {
+      const participants = leaderboard.participants;
+
+      if (participants.length === 1) {
         // Only one participant posted workouts
-        return leaderboard[0].pubkey;
+        return participants[0].pubkey;
       }
 
       // Check for tie
-      const firstPlace = leaderboard[0];
-      const secondPlace = leaderboard[1];
+      const firstPlace = participants[0];
+      const secondPlace = participants[1];
 
       if (this.scoresAreEqual(firstPlace, secondPlace)) {
         console.log('Scores are tied');
@@ -237,9 +238,9 @@ export class ChallengeCompletionService {
   /**
    * Check if two leaderboard entries have equal scores
    */
-  private scoresAreEqual(entry1: LeaderboardEntry, entry2: LeaderboardEntry): boolean {
-    // Compare based on progress percentage
-    return Math.abs(entry1.progress - entry2.progress) < 0.01; // Within 0.01% is considered tie
+  private scoresAreEqual(entry1: ChallengeParticipant, entry2: ChallengeParticipant): boolean {
+    // Compare based on current progress
+    return Math.abs(entry1.currentProgress - entry2.currentProgress) < 0.01; // Within 0.01 is considered tie
   }
 
   /**
@@ -267,10 +268,10 @@ export class ChallengeCompletionService {
         try {
           const expiresAt = challenge.expiresAt * 1000;
           if (now >= expiresAt) {
-            expiredIds.push(challenge.challengeId);
+            expiredIds.push(challenge.id);
           }
         } catch (error) {
-          console.error(`Error checking challenge ${challenge.challengeId}:`, error);
+          console.error(`Error checking challenge ${challenge.id}:`, error);
         }
       }
 

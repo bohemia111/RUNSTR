@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../ui/Card';
 import { theme } from '../../styles/theme';
 import { Avatar } from '../ui/Avatar';
-import { NutzapLightningButton } from '../nutzap/NutzapLightningButton';
+import { NWCLightningButton } from '../lightning/NWCLightningButton';
 
 export interface CompetitionWinner {
   id: string;
@@ -126,7 +126,7 @@ export const CompetitionWinnersCard: React.FC<CompetitionWinnersCardProps> = ({
                 </View>
               </View>
               <View style={styles.winnerRight}>
-                <NutzapLightningButton
+                <NWCLightningButton
                   recipientNpub={winner.winnerNpub}
                   recipientName={winner.winnerName}
                   size="small"

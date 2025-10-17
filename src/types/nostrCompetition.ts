@@ -125,6 +125,10 @@ export interface NostrEventDefinition {
   prizePoolSats?: number; // Optional prize pool amount in sats
   lightningAddress?: string; // Captain's Lightning address for receiving entry fees (e.g., "captain@getalby.com")
 
+  // Payment Configuration
+  paymentDestination?: 'captain' | 'charity';
+  paymentRecipientName?: string;
+
   // Status
   status: 'upcoming' | 'active' | 'completed' | 'cancelled';
   createdAt: number; // Unix timestamp

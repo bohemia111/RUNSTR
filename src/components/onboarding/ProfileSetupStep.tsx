@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../styles/theme';
-import { validateName, validateBio } from '../../utils/profileValidation';
+import { validateName, validateBio, validateLightningAddress, validateUrl } from '../../utils/profileValidation';
 import { EditableProfile } from '../../services/nostr/NostrProfilePublisher';
 
 interface ProfileSetupStepProps {
@@ -38,7 +38,9 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState<string>('');
-  const [errors, setErrors] = useState<{ name?: string; bio?: string }>({});
+  const [banner, setBanner] = useState('');
+  const [lightningAddress, setLightningAddress] = useState('');
+  const [errors, setErrors] = useState<{ name?: string; bio?: string; lud16?: string; banner?: string }>({});
 
   const handleNameChange = (text: string) => {
     setName(text);
@@ -53,6 +55,22 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
     // Clear error when user starts typing
     if (errors.bio) {
       setErrors(prev => ({ ...prev, bio: undefined }));
+    }
+  };
+
+  const handleLightningAddressChange = (text: string) => {
+    setLightningAddress(text);
+    // Clear error when user starts typing
+    if (errors.lud16) {
+      setErrors(prev => ({ ...prev, lud16: undefined }));
+    }
+  };
+
+  const handleBannerChange = (text: string) => {
+    setBanner(text);
+    // Clear error when user starts typing
+    if (errors.banner) {
+      setErrors(prev => ({ ...prev, banner: undefined }));
     }
   };
 
@@ -141,16 +159,35 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   };
 
   const validateForm = (): boolean => {
-    const newErrors: { name?: string; bio?: string } = {};
+    const newErrors: { name?: string; bio?: string; lud16?: string; banner?: string } = {};
 
-    const nameError = validateName(name);
-    if (nameError) {
-      newErrors.name = nameError;
+    // Only validate if fields have content
+    if (name) {
+      const nameError = validateName(name);
+      if (nameError) {
+        newErrors.name = nameError;
+      }
     }
 
-    const bioError = validateBio(bio);
-    if (bioError) {
-      newErrors.bio = bioError;
+    if (bio) {
+      const bioError = validateBio(bio);
+      if (bioError) {
+        newErrors.bio = bioError;
+      }
+    }
+
+    if (lightningAddress) {
+      const lud16Error = validateLightningAddress(lightningAddress);
+      if (lud16Error) {
+        newErrors.lud16 = lud16Error;
+      }
+    }
+
+    if (banner) {
+      const bannerError = validateUrl(banner);
+      if (bannerError) {
+        newErrors.banner = bannerError;
+      }
     }
 
     setErrors(newErrors);
@@ -162,7 +199,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
       return;
     }
 
-    // Build profile object
+    // Build profile object - all fields are optional
     const profile: Partial<EditableProfile> = {};
 
     if (name.trim()) {
@@ -175,6 +212,14 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
 
     if (profilePicture) {
       profile.picture = profilePicture;
+    }
+
+    if (banner.trim()) {
+      profile.banner = banner.trim();
+    }
+
+    if (lightningAddress.trim()) {
+      profile.lud16 = lightningAddress.trim();
     }
 
     onContinue(profile);
@@ -261,6 +306,48 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
           />
           {errors.bio && <Text style={styles.errorText}>{errors.bio}</Text>}
           <Text style={styles.helperText}>{bio.length}/500 characters</Text>
+        </View>
+
+        {/* Lightning Address */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>
+            Lightning Address
+            <Text style={styles.optionalLabel}> (optional)</Text>
+          </Text>
+          <TextInput
+            style={[styles.input, errors.lud16 && styles.inputError]}
+            value={lightningAddress}
+            onChangeText={handleLightningAddressChange}
+            placeholder="yourname@getalby.com"
+            placeholderTextColor={theme.colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+          />
+          {errors.lud16 && <Text style={styles.errorText}>{errors.lud16}</Text>}
+          <Text style={styles.helperText}>
+            <Ionicons name="information-circle" size={12} color={theme.colors.textMuted} /> Receive Bitcoin tips and rewards
+          </Text>
+        </View>
+
+        {/* Banner URL */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>
+            Banner Image URL
+            <Text style={styles.optionalLabel}> (optional)</Text>
+          </Text>
+          <TextInput
+            style={[styles.input, errors.banner && styles.inputError]}
+            value={banner}
+            onChangeText={handleBannerChange}
+            placeholder="https://example.com/banner.jpg"
+            placeholderTextColor={theme.colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+          {errors.banner && <Text style={styles.errorText}>{errors.banner}</Text>}
+          <Text style={styles.helperText}>Banner image for your profile</Text>
         </View>
 
         {/* Note */}
@@ -370,6 +457,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginBottom: 8,
   },
+  optionalLabel: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: theme.colors.textMuted,
+  },
   input: {
     backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
@@ -436,7 +528,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   continueButton: {
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.orangeBright,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -444,6 +536,6 @@ const styles = StyleSheet.create({
   continueButtonText: {
     fontSize: 17,
     fontWeight: '600',
-    color: theme.colors.background,
+    color: '#000000',
   },
 });

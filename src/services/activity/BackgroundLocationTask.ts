@@ -6,6 +6,7 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { LocationPoint } from './LocationTrackingService';
 
 export const BACKGROUND_LOCATION_TASK = 'runstr-background-location';
@@ -238,19 +239,25 @@ function getBackgroundLocationOptions(activityType: string): Location.LocationTa
   const baseOptions: Location.LocationTaskOptions = {
     accuracy: Location.Accuracy.BestForNavigation,
     // iOS-specific: Use fitness-optimized GPS algorithms
-    activityType: Location.ActivityType.Fitness,
-    // iOS-specific: Don't auto-pause during workouts
-    pausesUpdatesAutomatically: false,
-    // iOS-specific: Show blue bar when tracking in background (user transparency)
-    showsBackgroundLocationIndicator: true,
-    // iOS-specific: Disable deferred updates (prevents batching)
-    deferredUpdatesInterval: 0,
-    deferredUpdatesDistance: 0,
+    ...(Platform.OS === 'ios' && {
+      activityType: Location.ActivityType.Fitness,
+      // iOS-specific: Don't auto-pause during workouts
+      pausesUpdatesAutomatically: false,
+      // iOS-specific: Show blue bar when tracking in background (user transparency)
+      showsBackgroundLocationIndicator: true,
+      // iOS-specific: Disable deferred updates (prevents batching)
+      deferredUpdatesInterval: 0,
+      deferredUpdatesDistance: 0,
+    }),
     // Android-specific: Foreground service to prevent Doze Mode from stopping tracking
     foregroundService: {
       notificationTitle: notification.title,
       notificationBody: notification.body,
       notificationColor: '#FF6B35', // RUNSTR orange color
+      // Android 14+ requirement: High priority for persistent notification
+      ...(Platform.OS === 'android' && {
+        notificationPriority: 'high',
+      }),
     },
   };
 
@@ -258,29 +265,33 @@ function getBackgroundLocationOptions(activityType: string): Location.LocationTa
     case 'running':
       return {
         ...baseOptions,
-        timeInterval: 1000, // Every 1 second for continuous tracking (Android improvement)
-        distanceInterval: 3, // Update every 3 meters
+        // Android: 3s intervals to avoid throttling. iOS: 1s for responsive tracking
+        timeInterval: Platform.OS === 'android' ? 3000 : 1000,
+        distanceInterval: 5, // Primary trigger: update every 5 meters (more reliable than time)
         mayShowUserSettingsDialog: false,
       };
     case 'walking':
       return {
         ...baseOptions,
-        timeInterval: 2000, // Every 2 seconds (improved from 5s)
-        distanceInterval: 5, // Update every 5 meters
+        // Android: 3s intervals. iOS: 2s for smoother tracking
+        timeInterval: Platform.OS === 'android' ? 3000 : 2000,
+        distanceInterval: 5, // Primary trigger: update every 5 meters
         mayShowUserSettingsDialog: false,
       };
     case 'cycling':
       return {
         ...baseOptions,
-        timeInterval: 1000, // Every 1 second for high-speed tracking
-        distanceInterval: 5, // Update every 5 meters
+        // Android: 3s intervals. iOS: 1s for high-speed tracking
+        timeInterval: Platform.OS === 'android' ? 3000 : 1000,
+        distanceInterval: 8, // Primary trigger: update every 8 meters (cycling is faster)
         mayShowUserSettingsDialog: false,
       };
     default:
       return {
         ...baseOptions,
-        timeInterval: 2000,
-        distanceInterval: 5,
+        // Android: 3s intervals. iOS: 2s default
+        timeInterval: Platform.OS === 'android' ? 3000 : 2000,
+        distanceInterval: 5, // Primary trigger: update every 5 meters
       };
   }
 }

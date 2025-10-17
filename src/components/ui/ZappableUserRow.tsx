@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableWithoutFeedback } from 'react-native';
 import { theme } from '../../styles/theme';
 import { Avatar } from './Avatar';
-import { NutzapLightningButton } from '../nutzap/NutzapLightningButton';
+import { NWCLightningButton } from '../lightning/NWCLightningButton';
 import { ChallengeIconButton } from './ChallengeIconButton';
 import { QuickChallengeWizard } from '../wizards/QuickChallengeWizard';
 import { useNostrProfile } from '../../hooks/useCachedData';
@@ -84,7 +84,7 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
                     />
                   )}
                   {showQuickZap && (
-                    <NutzapLightningButton
+                    <NWCLightningButton
                       recipientNpub={npub}
                       recipientName={displayName}
                       size="small"

@@ -15,10 +15,7 @@ import { NotificationPreferencesService } from '../services/notifications/Notifi
 
 // Profile Components
 import { ProfileHeader } from '../components/profile/ProfileHeader';
-import { CompactWallet } from '../components/profile/CompactWallet';
-import { SendModal } from '../components/wallet/SendModal';
-import { ReceiveModal } from '../components/wallet/ReceiveModal';
-import { HistoryModal } from '../components/wallet/HistoryModal';
+// Wallet components moved to Settings
 import { MyTeamsBox } from '../components/profile/MyTeamsBox';
 import { ChallengeNotificationsBox } from '../components/profile/ChallengeNotificationsBox';
 import { YourCompetitionsBox } from '../components/profile/YourCompetitionsBox';
@@ -29,8 +26,7 @@ import { QRScannerModal } from '../components/qr/QRScannerModal';
 import { JoinPreviewModal } from '../components/qr/JoinPreviewModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useNutzap } from '../hooks/useNutzap';
-import { useWalletStore } from '../store/walletStore';
+// Wallet imports removed - moved to Settings
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { npubEncode } from '../utils/nostrEncoding';
 import { unifiedNotificationStore } from '../services/notifications/UnifiedNotificationStore';
@@ -92,35 +88,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
   const navigation = useNavigation<any>();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showSendModal, setShowSendModal] = useState(false);
-  const [showReceiveModal, setShowReceiveModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showJoinPreview, setShowJoinPreview] = useState(false);
   const [scannedQRData, setScannedQRData] = useState<QRData | null>(null);
   const [userNpub, setUserNpub] = useState<string>('');
-  const [showBalanceMenu, setShowBalanceMenu] = useState(false);
 
-  // ✅ PERFORMANCE: Lazy wallet initialization - don't auto-initialize on mount
-  const { balance, refreshBalance } = useNutzap(false); // autoInitialize = false
-  const { initialize: initializeWallet, isInitialized } = useWalletStore();
-
-  // ✅ PERFORMANCE: Wallet initialization happens ONLY when needed (user interacts with balance)
-  // Background initialization happens after 2 seconds (truly non-blocking)
-  useEffect(() => {
-    if (isInitialized) {
-      return; // Already initialized
-    }
-
-    // Defer wallet init by 2 seconds to allow UI to settle
-    const timer = setTimeout(() => {
-      console.log('[ProfileScreen] ⚡ Background wallet initialization (2s delay)...');
-      initializeWallet(undefined, true); // Quick resume mode
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [isInitialized, initializeWallet]);
+  // Wallet features moved to Settings screen
 
   // ✅ PERFORMANCE: Defer notification initialization by 3 seconds
   // Notifications are not critical for initial app load, delay them for better UX
@@ -208,17 +182,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onEditProfile?.();
   }, [onEditProfile]);
 
-  const handleSend = useCallback(() => {
-    setShowSendModal(true);
-  }, []);
-
-  const handleReceive = useCallback(() => {
-    setShowReceiveModal(true);
-  }, []);
-
-  const handleWalletHistory = useCallback(() => {
-    setShowHistoryModal(true);
-  }, []);
+  // Wallet handlers moved to Settings screen
 
   const handleSyncSourcePress = useCallback((provider: string) => {
     onSyncSourcePress?.(provider);
@@ -262,10 +226,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         console.warn('[ProfileScreen] Profile refetch failed:', err);
       });
 
-      // 3. Refresh wallet balance
-      await refreshBalance();
-
-      // 4. Call original onRefresh if provided
+      // 3. Call original onRefresh if provided
       await onRefresh?.();
 
       console.log('[ProfileScreen] ✅ Pull-to-refresh complete');
@@ -274,7 +235,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     } finally {
       setIsRefreshing(false);
     }
-  }, [refreshBalance, onRefresh]);
+  }, [onRefresh]);
 
   const handleSettingsPress = useCallback(() => {
     navigation.navigate('Settings', {
@@ -346,19 +307,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     }
   }, []);
 
-  // ✅ PERFORMANCE: Memoize balance formatting function
-  const formatBalance = useCallback((sats: number): string => {
-    if (sats >= 1000000) {
-      return `${(sats / 1000000).toFixed(2)}M`;
-    } else if (sats >= 1000) {
-      return `${(sats / 1000).toFixed(1)}K`;
-    }
-    return sats.toString();
-  }, []);
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header with QR Scanner, Balance, and Settings Button */}
+      {/* Header with QR Scanner and Settings Button */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.qrButton}
@@ -369,18 +320,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </TouchableOpacity>
         <View style={styles.headerSpacer} />
 
-        {/* Balance Display - Tappable */}
-        <TouchableOpacity
-          style={styles.balanceButton}
-          onPress={() => setShowBalanceMenu(!showBalanceMenu)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          {/* ✅ PERFORMANCE: Show loading state while wallet initializes */}
-          <Text style={styles.balanceText}>
-            {isInitialized ? formatBalance(balance) : '...'}
-          </Text>
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.settingsButton}
           onPress={handleSettingsPress}
@@ -389,33 +328,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <Ionicons name="menu-outline" size={24} color={theme.colors.text} />
         </TouchableOpacity>
       </View>
-
-      {/* Balance Menu Dropdown */}
-      {showBalanceMenu && (
-        <View style={styles.balanceMenu}>
-          <TouchableOpacity
-            style={styles.balanceMenuItem}
-            onPress={() => {
-              setShowBalanceMenu(false);
-              handleSend();
-            }}
-          >
-            <Ionicons name="arrow-up-outline" size={20} color={theme.colors.text} />
-            <Text style={styles.balanceMenuText}>Send</Text>
-          </TouchableOpacity>
-          <View style={styles.balanceMenuDivider} />
-          <TouchableOpacity
-            style={styles.balanceMenuItem}
-            onPress={() => {
-              setShowBalanceMenu(false);
-              handleReceive();
-            }}
-          >
-            <Ionicons name="arrow-down-outline" size={20} color={theme.colors.text} />
-            <Text style={styles.balanceMenuText}>Receive</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       <ScrollView
         style={styles.content}
@@ -467,26 +379,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </View>
       </ScrollView>
 
-      {/* Send Modal */}
-      <SendModal
-        visible={showSendModal}
-        onClose={() => setShowSendModal(false)}
-        currentBalance={balance}
-      />
-
-      {/* Receive Modal */}
-      <ReceiveModal
-        visible={showReceiveModal}
-        onClose={() => setShowReceiveModal(false)}
-        currentBalance={balance}
-        userNpub={userNpub}
-      />
-
-      {/* History Modal */}
-      <HistoryModal
-        visible={showHistoryModal}
-        onClose={() => setShowHistoryModal(false)}
-      />
+      {/* Wallet modals moved to Settings screen */}
 
       {/* Notification Modal */}
       <NotificationModal
@@ -538,63 +431,8 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  balanceButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#0a0a0a',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#1a1a1a',
-    marginRight: 8,
-  },
-
-  balanceText: {
-    fontSize: 14,
-    fontWeight: theme.typography.weights.semiBold,
-    color: theme.colors.text,
-  },
-
   settingsButton: {
     padding: 4,
-  },
-
-  // Balance Menu Dropdown
-  balanceMenu: {
-    position: 'absolute',
-    top: 56,
-    right: 60,
-    backgroundColor: '#0a0a0a',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#1a1a1a',
-    zIndex: 100,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 5,
-    minWidth: 140,
-  },
-
-  balanceMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-  },
-
-  balanceMenuText: {
-    fontSize: 14,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.text,
-  },
-
-  balanceMenuDivider: {
-    height: 1,
-    backgroundColor: '#1a1a1a',
   },
 
   // Content container (now scrollable with pull-to-refresh)

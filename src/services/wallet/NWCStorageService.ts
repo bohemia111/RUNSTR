@@ -1,13 +1,20 @@
 /**
  * NWCStorageService - Manages Nostr Wallet Connect connection strings
  * Handles storage, validation, and connection testing
+ * Uses SecureStore for hardware-backed encryption
  * Simple, safe, and reliable - fails gracefully
  */
 
+import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// SecureStore has key length limits, use shorter keys
+const SECURE_KEYS = {
+  NWC_STRING: 'nwc_string', // The sensitive NWC connection string
+} as const;
+
+// Non-sensitive data can stay in AsyncStorage
 const STORAGE_KEYS = {
-  NWC_STRING: '@runstr:nwc_string',
   NWC_STATUS: '@runstr:nwc_status',
   LAST_CONNECTION_TEST: '@runstr:nwc_last_test',
 } as const;
@@ -26,6 +33,32 @@ export interface NWCStatus {
  * All operations fail gracefully - app continues to work without NWC
  */
 class NWCStorageServiceClass {
+  /**
+   * Migrate existing NWC from AsyncStorage to SecureStore
+   * Called automatically on first access
+   */
+  private async migrateFromAsyncStorage(): Promise<void> {
+    try {
+      // Check if we have an old NWC string in AsyncStorage
+      const oldKey = '@runstr:nwc_string';
+      const oldNwcString = await AsyncStorage.getItem(oldKey);
+
+      if (oldNwcString) {
+        console.log('[NWC] Migrating from AsyncStorage to SecureStore...');
+
+        // Save to SecureStore
+        await SecureStore.setItemAsync(SECURE_KEYS.NWC_STRING, oldNwcString);
+
+        // Remove from AsyncStorage
+        await AsyncStorage.removeItem(oldKey);
+
+        console.log('[NWC] Migration completed successfully');
+      }
+    } catch (error) {
+      console.error('[NWC] Migration failed:', error);
+      // Continue without migration - don't break the app
+    }
+  }
   /**
    * Validate NWC connection string format
    * Checks basic format without network calls
@@ -107,8 +140,8 @@ class NWCStorageServiceClass {
         };
       }
 
-      // Save to storage
-      await AsyncStorage.setItem(STORAGE_KEYS.NWC_STRING, nwcString);
+      // Save to SecureStore (hardware-backed encryption)
+      await SecureStore.setItemAsync(SECURE_KEYS.NWC_STRING, nwcString);
 
       // Save connection status
       const status: NWCStatus = {
@@ -134,7 +167,10 @@ class NWCStorageServiceClass {
    */
   async getNWCString(): Promise<string | null> {
     try {
-      const nwcString = await AsyncStorage.getItem(STORAGE_KEYS.NWC_STRING);
+      // Check for migration on first access
+      await this.migrateFromAsyncStorage();
+
+      const nwcString = await SecureStore.getItemAsync(SECURE_KEYS.NWC_STRING);
       return nwcString;
     } catch (error) {
       console.error('[NWC] Failed to get connection string:', error);
@@ -198,8 +234,11 @@ class NWCStorageServiceClass {
    */
   async clearNWC(): Promise<void> {
     try {
+      // Remove from SecureStore
+      await SecureStore.deleteItemAsync(SECURE_KEYS.NWC_STRING);
+
+      // Remove status from AsyncStorage
       await AsyncStorage.multiRemove([
-        STORAGE_KEYS.NWC_STRING,
         STORAGE_KEYS.NWC_STATUS,
         STORAGE_KEYS.LAST_CONNECTION_TEST,
       ]);

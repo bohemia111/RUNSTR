@@ -32,6 +32,10 @@ export interface CompetitionEvent {
   eventDate: string; // ISO date
   targetDistance?: number;
   targetUnit?: string;
+  entryFeesSats?: number;
+  lightningAddress?: string;
+  paymentDestination?: 'captain' | 'charity';
+  paymentRecipientName?: string;
 }
 
 export class SimpleCompetitionService {
@@ -318,6 +322,7 @@ export class SimpleCompetitionService {
       }
 
       const targetValue = getTag('target_value');
+      const entryFee = getTag('entry_fee');
 
       return {
         id,
@@ -330,6 +335,10 @@ export class SimpleCompetitionService {
         eventDate: getTag('event_date') || new Date().toISOString(),
         targetDistance: targetValue ? parseFloat(targetValue) : undefined,
         targetUnit: getTag('target_unit'),
+        entryFeesSats: entryFee ? parseInt(entryFee) : undefined,
+        lightningAddress: getTag('lightning_address'),
+        paymentDestination: getTag('payment_destination') as 'captain' | 'charity' | undefined,
+        paymentRecipientName: getTag('payment_recipient_name'),
       };
     } catch (error) {
       console.error('Failed to parse event:', error);

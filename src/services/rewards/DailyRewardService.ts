@@ -4,13 +4,15 @@
  * REWARD FLOW:
  * 1. User publishes first workout of the day
  * 2. Check eligibility (once per day limit)
- * 3. User's wallet creates invoice for receiving 50 sats
- * 4. Reward sender wallet (app's wallet) pays the invoice
- * 5. User receives 50 sats in their own wallet
+ * 3. Get user's Lightning address from their Nostr profile (lud16)
+ * 4. Request Lightning invoice from their address via LNURL protocol
+ * 5. Reward sender wallet (app's wallet) pays the invoice
+ * 6. User receives 50 sats to their Lightning address
  *
- * TWO WALLETS INVOLVED:
- * - User's NWC wallet: Generates invoice, receives payment
- * - Reward sender wallet: Pays invoices using REWARD_SENDER_NWC env variable
+ * PAYMENT ARCHITECTURE:
+ * - User provides: Lightning address in Nostr profile bio (lud16 field)
+ * - App requests: Invoice from Lightning address via LNURL
+ * - Reward sender wallet: Pays invoice using REWARD_SENDER_NWC env variable
  *
  * SILENT FAILURE: If any step fails, user never sees error
  * Workout publishing always succeeds regardless of reward status
@@ -18,9 +20,9 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REWARD_CONFIG, REWARD_STORAGE_KEYS } from '../../config/rewards';
-import { NWCStorageService } from '../wallet/NWCStorageService';
-import { NWCWalletService } from '../wallet/NWCWalletService';
 import { RewardSenderWallet } from './RewardSenderWallet';
+import { ProfileService } from '../user/profileService';
+import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 
 export interface RewardResult {
   success: boolean;
@@ -60,62 +62,71 @@ class DailyRewardServiceClass {
   }
 
   /**
-   * Check if user has NWC wallet configured
+   * Get user's Lightning address from their Nostr profile
    *
-   * LIMITATION: Can only check current user's wallet status
-   * We cannot check if OTHER users have wallets configured because:
-   * - NWC strings are stored locally in current user's device
-   * - No way to query another user's wallet capabilities
+   * Lightning addresses allow any app to send Bitcoin to users
+   * without requiring them to have NWC wallet setup in our app.
+   * Users just need a Lightning address in their Nostr profile (lud16 field).
    *
-   * Future improvement: Support Lightning addresses from user profiles
+   * @param userPubkey - User's public key (npub or hex)
+   * @returns Lightning address if found, null otherwise
    */
-  private async userHasWallet(userPubkey: string): Promise<boolean> {
+  private async getUserLightningAddress(userPubkey: string): Promise<string | null> {
     try {
-      // Can only check if current user has NWC configured locally
-      // Other users' wallet status is unknown (always returns false for them)
-      const hasNWC = await NWCStorageService.hasNWC();
-      return hasNWC;
+      // Fetch user profile from Nostr
+      const profile = await ProfileService.getUserProfile(userPubkey);
+
+      if (!profile || !profile.lud16) {
+        console.log('[Reward] User has no Lightning address in profile');
+        return null;
+      }
+
+      console.log('[Reward] Found Lightning address:', profile.lud16);
+      return profile.lud16;
     } catch (error) {
-      console.error('[Reward] Error checking user wallet:', error);
-      return false;
+      console.error('[Reward] Error getting user Lightning address:', error);
+      return null;
     }
   }
 
   /**
-   * Generate Lightning invoice for user to receive reward
+   * Request Lightning invoice from user's Lightning address
    *
-   * WHY USER NEEDS NWC:
-   * - Lightning payments require an invoice from the receiver
-   * - We use user's NWC wallet to generate this invoice
-   * - Without NWC, we have no way to create an invoice for them
-   * - The invoice tells reward sender wallet where to send payment
+   * Uses LNURL protocol to request an invoice from any Lightning address.
+   * This allows us to pay users without them having NWC setup.
    *
-   * Returns invoice string if successful, null if user has no wallet
+   * PAYMENT FLOW:
+   * 1. Get Lightning address from user profile (e.g., alice@getalby.com)
+   * 2. Use LNURL to request invoice for 50 sats
+   * 3. Receive BOLT11 invoice that can be paid by any Lightning wallet
+   *
+   * @param lightningAddress - User's Lightning address
+   * @param amount - Amount in satoshis
+   * @returns Invoice string if successful, null otherwise
    */
-  private async getUserInvoice(userPubkey: string, amount: number): Promise<string | null> {
+  private async requestInvoiceFromUserAddress(
+    lightningAddress: string,
+    amount: number
+  ): Promise<string | null> {
     try {
-      // User must have NWC configured to generate receiving invoice
-      const hasWallet = await this.userHasWallet(userPubkey);
-      if (!hasWallet) {
-        console.log('[Reward] User has no wallet, cannot create invoice');
-        return null;
-      }
+      console.log('[Reward] Requesting invoice from Lightning address:', lightningAddress);
 
-      // Create invoice using user's NWC wallet (this becomes their receiving address)
-      const result = await NWCWalletService.createInvoice(
+      // Request invoice via LNURL protocol
+      const { invoice } = await getInvoiceFromLightningAddress(
+        lightningAddress,
         amount,
-        `Daily workout reward from RUNSTR! ⚡`,
-        { type: 'daily_reward', userPubkey }
+        `Daily workout reward from RUNSTR! ⚡`
       );
 
-      if (result.success && result.invoice) {
-        return result.invoice;
+      if (invoice) {
+        console.log('[Reward] Successfully got invoice from Lightning address');
+        return invoice;
       }
 
-      console.log('[Reward] Failed to create user invoice:', result.error);
+      console.log('[Reward] Failed to get invoice from Lightning address');
       return null;
     } catch (error) {
-      console.error('[Reward] Error creating user invoice:', error);
+      console.error('[Reward] Error getting invoice from Lightning address:', error);
       return null;
     }
   }
@@ -178,6 +189,11 @@ class DailyRewardServiceClass {
    * USER EXPERIENCE:
    * - Success: User sees "You earned 50 sats!" popup after workout
    * - Failure: User sees nothing (workout still posts normally)
+   *
+   * NEW PAYMENT FLOW:
+   * - No longer requires user to have NWC wallet in app
+   * - Pays directly to Lightning address from user's Nostr profile
+   * - Works with any Lightning wallet that supports LNURL
    */
   async sendReward(userPubkey: string): Promise<RewardResult> {
     try {
@@ -193,20 +209,23 @@ class DailyRewardServiceClass {
         };
       }
 
-      // Check if user has wallet to receive
-      const hasWallet = await this.userHasWallet(userPubkey);
-      if (!hasWallet) {
-        console.log('[Reward] User has no wallet, skipping reward');
+      // Get user's Lightning address from their Nostr profile
+      const lightningAddress = await this.getUserLightningAddress(userPubkey);
+      if (!lightningAddress) {
+        console.log('[Reward] User has no Lightning address in profile, skipping reward');
         return {
           success: false,
-          reason: 'no_wallet',
+          reason: 'no_lightning_address',
         };
       }
 
-      // Get user's invoice for receiving payment
-      const userInvoice = await this.getUserInvoice(userPubkey, REWARD_CONFIG.DAILY_WORKOUT_REWARD);
+      // Request invoice from user's Lightning address
+      const userInvoice = await this.requestInvoiceFromUserAddress(
+        lightningAddress,
+        REWARD_CONFIG.DAILY_WORKOUT_REWARD
+      );
       if (!userInvoice) {
-        console.log('[Reward] Could not get user invoice, skipping reward');
+        console.log('[Reward] Could not get invoice from Lightning address, skipping reward');
         return {
           success: false,
           reason: 'invoice_failed',
@@ -215,12 +234,12 @@ class DailyRewardServiceClass {
 
       // Send payment using app's dedicated reward sender wallet
       //
-      // WALLET ARCHITECTURE:
-      // - RewardSenderWallet is the app's Lightning wallet (REWARD_SENDER_NWC from .env)
-      // - It pays invoices generated by users' wallets
-      // - This is a separate wallet from users' personal NWC connections
-      // - Funded and managed by app developers to distribute rewards
-      console.log('[Reward] Sending payment from reward wallet...');
+      // PAYMENT ARCHITECTURE:
+      // - User provides: Lightning address in their Nostr profile (lud16 field)
+      // - App requests: Invoice from Lightning address via LNURL protocol
+      // - RewardSenderWallet: Pays invoice using REWARD_SENDER_NWC from .env
+      // - User receives: 50 sats directly to their Lightning wallet
+      console.log('[Reward] Sending payment to Lightning address:', lightningAddress);
 
       const paymentResult = await RewardSenderWallet.sendRewardPayment(userInvoice);
 
@@ -265,12 +284,12 @@ class DailyRewardServiceClass {
   }> {
     try {
       const canClaim = await this.canClaimToday(userPubkey);
-      const hasWallet = await this.userHasWallet(userPubkey);
+      const lightningAddress = await this.getUserLightningAddress(userPubkey);
 
-      if (!hasWallet) {
+      if (!lightningAddress) {
         return {
           eligible: false,
-          reason: 'no_wallet',
+          reason: 'no_lightning_address',
         };
       }
 

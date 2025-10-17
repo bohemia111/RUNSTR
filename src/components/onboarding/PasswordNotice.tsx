@@ -88,7 +88,7 @@ export const PasswordNotice: React.FC<PasswordNoticeProps> = ({
     <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
       {/* Icon */}
       <View style={styles.iconContainer}>
-        <Ionicons name="key" size={60} color={theme.colors.text} />
+        <Ionicons name="key" size={60} color={theme.colors.orangeBright} />
       </View>
 
       {/* Title */}
@@ -105,7 +105,7 @@ export const PasswordNotice: React.FC<PasswordNoticeProps> = ({
 
       {/* Important Notice */}
       <View style={styles.warningContainer}>
-        <Ionicons name="warning" size={24} color={theme.colors.text} />
+        <Ionicons name="warning" size={24} color={theme.colors.orangeBright} />
         <Text style={styles.warningText}>
           This is the ONLY way to access your account
         </Text>
@@ -226,9 +226,9 @@ const styles = StyleSheet.create({
   warningContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.cardBackground,
+    backgroundColor: `${theme.colors.orangeBright}10`,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.orangeBright,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
@@ -330,8 +330,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkboxChecked: {
-    backgroundColor: theme.colors.text,
-    borderColor: theme.colors.text,
+    backgroundColor: theme.colors.orangeBright,
+    borderColor: theme.colors.orangeBright,
   },
   checkboxText: {
     fontSize: 15,
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   continueButton: {
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.orangeBright,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   continueButtonText: {
     fontSize: 17,
     fontWeight: '600',
-    color: theme.colors.background,
+    color: '#000000',
   },
   continueButtonTextDisabled: {
     color: theme.colors.textMuted,

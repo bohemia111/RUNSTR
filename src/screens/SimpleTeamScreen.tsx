@@ -19,6 +19,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
 import SimpleCompetitionService from '../services/competition/SimpleCompetitionService';
+import unifiedCache from '../services/cache/UnifiedNostrCache';
+import { CacheKeys } from '../constants/cacheTTL';
 import { CharitySection } from '../components/team/CharitySection';
 import { CharityZapService } from '../services/charity/CharityZapService';
 
@@ -77,17 +79,32 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
           return;
         }
 
-        setLoadingEvents(true);
-        try {
-          console.log('[SimpleTeamScreen] 📅 Fetching events for team:', team.id);
-          const teamEvents = await SimpleCompetitionService.getInstance().getTeamEvents(team.id);
-          console.log('[SimpleTeamScreen] ✅ Found events:', teamEvents.length);
-          setEvents(teamEvents);
-        } catch (error) {
-          console.error('[SimpleTeamScreen] ❌ Error fetching events:', error);
-        } finally {
-          setLoadingEvents(false);
+        // Step 1: Check cache first and display immediately
+        const cachedEvents = await unifiedCache.getCachedAsync(CacheKeys.COMPETITIONS);
+        if (cachedEvents && Array.isArray(cachedEvents)) {
+          // Filter cached events for this specific team
+          const teamCachedEvents = cachedEvents.filter((event: any) => event.teamId === team.id);
+          console.log('[SimpleTeamScreen] 📱 Cache hit: Displaying', teamCachedEvents.length, 'cached events immediately');
+          setEvents(teamCachedEvents);
+          setLoadingEvents(false); // Hide spinner immediately since we have cached data
+        } else {
+          console.log('[SimpleTeamScreen] 📱 Cache miss: No cached events, will show spinner');
+          setLoadingEvents(true); // Only show spinner on first load when no cache
         }
+
+        // Step 2: Fetch fresh data in background (non-blocking)
+        console.log('[SimpleTeamScreen] 🔄 Starting background fetch for fresh events...');
+        SimpleCompetitionService.getInstance().getTeamEvents(team.id)
+          .then((freshEvents) => {
+            console.log('[SimpleTeamScreen] ✅ Background fetch complete:', freshEvents.length, 'events');
+            setEvents(freshEvents);
+            setLoadingEvents(false);
+          })
+          .catch((error) => {
+            console.error('[SimpleTeamScreen] ❌ Background fetch error:', error);
+            setLoadingEvents(false);
+            // Keep showing cached data if background fetch fails
+          });
       };
 
       fetchEvents();

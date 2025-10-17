@@ -34,6 +34,11 @@ import { useNavigation, CommonActions } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import { NWCStorageService } from '../services/wallet/NWCStorageService';
 import { WalletConfigModal } from '../components/wallet/WalletConfigModal';
+import { SendModal } from '../components/wallet/SendModal';
+import { ReceiveModal } from '../components/wallet/ReceiveModal';
+import { HistoryModal } from '../components/wallet/HistoryModal';
+import { useNutzap } from '../hooks/useNutzap';
+import { useWalletStore } from '../store/walletStore';
 
 interface SettingsScreenProps {
   currentTeam?: Team;
@@ -103,6 +108,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [showWalletConfig, setShowWalletConfig] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Wallet modals state
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [userNpub, setUserNpub] = useState<string>('');
+
+  // Wallet hooks for balance and initialization
+  const { balance, refreshBalance } = useNutzap(false); // autoInitialize = false
+  const { initialize: initializeWallet, isInitialized } = useWalletStore();
+
   // Alert state for CustomAlert
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -130,6 +145,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       // Check NWC wallet status
       const nwcAvailable = await NWCStorageService.hasNWC();
       setHasNWC(nwcAvailable);
+
+      // Initialize wallet if NWC is connected
+      if (nwcAvailable && !isInitialized) {
+        await initializeWallet(undefined, true); // Quick resume mode
+      }
+
+      // Load user's npub for receiving
+      const npub = await AsyncStorage.getItem('@runstr:npub');
+      if (npub) {
+        setUserNpub(npub);
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -302,6 +328,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     // Reload NWC status after successful configuration
     const nwcAvailable = await NWCStorageService.hasNWC();
     setHasNWC(nwcAvailable);
+
+    // Initialize wallet after successful connection
+    if (nwcAvailable && !isInitialized) {
+      await initializeWallet(undefined, true);
+    }
+  };
+
+  // Helper function to format balance
+  const formatBalance = (sats: number): string => {
+    if (sats >= 1000000) {
+      return `${(sats / 1000000).toFixed(2)}M sats`;
+    } else if (sats >= 1000) {
+      return `${(sats / 1000).toFixed(1)}K sats`;
+    }
+    return `${sats} sats`;
   };
 
   const handleDisconnectWallet = async () => {
@@ -457,33 +498,82 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 </View>
               }
             />
+          </Card>
+        </View>
 
-            {/* NWC Wallet Connection */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Wallet Connection</Text>
-                <Text style={styles.settingSubtitle}>
-                  {hasNWC
-                    ? 'NWC wallet connected'
-                    : 'Connect Lightning wallet for Bitcoin features'}
-                </Text>
-              </View>
-              {hasNWC ? (
+        {/* Wallet Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>WALLET</Text>
+          <Card style={styles.card}>
+            {hasNWC ? (
+              <>
+                {/* Balance Display */}
+                <View style={styles.settingItem}>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>Balance</Text>
+                    <Text style={styles.walletBalance}>
+                      {isInitialized ? formatBalance(balance) : 'Loading...'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.refreshButton}
+                    onPress={refreshBalance}
+                  >
+                    <Ionicons name="refresh" size={20} color={theme.colors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Wallet Actions */}
+                <View style={styles.walletActions}>
+                  <TouchableOpacity
+                    style={styles.walletActionButton}
+                    onPress={() => setShowSendModal(true)}
+                  >
+                    <Ionicons name="arrow-up-outline" size={20} color={theme.colors.text} />
+                    <Text style={styles.walletActionText}>Send</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.walletActionButton}
+                    onPress={() => setShowReceiveModal(true)}
+                  >
+                    <Ionicons name="arrow-down-outline" size={20} color={theme.colors.text} />
+                    <Text style={styles.walletActionText}>Receive</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.walletActionButton}
+                    onPress={() => setShowHistoryModal(true)}
+                  >
+                    <Ionicons name="time-outline" size={20} color={theme.colors.text} />
+                    <Text style={styles.walletActionText}>History</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Disconnect Option */}
                 <TouchableOpacity
-                  style={styles.disconnectButton}
+                  style={styles.disconnectWalletButton}
                   onPress={handleDisconnectWallet}
                 >
-                  <Text style={styles.disconnectButtonText}>Disconnect</Text>
+                  <Text style={styles.disconnectWalletText}>Disconnect Wallet</Text>
                 </TouchableOpacity>
-              ) : (
+              </>
+            ) : (
+              /* Connect Wallet Prompt */
+              <View style={styles.connectWalletContainer}>
+                <Ionicons name="wallet-outline" size={48} color={theme.colors.textMuted} />
+                <Text style={styles.connectWalletTitle}>Connect Your Wallet</Text>
+                <Text style={styles.connectWalletDescription}>
+                  Connect a Lightning wallet to send and receive Bitcoin payments directly from the app
+                </Text>
                 <TouchableOpacity
-                  style={styles.createButton}
+                  style={styles.connectWalletButton}
                   onPress={() => setShowWalletConfig(true)}
                 >
-                  <Text style={styles.createButtonText}>Connect</Text>
+                  <Text style={styles.connectWalletButtonText}>Connect Wallet</Text>
                 </TouchableOpacity>
-              )}
-            </View>
+              </View>
+            )}
           </Card>
         </View>
 
@@ -721,6 +811,27 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         onClose={() => setShowWalletConfig(false)}
         onSuccess={handleWalletConfigSuccess}
         allowSkip={true}
+      />
+
+      {/* Send Modal */}
+      <SendModal
+        visible={showSendModal}
+        onClose={() => setShowSendModal(false)}
+        currentBalance={balance}
+      />
+
+      {/* Receive Modal */}
+      <ReceiveModal
+        visible={showReceiveModal}
+        onClose={() => setShowReceiveModal(false)}
+        currentBalance={balance}
+        userNpub={userNpub}
+      />
+
+      {/* History Modal */}
+      <HistoryModal
+        visible={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
       />
     </SafeAreaView>
   );
@@ -964,5 +1075,94 @@ const styles = StyleSheet.create({
 
   testButtonTextDisabled: {
     color: theme.colors.textMuted,
+  },
+
+  // Wallet Section Styles
+  walletBalance: {
+    fontSize: 24,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.accent, // Orange color for balance
+    marginTop: 4,
+  },
+
+  refreshButton: {
+    padding: 8,
+    borderRadius: theme.borderRadius.small,
+    backgroundColor: theme.colors.cardBackground,
+  },
+
+  walletActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+
+  walletActionButton: {
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: theme.borderRadius.medium,
+    backgroundColor: theme.colors.cardBackground,
+    minWidth: 80,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+
+  walletActionText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.text,
+    marginTop: 4,
+  },
+
+  disconnectWalletButton: {
+    backgroundColor: theme.colors.orangeBurnt,
+    borderRadius: theme.borderRadius.medium,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+
+  disconnectWalletText: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.accentText,
+  },
+
+  // Connect Wallet Styles
+  connectWalletContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+
+  connectWalletTitle: {
+    fontSize: 18,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+
+  connectWalletDescription: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+
+  connectWalletButton: {
+    backgroundColor: theme.colors.accent, // Orange button
+    borderRadius: theme.borderRadius.medium,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+  },
+
+  connectWalletButtonText: {
+    fontSize: 16,
+    fontWeight: theme.typography.weights.bold,
+    color: '#000', // Black text on orange button
   },
 });

@@ -1,7 +1,12 @@
 /**
  * RewardMemberButton - Quick reward button for team members
- * Allows captains to send NutZaps directly from personal wallet
- * Replaces complex team wallet distribution system
+ * Allows captains to send Bitcoin via NWC to member's Lightning address
+ *
+ * Payment flow:
+ * 1. Captain clicks reward button
+ * 2. Gets member's Lightning address from their Nostr profile
+ * 3. Requests invoice via LNURL protocol
+ * 4. Pays invoice with captain's NWC wallet
  */
 
 import React, { useState } from 'react';
@@ -14,7 +19,7 @@ import {
 } from 'react-native';
 import { theme } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { useNutzap } from '../../hooks/useNutzap';
+import { useNWCZap } from '../../hooks/useNWCZap';
 
 interface RewardMemberButtonProps {
   memberPubkey: string;
@@ -33,10 +38,21 @@ export const RewardMemberButton: React.FC<RewardMemberButtonProps> = ({
   onSuccess,
   variant = 'primary',
 }) => {
-  const { balance, sendNutzap } = useNutzap();
+  const { balance, hasWallet, sendZap, error } = useNWCZap();
   const [isSending, setIsSending] = useState(false);
 
   const handleReward = async () => {
+    // Check if captain has NWC wallet configured
+    if (!hasWallet) {
+      Alert.alert(
+        'Wallet Not Connected',
+        'Please connect your NWC wallet in settings to send rewards.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Check balance
     if (balance < defaultAmount) {
       Alert.alert(
         'Insufficient Balance',
@@ -48,7 +64,7 @@ export const RewardMemberButton: React.FC<RewardMemberButtonProps> = ({
 
     Alert.alert(
       'Send Reward',
-      `Send ${defaultAmount} sats to ${memberName}?`,
+      `Send ${defaultAmount} sats to ${memberName}?\n\nThis will be sent to their Lightning address.`,
       [
         {
           text: 'Cancel',
@@ -60,7 +76,7 @@ export const RewardMemberButton: React.FC<RewardMemberButtonProps> = ({
             setIsSending(true);
             try {
               const rewardMemo = memo || `Team reward for ${memberName}`;
-              const success = await sendNutzap(memberPubkey, defaultAmount, rewardMemo);
+              const success = await sendZap(memberPubkey, defaultAmount, rewardMemo);
 
               if (success) {
                 Alert.alert(
@@ -70,9 +86,11 @@ export const RewardMemberButton: React.FC<RewardMemberButtonProps> = ({
                 );
                 onSuccess?.(defaultAmount);
               } else {
+                // Show specific error if available
+                const errorMessage = error || 'Unable to send reward. Please try again.';
                 Alert.alert(
                   'Send Failed',
-                  'Unable to send reward. Please try again.',
+                  errorMessage,
                   [{ text: 'OK' }]
                 );
               }

@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
 import { ProfileSetupStep } from '../components/onboarding/ProfileSetupStep';
 import { PasswordNotice } from '../components/onboarding/PasswordNotice';
+import { WalletSetupStep } from '../components/onboarding/WalletSetupStep';
 import { PermissionRequestStep } from '../components/onboarding/PermissionRequestStep';
 import OnboardingCacheService from '../services/cache/OnboardingCacheService';
 import { nostrProfilePublisher, type EditableProfile } from '../services/nostr/NostrProfilePublisher';
@@ -31,7 +32,7 @@ interface OnboardingScreenProps {
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ route }) => {
   const navigation = useNavigation<any>();
-  const [currentStep, setCurrentStep] = useState<'slides' | 'profile' | 'password' | 'permissions'>('slides');
+  const [currentStep, setCurrentStep] = useState<'slides' | 'profile' | 'password' | 'wallet' | 'permissions'>('slides');
   const [isLoading, setIsLoading] = useState(false);
   const [userPassword, setUserPassword] = useState<string>('');
   const [profileData, setProfileData] = useState<Partial<EditableProfile>>({});
@@ -109,7 +110,17 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ route }) => 
   };
 
   const handlePasswordContinue = () => {
-    console.log('[Onboarding] Password acknowledged, moving to permissions');
+    console.log('[Onboarding] Password acknowledged, moving to wallet setup');
+    setCurrentStep('wallet');
+  };
+
+  const handleWalletContinue = () => {
+    console.log('[Onboarding] Wallet setup completed, moving to permissions');
+    setCurrentStep('permissions');
+  };
+
+  const handleWalletSkip = () => {
+    console.log('[Onboarding] Wallet setup skipped, moving to permissions');
     setCurrentStep('permissions');
   };
 
@@ -161,6 +172,11 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ route }) => 
         <PasswordNotice
           password={userPassword}
           onContinue={handlePasswordContinue}
+        />
+      ) : currentStep === 'wallet' ? (
+        <WalletSetupStep
+          onContinue={handleWalletContinue}
+          onSkip={handleWalletSkip}
         />
       ) : (
         <PermissionRequestStep

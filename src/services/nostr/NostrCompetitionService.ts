@@ -233,6 +233,14 @@ export class NostrCompetitionService {
         tags.push(['lightning_address', eventData.lightningAddress]);
       }
 
+      // Add payment destination tags
+      if (eventData.paymentDestination) {
+        tags.push(['payment_destination', eventData.paymentDestination]);
+      }
+      if (eventData.paymentRecipientName) {
+        tags.push(['payment_recipient_name', eventData.paymentRecipientName]);
+      }
+
       const eventTemplate: EventTemplate = {
         kind: 30101,
         content: JSON.stringify(eventDefinition),

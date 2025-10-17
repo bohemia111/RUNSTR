@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2025-10-17
+
+### Fixed
+- **Modal Consistency**: Converted EventPaymentModal to CustomAlert for consistent UI
+  - Unified alert system across payment modals
+  - Better user experience with standardized modal behavior
+  - Improved accessibility and theme consistency
+- **Activity Tracker Alerts**: Converted 3 activity tracker screens to CustomAlert
+  - Running, walking, and cycling screens now use unified alert system
+  - Consistent error handling and user notifications
+  - Better modal dismiss behavior
+- **Zapstore Configuration**: Updated Zapstore URLs to correct endpoints
+  - Fixed app store URLs for proper distribution
+  - Corrected deep linking configuration
+- **Critical: Amber Security**: Resolved critical security and signing issues
+  - Enhanced security in Amber signer integration
+  - Fixed signing flow vulnerabilities
+  - Improved error handling for authentication
+- **Alert Modal Consistency**: Fixed cancel button visibility across all modals
+  - Consistent button placement and styling
+  - Better UX for dismissing modals
+  - Improved accessibility
+
 ## [0.2.7] - 2025-10-16
 
 ### Fixed

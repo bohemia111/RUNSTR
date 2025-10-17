@@ -93,6 +93,7 @@ export async function fetchLNURLPayDetails(
  * @param callbackUrl - LNURL callback URL from pay details
  * @param amountMillisats - Amount in millisatoshis (sats * 1000)
  * @param comment - Optional comment/memo
+ * @param zapRequest - Optional NIP-57 zap request (stringified JSON)
  * @returns Invoice response with BOLT11 payment request
  *
  * @example
@@ -105,7 +106,8 @@ export async function fetchLNURLPayDetails(
 export async function requestInvoiceFromLNURL(
   callbackUrl: string,
   amountMillisats: number,
-  comment?: string
+  comment?: string,
+  zapRequest?: string
 ): Promise<InvoiceResponse> {
   // Build callback URL with amount parameter
   const url = new URL(callbackUrl);
@@ -113,6 +115,11 @@ export async function requestInvoiceFromLNURL(
 
   if (comment) {
     url.searchParams.set('comment', comment);
+  }
+
+  // Add zap request for NIP-57
+  if (zapRequest) {
+    url.searchParams.set('nostr', zapRequest);
   }
 
   console.log('[LNURL] Requesting invoice for', amountMillisats, 'msats');
@@ -162,6 +169,7 @@ export async function requestInvoiceFromLNURL(
  * @param lightningAddress - Lightning address (user@domain.com)
  * @param amountSats - Amount in satoshis
  * @param description - Optional description/comment
+ * @param zapRequest - Optional NIP-57 zap request (stringified JSON)
  * @returns Invoice string and optional success message
  *
  * @example
@@ -175,7 +183,8 @@ export async function requestInvoiceFromLNURL(
 export async function getInvoiceFromLightningAddress(
   lightningAddress: string,
   amountSats: number,
-  description?: string
+  description?: string,
+  zapRequest?: string
 ): Promise<{ invoice: string; successMessage?: string }> {
   console.log('[LNURL] Getting invoice from', lightningAddress, 'for', amountSats, 'sats');
 
@@ -202,7 +211,8 @@ export async function getInvoiceFromLightningAddress(
     const invoiceData = await requestInvoiceFromLNURL(
       lnurlDetails.callback,
       amountMillisats,
-      description
+      description,
+      zapRequest
     );
 
     console.log('[LNURL] ✅ Complete - invoice ready');
