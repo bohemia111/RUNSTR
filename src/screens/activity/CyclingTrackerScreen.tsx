@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { BaseTrackerComponent } from '../../components/activity/BaseTrackerComponent';
 import { CustomAlert } from '../../components/ui/CustomAlert';
 import { simpleLocationTrackingService } from '../../services/activity/SimpleLocationTrackingService';
@@ -60,19 +61,36 @@ export const CyclingTrackerScreen: React.FC = () => {
   const startTracking = async () => {
     console.log('[CyclingTrackerScreen] Starting tracking...');
 
-    // Simple permission and start flow
-    const started = await simpleLocationTrackingService.startTracking('cycling');
-    if (!started) {
+    try {
+      // Simple permission and start flow
+      const started = await simpleLocationTrackingService.startTracking('cycling');
+      if (started) {
+        initializeTracking();
+      }
+    } catch (error) {
+      // Get detailed error message from service
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Show detailed error with helpful context
       setAlertConfig({
         title: 'Cannot Start Tracking',
-        message: 'Unable to start activity tracking. Please check location permissions and try again.',
-        buttons: [{ text: 'OK', style: 'default' }],
+        message: errorMessage,
+        buttons: [
+          { text: 'OK', style: 'default' },
+          ...(Platform.OS === 'android' ? [{
+            text: 'Settings',
+            style: 'default' as const,
+            onPress: () => {
+              // Open Android app settings
+              const { Linking } = require('react-native');
+              Linking.openSettings();
+            }
+          }] : [])
+        ],
       });
       setAlertVisible(true);
-      return;
+      console.error('[CyclingTrackerScreen] Failed to start tracking:', errorMessage);
     }
-
-    initializeTracking();
   };
 
   const initializeTracking = () => {

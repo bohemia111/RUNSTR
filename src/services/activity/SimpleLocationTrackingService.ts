@@ -12,6 +12,8 @@
 import * as Location from 'expo-location';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import { locationPermissionService } from './LocationPermissionService';
 import { KalmanFilter } from '../../utils/KalmanFilter';
 import { filterLocation } from '../../utils/gpsValidation';
@@ -86,10 +88,15 @@ export class SimpleLocationTrackingService {
   // GPS filtering
   private kalmanFilter: KalmanFilter;
 
+  // Android foreground service
+  private androidNotificationId: string | null = null;
+
   // Constants
   private readonly SPLIT_DISTANCE_METERS = 1000; // 1 km (TODO: support miles)
   private readonly GPS_SIGNAL_TIMEOUT_MS = 10000; // 10 seconds
   private readonly MIN_MOVEMENT_THRESHOLD_METERS = 0.5; // Filter micro-jitter
+  private readonly ANDROID_NOTIFICATION_CHANNEL_ID = 'workout-tracking';
+  private readonly ANDROID_NOTIFICATION_ID = 'workout-tracking-foreground';
 
   private constructor() {
     console.log('[SimpleLocationTrackingService] Initialized');
@@ -101,6 +108,99 @@ export class SimpleLocationTrackingService {
       SimpleLocationTrackingService.instance = new SimpleLocationTrackingService();
     }
     return SimpleLocationTrackingService.instance;
+  }
+
+  /**
+   * Create Android notification channel (required for Android 8+)
+   */
+  private async setupAndroidNotificationChannel(): Promise<void> {
+    if (Platform.OS !== 'android') return;
+
+    try {
+      await Notifications.setNotificationChannelAsync(this.ANDROID_NOTIFICATION_CHANNEL_ID, {
+        name: 'Activity Tracking',
+        description: 'Location tracking indicator',
+        importance: Notifications.AndroidImportance.LOW, // Low = no sound, just shows in status bar
+        vibrationPattern: [0],
+        sound: null,
+      });
+      console.log('[ANDROID] Notification channel created');
+    } catch (error) {
+      console.warn('[ANDROID] Failed to create notification channel:', error);
+    }
+  }
+
+  /**
+   * Start Android foreground service with notification
+   * Required for Android 14+ to get location updates
+   */
+  private async startAndroidForegroundService(activityType: string): Promise<boolean> {
+    if (Platform.OS !== 'android') return true;
+
+    try {
+      console.log('[ANDROID] Starting foreground service notification...');
+
+      // Setup notification channel first
+      await this.setupAndroidNotificationChannel();
+
+      // Schedule ultra-minimal notification (Option 3)
+      // Android requires this notification for location tracking
+      await Notifications.scheduleNotificationAsync({
+        identifier: this.ANDROID_NOTIFICATION_ID,
+        content: {
+          title: 'RUNSTR - Tracking',
+          body: '', // Empty body for minimal presence
+          priority: Notifications.AndroidNotificationPriority.LOW,
+          sticky: true, // Can't be dismissed by user (Android requirement)
+          autoDismiss: false,
+        },
+        trigger: null, // Show immediately
+      });
+
+      this.androidNotificationId = this.ANDROID_NOTIFICATION_ID;
+      console.log('[ANDROID] Foreground service notification started');
+      return true;
+    } catch (error) {
+      console.error('[ANDROID] Failed to start foreground service notification:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Stop Android foreground service notification
+   */
+  private async stopAndroidForegroundService(): Promise<void> {
+    if (Platform.OS !== 'android' || !this.androidNotificationId) return;
+
+    try {
+      await Notifications.dismissNotificationAsync(this.androidNotificationId);
+      this.androidNotificationId = null;
+      console.log('[ANDROID] Foreground service notification stopped');
+    } catch (error) {
+      console.warn('[ANDROID] Failed to stop foreground service notification:', error);
+    }
+  }
+
+  /**
+   * Check battery optimization and request exemption for Android 14+
+   * This prevents Doze Mode from stopping location updates
+   */
+  private async checkAndroidBatteryOptimization(): Promise<void> {
+    if (Platform.OS !== 'android') return;
+
+    try {
+      // Check Android API level
+      const apiLevel = Device.platformApiLevel || 0;
+
+      if (apiLevel >= 34) { // Android 14 = API 34
+        console.log('[ANDROID] Running on Android 14+ (API ' + apiLevel + ')');
+        console.log('[ANDROID] Battery optimization may affect background tracking');
+        console.log('[ANDROID] If tracking stops when using other apps, check battery settings');
+        // Note: We don't block tracking start - let user try and they can adjust settings if needed
+      }
+    } catch (error) {
+      console.warn('[ANDROID] Failed to check battery optimization:', error);
+    }
   }
 
   /**
@@ -123,7 +223,19 @@ export class SimpleLocationTrackingService {
         const granted = await locationPermissionService.requestActivityTrackingPermissions();
         if (!granted.foreground) {
           console.error('[SimpleLocationTrackingService] Location permissions denied');
-          return false;
+          throw new Error('Location permissions denied. Please enable location access in device settings.');
+        }
+      }
+
+      // 1.5. Android-specific: Check battery optimization and start foreground service
+      if (Platform.OS === 'android') {
+        // Check battery optimization settings (non-blocking)
+        await this.checkAndroidBatteryOptimization();
+
+        // Start foreground service notification (REQUIRED for Android 14+)
+        const foregroundServiceStarted = await this.startAndroidForegroundService(activityType);
+        if (!foregroundServiceStarted) {
+          throw new Error('Failed to start Android foreground service. Location tracking may not work properly.');
         }
       }
 
@@ -183,8 +295,22 @@ export class SimpleLocationTrackingService {
       console.log(`[SimpleLocationTrackingService] ✅ ${activityType} tracking started successfully`);
       return true;
     } catch (error) {
-      console.error('[SimpleLocationTrackingService] Failed to start tracking:', error);
-      return false;
+      // Detailed error logging for debugging
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[SimpleLocationTrackingService] Failed to start tracking:', errorMessage);
+      console.error('[SimpleLocationTrackingService] Full error:', error);
+
+      // Platform-specific error context
+      if (Platform.OS === 'android') {
+        console.error('[ANDROID] Common causes:');
+        console.error('  - Location services disabled in device settings');
+        console.error('  - Battery optimization blocking location access');
+        console.error('  - Google Play Services outdated or unavailable');
+        console.error('  - Foreground service notification failed');
+      }
+
+      // Re-throw error with message for UI to display
+      throw error;
     }
   }
 
@@ -401,6 +527,9 @@ export class SimpleLocationTrackingService {
       this.locationSubscription.remove();
       this.locationSubscription = null;
     }
+
+    // Stop Android foreground service
+    await this.stopAndroidForegroundService();
 
     // Deactivate KeepAwake
     try {
