@@ -4,11 +4,13 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as TaskManager from 'expo-task-manager';
 import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../../styles/theme';
+import { CustomAlert } from '../../components/ui/CustomAlert';
 import { simpleLocationTrackingService } from '../../services/activity/SimpleLocationTrackingService';
 import { activityMetricsService } from '../../services/activity/ActivityMetricsService';
 import type { TrackingSession } from '../../services/activity/SimpleLocationTrackingService';
@@ -24,6 +26,7 @@ const TIMER_INTERVAL_MS = 1000; // Update timer every second
 const METRICS_UPDATE_INTERVAL_MS = 1000; // Update metrics every second for running
 const MIN_WORKOUT_DISTANCE_METERS = 10; // Minimum distance to show workout summary
 const ZOMBIE_SESSION_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours
+const ANDROID_BACKGROUND_WARNING_KEY = '@runstr:android_background_warning_shown';
 
 interface MetricCardProps {
   label: string;
@@ -65,6 +68,16 @@ export const RunningTrackerScreen: React.FC = () => {
     splits?: Split[];
     localWorkoutId?: string; // For marking as synced later
   } | null>(null);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    message: string;
+    buttons: Array<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}>;
+  }>({
+    title: '',
+    message: '',
+    buttons: [],
+  });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const metricsUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -83,14 +96,48 @@ export const RunningTrackerScreen: React.FC = () => {
   const startTracking = async () => {
     console.log('[RunningTrackerScreen] Starting tracking...');
 
+    // Android-specific: Show background tracking tips on first run
+    if (Platform.OS === 'android') {
+      const hasSeenWarning = await AsyncStorage.getItem(ANDROID_BACKGROUND_WARNING_KEY);
+
+      if (!hasSeenWarning) {
+        setAlertConfig({
+          title: 'Background Tracking Tips',
+          message: 'To ensure accurate tracking while using other apps (like music players):\n\n' +
+            '• Keep the RUNSTR notification visible\n' +
+            '• Don\'t force-close the app\n' +
+            '• Music and other apps can run normally\n' +
+            '• If tracking stops, check battery optimization settings',
+          buttons: [
+            {
+              text: 'Got it',
+              style: 'default',
+              onPress: async () => {
+                await AsyncStorage.setItem(ANDROID_BACKGROUND_WARNING_KEY, 'true');
+                proceedWithTracking();
+              },
+            },
+          ],
+        });
+        setAlertVisible(true);
+        return; // Wait for user acknowledgment
+      }
+    }
+
+    // If iOS or warning already shown, proceed directly
+    proceedWithTracking();
+  };
+
+  const proceedWithTracking = async () => {
     // Simple permission and start flow
     const started = await simpleLocationTrackingService.startTracking('running');
     if (!started) {
-      Alert.alert(
-        'Cannot Start Tracking',
-        'Unable to start activity tracking. Please check location permissions and try again.',
-        [{ text: 'OK' }]
-      );
+      setAlertConfig({
+        title: 'Cannot Start Tracking',
+        message: 'Unable to start activity tracking. Please check location permissions and try again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
       return;
     }
 
@@ -325,6 +372,15 @@ export const RunningTrackerScreen: React.FC = () => {
           workout={workoutData}
         />
       )}
+
+      {/* Custom Alert Modal */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };

@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Alert } from 'react-native';
 import { BaseTrackerComponent } from '../../components/activity/BaseTrackerComponent';
+import { CustomAlert } from '../../components/ui/CustomAlert';
 import { simpleLocationTrackingService } from '../../services/activity/SimpleLocationTrackingService';
 import { activityMetricsService } from '../../services/activity/ActivityMetricsService';
 import type { TrackingSession } from '../../services/activity/SimpleLocationTrackingService';
@@ -32,6 +32,16 @@ export const WalkingTrackerScreen: React.FC = () => {
     steps?: number;
     localWorkoutId?: string; // For marking as synced later
   } | null>(null);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    message: string;
+    buttons: Array<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}>;
+  }>({
+    title: '',
+    message: '',
+    buttons: [],
+  });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const metricsUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -52,11 +62,12 @@ export const WalkingTrackerScreen: React.FC = () => {
     // Simple permission and start flow
     const started = await simpleLocationTrackingService.startTracking('walking');
     if (!started) {
-      Alert.alert(
-        'Cannot Start Tracking',
-        'Unable to start activity tracking. Please check location permissions and try again.',
-        [{ text: 'OK' }]
-      );
+      setAlertConfig({
+        title: 'Cannot Start Tracking',
+        message: 'Unable to start activity tracking. Please check location permissions and try again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
       return;
     }
 
@@ -225,6 +236,15 @@ export const WalkingTrackerScreen: React.FC = () => {
           workout={workoutData}
         />
       )}
+
+      {/* Custom Alert Modal */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertVisible(false)}
+      />
     </>
   );
 };
