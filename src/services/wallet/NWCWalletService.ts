@@ -44,6 +44,14 @@ class NWCWalletServiceClass {
   }
 
   /**
+   * Alias for isAvailable() - Check if NWC is configured
+   * Used by payment verification components
+   */
+  async hasNWCConfigured(): Promise<boolean> {
+    return await this.isAvailable();
+  }
+
+  /**
    * Initialize NWC client with user's stored connection string
    * Lazy initialization on first use
    */
@@ -295,35 +303,48 @@ class NWCWalletServiceClass {
   /**
    * Lookup invoice status
    * Check if invoice has been paid
+   * @param invoiceOrHash - Either a BOLT11 invoice string or payment hash
    */
-  async lookupInvoice(paymentHash: string): Promise<{ paid: boolean; error?: string }> {
+  async lookupInvoice(invoiceOrHash: string): Promise<{ paid: boolean; success: boolean; error?: string }> {
     try {
       const hasWallet = await this.isAvailable();
       if (!hasWallet) {
-        return { paid: false, error: 'No wallet configured' };
+        return { paid: false, success: false, error: 'No wallet configured' };
       }
 
       // Initialize client
       await this.initialize();
 
       if (!this.nwcClient) {
-        return { paid: false, error: 'Wallet not initialized' };
+        return { paid: false, success: false, error: 'Wallet not initialized' };
+      }
+
+      // Check if it's an invoice (starts with 'lnbc') or payment hash
+      let lookupParam: any;
+      if (invoiceOrHash.startsWith('lnbc') || invoiceOrHash.startsWith('lntb')) {
+        // It's a BOLT11 invoice
+        lookupParam = { invoice: invoiceOrHash };
+      } else {
+        // It's a payment hash
+        lookupParam = { payment_hash: invoiceOrHash };
       }
 
       // Lookup invoice using NWC client
-      const result = await this.nwcClient.lookupInvoice({
-        payment_hash: paymentHash,
-      });
+      const result = await this.nwcClient.lookupInvoice(lookupParam);
 
       if (result) {
-        return { paid: result.settled || false };
+        return {
+          paid: result.settled || false,
+          success: true,
+        };
       }
 
-      return { paid: false, error: 'Failed to lookup invoice' };
+      return { paid: false, success: false, error: 'Failed to lookup invoice' };
     } catch (error) {
       console.error('[NWC] Lookup invoice error:', error);
       return {
         paid: false,
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
@@ -403,6 +424,65 @@ class NWCWalletServiceClass {
     } catch (error) {
       console.error('[NWC] Parse invoice error:', error);
       return {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * List wallet transactions
+   * Useful for captain dashboard transaction history
+   */
+  async listTransactions(params?: {
+    from?: number;     // Start timestamp (unix seconds)
+    until?: number;    // End timestamp (unix seconds)
+    limit?: number;    // Max number of transactions
+    offset?: number;   // Pagination offset
+    type?: 'incoming' | 'outgoing'; // Filter by transaction type
+  }): Promise<{
+    success: boolean;
+    transactions?: Array<{
+      type: 'incoming' | 'outgoing';
+      invoice?: string;
+      description?: string;
+      preimage?: string;
+      payment_hash: string;
+      amount: number;
+      fees_paid?: number;
+      created_at: number;
+      settled_at?: number;
+      metadata?: any;
+    }>;
+    error?: string;
+  }> {
+    try {
+      const hasWallet = await this.isAvailable();
+      if (!hasWallet) {
+        return { success: false, error: 'No wallet configured' };
+      }
+
+      // Initialize client
+      await this.initialize();
+
+      if (!this.nwcClient) {
+        return { success: false, error: 'Wallet not initialized' };
+      }
+
+      // List transactions using NWC client
+      const result = await this.nwcClient.listTransactions(params || {});
+
+      if (result && result.transactions) {
+        return {
+          success: true,
+          transactions: result.transactions,
+        };
+      }
+
+      return { success: false, error: 'Failed to list transactions' };
+    } catch (error) {
+      console.error('[NWC] List transactions error:', error);
+      return {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }

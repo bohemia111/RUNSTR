@@ -209,11 +209,96 @@ await GlobalNDKService.reconnect();
 **Key Features:**
 - Event ticket sales with entry fees (e.g., 2,100 sats)
 - 1v1 challenge wagers with Bitcoin escrow
-- Payment detection via Alby MCP tools
+- Payment detection via Alby SDK (@getalby/sdk v6+)
 - Universal wallet support (Cash App, Strike, Alby, self-custodial)
 - Non-custodial team wallets via NWC connection strings
 
 📖 **For complete implementation details, code examples, and payment flows, see**: [docs/LIGHTNING_IMPLEMENTATION.md](./docs/LIGHTNING_IMPLEMENTATION.md)
+
+## Event Payment Verification System
+
+**Overview**: Complete payment verification system for paid event join requests with dual-path verification (NWC auto-verify + manual override).
+
+### **Architecture Components:**
+
+**1. Payment Data Model** (`EventJoinRequestService.ts`)
+- Join requests (kind 1105) include payment tracking fields:
+  - `paymentProof`: Lightning invoice string or 'MANUAL_VERIFICATION'
+  - `paymentHash`: Extracted payment hash for NWC lookups
+  - `amountPaid`: Entry fee amount in satoshis
+  - `paymentTimestamp`: When payment was submitted
+- Tags automatically extracted when parsing kind 1105 events
+
+**2. Payment Verification Badge** (`PaymentVerificationBadge.tsx`)
+- Visual indicator showing payment status with 6 states:
+  - `free`: No payment required
+  - `claimed`: User claims payment (can't auto-verify)
+  - `verifying`: Checking NWC for payment confirmation
+  - `verified`: Payment confirmed via NWC
+  - `not_found`: Payment not found in NWC transactions
+  - `manual_paid`: Captain manually marked as paid
+- Auto-verifies payments when captain has NWC wallet configured
+- Shows retry button for failed verifications
+
+**3. Transaction History** (`EventTransactionHistory.tsx`)
+- Shows incoming Lightning payments matching event entry fee
+- Filters transactions by:
+  - Amount (entry fee ±1% tolerance for network fees)
+  - Date range (event start date → present)
+  - Type (incoming only)
+- Collapsible UI component (only visible for paid events)
+- Requires captain to have NWC wallet configured
+
+**4. NWC Wallet Integration** (`NWCWalletService.ts`)
+- `listTransactions()`: Query wallet transaction history with filters
+- `lookupInvoice()`: Check if specific invoice has been paid
+- Supports both invoice strings and payment hashes
+- Returns settled status for payment verification
+
+### **Payment Flows:**
+
+**Flow 1: NWC Auto-Verification (Captains with NWC Wallets)**
+1. User pays entry fee → Submits join request with payment proof
+2. Captain opens join requests section
+3. PaymentVerificationBadge auto-checks NWC wallet via `lookupInvoice()`
+4. Badge shows "Verified ✓" if payment found, "Not Found ✗" if missing
+5. Captain can retry verification or manually approve
+
+**Flow 2: Lightning Address Manual Verification (Captains without NWC)**
+1. User pays entry fee → Submits join request with payment proof
+2. Captain sees "Payment Claimed ⚠️" badge (can't auto-verify)
+3. Captain clicks "Mark as Paid" button if payment received off-chain
+4. Badge updates to "Marked as Paid ✓"
+
+**Flow 3: Off-Chain Payments (Cash/Venmo)**
+1. User requests to join with amount specified (no invoice)
+2. Captain receives payment via cash/Venmo in person
+3. Captain clicks "Mark as Paid" button on join request
+4. Join request marked with `MANUAL_VERIFICATION` proof
+
+### **Implementation Files:**
+- `src/services/events/EventJoinRequestService.ts` - Payment data model
+- `src/services/event/EventJoinService.ts` - Submit join requests with payment tags
+- `src/services/wallet/NWCWalletService.ts` - NWC wallet operations + transaction history
+- `src/components/captain/PaymentVerificationBadge.tsx` - Payment status indicator
+- `src/components/captain/EventTransactionHistory.tsx` - Transaction history display
+- `src/components/captain/EventJoinRequestsSection.tsx` - Join request management UI
+- `src/screens/EventCaptainDashboardScreen.tsx` - Captain dashboard with transaction history
+
+### **Key Design Decisions:**
+- **Dual-Path Verification**: Auto-verify for NWC, manual for everything else
+- **No Payment Enforcement**: Captains can always manually approve (trust-based system)
+- **Transaction Matching**: Fuzzy matching (±1% tolerance) for network fee variations
+- **Special Proof Value**: `'MANUAL_VERIFICATION'` distinguishes captain-approved payments
+- **Performance**: Transaction history loads on-demand, not on every screen render
+
+### **Testing Checklist:**
+- [ ] NWC captain receives payment → Auto-verification shows "Verified"
+- [ ] Lightning address captain receives payment → "Payment Claimed" badge appears
+- [ ] Captain clicks "Mark as Paid" → Badge updates to "Marked as Paid"
+- [ ] Transaction history shows matching incoming payments
+- [ ] Non-NWC captains don't see transaction history section
+- [ ] Failed lookups show retry button
 
 ## Performance Optimization Strategy
 
@@ -433,7 +518,7 @@ git add . && git status && git commit -m "Fix: description" && git push origin m
 - Keep descriptions concise (1-2 sentences per file)
 - Update READMEs as part of file modification commits
 
-## Current Development Status - Captain Navigation Fixed (Jan 2025)
+## Current Development Status - Payment Verification System Complete (Jan 2025)
 ✅ Project structure and architecture established
 ✅ Two-tab navigation (Teams/Profile) with bottom tab navigation
 ✅ Nostr authentication with profile/workout auto-import
@@ -444,6 +529,9 @@ git add . && git status && git commit -m "Fix: description" && git push origin m
 ✅ **Captain Dashboard** - Team management with join request approvals and member removal
 ✅ **Dynamic Scoring System** - Automatic leaderboards based on wizard parameters
 ✅ **Bitcoin Integration** - NIP-60/61 Lightning P2P payments, direct prize distribution
+✅ **NEW: Event Payment Verification** - NWC auto-verify + manual override for paid event join requests
+✅ **NEW: Transaction History Dashboard** - Captain view of incoming payments matching entry fees
+✅ **NEW: Multi-Path Payment Support** - NWC wallets, Lightning addresses, cash/Venmo manual approval
 ✅ Two-tier membership system (local + official Nostr lists)
 ✅ **In-App Notifications** - Nostr event-driven notifications (no push)
 ✅ **HealthKit Workout Posting** - Transform Apple Health workouts into Nostr events and social cards

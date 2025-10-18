@@ -14,8 +14,11 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { JoinRequestCard } from '../team/JoinRequestCard';
+import { PaymentVerificationBadge } from './PaymentVerificationBadge';
+import type { PaymentStatus } from './PaymentVerificationBadge';
 import { EventJoinRequestService } from '../../services/events/EventJoinRequestService';
 import type { EventJoinRequest } from '../../services/events/EventJoinRequestService';
 import { NostrListService } from '../../services/nostr/NostrListService';
@@ -299,6 +302,37 @@ export const EventJoinRequestsSection: React.FC<EventJoinRequestsSectionProps> =
     Alert.alert('Request Declined', 'The join request has been declined');
   };
 
+  const handleMarkAsPaid = async (requestId: string, eventId: string) => {
+    Alert.alert(
+      'Mark as Paid',
+      'Did you receive payment for this entry fee via cash, Venmo, or other method?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Paid',
+          style: 'default',
+          onPress: () => {
+            // Update the request's payment status in state
+            setGroupedRequests((prev) => {
+              const updated = [...prev];
+              const eventGroup = updated.find(g => g.eventId === eventId);
+              if (eventGroup) {
+                const request = eventGroup.requests.find(r => r.id === requestId);
+                if (request) {
+                  // Mark as manually verified
+                  request.paymentProof = 'MANUAL_VERIFICATION';
+                }
+              }
+              return updated;
+            });
+
+            Alert.alert('Marked as Paid', 'This request has been marked as paid');
+          },
+        },
+      ]
+    );
+  };
+
   const totalRequests = groupedRequests.reduce((sum, g) => sum + g.requests.length, 0);
 
   if (isLoading) {
@@ -364,30 +398,59 @@ export const EventJoinRequestsSection: React.FC<EventJoinRequestsSectionProps> =
               {group.expandedState && (
                 <View style={styles.requestsContainer}>
                   {group.requests.map((request) => (
-                    <JoinRequestCard
-                      key={request.id}
-                      request={{
-                        id: request.id,
-                        teamId: request.teamId,
-                        teamName: request.eventName,
-                        requesterPubkey: request.requesterId,
-                        requesterName: request.requesterName,
-                        requestedAt: request.timestamp,
-                        message: request.message,
-                        nostrEvent: request.nostrEvent,
-                      }}
-                      teamId={teamId}
-                      captainPubkey={captainPubkey}
-                      onApprove={() =>
-                        handleApproveRequest(
-                          request.id,
-                          request.requesterId,
-                          request.eventId,
-                          request.eventName
-                        )
-                      }
-                      onReject={() => handleRejectRequest(request.id, request.eventId)}
-                    />
+                    <View key={request.id} style={styles.requestWrapper}>
+                      <JoinRequestCard
+                        request={{
+                          id: request.id,
+                          teamId: request.teamId,
+                          teamName: request.eventName,
+                          requesterPubkey: request.requesterId,
+                          requesterName: request.requesterName,
+                          requestedAt: request.timestamp,
+                          message: request.message,
+                          nostrEvent: request.nostrEvent,
+                        }}
+                        teamId={teamId}
+                        captainPubkey={captainPubkey}
+                        onApprove={() =>
+                          handleApproveRequest(
+                            request.id,
+                            request.requesterId,
+                            request.eventId,
+                            request.eventName
+                          )
+                        }
+                        onReject={() => handleRejectRequest(request.id, request.eventId)}
+                      />
+                      {/* Payment verification badge */}
+                      {request.paymentProof ? (
+                        <View style={styles.paymentBadgeContainer}>
+                          <PaymentVerificationBadge
+                            paymentProof={request.paymentProof}
+                            amountPaid={request.amountPaid}
+                            onVerificationComplete={(verified) => {
+                              console.log(
+                                `Payment ${verified ? 'verified' : 'not found'} for request ${request.id}`
+                              );
+                            }}
+                          />
+                        </View>
+                      ) : request.amountPaid && request.amountPaid > 0 ? (
+                        <View style={styles.paymentBadgeContainer}>
+                          <PaymentVerificationBadge
+                            amountPaid={request.amountPaid}
+                            paymentStatus="claimed"
+                          />
+                          <TouchableOpacity
+                            style={styles.markPaidButton}
+                            onPress={() => handleMarkAsPaid(request.id, request.eventId)}
+                          >
+                            <Ionicons name="checkmark-done" size={16} color="#4CAF50" />
+                            <Text style={styles.markPaidButtonText}>Mark as Paid</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : null}
+                    </View>
                   ))}
                 </View>
               )}
@@ -481,5 +544,30 @@ const styles = StyleSheet.create({
   },
   requestsContainer: {
     padding: 8,
+  },
+  requestWrapper: {
+    marginBottom: 12,
+  },
+  paymentBadgeContainer: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  markPaidButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    alignSelf: 'flex-start',
+  },
+  markPaidButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4CAF50',
   },
 });

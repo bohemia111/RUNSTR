@@ -19,6 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
 import { QRDisplayModal } from '../components/qr/QRDisplayModal';
+import { EventTransactionHistory } from '../components/captain/EventTransactionHistory';
 import QRCodeService from '../services/qr/QRCodeService';
 import type { EventQRData } from '../services/qr/QRCodeService';
 import type { RootStackParamList } from '../types';
@@ -210,6 +211,17 @@ export const EventCaptainDashboardScreen: React.FC<EventCaptainDashboardScreenPr
             </View>
           )}
         </View>
+
+        {/* Transaction History (only for paid events with NWC) */}
+        {eventData.entryFeesSats && eventData.entryFeesSats > 0 && (
+          <EventTransactionHistory
+            eventId={eventId}
+            eventName={eventData.name}
+            eventStartDate={Math.floor(new Date(eventData.eventDate).getTime() / 1000)}
+            entryFee={eventData.entryFeesSats}
+            style={styles.transactionHistory}
+          />
+        )}
 
         {/* Event Controls Section */}
         <View style={styles.section}>
@@ -449,6 +461,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: theme.colors.text,
+  },
+  transactionHistory: {
+    marginTop: 16,
   },
 });
 

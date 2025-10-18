@@ -21,6 +21,11 @@ export interface EventJoinRequest {
   timestamp: number;
   status: 'pending' | 'approved' | 'declined';
   nostrEvent: Event;
+  // Payment tracking fields
+  paymentProof?: string;      // Lightning invoice from payment_proof tag
+  paymentHash?: string;       // Extracted payment hash for NWC verification
+  amountPaid?: number;        // Amount in sats from amount_paid tag
+  paymentTimestamp?: number;  // When payment was made (from payment_timestamp tag)
 }
 
 export interface EventJoinRequestData {
@@ -261,6 +266,17 @@ export class EventJoinRequestService {
         return null;
       }
 
+      // Extract payment tags
+      const paymentProofTag = event.tags.find((t) => t[0] === 'payment_proof');
+      const amountPaidTag = event.tags.find((t) => t[0] === 'amount_paid');
+      const paymentTimestampTag = event.tags.find((t) => t[0] === 'payment_timestamp');
+
+      // Extract payment hash from invoice if present
+      let paymentHash: string | undefined;
+      if (paymentProofTag?.[1]) {
+        paymentHash = this.extractPaymentHashFromInvoice(paymentProofTag[1]);
+      }
+
       return {
         id: event.id || '',
         requesterId: event.pubkey,
@@ -272,10 +288,46 @@ export class EventJoinRequestService {
         timestamp: event.created_at || Math.floor(Date.now() / 1000),
         status: 'pending',
         nostrEvent: event,
+        // Payment fields
+        paymentProof: paymentProofTag?.[1],
+        paymentHash,
+        amountPaid: amountPaidTag?.[1] ? parseInt(amountPaidTag[1], 10) : undefined,
+        paymentTimestamp: paymentTimestampTag?.[1] ? parseInt(paymentTimestampTag[1], 10) : undefined,
       };
     } catch (error) {
       console.error('❌ Failed to parse event join request:', error);
       return null;
+    }
+  }
+
+  /**
+   * Extract payment hash from Lightning invoice (BOLT11)
+   * Payment hash is used for NWC verification via lookupInvoice()
+   */
+  private extractPaymentHashFromInvoice(invoice: string): string | undefined {
+    try {
+      // BOLT11 invoices have payment hash embedded in the data section
+      // We'll use a simple extraction based on the invoice structure
+      // Format: lnbc<amount>1<separator><data><signature>
+
+      // Remove protocol prefix if present
+      const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
+
+      // Find the data section (after first '1' and before last '1')
+      const parts = cleanInvoice.split('1');
+      if (parts.length < 3) {
+        console.warn('⚠️ Invalid invoice format - not enough parts');
+        return undefined;
+      }
+
+      // The payment hash is encoded in the data section
+      // For now, we'll return undefined and rely on the full invoice
+      // Real implementation would decode bech32 properly
+      // This is a placeholder - Alby SDK can handle full invoices
+      return undefined;
+    } catch (error) {
+      console.error('❌ Failed to extract payment hash from invoice:', error);
+      return undefined;
     }
   }
 

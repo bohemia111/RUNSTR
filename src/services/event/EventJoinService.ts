@@ -266,8 +266,12 @@ export class EventJoinService {
         authData.hexPubkey
       );
 
-      // Add payment proof as tag
-      eventTemplate.tags.push(['payment_proof', paymentInvoice]);
+      // Add payment proof tags
+      if (eventTemplate.tags) {
+        eventTemplate.tags.push(['payment_proof', paymentInvoice]);
+        eventTemplate.tags.push(['amount_paid', eventData.entry_fee.toString()]);
+        eventTemplate.tags.push(['payment_timestamp', Date.now().toString()]);
+      }
 
       // Sign and publish event
       const protocolHandler = new NostrProtocolHandler();
