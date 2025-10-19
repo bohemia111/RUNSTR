@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-10-19
+
+### Fixed
+- **Background Tracking Stability**: Resolved critical distance tracking issues during backgrounded workouts
+  - Fixed distance updates continuing reliably when app is in background
+  - Improved GPS signal processing for long-duration activities
+  - Enhanced location service stability for extended workout sessions
+- **Event Creation Workflow**: Fixed event creation reliability issues
+  - More robust event publishing to Nostr relays
+  - Better error handling during event creation process
+  - Improved validation and confirmation flow
+
+### Improved
+- **Teams Page Performance**: Dramatically improved event loading speed on teams page
+  - Optimized event queries and caching strategy
+  - Faster initial page load with progressive data fetching
+  - Reduced redundant network requests for team events
+  - Smoother scrolling and navigation experience
+
 ## [0.3.0] - 2025-10-17
 
 ### Fixed
