@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2025-10-22
+
+### Added
+- **Race Replay Data**: Enhanced Kind 1301 workout events with comprehensive race replay visualization support
+  - Individual kilometer split times with elapsed timestamps for website animations
+  - Split pace tracking (pace per kilometer/mile) for detailed performance analysis
+  - Average pace calculation and publishing in min/km or min/mi format
+  - Elevation loss tracking alongside existing elevation gain data
+  - GPS data point counts showing tracking detail and accuracy
+  - Workout pause counts for understanding activity interruptions
+  - Workout start timestamp (separate from event publication time)
+- **Android Permission System**: User-friendly modal-based permission request flow
+  - Dedicated permission request modal with clear explanations
+  - Automatic permission checking on app startup for Android users
+  - Graceful handling of denied permissions with settings navigation
+  - Improved onboarding experience with upfront permission requests
+
+### Improved
+- **Location Tracking Service**: Enhanced SimpleLocationTrackingService with better reliability
+  - Improved GPS data validation and filtering
+  - More accurate distance calculations during workouts
+  - Better handling of background location updates
+- **Workout Publishing**: Complete Kind 1301 event enhancement for external leaderboards
+  - All race replay data automatically included when publishing workouts
+  - Richer workout data for runstr.app website visualizations
+  - Better compatibility with external fitness tracking platforms
+
+### Documentation
+- **Kind 1301 Specification**: Updated with comprehensive race replay tag documentation
+  - Detailed examples of all new tags (split, split_pace, avg_pace, elevation_loss, etc.)
+  - Format specifications for each tag type
+  - Usage guidelines for external platform integration
+
 ## [0.3.1] - 2025-10-19
 
 ### Fixed

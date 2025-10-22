@@ -14,7 +14,7 @@ import './services/activity/BackgroundLocationTask';
 import { BACKGROUND_LOCATION_TASK } from './services/activity/BackgroundLocationTask';
 
 import React from 'react';
-import { StatusBar, View, Text, StyleSheet, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
+import { StatusBar, View, Text, StyleSheet, TouchableOpacity, AppState, AppStateStatus, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Error Boundary Component to catch runtime errors during initialization
@@ -95,6 +95,8 @@ import { theme } from './styles/theme';
 import unifiedCache from './services/cache/UnifiedNostrCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { challengeCompletionService } from './services/challenge/ChallengeCompletionService';
+import { appPermissionService } from './services/initialization/AppPermissionService';
+import { PermissionRequestModal } from './components/permissions/PermissionRequestModal';
 
 // Types for authenticated app navigation
 type AuthenticatedStackParamList = {
@@ -138,6 +140,7 @@ const AppContent: React.FC = () => {
 
   const [onboardingCompleted, setOnboardingCompleted] = React.useState<boolean | null>(null);
   const [prefetchCompleted, setPrefetchCompleted] = React.useState(false);
+  const [showPermissionModal, setShowPermissionModal] = React.useState(false);
 
   // ✅ PERFORMANCE: Use cache-first strategy - show app immediately if ANY cache exists
   React.useEffect(() => {
@@ -192,6 +195,24 @@ const AppContent: React.FC = () => {
     };
     checkOnboarding();
   }, [isAuthenticated, currentUser]);
+
+  // Check permissions when user becomes authenticated (Android only)
+  React.useEffect(() => {
+    const checkPermissions = async () => {
+      if (isAuthenticated && Platform.OS === 'android') {
+        console.log('[App] 🔐 Checking Android permissions...');
+        const status = await appPermissionService.checkAllPermissions();
+
+        if (!status.allGranted) {
+          console.log('[App] ⚠️ Missing permissions, showing modal');
+          setShowPermissionModal(true);
+        } else {
+          console.log('[App] ✅ All permissions granted');
+        }
+      }
+    };
+    checkPermissions();
+  }, [isAuthenticated]);
 
   // PERFORMANCE OPTIMIZATION: App state detection for smart resume
   const walletStore = useWalletStore();
@@ -788,6 +809,14 @@ const AppContent: React.FC = () => {
           return <AppNavigator initialRoute="Login" isFirstTime={true} />;
         })()}
       </NavigationContainer>
+
+      {/* Permission Request Modal - Shows when Android permissions are missing */}
+      {showPermissionModal && (
+        <PermissionRequestModal
+          visible={showPermissionModal}
+          onComplete={() => setShowPermissionModal(false)}
+        />
+      )}
     </SafeAreaProvider>
   );
 };

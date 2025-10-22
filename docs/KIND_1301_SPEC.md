@@ -139,6 +139,70 @@ Kind 1301 is a Nostr event kind for publishing fitness tracking data. RUNSTR pub
 - **Format**: Integer as string
 - **Example**: `["max_heart_rate", "182"]`
 
+### `split` - Kilometer Split Times (Race Replay Data)
+```typescript
+["split", "1", "00:05:12"]
+```
+- **Purpose**: Individual kilometer split times for race replay visualization
+- **Format**: Three elements - tag name, km number (string), elapsed time (HH:MM:SS)
+- **Example**: `["split", "3", "00:16:20"]` (km 3 completed at 16:20 total elapsed)
+- **Note**: Multiple split tags allowed (one per kilometer)
+- **Used For**: Website race replay animations showing runner progression
+
+### `avg_pace` - Average Pace
+```typescript
+["avg_pace", "05:24", "min/km"]
+```
+- **Purpose**: Average pace across entire workout
+- **Format**: Three elements - tag name, pace (MM:SS), unit
+- **Valid Units**: `min/km`, `min/mi`
+- **Example**: `["avg_pace", "08:42", "min/mi"]`
+- **Note**: Calculated from total distance / total duration
+
+### `elevation_loss` - Elevation Loss
+```typescript
+["elevation_loss", "85", "m"]
+```
+- **Purpose**: Vertical elevation lost during workout
+- **Format**: Three elements - tag name, value, unit
+- **Valid Units**: `m`, `ft`
+- **Example**: `["elevation_loss", "279", "ft"]`
+
+### `split_pace` - Individual Split Pace
+```typescript
+["split_pace", "1", "360"]
+```
+- **Purpose**: Pace for individual kilometer/mile splits (in seconds per km/mi)
+- **Format**: Three elements - tag name, split number (string), pace in seconds
+- **Example**: `["split_pace", "3", "342"]` (5:42/km for split 3)
+- **Note**: Multiple split_pace tags allowed (one per split)
+
+### `data_points` - GPS Sample Count
+```typescript
+["data_points", "457"]
+```
+- **Purpose**: Number of GPS location samples recorded during workout
+- **Format**: Integer as string
+- **Example**: `["data_points", "1203"]`
+- **Note**: Higher values indicate more detailed GPS tracking
+
+### `recording_pauses` - Pause Count
+```typescript
+["recording_pauses", "2"]
+```
+- **Purpose**: Number of times workout tracking was paused
+- **Format**: Integer as string
+- **Example**: `["recording_pauses", "0"]`
+
+### `workout_start_time` - Workout Start Timestamp
+```typescript
+["workout_start_time", "1736950800"]
+```
+- **Purpose**: Unix timestamp (seconds) when workout actually started
+- **Format**: Unix timestamp as string
+- **Example**: `["workout_start_time", "1736950800"]`
+- **Note**: Different from event `created_at` which is publication time
+
 ## Content Field
 
 The `content` field must be **plain text**, NOT JSON.
@@ -212,7 +276,7 @@ External leaderboards (runstr.app website) currently support **cardio activities
 
 ## Example Events
 
-### Running Workout
+### Running Workout (with Enhanced Tracking Data)
 ```json
 {
   "kind": 1301,
@@ -225,7 +289,22 @@ External leaderboards (runstr.app website) currently support **cardio activities
     ["duration", "00:28:15"],
     ["calories", "285"],
     ["elevation_gain", "45", "m"],
+    ["elevation_loss", "38", "m"],
     ["avg_heart_rate", "142"],
+    ["split", "1", "00:05:38"],
+    ["split", "2", "00:11:22"],
+    ["split", "3", "00:17:05"],
+    ["split", "4", "00:22:41"],
+    ["split", "5", "00:28:15"],
+    ["split_pace", "1", "338"],
+    ["split_pace", "2", "344"],
+    ["split_pace", "3", "343"],
+    ["split_pace", "4", "336"],
+    ["split_pace", "5", "334"],
+    ["avg_pace", "05:39", "min/km"],
+    ["data_points", "1687"],
+    ["recording_pauses", "1"],
+    ["workout_start_time", "1736950800"],
     ["source", "RUNSTR"],
     ["client", "RUNSTR", "0.2.6"],
     ["t", "Running"]

@@ -18,9 +18,13 @@ import { CacheInvalidationService } from '../cache/CacheInvalidationService';
 import { DailyRewardService } from '../rewards/DailyRewardService';
 import { FEATURES } from '../../config/features';
 
+// Import split type for race replay data
+import type { Split } from '../activity/SplitTrackingService';
+
 // Extended workout interface for publishing (simplified from UnifiedWorkout)
 export interface PublishableWorkout extends Workout {
   elevationGain?: number;
+  elevationLoss?: number;
   unitSystem?: 'metric' | 'imperial';
   nostrEventId?: string;
   sourceApp?: string;
@@ -30,6 +34,11 @@ export interface PublishableWorkout extends Workout {
   sets?: number;
   reps?: number;
   notes?: string;
+  // Race replay data (kilometer splits for running)
+  splits?: Split[];
+  // Enhanced tracking data
+  positions?: Array<{ latitude: number; longitude: number; timestamp: number }>;
+  pauseCount?: number;
 }
 
 export interface WorkoutPublishResult {
@@ -306,6 +315,61 @@ export class WorkoutPublishingService {
       tags.push(['reps', workout.reps.toString()]);
     }
 
+    // Add split times for running workouts (race replay data)
+    if (workout.splits && workout.splits.length > 0) {
+      for (const split of workout.splits) {
+        // Format: ["split", "km_number", "elapsed_time_HH:MM:SS"]
+        const elapsedTimeFormatted = this.formatDurationHHMMSS(split.elapsedTime);
+        tags.push(['split', split.number.toString(), elapsedTimeFormatted]);
+      }
+
+      // Add individual split paces (seconds per km/mi)
+      for (const split of workout.splits) {
+        // Format: ["split_pace", "split_number", "pace_in_seconds"]
+        tags.push(['split_pace', split.number.toString(), Math.round(split.splitTime).toString()]);
+      }
+
+      // Calculate and add average pace from splits
+      const totalSplitTime = workout.splits.reduce((sum, s) => sum + s.splitTime, 0);
+      const averagePaceSeconds = totalSplitTime / workout.splits.length;
+      const paceFormatted = this.formatPaceMMSS(averagePaceSeconds);
+      const paceUnit = workout.unitSystem === 'imperial' ? 'min/mi' : 'min/km';
+
+      // If using imperial, convert pace from min/km to min/mi
+      if (workout.unitSystem === 'imperial') {
+        const paceMinPerMile = averagePaceSeconds * 1.60934; // Convert km pace to mile pace
+        const paceFormattedMiles = this.formatPaceMMSS(paceMinPerMile);
+        tags.push(['avg_pace', paceFormattedMiles, paceUnit]);
+      } else {
+        tags.push(['avg_pace', paceFormatted, paceUnit]);
+      }
+    }
+
+    // Add elevation loss if available (for running, hiking, cycling)
+    if (workout.elevationLoss && workout.elevationLoss > 0) {
+      const elevationUnit = workout.unitSystem === 'imperial' ? 'ft' : 'm';
+      const elevationValue = workout.unitSystem === 'imperial'
+        ? Math.round(workout.elevationLoss * 3.28084).toString()
+        : Math.round(workout.elevationLoss).toString();
+      tags.push(['elevation_loss', elevationValue, elevationUnit]);
+    }
+
+    // Add GPS data point count if available
+    if (workout.positions && workout.positions.length > 0) {
+      tags.push(['data_points', workout.positions.length.toString()]);
+    }
+
+    // Add pause count if available
+    if (workout.pauseCount !== undefined) {
+      tags.push(['recording_pauses', workout.pauseCount.toString()]);
+    }
+
+    // Add workout start timestamp (Unix seconds)
+    if (workout.startTime) {
+      const startTimestamp = this.toUnixSeconds(workout.startTime);
+      tags.push(['workout_start_time', startTimestamp]);
+    }
+
     // TODO: Add team and challenge associations when available
     // ['team', '33404:pubkey:uuid', 'relay', 'teamName']
     // ['challenge_uuid', 'uuid']
@@ -344,6 +408,15 @@ export class WorkoutPublishingService {
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Format pace as MM:SS string for avg_pace tag
+   */
+  private formatPaceMMSS(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
   /**

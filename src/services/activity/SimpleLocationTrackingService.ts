@@ -17,6 +17,14 @@ import * as Device from 'expo-device';
 import { locationPermissionService } from './LocationPermissionService';
 import { KalmanFilter } from '../../utils/KalmanFilter';
 import { filterLocation } from '../../utils/gpsValidation';
+import { appPermissionService } from '../initialization/AppPermissionService';
+import {
+  startBackgroundLocationTracking,
+  stopBackgroundLocationTracking,
+  pauseBackgroundTracking,
+  resumeBackgroundTracking,
+  getAndClearBackgroundLocations,
+} from './BackgroundLocationTask';
 
 // Types
 export interface LocationPoint {
@@ -44,6 +52,8 @@ export interface TrackingSession {
   duration: number; // seconds (excluding pauses)
   pausedDuration: number; // seconds
   elevationGain: number; // meters
+  elevationLoss: number; // meters
+  pauseCount: number; // number of times paused
   splits: Split[];
   positions: LocationPoint[];
 }
@@ -73,9 +83,11 @@ export class SimpleLocationTrackingService {
   private distance: number = 0; // meters
   private positions: LocationPoint[] = [];
   private elevationGain: number = 0;
+  private elevationLoss: number = 0;
   private lastAltitude: number | null = null;
   private splits: Split[] = [];
   private lastSplitDistance: number = 0; // meters
+  private pauseCount: number = 0;
 
   // Location subscription
   private locationSubscription: Location.LocationSubscription | null = null;
@@ -88,15 +100,10 @@ export class SimpleLocationTrackingService {
   // GPS filtering
   private kalmanFilter: KalmanFilter;
 
-  // Android foreground service
-  private androidNotificationId: string | null = null;
-
   // Constants
   private readonly SPLIT_DISTANCE_METERS = 1000; // 1 km (TODO: support miles)
   private readonly GPS_SIGNAL_TIMEOUT_MS = 10000; // 10 seconds
   private readonly MIN_MOVEMENT_THRESHOLD_METERS = 0.5; // Filter micro-jitter
-  private readonly ANDROID_NOTIFICATION_CHANNEL_ID = 'workout-tracking';
-  private readonly ANDROID_NOTIFICATION_ID = 'workout-tracking-foreground';
 
   private constructor() {
     console.log('[SimpleLocationTrackingService] Initialized');
@@ -108,99 +115,6 @@ export class SimpleLocationTrackingService {
       SimpleLocationTrackingService.instance = new SimpleLocationTrackingService();
     }
     return SimpleLocationTrackingService.instance;
-  }
-
-  /**
-   * Create Android notification channel (required for Android 8+)
-   */
-  private async setupAndroidNotificationChannel(): Promise<void> {
-    if (Platform.OS !== 'android') return;
-
-    try {
-      await Notifications.setNotificationChannelAsync(this.ANDROID_NOTIFICATION_CHANNEL_ID, {
-        name: 'Activity Tracking',
-        description: 'Location tracking indicator',
-        importance: Notifications.AndroidImportance.LOW, // Low = no sound, just shows in status bar
-        vibrationPattern: [0],
-        sound: null,
-      });
-      console.log('[ANDROID] Notification channel created');
-    } catch (error) {
-      console.warn('[ANDROID] Failed to create notification channel:', error);
-    }
-  }
-
-  /**
-   * Start Android foreground service with notification
-   * Required for Android 14+ to get location updates
-   */
-  private async startAndroidForegroundService(activityType: string): Promise<boolean> {
-    if (Platform.OS !== 'android') return true;
-
-    try {
-      console.log('[ANDROID] Starting foreground service notification...');
-
-      // Setup notification channel first
-      await this.setupAndroidNotificationChannel();
-
-      // Schedule ultra-minimal notification (Option 3)
-      // Android requires this notification for location tracking
-      await Notifications.scheduleNotificationAsync({
-        identifier: this.ANDROID_NOTIFICATION_ID,
-        content: {
-          title: 'RUNSTR - Tracking',
-          body: '', // Empty body for minimal presence
-          priority: Notifications.AndroidNotificationPriority.LOW,
-          sticky: true, // Can't be dismissed by user (Android requirement)
-          autoDismiss: false,
-        },
-        trigger: null, // Show immediately
-      });
-
-      this.androidNotificationId = this.ANDROID_NOTIFICATION_ID;
-      console.log('[ANDROID] Foreground service notification started');
-      return true;
-    } catch (error) {
-      console.error('[ANDROID] Failed to start foreground service notification:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Stop Android foreground service notification
-   */
-  private async stopAndroidForegroundService(): Promise<void> {
-    if (Platform.OS !== 'android' || !this.androidNotificationId) return;
-
-    try {
-      await Notifications.dismissNotificationAsync(this.androidNotificationId);
-      this.androidNotificationId = null;
-      console.log('[ANDROID] Foreground service notification stopped');
-    } catch (error) {
-      console.warn('[ANDROID] Failed to stop foreground service notification:', error);
-    }
-  }
-
-  /**
-   * Check battery optimization and request exemption for Android 14+
-   * This prevents Doze Mode from stopping location updates
-   */
-  private async checkAndroidBatteryOptimization(): Promise<void> {
-    if (Platform.OS !== 'android') return;
-
-    try {
-      // Check Android API level
-      const apiLevel = Device.platformApiLevel || 0;
-
-      if (apiLevel >= 34) { // Android 14 = API 34
-        console.log('[ANDROID] Running on Android 14+ (API ' + apiLevel + ')');
-        console.log('[ANDROID] Battery optimization may affect background tracking');
-        console.log('[ANDROID] If tracking stops when using other apps, check battery settings');
-        // Note: We don't block tracking start - let user try and they can adjust settings if needed
-      }
-    } catch (error) {
-      console.warn('[ANDROID] Failed to check battery optimization:', error);
-    }
   }
 
   /**
@@ -216,26 +130,30 @@ export class SimpleLocationTrackingService {
         return false;
       }
 
-      // 1. Check permissions FIRST (before any tracking logic)
-      const permissionStatus = await locationPermissionService.checkPermissionStatus();
-      if (permissionStatus.foreground !== 'granted') {
-        console.log('[SimpleLocationTrackingService] Requesting permissions...');
-        const granted = await locationPermissionService.requestActivityTrackingPermissions();
-        if (!granted.foreground) {
-          console.error('[SimpleLocationTrackingService] Location permissions denied');
-          throw new Error('Location permissions denied. Please enable location access in device settings.');
-        }
+      // 1. Validate permissions (all permissions should be granted by app startup modal)
+      const permissionStatus = await appPermissionService.checkAllPermissions();
+
+      if (!permissionStatus.location) {
+        console.error('[SimpleLocationTrackingService] Location permissions missing');
+        throw new Error(
+          'Location permission required.\n\n' +
+          'Please restart the app to grant location permissions.'
+        );
       }
 
-      // 1.5. Android-specific: Check battery optimization and start foreground service
+      // Android-specific: Validate additional permissions
       if (Platform.OS === 'android') {
-        // Check battery optimization settings (non-blocking)
-        await this.checkAndroidBatteryOptimization();
+        if (!permissionStatus.notification) {
+          console.error('[ANDROID] Notification permission missing');
+          throw new Error(
+            'Notification permission required for background tracking.\n\n' +
+            'Please restart the app to grant notification permission.'
+          );
+        }
 
-        // Start foreground service notification (REQUIRED for Android 14+)
-        const foregroundServiceStarted = await this.startAndroidForegroundService(activityType);
-        if (!foregroundServiceStarted) {
-          throw new Error('Failed to start Android foreground service. Location tracking may not work properly.');
+        if (!permissionStatus.batteryOptimization) {
+          console.warn('[ANDROID] Battery optimization not configured - background tracking may be limited');
+          // Don't block - this is non-critical
         }
       }
 
@@ -250,9 +168,11 @@ export class SimpleLocationTrackingService {
       this.distance = 0;
       this.positions = [];
       this.elevationGain = 0;
+      this.elevationLoss = 0;
       this.lastAltitude = null;
       this.splits = [];
       this.lastSplitDistance = 0;
+      this.pauseCount = 0;
       this.lastPosition = null;
       this.lastGPSUpdate = Date.now();
       this.currentAccuracy = undefined;
@@ -280,6 +200,20 @@ export class SimpleLocationTrackingService {
         (location) => this.handleLocationUpdate(location)
       );
 
+      // 3.5. Android-specific: Start background location task
+      if (Platform.OS === 'android') {
+        const backgroundStarted = await startBackgroundLocationTracking(
+          activityType,
+          this.sessionId || `session_${Date.now()}`
+        );
+
+        if (backgroundStarted) {
+          console.log('[ANDROID] Background location task started');
+        } else {
+          console.warn('[ANDROID] Failed to start background task - continuing with foreground only');
+        }
+      }
+
       // 4. Activate KeepAwake to prevent GPS throttling
       try {
         await activateKeepAwakeAsync('activity-tracking');
@@ -300,13 +234,29 @@ export class SimpleLocationTrackingService {
       console.error('[SimpleLocationTrackingService] Failed to start tracking:', errorMessage);
       console.error('[SimpleLocationTrackingService] Full error:', error);
 
-      // Platform-specific error context
+      // Provide Android-specific guidance based on error type
       if (Platform.OS === 'android') {
+        const apiLevel = Device.platformApiLevel || 0;
+
+        if (errorMessage.includes('notification')) {
+          throw new Error(
+            'Background tracking requires notification permission on Android 13+.\n\n' +
+            'Please go to Settings → Apps → RUNSTR → Permissions and enable Notifications.'
+          );
+        }
+
+        if (errorMessage.includes('location')) {
+          throw new Error(
+            'Location permission required for tracking.\n\n' +
+            'Please ensure location is set to "Allow all the time" in Settings → Apps → RUNSTR → Permissions.'
+          );
+        }
+
+        // Generic Android error with helpful context
         console.error('[ANDROID] Common causes:');
         console.error('  - Location services disabled in device settings');
         console.error('  - Battery optimization blocking location access');
         console.error('  - Google Play Services outdated or unavailable');
-        console.error('  - Foreground service notification failed');
       }
 
       // Re-throw error with message for UI to display
@@ -411,6 +361,22 @@ export class SimpleLocationTrackingService {
   }
 
   /**
+   * Calculate total distance from array of positions
+   */
+  private calculateTotalDistance(positions: LocationPoint[]): number {
+    if (positions.length < 2) {
+      return 0;
+    }
+
+    let totalDistance = 0;
+    for (let i = 1; i < positions.length; i++) {
+      totalDistance += this.calculateDistance(positions[i - 1], positions[i]);
+    }
+
+    return totalDistance;
+  }
+
+  /**
    * Calculate distance between two points using Haversine formula
    * (Same as reference implementation)
    */
@@ -430,7 +396,7 @@ export class SimpleLocationTrackingService {
   }
 
   /**
-   * Update elevation gain
+   * Update elevation gain and loss
    */
   private updateElevation(altitude: number): void {
     if (this.lastAltitude !== null) {
@@ -439,6 +405,8 @@ export class SimpleLocationTrackingService {
       // Filter out small fluctuations (less than 1 meter)
       if (diff > 1) {
         this.elevationGain += diff;
+      } else if (diff < -1) {
+        this.elevationLoss += Math.abs(diff);
       }
     }
     this.lastAltitude = altitude;
@@ -488,6 +456,13 @@ export class SimpleLocationTrackingService {
 
     this.isPaused = true;
     this.pauseStartTime = Date.now();
+    this.pauseCount++; // Track number of pauses
+
+    // Android-specific: Pause background tracking
+    if (Platform.OS === 'android') {
+      await pauseBackgroundTracking();
+    }
+
     console.log('[SimpleLocationTrackingService] Tracking paused');
   }
 
@@ -507,6 +482,11 @@ export class SimpleLocationTrackingService {
     this.isPaused = false;
     this.pauseStartTime = 0;
     this.lastPosition = null; // Reset to avoid jumps after pause
+
+    // Android-specific: Resume background tracking
+    if (Platform.OS === 'android') {
+      await resumeBackgroundTracking();
+    }
 
     console.log(`[SimpleLocationTrackingService] Tracking resumed (paused for ${(pauseDuration / 1000).toFixed(0)}s)`);
   }
@@ -528,8 +508,22 @@ export class SimpleLocationTrackingService {
       this.locationSubscription = null;
     }
 
-    // Stop Android foreground service
-    await this.stopAndroidForegroundService();
+    // Android-specific: Stop background task and merge locations
+    if (Platform.OS === 'android') {
+      await stopBackgroundLocationTracking();
+
+      // Get and merge background locations
+      const backgroundLocations = await getAndClearBackgroundLocations();
+      if (backgroundLocations.length > 0) {
+        console.log(`[ANDROID] Merging ${backgroundLocations.length} background locations`);
+
+        // Add background locations to session
+        this.positions.push(...backgroundLocations);
+
+        // Recalculate distance with merged locations
+        this.distance = this.calculateTotalDistance(this.positions);
+      }
+    }
 
     // Deactivate KeepAwake
     try {
@@ -553,6 +547,8 @@ export class SimpleLocationTrackingService {
       duration: totalDuration,
       pausedDuration: Math.floor(this.totalPausedTime / 1000), // seconds
       elevationGain: this.elevationGain,
+      elevationLoss: this.elevationLoss,
+      pauseCount: this.pauseCount,
       splits: this.splits,
       positions: this.positions,
     };
@@ -588,6 +584,8 @@ export class SimpleLocationTrackingService {
       duration: currentDuration,
       pausedDuration: Math.floor(this.totalPausedTime / 1000),
       elevationGain: this.elevationGain,
+      elevationLoss: this.elevationLoss,
+      pauseCount: this.pauseCount,
       splits: this.splits,
       positions: this.positions,
     };
