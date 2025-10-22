@@ -2,6 +2,11 @@
 
 Main application screens for the RUNSTR mobile app's user interface.
 
+## Subdirectories
+
+- **activity/** - Activity tracking screens (running, cycling, walking, meditation, strength, diet)
+- **routes/** - Route management screens (saved routes library, route details, comparisons)
+
 ## Files
 
 - **CaptainDashboardScreen.tsx** - Captain management interface for team oversight and competition creation
