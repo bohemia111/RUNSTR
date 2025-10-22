@@ -26,6 +26,14 @@ import { activityMetricsService } from '../../services/activity/ActivityMetricsS
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import { CustomAlert } from '../ui/CustomAlert';
 import { RewardEarnedModal } from '../rewards/RewardEarnedModal';
+import routeStorageService from '../../services/routes/RouteStorageService';
+
+interface GPSCoordinate {
+  latitude: number;
+  longitude: number;
+  altitude?: number;
+  timestamp?: number;
+}
 
 interface WorkoutSummaryProps {
   visible: boolean;
@@ -41,6 +49,7 @@ interface WorkoutSummaryProps {
     steps?: number; // for walking
     splits?: Split[]; // kilometer splits for running
     localWorkoutId?: string; // For marking as synced after posting
+    gpsCoordinates?: GPSCoordinate[]; // GPS track for route saving
   };
 }
 
@@ -55,6 +64,8 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
   const [saved, setSaved] = useState(false);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSavingRoute, setIsSavingRoute] = useState(false);
+  const [routeSaved, setRouteSaved] = useState(false);
 
   // Reward modal state
   const [showRewardModal, setShowRewardModal] = useState(false);
@@ -334,6 +345,65 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
     }
   };
 
+  const handleSaveAsRoute = async () => {
+    // Check if GPS coordinates are available
+    if (!workout.gpsCoordinates || workout.gpsCoordinates.length === 0) {
+      setAlertState({
+        visible: true,
+        title: 'No GPS Data',
+        message: 'This workout doesn\'t have GPS tracking data. Only workouts with GPS can be saved as routes.',
+      });
+      return;
+    }
+
+    setIsSavingRoute(true);
+    try {
+      // Generate default route name based on workout
+      const activityName = workout.type.charAt(0).toUpperCase() + workout.type.slice(1);
+      const distanceKm = (workout.distance / 1000).toFixed(1);
+      const defaultName = `${activityName} ${distanceKm}km`;
+
+      // Convert GPS coordinates to RouteStorageService format
+      const coordinates = workout.gpsCoordinates.map(coord => ({
+        latitude: coord.latitude,
+        longitude: coord.longitude,
+        altitude: coord.altitude,
+        timestamp: coord.timestamp,
+      }));
+
+      // Save route
+      const routeId = await routeStorageService.saveRoute({
+        name: defaultName,
+        description: `Saved from ${new Date().toLocaleDateString()}`,
+        activityType: workout.type,
+        coordinates,
+        distance: workout.distance,
+        elevationGain: workout.elevation || 0,
+        workoutId: workout.localWorkoutId,
+        workoutTime: workout.duration,
+        tags: [],
+      });
+
+      setRouteSaved(true);
+      setAlertState({
+        visible: true,
+        title: 'Route Saved! 📍',
+        message: `"${defaultName}" has been saved to your route library. You can reuse this route or compare future workouts against it.`,
+      });
+
+      console.log(`✅ Saved workout as route: ${routeId}`);
+    } catch (error) {
+      console.error('Failed to save route:', error);
+      setAlertState({
+        visible: true,
+        title: 'Error',
+        message: 'Failed to save route. Please try again.',
+      });
+    } finally {
+      setIsSavingRoute(false);
+    }
+  };
+
   const getActivityIcon = (): keyof typeof Ionicons.glyphMap => {
     switch (workout.type) {
       case 'running':
@@ -575,6 +645,34 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
                 </>
               )}
             </TouchableOpacity>
+
+            {/* Save as Route Button - Only show if GPS data available */}
+            {workout.gpsCoordinates && workout.gpsCoordinates.length > 0 && (
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.routeButton,
+                  routeSaved && styles.disabledButton,
+                ]}
+                onPress={handleSaveAsRoute}
+                disabled={isSavingRoute || routeSaved}
+              >
+                {isSavingRoute ? (
+                  <ActivityIndicator size="small" color={theme.colors.text} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name={routeSaved ? 'checkmark-circle' : 'map-outline'}
+                      size={20}
+                      color={theme.colors.text}
+                    />
+                    <Text style={styles.routeButtonText}>
+                      {routeSaved ? 'Route Saved' : 'Save Route'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Info Text */}
@@ -587,6 +685,11 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
               <Text style={styles.infoBold}>Compete:</Text> Enter into active
               competitions and leaderboards
             </Text>
+            {workout.gpsCoordinates && workout.gpsCoordinates.length > 0 && (
+              <Text style={styles.infoText}>
+                <Text style={styles.infoBold}>Save Route:</Text> Save this GPS track to reuse later
+              </Text>
+            )}
           </View>
 
           {/* Dismiss Button */}
@@ -719,6 +822,11 @@ const styles = StyleSheet.create({
   saveButton: {
     backgroundColor: theme.colors.orangeDeep, // Deep orange
   },
+  routeButton: {
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+  },
   disabledButton: {
     opacity: 0.5,
   },
@@ -729,6 +837,11 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: theme.colors.background,
+    fontSize: 16,
+    fontWeight: theme.typography.weights.bold,
+  },
+  routeButtonText: {
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: theme.typography.weights.bold,
   },
