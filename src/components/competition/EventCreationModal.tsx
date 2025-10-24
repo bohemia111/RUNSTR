@@ -17,9 +17,14 @@ import {
   Platform,
 } from 'react-native';
 import { theme } from '../../styles/theme';
-import { CompetitionService } from '../../services/competition/competitionService';
+import { NostrCompetitionService } from '../../services/nostr/NostrCompetitionService';
+import { NostrListService } from '../../services/nostr/NostrListService';
+import { GlobalNDKService } from '../../services/nostr/GlobalNDKService';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { npubToHex } from '../../utils/ndkConversion';
+import UnifiedSigningService from '../../services/auth/UnifiedSigningService';
+import { getAuthenticationData } from '../../utils/nostrAuth';
 import type { NostrTeam } from '../../services/nostr/NostrTeamService';
-import type { CompetitionData } from '../../services/competition/competitionService';
 
 interface EventCreationModalProps {
   visible: boolean;
@@ -88,8 +93,6 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
   });
   const [isCreating, setIsCreating] = useState(false);
 
-  const competitionService = CompetitionService.getInstance();
-
   const updateFormData = <K extends keyof FormData>(
     key: K,
     value: FormData[K]
@@ -134,37 +137,138 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
     try {
       setIsCreating(true);
 
-      // Prepare competition data
-      const competitionData: CompetitionData = {
+      // Get authentication data
+      const authData = await getAuthenticationData();
+      if (!authData || !authData.nsec) {
+        Alert.alert(
+          'Authentication Required',
+          'Please log in again to create events.',
+          [{ text: 'OK' }]
+        );
+        setIsCreating(false);
+        return;
+      }
+
+      console.log('✅ Retrieved auth data for event creation');
+
+      // Get signer (works for both nsec and Amber)
+      const signingService = UnifiedSigningService.getInstance();
+      const signer = await signingService.getSigner();
+      if (!signer) {
+        Alert.alert('Error', 'No authentication found. Please login first.');
+        setIsCreating(false);
+        return;
+      }
+
+      // Calculate event date
+      const eventDate =
+        formData.startTime === 'now'
+          ? new Date()
+          : formData.customStartTime || new Date();
+
+      // Map goalType to competitionType for Nostr event
+      const competitionTypeMap = {
+        distance: 'Distance Challenge',
+        speed: 'Speed Challenge',
+        duration: 'Duration Challenge',
+        consistency: 'Consistency Streak',
+      } as const;
+
+      // Prepare event data for Nostr
+      const eventCreationData = {
+        teamId: team.id,
         name: formData.name.trim(),
         description:
           formData.description.trim() ||
           `${formData.goalType} event for ${team.name}`,
-        type: 'event',
-        goalType: formData.goalType,
-        goalValue: formData.goalValue ? Number(formData.goalValue) : undefined,
-        goalUnit: formData.goalValue ? formData.goalUnit : undefined,
-        durationDays: 1, // Events are 1 day
-        startTime:
-          formData.startTime === 'now'
-            ? Math.floor(Date.now() / 1000)
-            : formData.customStartTime
-            ? Math.floor(formData.customStartTime.getTime() / 1000)
-            : Math.floor(Date.now() / 1000),
+        activityType: 'Running' as const, // Default to Running (NostrActivityType)
+        competitionType: competitionTypeMap[formData.goalType],
+        eventDate: eventDate.toISOString(),
+        entryFeesSats: 0, // Default to free
+        maxParticipants: 50,
+        requireApproval: false,
+        targetValue: formData.goalValue ? Number(formData.goalValue) : undefined,
+        targetUnit: formData.goalUnit,
       };
 
-      // Prepare event creation (returns unsigned event template)
-      const result = competitionService.prepareCompetitionCreation(
-        team,
-        competitionData,
-        captainPubkey
+      console.log('🎯 Creating event:', eventCreationData);
+
+      // Create event using Nostr Competition Service
+      const result = await NostrCompetitionService.createEvent(
+        eventCreationData,
+        signer
       );
 
-      console.log(`✅ Prepared event creation: ${result.competitionId}`);
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to create event');
+      }
 
-      // TODO: In a real implementation, this would need to be signed by the captain
-      // For now, we'll simulate successful creation
-      onEventCreated(result.competitionId);
+      console.log('✅ Event created successfully:', result.competitionId);
+
+      // Track participant list creation status
+      let participantListCreated = false;
+      let participantListError = '';
+
+      // Create empty participant list for opt-in participation
+      if (result.competitionId) {
+        try {
+          console.log('📋 Creating empty participant list for event (opt-in)');
+          const listService = NostrListService.getInstance();
+
+          // Get captain's hex pubkey from npub
+          const captainHexPubkey = npubToHex(authData.npub);
+          if (!captainHexPubkey) {
+            throw new Error('Failed to convert npub to hex pubkey');
+          }
+
+          // Prepare empty participant list (kind 30000)
+          const participantListData = {
+            name: `${formData.name} Participants`,
+            description: `Participants for ${formData.name}`,
+            members: [], // Start with empty list - fully opt-in
+            dTag: `event-${result.competitionId}-participants`,
+            listType: 'people' as const,
+          };
+
+          // Create the participant list event template
+          const listEventTemplate = listService.prepareListCreation(
+            participantListData,
+            captainHexPubkey
+          );
+
+          console.log('🔐 Signing participant list...');
+
+          // Get global NDK instance
+          const ndk = await GlobalNDKService.getInstance();
+
+          // Create NDK event and sign it
+          const ndkEvent = new NDKEvent(ndk, listEventTemplate);
+          await ndkEvent.sign(signer);
+
+          console.log('📤 Publishing participant list to Nostr...');
+
+          // Publish to relays
+          await ndkEvent.publish();
+
+          participantListCreated = true;
+          console.log(
+            '✅ Participant list created and published:',
+            participantListData.dTag
+          );
+        } catch (listError) {
+          console.error('⚠️ Failed to create participant list:', listError);
+          participantListError =
+            listError instanceof Error ? listError.message : 'Unknown error';
+          // Don't block event creation, just log the error
+        }
+      }
+
+      // Show success message with participant list status
+      const successMessage = participantListCreated
+        ? `Event "${formData.name}" has been created and published to Nostr relays.\n\n✅ Participant list created successfully.`
+        : participantListError
+        ? `Event "${formData.name}" has been created, but participant list creation failed.\n\n⚠️ ${participantListError}\n\nYou may need to create the participant list manually from the Captain Dashboard.`
+        : `Event "${formData.name}" has been created and published to Nostr relays.`;
 
       // Reset form and close modal
       setFormData({
@@ -176,18 +280,23 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
         startTime: 'now',
       });
 
+      // Notify parent of success
+      if (result.competitionId) {
+        onEventCreated(result.competitionId);
+      }
+
       onClose();
 
+      Alert.alert('Success!', successMessage, [{ text: 'OK' }]);
+    } catch (error) {
+      console.error('❌ Failed to create event:', error);
       Alert.alert(
-        'Event Created!',
-        `"${formData.name}" has been created and will start ${
-          formData.startTime === 'now' ? 'now' : 'at the scheduled time'
-        }.`,
+        'Error',
+        `Failed to create event: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
         [{ text: 'OK' }]
       );
-    } catch (error) {
-      console.error('Failed to create event:', error);
-      Alert.alert('Error', 'Failed to create event. Please try again.');
     } finally {
       setIsCreating(false);
     }
