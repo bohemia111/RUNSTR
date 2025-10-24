@@ -1,10 +1,11 @@
 /**
  * CharitySection - Display team's supported charity with zap button
  * Shows charity info below team bio on team detail screens
- * Works with ANY Lightning wallet - no NWC required
+ * Works with NWC for quick zaps, external wallets for custom amounts
+ * Follows standard NWC pattern: single tap = quick 21 sats, long press = amount modal
  */
 
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,12 +13,21 @@ import {
   StyleSheet,
   Alert,
   Linking,
+  Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { getCharityById } from '../../constants/charities';
 import { CharityZapService } from '../../services/charity/CharityZapService';
 import { CharityPaymentModal } from '../charity/CharityPaymentModal';
+import { EnhancedZapModal } from '../nutzap/EnhancedZapModal';
+import { ExternalZapModal } from '../nutzap/ExternalZapModal';
+import { NWCWalletService } from '../../services/wallet/NWCWalletService';
+import { useNWCZap } from '../../hooks/useNWCZap';
+import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
+
+const DEFAULT_ZAP_AMOUNT = 21; // Standard quick zap amount
 
 interface CharitySectionProps {
   charityId?: string;
@@ -26,10 +36,22 @@ interface CharitySectionProps {
 export const CharitySection: React.FC<CharitySectionProps> = ({
   charityId,
 }) => {
-  const [showPaymentModal, setShowPaymentModal] = React.useState(false);
-  const [paymentInvoice, setPaymentInvoice] = React.useState('');
-  const [paymentAmount, setPaymentAmount] = React.useState(0);
-  const [charityName, setCharityName] = React.useState('');
+  // State for modals
+  const [showEnhancedModal, setShowEnhancedModal] = useState(false);
+  const [showExternalModal, setShowExternalModal] = useState(false);
+  const [selectedAmount, setSelectedAmount] = useState(DEFAULT_ZAP_AMOUNT);
+  const [charityNpub, setCharityNpub] = useState('');
+
+  // Animation for button press
+  const scaleAnimation = useRef(new Animated.Value(1)).current;
+
+  // Zapped state tracking
+  const [isZapped, setIsZapped] = useState(false);
+  const [isZapping, setIsZapping] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+
+  // NWC hook for wallet operations
+  const { sendZap, hasWallet, balance, refreshBalance } = useNWCZap();
 
   // If no charity selected, don't render anything
   if (!charityId) {
@@ -43,97 +65,142 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
     return null;
   }
 
-  const handleZapPress = () => {
-    // Prompt user for donation amount
-    Alert.prompt(
-      `Donate to ${charity.name}`,
-      'Enter amount in sats:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Continue',
-          onPress: async (amountText) => {
-            if (!amountText) return;
+  // Load zapped state and wallet balance on mount
+  useEffect(() => {
+    const loadZappedState = async () => {
+      try {
+        const today = new Date().toDateString();
+        const stored = await AsyncStorage.getItem('@runstr:zapped_charities');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.date === today && parsed.charities?.includes(charity.id)) {
+            setIsZapped(true);
+          }
+        }
+      } catch (error) {
+        console.log('[CharitySection] Error loading zapped state:', error);
+      }
+    };
 
-            const amount = parseInt(amountText, 10);
-            if (isNaN(amount) || amount <= 0) {
-              Alert.alert(
-                'Invalid Amount',
-                'Please enter a valid number of sats.'
-              );
-              return;
-            }
+    loadZappedState();
+  }, [charity.id]);
 
-            try {
-              // Generate Lightning invoice
-              const result = await CharityZapService.generateCharityInvoice(
-                charity.id,
-                amount
-              );
+  // Update wallet balance when it changes
+  useEffect(() => {
+    if (hasWallet) {
+      setWalletBalance(balance || 0);
+    }
+  }, [balance, hasWallet]);
 
-              if (!result.success || !result.invoice) {
-                Alert.alert(
-                  'Invoice Generation Failed',
-                  result.error ||
-                    'Unable to generate invoice. Please try again.'
-                );
-                return;
-              }
+  // Update zapped state after successful zap
+  const markAsZapped = async () => {
+    try {
+      const today = new Date().toDateString();
+      const stored = await AsyncStorage.getItem('@runstr:zapped_charities');
+      const data = stored ? JSON.parse(stored) : { date: today, charities: [] };
 
-              // Show payment modal
-              setPaymentInvoice(result.invoice);
-              setPaymentAmount(amount);
-              setCharityName(charity.name);
-              setShowPaymentModal(true);
-            } catch (error) {
-              console.error(
-                '[CharitySection] Error generating invoice:',
-                error
-              );
-              Alert.alert(
-                'Error',
-                'Failed to generate invoice. Please try again.'
-              );
-            }
-          },
-        },
-      ],
-      'plain-text',
-      '',
-      'numeric'
-    );
+      // Reset if it's a new day
+      if (data.date !== today) {
+        data.date = today;
+        data.charities = [];
+      }
+
+      // Add this charity if not already zapped
+      if (!data.charities.includes(charity.id)) {
+        data.charities.push(charity.id);
+      }
+
+      await AsyncStorage.setItem('@runstr:zapped_charities', JSON.stringify(data));
+      setIsZapped(true);
+    } catch (error) {
+      console.error('[CharitySection] Error saving zapped state:', error);
+    }
   };
 
-  const handleZapLongPress = async () => {
-    // On long press, generate invoice with default amount (2100 sats) for quick payment
-    const defaultAmount = 2100; // Default donation amount in sats (~$2)
+  // Animation for button press
+  const animatePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnimation, {
+        toValue: 0.95,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnimation, {
+        toValue: 1.0,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
+  // SINGLE TAP: Quick zap with NWC (21 sats default)
+  const handleZapPress = async () => {
+    animatePress();
+
+    // Check for NWC wallet
+    if (!hasWallet) {
+      Alert.alert(
+        'Wallet Not Configured',
+        'Long press to donate using an external wallet like Cash App or Strike.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Check balance
+    if (walletBalance < DEFAULT_ZAP_AMOUNT) {
+      Alert.alert(
+        'Insufficient Balance',
+        `You need ${DEFAULT_ZAP_AMOUNT} sats but only have ${walletBalance}. Long press to use an external wallet.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Quick zap with default amount
+    setIsZapping(true);
     try {
-      console.log('[CharitySection] Long press detected - generating quick donation invoice');
+      console.log(`[CharitySection] Quick zapping ${charity.name} with ${DEFAULT_ZAP_AMOUNT} sats`);
 
-      // Generate Lightning invoice with default amount
-      const result = await CharityZapService.generateCharityInvoice(
-        charity.id,
-        defaultAmount
+      // Get invoice from charity's Lightning address
+      const { invoice } = await getInvoiceFromLightningAddress(
+        charity.lightningAddress,
+        DEFAULT_ZAP_AMOUNT,
+        `Donation to ${charity.name}`
       );
 
-      if (!result.success || !result.invoice) {
-        Alert.alert(
-          'Invoice Generation Failed',
-          result.error || 'Unable to generate invoice. Please try again.'
-        );
+      if (!invoice) {
+        Alert.alert('Error', 'Failed to get invoice from charity.');
+        setIsZapping(false);
         return;
       }
 
-      // Show payment modal directly without amount prompt
-      setPaymentInvoice(result.invoice);
-      setPaymentAmount(defaultAmount);
-      setCharityName(charity.name);
-      setShowPaymentModal(true);
+      // Pay the invoice with NWC wallet
+      const paymentResult = await NWCWalletService.getInstance().sendPayment(invoice);
+
+      if (paymentResult.success) {
+        await markAsZapped();
+        await refreshBalance(); // Update the balance after payment
+        Alert.alert('Success', `Donated ${DEFAULT_ZAP_AMOUNT} sats to ${charity.name}!`);
+      } else {
+        Alert.alert('Error', paymentResult.error || 'Failed to process donation. Please try again.');
+      }
     } catch (error) {
-      console.error('[CharitySection] Error generating quick donation invoice:', error);
-      Alert.alert('Error', 'Failed to generate invoice. Please try again.');
+      console.error('[CharitySection] Quick zap error:', error);
+      Alert.alert('Error', 'Failed to process donation. Long press to use an external wallet.');
+    } finally {
+      setIsZapping(false);
     }
+  };
+
+  // LONG PRESS: Open modal for custom amount
+  const handleZapLongPress = () => {
+    animatePress();
+    console.log('[CharitySection] Long press detected - opening amount modal');
+
+    // Set charity Lightning address for the modal
+    setCharityNpub(charity.lightningAddress);
+    setShowEnhancedModal(true);
   };
 
   const handleLearnMore = () => {
@@ -142,17 +209,15 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
     }
   };
 
-  const handlePaymentConfirmed = () => {
-    setShowPaymentModal(false);
+  // Handle external wallet payment confirmation
+  const handleExternalPaymentConfirmed = async () => {
+    await markAsZapped();
+    setShowExternalModal(false);
     Alert.alert(
       'Thank You!',
-      `Your donation to ${charityName} has been sent. Thank you for making a difference!`,
+      `Your donation to ${charity.name} has been sent. Thank you for making a difference!`,
       [{ text: 'OK' }]
     );
-  };
-
-  const handlePaymentCancelled = () => {
-    setShowPaymentModal(false);
   };
 
   return (
@@ -188,28 +253,65 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
           )}
         </View>
 
-        {/* Zap Button - Single tap for amount prompt, long press for quick zap */}
-        <TouchableOpacity
-          onPress={handleZapPress}
-          onLongPress={handleZapLongPress}
-          style={styles.zapButton}
-          activeOpacity={0.7}
-          delayLongPress={500}  // 500ms long press delay
-        >
-          <Ionicons name="flash" size={20} color="#000000" />
-          <Text style={styles.zapButtonText}>Zap</Text>
-        </TouchableOpacity>
+        {/* Zap Button - Single tap for quick 21 sats, long press for custom amount */}
+        <Animated.View style={{ transform: [{ scale: scaleAnimation }] }}>
+          <TouchableOpacity
+            onPress={handleZapPress}
+            onLongPress={handleZapLongPress}
+            style={[
+              styles.zapButton,
+              isZapped && styles.zappedButton,
+              isZapping && styles.zappingButton
+            ]}
+            activeOpacity={0.7}
+            delayLongPress={500}  // 500ms long press delay
+            disabled={isZapping}
+          >
+            <Ionicons
+              name="flash"
+              size={20}
+              color={isZapped ? "#FFD700" : "#000000"}
+            />
+            <Text style={[
+              styles.zapButtonText,
+              isZapped && styles.zappedButtonText
+            ]}>
+              {isZapping ? 'Sending...' : isZapped ? 'Zapped' : 'Zap'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
 
-      {/* Payment Modal */}
-      {showPaymentModal && paymentInvoice && (
-        <CharityPaymentModal
-          visible={showPaymentModal}
-          charityName={charityName}
-          amount={paymentAmount}
-          invoice={paymentInvoice}
-          onPaymentConfirmed={handlePaymentConfirmed}
-          onCancel={handlePaymentCancelled}
+      {/* Enhanced Zap Modal for amount selection */}
+      {showEnhancedModal && (
+        <EnhancedZapModal
+          visible={showEnhancedModal}
+          onClose={() => setShowEnhancedModal(false)}
+          recipientNpub={charityNpub}
+          recipientName={charity.name}
+          balance={walletBalance}
+          defaultAmount={DEFAULT_ZAP_AMOUNT}
+          onSuccess={async () => {
+            await markAsZapped();
+            setShowEnhancedModal(false);
+          }}
+          onShowExternalWallet={(amount, memo) => {
+            setSelectedAmount(amount);
+            setShowEnhancedModal(false);
+            setShowExternalModal(true);
+          }}
+        />
+      )}
+
+      {/* External Wallet Modal for QR code payment */}
+      {showExternalModal && (
+        <ExternalZapModal
+          visible={showExternalModal}
+          onClose={() => setShowExternalModal(false)}
+          recipientNpub={charityNpub}
+          recipientName={charity.name}
+          amount={selectedAmount}
+          onPaymentConfirmed={handleExternalPaymentConfirmed}
         />
       )}
     </View>
@@ -296,5 +398,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: theme.typography.weights.semiBold,
     color: '#000000',
+  },
+
+  zappedButton: {
+    backgroundColor: '#FFE4B5', // Light gold when zapped
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+
+  zappingButton: {
+    opacity: 0.7,
+  },
+
+  zappedButtonText: {
+    color: '#000000', // Keep text black on light gold background
   },
 });
