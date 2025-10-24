@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2025-10-23
+
+### Fixed
+- **Android Background Distance Tracking**: Revolutionary fix for distance calculation when app is backgrounded
+  - Distance calculation now runs in background task with headless JavaScript context
+  - Survives app backgrounding and continues accurate distance tracking
+  - No more lost distance when switching apps during workouts
+  - Improved reliability for long-duration activities
+- **Team About Section Display**: Fixed display of team's about section
+  - About section now properly renders when stored as plain text in Nostr events
+  - Improved team profile completeness
+- **Back Button Responsiveness**: Eliminated 30-second delay on back button
+  - Immediate response when navigating back from screens
+  - Better UI responsiveness throughout the app
+
+### Added
+- **Route Tracking Feature**: Complete privacy-first route tracking implementation
+  - GPS route recording with privacy controls
+  - Route saving and management capabilities
+  - Route replay and comparison features
+  - Personal record tracking on saved routes
+
+### Improved
+- **Charity Donation Flow**: Standardized zap pattern implementation
+  - Consistent payment flow matching rest of app's zap functionality
+  - Better user experience for charity donations
+  - More reliable payment processing
+
 ## [0.4.1] - 2025-10-23
 
 ### Fixed
