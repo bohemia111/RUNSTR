@@ -87,6 +87,7 @@ export class SimpleLocationTrackingService {
 
   // GPS data
   private distance: number = 0; // meters
+  private duration: number = 0; // seconds - calculated from GPS timestamps
   private positions: LocationPoint[] = [];
   private elevationGain: number = 0;
   private elevationLoss: number = 0;
@@ -135,30 +136,69 @@ export class SimpleLocationTrackingService {
   }
 
   /**
-   * Set up AppState listener to optimize background polling
-   * Stops JavaScript polling when app backgrounds (saves battery)
-   * Resumes when app returns to foreground
+   * Set up AppState listener to optimize background polling and prevent subscription conflicts
+   * CRITICAL FIX: Stop foreground subscription when backgrounding to prevent dual-subscription conflicts
+   * This ensures only ONE location listener is active at a time (Android limitation)
    */
   private setupAppStateListener(): void {
     this.appStateSubscription = AppState.addEventListener(
       'change',
-      (nextAppState: AppStateStatus) => {
+      async (nextAppState: AppStateStatus) => {
         if (nextAppState === 'background') {
-          // App went to background - stop JavaScript polling
-          // Background task will continue GPS tracking natively
+          // App went to background
+          console.log(
+            '[SimpleLocationTrackingService] App backgrounded - stopping foreground subscription'
+          );
+
+          // CRITICAL FIX: Stop foreground location subscription to prevent conflict
+          // Background TaskManager will continue tracking
+          if (this.locationSubscription) {
+            this.locationSubscription.remove();
+            this.locationSubscription = null;
+            console.log('[SimpleLocationTrackingService] ✅ Foreground subscription removed');
+          }
+
+          // Stop JavaScript polling timer (saves battery)
           if (this.backgroundSyncTimer) {
-            console.log(
-              '[SimpleLocationTrackingService] App backgrounded, stopping JS polling timer (background task continues)'
-            );
             this.stopBackgroundSyncPolling();
           }
         } else if (nextAppState === 'active') {
-          // App returned to foreground - resume JavaScript polling
-          if (this.isTracking && !this.isPaused && !this.backgroundSyncTimer) {
+          // App returned to foreground
+          if (this.isTracking && !this.isPaused) {
             console.log(
-              '[SimpleLocationTrackingService] App foregrounded, resuming JS polling timer'
+              '[SimpleLocationTrackingService] App foregrounded, restarting foreground subscription...'
             );
-            this.startBackgroundSyncPolling();
+
+            // Step 1: Immediately sync background data BEFORE resuming
+            const synced = await this.syncFromBackground();
+            if (synced) {
+              console.log('[SimpleLocationTrackingService] ✅ Background data synced on foreground');
+            }
+
+            // Step 2: Restart foreground location subscription for real-time UI updates
+            try {
+              this.locationSubscription = await Location.watchPositionAsync(
+                {
+                  accuracy: Location.Accuracy.BestForNavigation,
+                  timeInterval: 1000,
+                  distanceInterval: 0,
+                  ...(Platform.OS === 'ios' && {
+                    activityType: Location.ActivityType.Fitness,
+                    pausesUpdatesAutomatically: false,
+                    showsBackgroundLocationIndicator: true,
+                  }),
+                },
+                (location) => this.handleLocationUpdate(location)
+              );
+              console.log('[SimpleLocationTrackingService] ✅ Foreground subscription restarted');
+            } catch (error) {
+              console.error('[SimpleLocationTrackingService] Failed to restart foreground subscription:', error);
+            }
+
+            // Step 3: Resume polling for ongoing background sync
+            if (!this.backgroundSyncTimer) {
+              this.startBackgroundSyncPolling();
+            }
           }
         }
       }
@@ -224,6 +264,7 @@ export class SimpleLocationTrackingService {
 
       // Reset tracking data
       this.distance = 0;
+      this.duration = 0;  // Reset GPS-timestamp-based duration
       this.positions = [];
       this.elevationGain = 0;
       this.elevationLoss = 0;
@@ -408,6 +449,16 @@ export class SimpleLocationTrackingService {
     this.lastGPSUpdate = Date.now();
     this.currentAccuracy = processedPoint.accuracy;
 
+    // 🔧 CRITICAL FIX: Calculate duration using GPS timestamps (not Date.now())
+    // This prevents timer drift when JavaScript is suspended in background
+    // Reference: runstr-github RunTracker.js line 221
+    if (!this.isPaused) {
+      this.duration = Math.floor(
+        (processedPoint.timestamp - this.startTime - this.totalPausedTime) / 1000
+      );
+      // Duration will be read by getCurrentSession() for UI updates
+    }
+
     // Platform-specific logging
     if (Platform.OS === 'android') {
       console.log(
@@ -472,72 +523,73 @@ export class SimpleLocationTrackingService {
   }
 
   /**
+   * Immediately sync background data (for foreground transitions)
+   * Returns true if data was synced, false if no data available
+   *
+   * This method extracts background distance and locations from AsyncStorage
+   * and merges them into the current session. Use this when the app returns
+   * to foreground to avoid stale data and 10-second polling delays.
+   */
+  async syncFromBackground(): Promise<boolean> {
+    if (!this.isTracking) {
+      return false;
+    }
+
+    let dataSynced = false;
+
+    try {
+      // CRITICAL: Get pre-calculated background distance
+      // This is calculated in the background task when app is backgrounded
+      const backgroundDistance = await getAndClearBackgroundDistance();
+
+      if (backgroundDistance) {
+        const distanceToAdd = backgroundDistance.totalDistance - this.distance;
+
+        if (distanceToAdd > 0) {
+          this.distance = backgroundDistance.totalDistance;
+          console.log(
+            `[SimpleLocationTrackingService] Synced background distance: +${distanceToAdd.toFixed(1)}m, ` +
+            `total=${this.distance.toFixed(1)}m`
+          );
+
+          // Check for split milestones after distance update
+          this.checkForSplit();
+          dataSynced = true;
+        }
+      }
+
+      // Get any unprocessed background locations
+      const backgroundLocations = await getAndClearBackgroundLocations();
+
+      if (backgroundLocations.length > 0) {
+        console.log(
+          `[SimpleLocationTrackingService] Processing ${backgroundLocations.length} background locations`
+        );
+
+        // Add to positions for route data
+        this.positions.push(...backgroundLocations);
+        dataSynced = true;
+      }
+
+      return dataSynced;
+    } catch (error) {
+      console.warn('[SimpleLocationTrackingService] Error syncing background data:', error);
+      return false;
+    }
+  }
+
+  /**
    * Start background sync polling to process locations in real-time
    * This ensures distance updates even when app is backgrounded
-   * CRITICAL: This syncs pre-calculated distance from background task on Android
+   * Now uses centralized syncFromBackground() method for consistency
    */
   private startBackgroundSyncPolling(): void {
-    // Poll every 3 seconds to match Android GPS interval
-    const SYNC_INTERVAL_MS = 3000;
+    // Poll every 10 seconds to reduce battery drain and avoid Android termination
+    const SYNC_INTERVAL_MS = 10000;
 
     this.backgroundSyncTimer = setInterval(async () => {
       if (this.isTracking && !this.isPaused) {
-        try {
-          // CRITICAL FIX: First check for pre-calculated background distance
-          // This is calculated in the background task when app is backgrounded on Android
-          const backgroundDistance = await getAndClearBackgroundDistance();
-
-          if (backgroundDistance) {
-            // Merge the background-calculated distance
-            const distanceToAdd = backgroundDistance.totalDistance - this.distance;
-
-            if (distanceToAdd > 0) {
-              this.distance = backgroundDistance.totalDistance;
-              console.log(
-                `[BackgroundSync] Merged pre-calculated distance: +${distanceToAdd.toFixed(1)}m, ` +
-                `total=${this.distance.toFixed(1)}m, locations=${backgroundDistance.locationCount}`
-              );
-
-              // Check for split milestones after distance update
-              this.checkForSplit();
-            }
-          }
-
-          // Then get any unprocessed background locations (for backwards compatibility)
-          const backgroundLocations = await getAndClearBackgroundLocations();
-
-          if (backgroundLocations.length > 0) {
-            console.log(
-              `[BackgroundSync] Processing ${backgroundLocations.length} unprocessed locations`
-            );
-
-            // Process each location through the normal update pipeline
-            for (const loc of backgroundLocations) {
-              // Convert to LocationObject format expected by handleLocationUpdate
-              const locationObject: Location.LocationObject = {
-                coords: {
-                  latitude: loc.latitude,
-                  longitude: loc.longitude,
-                  altitude: loc.altitude || null,
-                  accuracy: loc.accuracy || null,
-                  altitudeAccuracy: null,
-                  heading: null,
-                  speed: loc.speed || null,
-                },
-                timestamp: loc.timestamp,
-              };
-
-              // Process through normal pipeline for filtering and distance calculation
-              this.handleLocationUpdate(locationObject);
-            }
-
-            console.log(
-              `[BackgroundSync] Distance after processing locations: ${this.distance.toFixed(1)}m`
-            );
-          }
-        } catch (error) {
-          console.warn('[BackgroundSync] Error processing background data:', error);
-        }
+        await this.syncFromBackground();
       }
     }, SYNC_INTERVAL_MS);
 
@@ -799,13 +851,16 @@ export class SimpleLocationTrackingService {
 
   /**
    * Get current session data (for live updates)
+   * Now uses GPS-timestamp-based duration instead of Date.now()
    */
   getCurrentSession(): TrackingSession | null {
     if (!this.isTracking) {
       return null;
     }
 
-    const currentDuration = this.getElapsedTime();
+    // Use GPS-timestamp-based duration (updated in handleLocationUpdate)
+    // Falls back to calculation if no GPS updates yet
+    const currentDuration = this.duration > 0 ? this.duration : this.getElapsedTime();
 
     return {
       id: this.sessionId || `session_${Date.now()}`,

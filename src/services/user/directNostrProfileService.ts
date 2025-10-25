@@ -7,6 +7,9 @@
 import { getNpubFromStorage } from '../../utils/nostr';
 import { nostrProfileService } from '../nostr/NostrProfileService';
 import { NostrCacheService } from '../cache/NostrCacheService';
+import { UnifiedNostrCache } from '../cache/UnifiedNostrCache';
+import { CacheKeys } from '../../constants/cacheTTL';
+import { nip19 } from 'nostr-tools';
 import type { UserWithWallet } from '../../types';
 
 export interface DirectNostrUser
@@ -168,6 +171,31 @@ export class DirectNostrProfileService {
 
       // Cache the fresh profile data
       await NostrCacheService.setCachedProfile(storedNpub, directUser);
+
+      // ✅ PROFILE CACHE FIX: Persist to UnifiedCache (non-blocking for fast startup)
+      try {
+        const { data: hexPubkey } = nip19.decode(storedNpub);
+        const unifiedCache = UnifiedNostrCache.getInstance();
+        // Fire-and-forget: save in background without blocking profile load
+        unifiedCache.set(
+          CacheKeys.USER_PROFILE(hexPubkey as string),
+          directUser,
+          24 * 60 * 60 * 1000, // 24hr TTL
+          true // persist to AsyncStorage
+        ).then(() => {
+          console.log('✅ DirectNostrProfileService: Persisted to UnifiedCache');
+        }).catch((cacheError) => {
+          console.warn(
+            '⚠️ DirectNostrProfileService: Failed to persist to UnifiedCache:',
+            cacheError
+          );
+        });
+      } catch (cacheError) {
+        console.warn(
+          '⚠️ DirectNostrProfileService: nip19 decode failed:',
+          cacheError
+        );
+      }
 
       console.log(
         '✅ DirectNostrProfileService: Created and cached user profile:',

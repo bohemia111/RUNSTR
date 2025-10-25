@@ -187,6 +187,7 @@ export class SimpleCompetitionService {
 
   /**
    * Get all events for a team (with caching)
+   * ✅ PERFORMANCE FIX: Team-specific cache + filtered Nostr queries
    * @param signal - Optional AbortSignal for cancellation
    */
   async getTeamEvents(teamId: string, signal?: AbortSignal): Promise<CompetitionEvent[]> {
@@ -198,14 +199,14 @@ export class SimpleCompetitionService {
         throw new Error('Request aborted');
       }
 
-      // ✅ Try to get from cache first
-      // When abort signal is provided, disable background refresh to allow immediate cancellation
-      const allEvents = await unifiedCache.get(
-        CacheKeys.COMPETITIONS,
-        () => this.getAllEvents(),
+      // ✅ PERFORMANCE FIX: Use team-specific cache key instead of global cache
+      // This prevents fetching ALL events when we only need one team's events
+      const teamEvents = await unifiedCache.get(
+        CacheKeys.TEAM_EVENTS(teamId),
+        () => this.fetchTeamEventsFromNostr(teamId, signal),
         {
           ttl: CacheTTL.COMPETITIONS,
-          backgroundRefresh: !signal // Disable background refresh if abort signal provided
+          backgroundRefresh: true // ✅ Always enable background refresh for instant UI
         }
       );
 
@@ -214,36 +215,100 @@ export class SimpleCompetitionService {
         throw new Error('Request aborted');
       }
 
-      // Filter for this team AND filter out old events
+      console.log(
+        `✅ Found ${teamEvents.length} events for team ${teamId} (from team-specific cache)`
+      );
+
+      return teamEvents;
+    } catch (error: any) {
+      if (error?.message === 'Request aborted') {
+        throw new Error('AbortError');
+      }
+      console.error('Failed to fetch events:', error);
+      return [];
+    }
+  }
+
+  /**
+   * ✅ NEW: Fetch events for a SPECIFIC team from Nostr (not all teams)
+   * This reduces query size from 500 events → ~10-20 events per team
+   */
+  private async fetchTeamEventsFromNostr(teamId: string, signal?: AbortSignal): Promise<CompetitionEvent[]> {
+    console.log(`🔍 Fetching events from Nostr for team: ${teamId}`);
+
+    try {
+      // Check if aborted before starting
+      if (signal?.aborted) {
+        throw new Error('Request aborted');
+      }
+
+      const connected = await GlobalNDKService.waitForMinimumConnection(2, 4000);
+      if (!connected) {
+        console.warn('⚠️ Proceeding with minimal relay connectivity for team events query');
+      }
+
+      const ndk = await GlobalNDKService.getInstance();
+
+      // ✅ PERFORMANCE FIX: Filter by team at Nostr query level (not client-side)
+      const filter: NDKFilter = {
+        kinds: [30101],
+        '#team': [teamId], // Only fetch events for THIS team
+        limit: 100, // Reduced from 500 (most teams have <20 events)
+      };
+
+      // Check if aborted before fetch
+      if (signal?.aborted) {
+        throw new Error('Request aborted');
+      }
+
+      const events = await Promise.race([
+        ndk.fetchEvents(filter),
+        new Promise<Set<NDKEvent>>(
+          (resolve) => setTimeout(() => resolve(new Set()), 2000) // 2s timeout
+        ),
+      ]);
+
+      // Check if aborted after fetch
+      if (signal?.aborted) {
+        throw new Error('Request aborted');
+      }
+
+      const competitionEvents: CompetitionEvent[] = [];
       const now = new Date();
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
-      const teamEvents = allEvents.filter((event) => {
-        // Must be for this team
-        if (event.teamId !== teamId) return false;
+      events.forEach((event) => {
+        try {
+          const competitionEvent = this.parseEventEvent(event);
+          if (!competitionEvent) return;
 
-        // Parse event date
-        const eventDate = new Date(event.eventDate);
+          // Ensure teamId is set (from filter context if missing in event)
+          if (!competitionEvent.teamId) {
+            competitionEvent.teamId = teamId;
+          }
 
-        // Show events from:
-        // - Past 7 days (recently completed)
-        // - Today (active)
-        // - Next 90 days (upcoming)
-        if (eventDate < sevenDaysAgo) {
-          console.log(`⏩ Filtering out old event: ${event.name} (${event.eventDate}) - older than 7 days`);
-          return false;
+          // Filter out old/distant events
+          const eventDate = new Date(competitionEvent.eventDate);
+
+          if (eventDate < sevenDaysAgo) {
+            console.log(`⏩ Filtering out old event: ${competitionEvent.name} (${competitionEvent.eventDate})`);
+            return;
+          }
+
+          if (eventDate > ninetyDaysFromNow) {
+            console.log(`⏩ Filtering out distant event: ${competitionEvent.name} (${competitionEvent.eventDate})`);
+            return;
+          }
+
+          competitionEvents.push(competitionEvent);
+        } catch (error) {
+          console.error('Failed to parse event:', error);
         }
+      });
 
-        if (eventDate > ninetyDaysFromNow) {
-          console.log(`⏩ Filtering out distant event: ${event.name} (${event.eventDate}) - more than 90 days away`);
-          return false;
-        }
-
-        return true;
-      })
       // Sort by date - upcoming events first, then recent past events
-      .sort((a, b) => {
+      competitionEvents.sort((a, b) => {
         const dateA = new Date(a.eventDate).getTime();
         const dateB = new Date(b.eventDate).getTime();
         const nowTime = now.getTime();
@@ -262,16 +327,13 @@ export class SimpleCompetitionService {
         return dateA >= nowTime ? -1 : 1;
       });
 
-      console.log(
-        `✅ Found ${teamEvents.length} recent events for team ${teamId} (${allEvents.length} total cached)`
-      );
-
-      return teamEvents;
+      console.log(`✅ Fetched ${competitionEvents.length} events from Nostr for team ${teamId}`);
+      return competitionEvents;
     } catch (error: any) {
       if (error?.message === 'Request aborted') {
         throw new Error('AbortError');
       }
-      console.error('Failed to fetch events:', error);
+      console.error(`Failed to fetch team events from Nostr: ${teamId}`, error);
       return [];
     }
   }
@@ -302,7 +364,13 @@ export class SimpleCompetitionService {
         limit: 1,
       };
 
-      const events = await ndk.fetchEvents(filter);
+      // Add 2s timeout to prevent infinite loading
+      const events = await Promise.race([
+        ndk.fetchEvents(filter),
+        new Promise<Set<NDKEvent>>(
+          (resolve) => setTimeout(() => resolve(new Set()), 2000) // 2s timeout
+        ),
+      ]);
 
       for (const event of events) {
         const league = this.parseLeagueEvent(event);
@@ -344,7 +412,13 @@ export class SimpleCompetitionService {
         limit: 1,
       };
 
-      const events = await ndk.fetchEvents(filter);
+      // Add 2s timeout to prevent infinite loading
+      const events = await Promise.race([
+        ndk.fetchEvents(filter),
+        new Promise<Set<NDKEvent>>(
+          (resolve) => setTimeout(() => resolve(new Set()), 2000) // 2s timeout
+        ),
+      ]);
 
       for (const event of events) {
         const competitionEvent = this.parseEventEvent(event);

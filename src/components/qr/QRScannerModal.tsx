@@ -153,7 +153,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
             <View style={styles.bottomOverlay}>
               <Text style={styles.instructionText}>
-                Scan QR code to join challenge or event
+                Scan QR code to join challenges, events, or connect your wallet
               </Text>
 
               <TouchableOpacity

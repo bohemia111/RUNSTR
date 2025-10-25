@@ -59,6 +59,12 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
 
   // Normalize recipient pubkey to hex for sending, and npub for display
   const recipientHex = React.useMemo(() => {
+    // If it's a Lightning address, don't try to convert it
+    if (recipientNpub && recipientNpub.includes('@')) {
+      console.log('[EnhancedZapModal] Lightning address detected, skipping npub conversion');
+      return recipientNpub;
+    }
+
     const normalized = npubToHex(recipientNpub);
     if (!normalized) {
       console.warn(

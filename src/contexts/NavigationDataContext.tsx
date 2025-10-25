@@ -709,8 +709,14 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
       setUser(currentUser);
       // Always rebuild profile data when user changes (ensures avatar/bio appear immediately)
       fetchProfileData(currentUser);
+    } else if (currentUser && !profileData) {
+      // ✅ PROFILE CACHE FIX: User loaded from cache but profileData not built yet
+      console.log(
+        '✅ NavigationData: Building profileData for cached user'
+      );
+      fetchProfileData(currentUser);
     }
-  }, [currentUser, user?.id]);
+  }, [currentUser, user?.id, profileData]);
 
   // ✅ ANDROID FIX: Initial load - Skip if AuthContext already loaded user
   useEffect(() => {
@@ -721,6 +727,8 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
           '✅ NavigationData: Skipping init (AuthContext already loaded user)'
         );
         setUser(currentUser);
+        // ✅ PROFILE CACHE FIX: Build profileData from cached user
+        await fetchProfileData(currentUser);
         setIsLoading(false);
         return;
       }

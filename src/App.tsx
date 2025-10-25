@@ -9,8 +9,8 @@ import { initializeWebSocketPolyfill } from './utils/webSocketPolyfill';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import * as TaskManager from 'expo-task-manager';
 
-// Initialize background location task (must be imported early for TaskManager.defineTask to execute)
-import './services/activity/BackgroundLocationTask';
+// Background location task imported in index.js (before app initialization)
+// Only import the functions we need here
 import {
   BACKGROUND_LOCATION_TASK,
   stopBackgroundLocationTracking,
@@ -355,7 +355,11 @@ const AppContent: React.FC = () => {
             `[AppState] App returning to foreground (${secondsInBackground}s in background)`
           );
 
-          // Smart refresh strategy based on time in background
+          // ❌ CASHU WALLET REFRESH DISABLED: Removed in favor of NWC (v0.2.4+)
+          // Smart refresh strategy previously triggered Cashu wallet sync on app resume
+          // NWC wallet services now handle all Lightning payments independently
+          console.log('[AppState] Cashu wallet refresh skipped (using NWC for Lightning payments)');
+          /*
           if (isAuthenticated && walletStore.isInitialized) {
             if (timeInBackground < 60 * 1000) {
               // < 1 minute: No refresh needed
@@ -370,6 +374,7 @@ const AppContent: React.FC = () => {
               walletStore.refreshBalance();
             }
           }
+          */
         }
 
         appState.current = nextAppState;
@@ -407,14 +412,31 @@ const AppContent: React.FC = () => {
           // Non-blocking background initialization
           await appInitializationService.initializeAppData(pubkey);
 
-          // ✅ WALLET FIX: Initialize wallet after app data loaded
-          console.log('[App] 💰 Initializing wallet for authenticated user...');
+          // ✅ CLEANUP: Remove expired event snapshots on app start
+          try {
+            const { EventSnapshotStore } = await import(
+              './services/event/EventSnapshotStore'
+            );
+            const removed = await EventSnapshotStore.cleanupExpired();
+            if (removed > 0) {
+              console.log(`🧹 Cleaned up ${removed} expired event snapshots`);
+            }
+          } catch (error) {
+            console.warn('⚠️ Event snapshot cleanup failed (non-critical):', error);
+          }
+
+          // ❌ CASHU WALLET DISABLED: Removed in favor of NWC (v0.2.4+)
+          // This initialization triggered Amber signing prompts for Cashu wallet encryption
+          // NWC wallet services now handle all Lightning payments independently
+          console.log('[App] 💰 Cashu wallet initialization skipped (using NWC for Lightning payments)');
+          /*
           if (!walletStore.isInitialized && !walletStore.isInitializing) {
             await walletStore.initialize();
             console.log('[App] ✅ Wallet initialization complete');
           } else {
             console.log('[App] ℹ️  Wallet already initialized, skipping');
           }
+          */
 
           // ✅ CHALLENGE COMPLETION: Start monitoring active challenges
           console.log('[App] 🏁 Starting challenge completion monitoring...');
@@ -1110,6 +1132,14 @@ export default function App() {
               );
               try {
                 await stopBackgroundLocationTracking();
+
+                // ✅ FIX: Also reset the service's internal state
+                // This ensures isTracking=false even if service singleton persists
+                const { simpleLocationTrackingService } = await import(
+                  './services/activity/SimpleLocationTrackingService'
+                );
+                await simpleLocationTrackingService.stopTracking();
+
                 await AsyncStorage.removeItem('@runstr:active_session_state');
                 await AsyncStorage.removeItem(
                   '@runstr:background_distance_state'

@@ -64,12 +64,44 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
     try {
       console.log('🔍 Loading event:', eventId);
 
-      // PHASE 1: Event data (instant if passed via navigation)
+      // PHASE 1: Event data - Cache-first pattern
       let event = passedEventData;
+      let usedSnapshot = false;
 
       if (!event) {
+        // ✅ CRITICAL: Check local snapshot FIRST (instant display)
+        const { EventSnapshotStore } = await import(
+          '../services/event/EventSnapshotStore'
+        );
+        const snapshot = await EventSnapshotStore.getSnapshot(eventId);
+
+        if (snapshot && !EventSnapshotStore.isExpired(snapshot)) {
+          console.log(
+            '⚡ Using cached snapshot (instant load) -',
+            snapshot.eventData.name
+          );
+          event = snapshot.eventData;
+          setEventData(event);
+          setParticipants(snapshot.participants);
+          setLeaderboard(snapshot.leaderboard);
+          setIsParticipant(snapshot.userIsParticipant);
+          setLoadingMembers(false);
+          setLoadingLeaderboard(false);
+          setIsLoading(false);
+          usedSnapshot = true;
+
+          // For active/upcoming events, refresh in background
+          if (snapshot.eventStatus !== 'completed') {
+            console.log('🔄 Scheduling background refresh for active/upcoming event');
+            loadFreshDataInBackground(eventId, event);
+          }
+
+          return; // Exit early - display cached data
+        }
+
+        // No cache or expired - fetch from Nostr
         setIsLoading(true);
-        console.log('⏳ Fetching event from Nostr (event data not passed)...');
+        console.log('⏳ Fetching event from Nostr (no cache)...');
         const SimpleCompetitionService = (
           await import('../services/competition/SimpleCompetitionService')
         ).default;
@@ -169,12 +201,95 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       setLeaderboard(rankings);
       setLoadingLeaderboard(false);
       console.log(`✅ Leaderboard calculated: ${rankings.length} entries`);
+
+      // ✅ CRITICAL: Save snapshot for instant future access
+      if (!usedSnapshot && event) {
+        try {
+          const { EventSnapshotStore } = await import(
+            '../services/event/EventSnapshotStore'
+          );
+          await EventSnapshotStore.saveSnapshot({
+            eventId,
+            eventData: event,
+            participants,
+            leaderboard: rankings,
+            userIsParticipant: isParticipant,
+          });
+          console.log('💾 Event snapshot saved for instant future display');
+        } catch (snapshotError) {
+          console.warn('⚠️ Failed to save snapshot (non-critical):', snapshotError);
+          // Don't throw - snapshot is optional optimization
+        }
+      }
     } catch (err) {
       console.error('❌ Failed to load event:', err);
       setError(err instanceof Error ? err.message : 'Failed to load event');
       setIsLoading(false);
       setLoadingMembers(false);
       setLoadingLeaderboard(false);
+    }
+  };
+
+  const loadFreshDataInBackground = async (eventId: string, cachedEvent: any) => {
+    // Non-blocking background refresh for active/upcoming events
+    try {
+      console.log('🔄 Background refresh started for event:', eventId);
+
+      const SimpleCompetitionService = (
+        await import('../services/competition/SimpleCompetitionService')
+      ).default;
+      const NostrListService = (
+        await import('../services/nostr/NostrListService')
+      ).NostrListService.getInstance();
+      const SimpleLeaderboardService = (
+        await import('../services/competition/SimpleLeaderboardService')
+      ).default;
+
+      // Fetch fresh data
+      const freshEvent = await SimpleCompetitionService.getInstance().getEventById(eventId);
+      if (!freshEvent) {
+        console.warn('⚠️ Background refresh: Event not found');
+        return;
+      }
+
+      const freshParticipants = await NostrListService.getListMembers(
+        freshEvent.captainPubkey,
+        `event-${eventId}-participants`
+      );
+
+      const freshLeaderboard = await SimpleLeaderboardService.calculateEventLeaderboard(
+        freshEvent,
+        freshParticipants
+      );
+
+      // Update UI with fresh data (only if still on this screen)
+      setEventData(freshEvent);
+      setParticipants(freshParticipants);
+      setLeaderboard(freshLeaderboard);
+
+      // Check user participation
+      const userHexPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+      if (userHexPubkey) {
+        const isUserParticipant = freshParticipants.includes(userHexPubkey);
+        setIsParticipant(isUserParticipant);
+      }
+
+      // Save updated snapshot
+      const { EventSnapshotStore } = await import(
+        '../services/event/EventSnapshotStore'
+      );
+      await EventSnapshotStore.saveSnapshot({
+        eventId,
+        eventData: freshEvent,
+        participants: freshParticipants,
+        leaderboard: freshLeaderboard,
+        userIsParticipant: isParticipant,
+      });
+
+      console.log('✅ Background refresh complete and snapshot updated');
+    } catch (error) {
+      console.warn('⚠️ Background refresh failed (showing cached data):', error);
+      // Don't show error to user - cached data is still displayed
     }
   };
 
@@ -256,6 +371,13 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         // Update UI
         setIsParticipant(true);
 
+        // Invalidate snapshot - participants changed
+        const { EventSnapshotStore } = await import(
+          '../services/event/EventSnapshotStore'
+        );
+        await EventSnapshotStore.deleteSnapshot(eventData.id);
+        console.log('🗑️ Cache invalidated - participants changed');
+
         console.log('✅ Joined event:', eventData.name);
       }
     } catch (error) {
@@ -314,6 +436,13 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         // Update UI
         setIsParticipant(true);
         setShowPaymentModal(false);
+
+        // Invalidate snapshot - participants changed
+        const { EventSnapshotStore } = await import(
+          '../services/event/EventSnapshotStore'
+        );
+        await EventSnapshotStore.deleteSnapshot(eventData.id);
+        console.log('🗑️ Cache invalidated - participants changed');
 
         console.log('✅ Paid join request submitted successfully');
       }

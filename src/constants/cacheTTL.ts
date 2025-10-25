@@ -203,6 +203,7 @@ export const CacheKeys = {
   TEAM_METADATA: (teamId: string) => `team_metadata_${teamId}`,
   TEAM_MEMBERS: (teamId: string) => `team_members_${teamId}`,
   TEAM_ACTIVITY: (teamId: string) => `team_activity_${teamId}`,
+  TEAM_EVENTS: (teamId: string) => `team_events_${teamId}`,
   JOIN_REQUESTS: (teamId: string) => `join_requests_${teamId}`,
 
   // Global data
@@ -222,6 +223,7 @@ export const CacheKeys = {
   // Competition data
   LEADERBOARD: (competitionId: string) => `leaderboard_${competitionId}`,
   EVENT_PARTICIPANTS: (eventId: string) => `event_participants_${eventId}`,
+  EVENT_LEADERBOARD: (eventId: string) => `event_leaderboard_${eventId}`,
 } as const;
 
 /**

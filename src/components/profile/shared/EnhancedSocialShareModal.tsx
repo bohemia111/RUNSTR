@@ -21,7 +21,9 @@ import { WorkoutPublishingService } from '../../../services/nostr/workoutPublish
 import { WorkoutStatusTracker } from '../../../services/fitness/WorkoutStatusTracker';
 import { WorkoutCardGenerator } from '../../../services/nostr/workoutCardGenerator';
 import { WorkoutCardRenderer } from '../../cards/WorkoutCardRenderer';
+import { UnifiedSigningService } from '../../../services/auth/UnifiedSigningService';
 import { getNsecFromStorage } from '../../../utils/nostr';
+import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import type { Workout } from '../../../types/workout';
 import type { PublishableWorkout } from '../../../services/nostr/workoutPublishingService';
 
@@ -56,11 +58,30 @@ export const EnhancedSocialShareModal: React.FC<
     width: 800,
     height: 600,
   });
+  const [signer, setSigner] = useState<NDKSigner | null>(null);
   const cardRef = useRef<View>(null);
 
   const publishingService = WorkoutPublishingService.getInstance();
   const statusTracker = WorkoutStatusTracker.getInstance();
   const cardGenerator = WorkoutCardGenerator.getInstance();
+
+  // Load signer when modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      loadSigner();
+    }
+  }, [visible]);
+
+  const loadSigner = async () => {
+    try {
+      const userSigner = await UnifiedSigningService.getInstance().getSigner();
+      setSigner(userSigner);
+      console.log('✅ Signer loaded for social share (supports both nsec and Amber)');
+    } catch (error) {
+      console.error('Failed to load signer:', error);
+      // Signer will be null - we'll fall back to nsec in handleShare
+    }
+  };
 
   // Generate card preview when workout or template changes
   useEffect(() => {
@@ -115,15 +136,24 @@ export const EnhancedSocialShareModal: React.FC<
     setLoading(true);
 
     try {
-      // Get user's nsec
-      const nsec = await getNsecFromStorage(userId);
-      if (!nsec) {
-        Alert.alert(
-          'Authentication Required',
-          'Please log in with your Nostr key to share workouts.'
-        );
-        setLoading(false);
-        return;
+      // Try to get signer (Amber on Android) or fall back to nsec (iOS or no Amber)
+      let signerOrNsec: NDKSigner | string | null = signer;
+
+      if (!signerOrNsec) {
+        // Fall back to nsec (required for iOS since Amber not supported)
+        const nsec = await getNsecFromStorage(userId);
+        if (!nsec) {
+          Alert.alert(
+            'Authentication Required',
+            'Please log in with your Nostr key to share workouts.'
+          );
+          setLoading(false);
+          return;
+        }
+        signerOrNsec = nsec;
+        console.log('📝 Using nsec for social post (iOS or Amber not available)');
+      } else {
+        console.log('📝 Using Amber signer for social post (Android)');
       }
 
       // Capture card as image (skip for text-based template)
@@ -163,9 +193,10 @@ export const EnhancedSocialShareModal: React.FC<
       }
 
       // Post to Nostr as kind 1 social event with image
+      // Supports both Amber signer (Android) and nsec (iOS)
       const result = await publishingService.postWorkoutToSocial(
         workout as PublishableWorkout,
-        nsec,
+        signerOrNsec,
         userId,
         {
           includeCard: true,

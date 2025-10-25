@@ -20,10 +20,14 @@ import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../../styles/theme';
 import { CustomAlert } from '../../components/ui/CustomAlert';
-import { simpleLocationTrackingService } from '../../services/activity/SimpleLocationTrackingService';
+import { simpleRunTracker } from '../../services/activity/SimpleRunTracker';
+import type { RunSession, GPSPoint } from '../../services/activity/SimpleRunTracker';
 import { activityMetricsService } from '../../services/activity/ActivityMetricsService';
-import type { TrackingSession, Split } from '../../services/activity/SimpleLocationTrackingService';
 import type { FormattedMetrics } from '../../services/activity/ActivityMetricsService';
+import { gpsHealthMonitor } from '../../services/activity/GPSHealthMonitor';
+
+// Legacy import for type compatibility
+import type { Split } from '../../services/activity/SimpleLocationTrackingService';
 import {
   GPSStatusIndicator,
   type GPSSignalStrength,
@@ -83,7 +87,7 @@ export const RunningTrackerScreen: React.FC = () => {
     elevation: '0 m',
   });
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [gpsSignal, setGpsSignal] = useState<GPSSignalStrength>('searching'); // Start with 'searching' for proper UI initialization
+  const [gpsSignal, setGpsSignal] = useState<GPSSignalStrength>('none'); // Start with 'none' until tracking begins
   const [gpsAccuracy, setGpsAccuracy] = useState<number | undefined>();
   const [isBackgroundTracking, setIsBackgroundTracking] = useState(false);
   const [summaryModalVisible, setSummaryModalVisible] = useState(false);
@@ -95,6 +99,8 @@ export const RunningTrackerScreen: React.FC = () => {
     calories: number;
     elevation?: number;
     pace?: number;
+    speed?: number;
+    steps?: number;
     splits?: Split[];
     localWorkoutId?: string; // For marking as synced later
     gpsCoordinates?: Array<{
@@ -125,18 +131,13 @@ export const RunningTrackerScreen: React.FC = () => {
   const [showRouteSelectionModal, setShowRouteSelectionModal] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<SavedRoute | null>(null);
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const metricsUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const routeCheckRef = useRef<NodeJS.Timeout | null>(null); // For route matching interval
-  const startTimeRef = useRef<number>(0);
-  const pauseStartTimeRef = useRef<number>(0); // When pause started
-  const totalPausedTimeRef = useRef<number>(0); // Cumulative pause duration in ms
-  const isPausedRef = useRef<boolean>(false); // Ref to avoid stale closure in timer
+  // NOTE: Timer refs removed - SimpleRunTracker handles all timing internally via hybrid timer
 
   useEffect(() => {
     return () => {
-      // Cleanup timers on unmount
-      if (timerRef.current) clearInterval(timerRef.current);
+      // Cleanup timers on unmount (duration now GPS-timestamp-based from service)
       if (metricsUpdateRef.current) clearInterval(metricsUpdateRef.current);
       if (routeCheckRef.current) clearInterval(routeCheckRef.current);
     };
@@ -144,28 +145,23 @@ export const RunningTrackerScreen: React.FC = () => {
 
   // AppState listener for background/foreground transitions
   useEffect(() => {
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active' && isTracking) {
-        // App returned to foreground while tracking - sync immediately
-        console.log('[RunningTrackerScreen] App returned to foreground, syncing metrics...');
+        // App returned to foreground - SimpleRunTracker automatically syncs background data
+        console.log('[RunningTrackerScreen] App returned to foreground, syncing...');
 
-        // Force immediate sync of metrics
-        const session = simpleLocationTrackingService.getCurrentSession();
-        if (session) {
-          const now = Date.now();
-          const currentElapsed = Math.floor(
-            (now - startTimeRef.current - totalPausedTimeRef.current) / 1000
-          );
-          const formattedDuration = formatElapsedTime(currentElapsed);
+        const session = await simpleRunTracker.getCurrentSession();
+        if (session && session.distance !== undefined && session.duration !== undefined) {
+          const formattedDuration = formatElapsedTime(session.duration);
 
           const currentMetrics = {
             distance: session.distance,
-            duration: currentElapsed,
+            duration: session.duration,
             pace: activityMetricsService.calculatePace(
               session.distance,
-              currentElapsed
+              session.duration
             ),
-            elevationGain: session.elevationGain,
+            elevationGain: 0, // TODO: SimpleRunTracker doesn't track elevation yet
           };
 
           const formatted = activityMetricsService.getFormattedMetrics(
@@ -175,12 +171,22 @@ export const RunningTrackerScreen: React.FC = () => {
           formatted.duration = formattedDuration;
 
           setMetrics(formatted);
-          setElapsedTime(currentElapsed);
-          setGpsSignal(simpleLocationTrackingService.getGPSSignalStrength());
+          setElapsedTime(session.duration);
+
+          // Update GPS signal from health monitor
+          const lastPoint = session.gpsPoints?.[session.gpsPoints.length - 1];
+          const gpsStatus = gpsHealthMonitor.assessSignalQuality(lastPoint?.accuracy);
+          setGpsSignal(
+            gpsStatus.quality === 'excellent' || gpsStatus.quality === 'good'
+              ? 'strong'
+              : gpsStatus.quality === 'poor'
+              ? 'weak'
+              : 'none'
+          );
 
           console.log(
             `[RunningTrackerScreen] ✅ Synced: ${(session.distance / 1000).toFixed(2)} km, ` +
-            `${currentElapsed}s, tracking continued in background`
+            `${session.duration}s`
           );
         }
       }
@@ -212,13 +218,9 @@ export const RunningTrackerScreen: React.FC = () => {
 
   const proceedWithTracking = async () => {
     try {
-      // Simple permission and start flow
-      const started = await simpleLocationTrackingService.startTracking(
-        'running'
-      );
-      if (started) {
-        initializeTracking();
-      }
+      // Start tracking with SimpleRunTracker
+      await simpleRunTracker.startTracking('running');
+      initializeTracking();
     } catch (error) {
       // Get detailed error message from service
       const errorMessage =
@@ -256,10 +258,8 @@ export const RunningTrackerScreen: React.FC = () => {
   const initializeTracking = () => {
     setIsTracking(true);
     setIsPaused(false);
-    isPausedRef.current = false;
-    startTimeRef.current = Date.now();
-    pauseStartTimeRef.current = 0;
-    totalPausedTimeRef.current = 0;
+    setGpsSignal('searching'); // Show GPS initializing when tracking starts
+    gpsHealthMonitor.reset(); // Reset GPS health monitor for new session
 
     // Reset route matching state (unless we pre-selected a route)
     if (!selectedRoute) {
@@ -277,42 +277,26 @@ export const RunningTrackerScreen: React.FC = () => {
       });
     }
 
-    // Start timer for duration
-    timerRef.current = setInterval(() => {
-      if (!isPausedRef.current) {
-        const now = Date.now();
-        const totalElapsed = Math.floor(
-          (now - startTimeRef.current - totalPausedTimeRef.current) / 1000
-        );
-        setElapsedTime(totalElapsed);
-      }
-    }, TIMER_INTERVAL_MS);
-
     // Start route checking timer
     routeCheckRef.current = setInterval(checkForRouteMatch, ROUTE_CHECK_INTERVAL_MS);
     // Check immediately as well
     setTimeout(checkForRouteMatch, 5000); // Check after 5 seconds to get initial GPS points
 
-    // Start metrics update timer (1 second for responsive UI)
-    metricsUpdateRef.current = setInterval(() => {
-      const session = simpleLocationTrackingService.getCurrentSession();
+    // Start metrics update timer - SimpleRunTracker handles all timing internally
+    metricsUpdateRef.current = setInterval(async () => {
+      const session = await simpleRunTracker.getCurrentSession();
 
-      // Calculate current elapsed time from refs INSIDE the interval callback
-      const now = Date.now();
-      const currentElapsed = Math.floor(
-        (now - startTimeRef.current - totalPausedTimeRef.current) / 1000
-      );
-      const formattedDuration = formatElapsedTime(currentElapsed);
+      if (session && session.distance !== undefined && session.duration !== undefined) {
+        const formattedDuration = formatElapsedTime(session.duration);
 
-      if (session) {
         const currentMetrics = {
           distance: session.distance,
-          duration: currentElapsed,
+          duration: session.duration,
           pace: activityMetricsService.calculatePace(
             session.distance,
-            currentElapsed
+            session.duration
           ),
-          elevationGain: session.elevationGain,
+          elevationGain: 0, // TODO: SimpleRunTracker doesn't track elevation yet
         };
 
         const formatted = activityMetricsService.getFormattedMetrics(
@@ -322,16 +306,20 @@ export const RunningTrackerScreen: React.FC = () => {
         formatted.duration = formattedDuration;
 
         setMetrics(formatted);
-        setGpsSignal(simpleLocationTrackingService.getGPSSignalStrength());
-        setGpsAccuracy(
-          session.positions[session.positions.length - 1]?.accuracy
+        setElapsedTime(session.duration);
+
+        // Update GPS signal from health monitor
+        const lastPoint = session.gpsPoints?.[session.gpsPoints.length - 1];
+        const gpsStatus = gpsHealthMonitor.assessSignalQuality(lastPoint?.accuracy);
+        setGpsSignal(
+          gpsStatus.quality === 'excellent' || gpsStatus.quality === 'good'
+            ? 'strong'
+            : gpsStatus.quality === 'poor'
+            ? 'weak'
+            : 'none'
         );
-        setIsBackgroundTracking(false); // Simple service doesn't differentiate
-      } else if (isTracking) {
-        setMetrics((prev) => ({
-          ...prev,
-          duration: formattedDuration,
-        }));
+        setGpsAccuracy(lastPoint?.accuracy);
+        setIsBackgroundTracking(false);
       }
     }, METRICS_UPDATE_INTERVAL_MS);
   };
@@ -356,34 +344,26 @@ export const RunningTrackerScreen: React.FC = () => {
   };
 
   const checkForRouteMatch = async () => {
-    const session = simpleLocationTrackingService.getCurrentSession();
-    if (!session || session.positions.length < 10) {
+    const session = await simpleRunTracker.getCurrentSession();
+    if (!session || !session.gpsPoints || session.gpsPoints.length < 10) {
       return; // Need at least 10 GPS points to attempt matching
     }
 
     try {
-      // Convert LocationPoint[] to GPSPoint[] for route matching
-      const gpsPoints = session.positions.map(p => ({
-        latitude: p.latitude,
-        longitude: p.longitude,
-        altitude: p.altitude,
-        timestamp: p.timestamp,
-      }));
-
-      // Check if we're on a saved route
+      // SimpleRunTracker already uses GPSPoint[] format
       const match = await routeMatchingService.findMatchingRoute(
-        gpsPoints,
+        session.gpsPoints,
         'running'
       );
 
-      if (match && match.confidence >= 0.7) {
+      if (match && match.confidence >= 0.7 && session.distance !== undefined && session.duration !== undefined) {
         setMatchedRoute(match);
 
         // Check PR comparison if we have a matched route
         const comparison = await routeMatchingService.compareWithPR(
           match.routeId,
           session.distance,
-          elapsedTime
+          session.duration
         );
 
         if (comparison) {
@@ -403,29 +383,20 @@ export const RunningTrackerScreen: React.FC = () => {
 
   const pauseTracking = async () => {
     if (!isPaused) {
-      await simpleLocationTrackingService.pauseTracking();
+      await simpleRunTracker.pauseTracking();
       setIsPaused(true);
-      isPausedRef.current = true;
-      pauseStartTimeRef.current = Date.now(); // Store when pause started
     }
   };
 
   const resumeTracking = async () => {
     if (isPaused) {
-      const pauseDuration = Date.now() - pauseStartTimeRef.current; // Calculate how long we were paused
-      totalPausedTimeRef.current += pauseDuration; // Add to cumulative total
-      await simpleLocationTrackingService.resumeTracking();
+      await simpleRunTracker.resumeTracking();
       setIsPaused(false);
-      isPausedRef.current = false;
     }
   };
 
   const stopTracking = async () => {
     // Clear timers
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
     if (metricsUpdateRef.current) {
       clearInterval(metricsUpdateRef.current);
       metricsUpdateRef.current = null;
@@ -435,33 +406,35 @@ export const RunningTrackerScreen: React.FC = () => {
       routeCheckRef.current = null;
     }
 
-    const session = await simpleLocationTrackingService.stopTracking();
+    const session = await simpleRunTracker.stopTracking();
     setIsTracking(false);
     setIsPaused(false);
 
     // If we were on a matched route, update its stats
-    if (matchedRoute && session) {
+    if (matchedRoute && session && session.distance && session.duration) {
       try {
         const pace = activityMetricsService.calculatePace(
           session.distance,
-          elapsedTime
+          session.duration
         );
 
-        await routeStorageService.updateRouteStats(matchedRoute.routeId, {
-          workoutId: `workout_${Date.now()}`,
-          workoutTime: elapsedTime,
-          workoutPace: pace,
-        });
+        if (pace !== undefined) {
+          await routeStorageService.updateRouteStats(matchedRoute.routeId, {
+            workoutId: `workout_${Date.now()}`,
+            workoutTime: session.duration,
+            workoutPace: pace,
+          });
 
-        console.log(`✅ Updated route stats for "${matchedRoute.routeName}"`);
+          console.log(`✅ Updated route stats for "${matchedRoute.routeName}"`);
+        }
       } catch (error) {
         console.error('Failed to update route stats:', error);
       }
     }
 
-    if (session && session.distance > MIN_WORKOUT_DISTANCE_METERS) {
+    if (session && session.distance !== undefined && session.distance > MIN_WORKOUT_DISTANCE_METERS) {
       // Only show summary if moved at least 10 meters
-      showWorkoutSummary(session);
+      showWorkoutSummary(session as RunSession);
     } else {
       // Reset metrics
       setMetrics({
@@ -477,19 +450,19 @@ export const RunningTrackerScreen: React.FC = () => {
     }
   };
 
-  const showWorkoutSummary = async (session: TrackingSession) => {
+  const showWorkoutSummary = async (session: RunSession) => {
     const calories = activityMetricsService.estimateCalories(
       'running',
       session.distance,
-      elapsedTime
+      session.duration
     );
     const pace = activityMetricsService.calculatePace(
       session.distance,
-      elapsedTime
+      session.duration
     );
 
-    // Convert LocationPoint[] to GPSCoordinate[] for route saving
-    const gpsCoordinates = session.positions.map(point => ({
+    // SimpleRunTracker already uses GPSPoint[] format (compatible with GPSCoordinate)
+    const gpsCoordinates = session.gpsPoints.map(point => ({
       latitude: point.latitude,
       longitude: point.longitude,
       altitude: point.altitude,
@@ -500,16 +473,16 @@ export const RunningTrackerScreen: React.FC = () => {
     // This ensures data persists even if user dismisses modal
     try {
       // Get start position for weather lookup
-      const startPosition = session.positions[0];
+      const startPosition = session.gpsPoints[0];
 
       const workoutId = await LocalWorkoutStorageService.saveGPSWorkout({
         type: 'running',
         distance: session.distance,
-        duration: elapsedTime,
+        duration: session.duration,
         calories,
-        elevation: session.elevationGain,
+        elevation: 0, // TODO: SimpleRunTracker doesn't calculate elevation yet
         pace,
-        splits: session.splits,
+        splits: undefined, // TODO: SimpleRunTracker doesn't calculate splits yet
         // Pass GPS coordinates for weather lookup
         startLatitude: startPosition?.latitude,
         startLongitude: startPosition?.longitude,
@@ -520,11 +493,11 @@ export const RunningTrackerScreen: React.FC = () => {
       setWorkoutData({
         type: 'running',
         distance: session.distance,
-        duration: elapsedTime,
+        duration: session.duration,
         calories,
-        elevation: session.elevationGain,
+        elevation: 0, // TODO: Add elevation tracking to SimpleRunTracker
         pace,
-        splits: session.splits,
+        splits: undefined, // TODO: Add splits calculation to SimpleRunTracker
         localWorkoutId: workoutId, // Pass to modal for sync tracking
         gpsCoordinates, // Pass GPS data for route saving
       });
@@ -535,11 +508,11 @@ export const RunningTrackerScreen: React.FC = () => {
       setWorkoutData({
         type: 'running',
         distance: session.distance,
-        duration: elapsedTime,
+        duration: session.duration,
         calories,
-        elevation: session.elevationGain,
+        elevation: 0,
         pace,
-        splits: session.splits,
+        splits: undefined,
         gpsCoordinates, // Pass GPS data even if local save failed
       });
       setSummaryModalVisible(true);
@@ -679,7 +652,7 @@ export const RunningTrackerScreen: React.FC = () => {
             setSummaryModalVisible(false);
             setWorkoutData(null);
           }}
-          workout={workoutData}
+          workout={workoutData as any}
         />
       )}
 
@@ -692,11 +665,13 @@ export const RunningTrackerScreen: React.FC = () => {
         onClose={() => setAlertVisible(false)}
       />
 
-      {/* Permission Request Modal */}
-      <PermissionRequestModal
-        visible={showPermissionModal}
-        onComplete={handlePermissionsGranted}
-      />
+      {/* Permission Request Modal - Only mount when needed to prevent auto-start bug */}
+      {showPermissionModal && (
+        <PermissionRequestModal
+          visible={true}
+          onComplete={handlePermissionsGranted}
+        />
+      )}
 
       {/* Route Selection Modal */}
       <RouteSelectionModal

@@ -531,9 +531,8 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
         return;
       }
 
-      // Get global NDK instance
-      const g = globalThis as any;
-      const ndk = g.__RUNSTR_NDK_INSTANCE__;
+      // Get global NDK instance using proper async pattern
+      const ndk = await GlobalNDKService.getInstance();
 
       if (!ndk) {
         Alert.alert('Error', 'Unable to connect to Nostr network');
@@ -702,9 +701,8 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
         return;
       }
 
-      // Get global NDK instance
-      const g = globalThis as any;
-      const ndk = g.__RUNSTR_NDK_INSTANCE__;
+      // Get global NDK instance using proper async pattern
+      const ndk = await GlobalNDKService.getInstance();
 
       if (!ndk) {
         Alert.alert('Error', 'Unable to connect to Nostr network');
@@ -1232,7 +1230,11 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
         onRequestClose={() => setShowEditTeamModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <ScrollView
+            style={styles.modalContent}
+            contentContainerStyle={styles.modalContentContainer}
+            showsVerticalScrollIndicator={true}
+          >
             <Text style={styles.modalTitle}>Edit Team Information</Text>
 
             <Text style={styles.inputLabel}>Team Name</Text>
@@ -1382,7 +1384,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -1710,9 +1712,14 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: theme.colors.card,
     borderRadius: 12,
-    padding: 20,
     width: '90%',
     maxWidth: 400,
+    maxHeight: '85%',
+  },
+
+  modalContentContainer: {
+    padding: 20,
+    paddingBottom: 40,
   },
 
   modalTitle: {

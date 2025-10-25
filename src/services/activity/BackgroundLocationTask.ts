@@ -112,22 +112,25 @@ async function updateLiveNotification(
       statsText = `${distanceKm} km • ${duration}`;
     }
 
-    // Update notification content
+    // Update notification content with MAX priority (Android 12+ requirement)
     await Notifications.setNotificationChannelAsync('workout-tracking', {
       name: 'Workout Tracking',
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: Notifications.AndroidImportance.MAX, // ✅ MAX for foreground services
       sound: null, // Silent updates
       vibrationPattern: null,
+      enableLights: false,
+      enableVibrate: false,
     });
 
-    // Schedule/update the notification
+    // Schedule/update the notification with MAX priority and ongoing flag
     await Notifications.scheduleNotificationAsync({
       content: {
         title: `RUNSTR - ${activityType.charAt(0).toUpperCase() + activityType.slice(1)} Tracking`,
         body: statsText,
         color: '#FF6B35',
-        priority: Notifications.AndroidNotificationPriority.HIGH,
+        priority: Notifications.AndroidNotificationPriority.MAX, // ✅ MAX priority prevents service kill
         sticky: true, // Keep notification visible
+        autoDismiss: false, // Don't auto-dismiss
       },
       trigger: null, // Immediate
       identifier: BACKGROUND_LOCATION_TASK, // Use consistent ID to update same notification
@@ -313,6 +316,13 @@ export async function startBackgroundLocationTracking(
       return false;
     }
 
+    // Android-specific: Log battery optimization warnings
+    if (Platform.OS === 'android') {
+      console.log('[ANDROID] ⚠️ CRITICAL: Ensure battery optimization is disabled for RUNSTR');
+      console.log('[ANDROID] Settings → Apps → RUNSTR → Battery → Unrestricted');
+      console.log('[ANDROID] Without this, GPS will stop after a few minutes in background');
+    }
+
     // Store session state for background task
     await AsyncStorage.setItem(
       SESSION_STATE_KEY,
@@ -336,6 +346,8 @@ export async function startBackgroundLocationTracking(
     console.log(
       `[BackgroundLocationTask] ✅ Started background tracking for ${activityType} on ${Platform.OS}`
     );
+    console.log(`[BackgroundLocationTask] Time interval: ${locationOptions.timeInterval}ms`);
+    console.log(`[BackgroundLocationTask] Distance interval: ${locationOptions.distanceInterval}m`);
     return true;
   } catch (error) {
     console.error(
@@ -345,6 +357,15 @@ export async function startBackgroundLocationTracking(
     console.error(`[BackgroundLocationTask] Platform: ${Platform.OS}`);
     console.error(`[BackgroundLocationTask] Session ID: ${sessionId}`);
     console.error(`[BackgroundLocationTask] Activity: ${activityType}`);
+
+    // Android-specific error guidance
+    if (Platform.OS === 'android') {
+      console.error('[ANDROID] Common causes:');
+      console.error('  1. Battery optimization not disabled (Settings → Apps → RUNSTR → Battery → Unrestricted)');
+      console.error('  2. Location permission not set to "Allow all the time"');
+      console.error('  3. Notification permission denied (Android 13+)');
+      console.error('  4. Background location permission denied');
+    }
     return false;
   }
 }
@@ -524,9 +545,10 @@ function getBackgroundLocationOptions(
       notificationTitle: notification.title,
       notificationBody: notification.body,
       notificationColor: '#FF6B35', // RUNSTR orange color
-      // Android 14+ requirement: High priority for persistent notification
+      // Android 12+ requirement: MAX priority for foreground service persistence
+      // Prevents Android from killing the service when app is backgrounded
       ...(Platform.OS === 'android' && {
-        notificationPriority: 'high',
+        notificationPriority: 'max', // ✅ Changed from 'high' to 'max'
       }),
     },
   };
@@ -535,32 +557,34 @@ function getBackgroundLocationOptions(
     case 'running':
       return {
         ...baseOptions,
-        // Android: 3s intervals to avoid throttling. iOS: 1s for responsive tracking
-        timeInterval: Platform.OS === 'android' ? 3000 : 1000,
+        // CRITICAL FIX: Use 1s intervals on Android to compensate for system throttling
+        // Android will throttle this further when backgrounded, so start aggressive
+        // This matches Strava/Nike Run Club behavior
+        timeInterval: 1000, // 1 second on both platforms (Android needs this despite throttling)
         distanceInterval: 5, // Primary trigger: update every 5 meters (more reliable than time)
         mayShowUserSettingsDialog: false,
       };
     case 'walking':
       return {
         ...baseOptions,
-        // Android: 3s intervals. iOS: 2s for smoother tracking
-        timeInterval: Platform.OS === 'android' ? 3000 : 2000,
+        // Walking can tolerate slightly longer intervals
+        timeInterval: Platform.OS === 'android' ? 1500 : 2000, // 1.5s Android, 2s iOS
         distanceInterval: 5, // Primary trigger: update every 5 meters
         mayShowUserSettingsDialog: false,
       };
     case 'cycling':
       return {
         ...baseOptions,
-        // Android: 3s intervals. iOS: 1s for high-speed tracking
-        timeInterval: Platform.OS === 'android' ? 3000 : 1000,
+        // Cycling needs frequent updates due to higher speeds
+        timeInterval: 1000, // 1 second on both platforms
         distanceInterval: 8, // Primary trigger: update every 8 meters (cycling is faster)
         mayShowUserSettingsDialog: false,
       };
     default:
       return {
         ...baseOptions,
-        // Android: 3s intervals. iOS: 2s default
-        timeInterval: Platform.OS === 'android' ? 3000 : 2000,
+        // Default: aggressive intervals for unknown activities
+        timeInterval: Platform.OS === 'android' ? 1500 : 2000, // 1.5s Android, 2s iOS
         distanceInterval: 5, // Primary trigger: update every 5 meters
       };
   }

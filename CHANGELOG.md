@@ -6,6 +6,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.7] - 2025-10-25
+
+### Added
+- **Enhanced Activity Tracking Services**: New service layer for improved workout tracking reliability
+  - **AutoPauseDetector**: Automatic pause detection during workouts when user stops moving
+  - **GPSHealthMonitor**: Real-time GPS signal health monitoring and diagnostics
+  - **SimpleRunTracker**: Simplified run tracking service with cleaner architecture
+  - **SimpleRunTrackerTask**: Background run tracking task for Android foreground service
+  - **WorkoutRecovery**: Workout data recovery service to prevent data loss
+  - **EventSnapshotStore**: Event snapshot functionality for better state management
+
+### Fixed
+- **Team Detail Screen**: Comprehensive bug fixes for team detail pages
+  - **SimpleTeamScreen**: Fixed team detail screen display and navigation issues
+  - **EventDetailScreen**: 133 line changes improving event information display
+  - **CaptainDashboardScreen**: Enhanced captain dashboard reliability and UX
+  - **EventJoinRequestsSection**: Improved join request handling and approval flow
+- **RunningTrackerScreen**: Major overhaul with 233 line changes
+  - Enhanced GPS accuracy indicators
+  - Improved pause/resume functionality
+  - Better workout summary display
+  - More reliable distance tracking
+
+### Improved
+- **Activity Tracking Architecture**: Cleaner separation of concerns with new service layer
+  - Better error handling throughout tracking services
+  - Improved GPS health monitoring and recovery
+  - More reliable background tracking for long workouts
+- **Team Management UX**: Smoother team detail page experience
+  - Faster event loading on team pages
+  - Better join request workflow for captains
+  - Enhanced event detail presentation
+
+### Technical
+- Version numbers updated across all platforms:
+  - app.json: 0.4.7 (versionCode 38)
+  - android/app/build.gradle: 0.4.7 (versionCode 38)
+  - package.json: 0.4.7
+- Modified files:
+  - `src/services/activity/AutoPauseDetector.ts` - New auto-pause detection
+  - `src/services/activity/GPSHealthMonitor.ts` - New GPS health monitoring
+  - `src/services/activity/SimpleRunTracker.ts` - New simplified tracker
+  - `src/services/activity/SimpleRunTrackerTask.ts` - New background task
+  - `src/services/activity/WorkoutRecovery.ts` - New workout recovery
+  - `src/services/event/EventSnapshotStore.ts` - New event snapshots
+  - `src/screens/activity/RunningTrackerScreen.tsx` - Major improvements (233 lines)
+  - `src/screens/EventDetailScreen.tsx` - Display improvements (133 lines)
+  - `src/screens/SimpleTeamScreen.tsx` - Team detail fixes
+  - `src/screens/CaptainDashboardScreen.tsx` - Dashboard enhancements
+  - `src/components/captain/EventJoinRequestsSection.tsx` - Join request improvements
+
 ## [0.4.6] - 2025-10-24
 
 ### Fixed

@@ -65,6 +65,33 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
     return `${Math.round(meters)}m`;
   };
 
+  const formatSpeed = (metersPerSecond?: number): string => {
+    if (!metersPerSecond) return '--';
+    const kmh = (metersPerSecond * 3.6).toFixed(1);
+    return `${kmh} km/h`;
+  };
+
+  const formatTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const getDayOfWeek = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+  };
+
+  const getTimeOfDay = (dateString: string): string => {
+    const hour = new Date(dateString).getHours();
+    if (hour < 12) return 'Morning';
+    if (hour < 17) return 'Afternoon';
+    return 'Evening';
+  };
+
   const getWeatherEmoji = (icon: string): string => {
     const iconMap: Record<string, string> = {
       '01d': '☀️',
@@ -151,6 +178,25 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
 
     return (
       <>
+        {/* Time & Context Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Workout Details</Text>
+          <View style={styles.contextCard}>
+            <View style={styles.contextRow}>
+              <Text style={styles.contextLabel}>Started</Text>
+              <Text style={styles.contextValue}>
+                {formatTime(workout.startTime)} - {getDayOfWeek(workout.startTime)}
+              </Text>
+            </View>
+            <View style={styles.contextRow}>
+              <Text style={styles.contextLabel}>Time of Day</Text>
+              <Text style={styles.contextValue}>
+                {getTimeOfDay(workout.startTime)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
         {/* Summary Stats */}
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
@@ -165,15 +211,27 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
               <Text style={styles.statValue}>{formatPace(workout.pace)}</Text>
             </View>
           )}
-          {localWorkout.elevation && (
+          {localWorkout.speed && (
             <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Elevation</Text>
+              <Text style={styles.statLabel}>Avg Speed</Text>
               <Text style={styles.statValue}>
-                {formatElevation(localWorkout.elevation)}
+                {formatSpeed(localWorkout.speed)}
               </Text>
             </View>
           )}
         </View>
+
+        {/* Elevation Row */}
+        {localWorkout.elevation && (
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>Elevation Gain</Text>
+              <Text style={styles.statValue}>
+                {formatElevation(localWorkout.elevation)}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Splits Table */}
         {splits && splits.length > 0 && (
@@ -228,6 +286,7 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
 
   const renderMeditationDetails = () => {
     const localWorkout = workout as LocalWorkout;
+    const mindfulnessRating = localWorkout.mindfulnessRating || 0;
 
     return (
       <View style={styles.section}>
@@ -239,6 +298,28 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
           {localWorkout.meditationType && (
             <Text style={styles.meditationType}>{getActivityTypeName()}</Text>
           )}
+
+          {/* Mindfulness Rating */}
+          {mindfulnessRating > 0 && (
+            <View style={styles.ratingContainer}>
+              <Text style={styles.ratingLabel}>Mindfulness</Text>
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Ionicons
+                    key={star}
+                    name={star <= mindfulnessRating ? 'star' : 'star-outline'}
+                    size={24}
+                    color={
+                      star <= mindfulnessRating
+                        ? theme.colors.orangeBright
+                        : theme.colors.textMuted
+                    }
+                    style={styles.star}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -248,6 +329,20 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
     const localWorkout = workout as LocalWorkout;
     const totalReps = workout.reps || 0;
     const totalSets = workout.sets || 0;
+
+    // Calculate volume stats
+    const repsBreakdown = localWorkout.repsBreakdown || [];
+    const avgRepsPerSet =
+      repsBreakdown.length > 0
+        ? (repsBreakdown.reduce((sum, reps) => sum + reps, 0) /
+            repsBreakdown.length).toFixed(1)
+        : '0';
+
+    // Calculate rep decline (difference between first and last set)
+    const repDecline =
+      repsBreakdown.length > 1
+        ? repsBreakdown[0] - repsBreakdown[repsBreakdown.length - 1]
+        : 0;
 
     return (
       <View style={styles.section}>
@@ -268,24 +363,41 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
           </View>
         </View>
 
-        {/* Sets Breakdown */}
-        {localWorkout.repsBreakdown &&
-          localWorkout.repsBreakdown.length > 0 && (
-            <View style={styles.subsection}>
-              <Text style={styles.subsectionTitle}>Sets Breakdown</Text>
-              {localWorkout.repsBreakdown.map((reps, index) => (
-                <View key={index} style={styles.setRow}>
-                  <Text style={styles.setNumber}>Set {index + 1}</Text>
-                  <Text style={styles.setReps}>{reps} reps</Text>
-                </View>
-              ))}
-              {localWorkout.restTime && (
-                <Text style={styles.restTimeText}>
-                  Rest: {localWorkout.restTime} seconds between sets
-                </Text>
-              )}
+        {/* Volume Analysis */}
+        {repsBreakdown.length > 0 && (
+          <View style={styles.volumeAnalysis}>
+            <View style={styles.volumeRow}>
+              <Text style={styles.volumeLabel}>Avg Reps/Set</Text>
+              <Text style={styles.volumeValue}>{avgRepsPerSet}</Text>
             </View>
-          )}
+            {repDecline !== 0 && (
+              <View style={styles.volumeRow}>
+                <Text style={styles.volumeLabel}>Rep Decline</Text>
+                <Text style={[styles.volumeValue, repDecline > 0 && styles.declineText]}>
+                  {repDecline > 0 ? `-${repDecline}` : `+${Math.abs(repDecline)}`}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Sets Breakdown */}
+        {repsBreakdown.length > 0 && (
+          <View style={styles.subsection}>
+            <Text style={styles.subsectionTitle}>Sets Breakdown</Text>
+            {repsBreakdown.map((reps, index) => (
+              <View key={index} style={styles.setRow}>
+                <Text style={styles.setNumber}>Set {index + 1}</Text>
+                <Text style={styles.setReps}>{reps} reps</Text>
+              </View>
+            ))}
+            {localWorkout.restTime && (
+              <Text style={styles.restTimeText}>
+                Rest: {localWorkout.restTime} seconds between sets
+              </Text>
+            )}
+          </View>
+        )}
       </View>
     );
   };
@@ -302,10 +414,7 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
               <Text style={styles.dietType}>{getActivityTypeName()}</Text>
               {localWorkout.mealTime && (
                 <Text style={styles.dietTime}>
-                  {new Date(localWorkout.mealTime).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatTime(localWorkout.mealTime)}
                 </Text>
               )}
             </View>
@@ -313,17 +422,34 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
         )}
 
         {workout.type === 'fasting' && (
-          <View style={styles.dietInfo}>
-            <Ionicons
-              name="timer"
-              size={48}
-              color={theme.colors.orangeBright}
-            />
-            <Text style={styles.dietType}>Fasting</Text>
-            <Text style={styles.dietDuration}>
-              {formatDuration(workout.duration)}
-            </Text>
-          </View>
+          <>
+            <View style={styles.dietInfo}>
+              <Ionicons
+                name="timer"
+                size={48}
+                color={theme.colors.orangeBright}
+              />
+              <Text style={styles.dietType}>Fasting</Text>
+              <Text style={styles.dietDuration}>
+                {formatDuration(workout.duration)}
+              </Text>
+            </View>
+            {/* Fasting Times */}
+            <View style={styles.fastingTimes}>
+              <View style={styles.fastingTimeRow}>
+                <Text style={styles.fastingLabel}>Started</Text>
+                <Text style={styles.fastingValue}>
+                  {formatTime(workout.startTime)}
+                </Text>
+              </View>
+              <View style={styles.fastingTimeRow}>
+                <Text style={styles.fastingLabel}>Ended</Text>
+                <Text style={styles.fastingValue}>
+                  {formatTime(workout.endTime)}
+                </Text>
+              </View>
+            </View>
+          </>
         )}
       </View>
     );
@@ -674,5 +800,101 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  // Context card styles
+  contextCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  contextRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  contextLabel: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    fontWeight: theme.typography.weights.medium,
+  },
+  contextValue: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: theme.typography.weights.semiBold,
+  },
+  // Volume analysis styles
+  volumeAnalysis: {
+    backgroundColor: theme.colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  volumeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  volumeLabel: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    fontWeight: theme.typography.weights.medium,
+  },
+  volumeValue: {
+    fontSize: 16,
+    color: theme.colors.text,
+    fontWeight: theme.typography.weights.semiBold,
+  },
+  declineText: {
+    color: theme.colors.textSecondary,
+  },
+  // Rating styles for meditation
+  ratingContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  ratingLabel: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  star: {
+    marginHorizontal: 2,
+  },
+  // Fasting times styles
+  fastingTimes: {
+    backgroundColor: theme.colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  fastingTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  fastingLabel: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    fontWeight: theme.typography.weights.medium,
+  },
+  fastingValue: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: theme.typography.weights.semiBold,
   },
 });

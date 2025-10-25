@@ -30,9 +30,10 @@ import {
 } from '../../utils/bolt11Parser';
 import {
   openInCashApp,
-  openInStrike,
-  openInGenericWallet,
-  openInBestAvailableWallet,
+  openInZeus,
+  openInPhoenix,
+  openInWalletOfSatoshi,
+  openInBreez,
 } from '../../utils/walletDeepLinks';
 
 interface ExternalZapModalProps {
@@ -276,16 +277,20 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
     await openInCashApp(invoice);
   };
 
-  const handleOpenInStrike = async () => {
-    await openInStrike(invoice);
+  const handleOpenInZeus = async () => {
+    await openInZeus(invoice);
   };
 
-  const handleOpenInOtherWallet = async () => {
-    await openInGenericWallet(invoice);
+  const handleOpenInPhoenix = async () => {
+    await openInPhoenix(invoice);
   };
 
-  const handleOpenInBestWallet = async () => {
-    await openInBestAvailableWallet(invoice);
+  const handleOpenInWalletOfSatoshi = async () => {
+    await openInWalletOfSatoshi(invoice);
+  };
+
+  const handleOpenInBreez = async () => {
+    await openInBreez(invoice);
   };
 
   const handlePaymentConfirmed = () => {
@@ -430,55 +435,91 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
                   {/* Wallet Selection Buttons */}
                   <View style={styles.walletButtonsSection}>
                     <Text style={styles.walletSectionTitle}>
-                      Open in Wallet
+                      Select Wallet
                     </Text>
 
-                    {/* Primary Wallets - Cash App & Strike */}
-                    <View style={styles.primaryWallets}>
-                      <TouchableOpacity
-                        style={styles.walletButton}
-                        onPress={handleOpenInCashApp}
-                      >
-                        <View style={styles.walletIconCircle}>
-                          <Ionicons
-                            name="logo-usd"
-                            size={20}
-                            color={theme.colors.accent}
-                          />
-                        </View>
-                        <Text style={styles.walletButtonText}>Cash App</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.walletButton}
-                        onPress={handleOpenInStrike}
-                      >
-                        <View style={styles.walletIconCircle}>
-                          <Ionicons
-                            name="flash"
-                            size={20}
-                            color={theme.colors.accent}
-                          />
-                        </View>
-                        <Text style={styles.walletButtonText}>Strike</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Other Wallets Button */}
+                    {/* Cash App */}
                     <TouchableOpacity
-                      style={styles.otherWalletsButton}
-                      onPress={handleOpenInOtherWallet}
+                      style={styles.walletButtonFullWidth}
+                      onPress={handleOpenInCashApp}
                     >
-                      <Ionicons
-                        name="wallet-outline"
-                        size={20}
-                        color={theme.colors.text}
-                      />
-                      <Text style={styles.otherWalletsButtonText}>
-                        Other Lightning Wallets
+                      <View style={styles.walletIconCircleInline}>
+                        <Ionicons
+                          name="logo-usd"
+                          size={24}
+                          color={theme.colors.accent}
+                        />
+                      </View>
+                      <Text style={styles.walletButtonText} numberOfLines={1}>
+                        Cash App
                       </Text>
-                      <Text style={styles.otherWalletsSubtext}>
-                        Alby • Phoenix • Breez • BlueWallet • Zeus
+                    </TouchableOpacity>
+
+                    {/* Zeus */}
+                    <TouchableOpacity
+                      style={styles.walletButtonFullWidth}
+                      onPress={handleOpenInZeus}
+                    >
+                      <View style={styles.walletIconCircleInline}>
+                        <Ionicons
+                          name="flash-outline"
+                          size={24}
+                          color={theme.colors.accent}
+                        />
+                      </View>
+                      <Text style={styles.walletButtonText} numberOfLines={1}>
+                        Zeus
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Phoenix */}
+                    <TouchableOpacity
+                      style={styles.walletButtonFullWidth}
+                      onPress={handleOpenInPhoenix}
+                    >
+                      <View style={styles.walletIconCircleInline}>
+                        <Ionicons
+                          name="rocket-outline"
+                          size={24}
+                          color={theme.colors.accent}
+                        />
+                      </View>
+                      <Text style={styles.walletButtonText} numberOfLines={1}>
+                        Phoenix
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Wallet of Satoshi */}
+                    <TouchableOpacity
+                      style={styles.walletButtonFullWidth}
+                      onPress={handleOpenInWalletOfSatoshi}
+                    >
+                      <View style={styles.walletIconCircleInline}>
+                        <Ionicons
+                          name="wallet-outline"
+                          size={24}
+                          color={theme.colors.accent}
+                        />
+                      </View>
+                      <Text style={styles.walletButtonText} numberOfLines={1}>
+                        Wallet of Satoshi
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Breez */}
+                    <TouchableOpacity
+                      style={styles.walletButtonFullWidth}
+                      onPress={handleOpenInBreez}
+                    >
+                      <View style={styles.walletIconCircleInline}>
+                        <Ionicons
+                          name="wind-outline"
+                          size={24}
+                          color={theme.colors.accent}
+                        />
+                      </View>
+                      <Text style={styles.walletButtonText} numberOfLines={1}>
+                        Breez
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -529,7 +570,7 @@ const styles = StyleSheet.create({
   modal: {
     width: '100%',
     maxWidth: 400,
-    maxHeight: '85%',
+    height: '85%',  // Fixed height to establish flex context for ScrollView
     backgroundColor: theme.colors.background,
     borderRadius: theme.borderRadius.large,
     borderWidth: 1,
@@ -700,60 +741,62 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  primaryWallets: {
+  walletRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: 14,
+    marginBottom: 16,
   },
 
   walletButton: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 6,
     borderRadius: theme.borderRadius.medium,
     backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    minHeight: 100,
+  },
+
+  walletButtonFullWidth: {
+    alignItems: 'center',
+    paddingVertical: 22,
+    paddingHorizontal: 24,
+    borderRadius: theme.borderRadius.medium,
+    backgroundColor: theme.colors.cardBackground,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    gap: 16,
+    minHeight: 80,
+    marginBottom: 12,
   },
 
   walletIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: 'rgba(255, 157, 66, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+
+  walletIconCircleInline: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 157, 66, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   walletButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: theme.typography.weights.semiBold,
     color: theme.colors.text,
-  },
-
-  otherWalletsButton: {
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: theme.borderRadius.medium,
-    backgroundColor: theme.colors.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-
-  otherWalletsButtonText: {
-    fontSize: 14,
-    fontWeight: theme.typography.weights.semiBold,
-    color: theme.colors.text,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-
-  otherWalletsSubtext: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
     textAlign: 'center',
   },
 

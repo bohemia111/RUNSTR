@@ -1,7 +1,7 @@
 /**
  * QuickChallengeWizard - Streamlined challenge creation with preselected opponent
  * Used when tapping challenge icon next to usernames
- * 3-step flow: Activity Configuration → Arbitrator Selection (paid only) → Review & Send
+ * 5-step flow: Activity → Metric → Duration → Wager → Review & Send
  */
 
 import React, { useState, useCallback } from 'react';
@@ -14,31 +14,31 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { theme } from '../../styles/theme';
 import { challengeRequestService } from '../../services/challenge/ChallengeRequestService';
-import { challengePaymentService } from '../../services/challenge/ChallengePaymentService';
 import { getUserNostrIdentifiers } from '../../utils/nostr';
 import UnifiedSigningService from '../../services/auth/UnifiedSigningService';
-import type { ActivityConfiguration } from '../../types/challenge';
+import type {
+  ActivityType,
+  MetricType,
+  DurationOption,
+} from '../../types/challenge';
 import type { DiscoveredNostrUser } from '../../services/user/UserDiscoveryService';
 
 // Step components
-import { ActivityConfigurationStep } from './steps/ActivityConfigurationStep';
-import { ArbitratorSelectionStep } from './steps/ArbitratorSelectionStep';
+import { SelectActivityStep } from './steps/SelectActivityStep';
+import { SelectMetricStep } from './steps/SelectMetricStep';
+import { SelectDurationStep } from './steps/SelectDurationStep';
+import { SelectWagerStep } from './steps/SelectWagerStep';
 import { ChallengeReviewStep } from './steps/ChallengeReviewStep';
 
-type QuickChallengeStep = 'activity_config' | 'arbitrator' | 'review';
-
-interface ArbitratorTeam {
-  id: string;
-  name: string;
-  captainPubkey: string;
-  captainName?: string;
-  captainLightningAddress?: string;
-  memberCount?: number;
-}
+type QuickChallengeStep =
+  | 'select_activity'
+  | 'select_metric'
+  | 'select_duration'
+  | 'select_wager'
+  | 'review';
 
 export interface QuickChallengeWizardProps {
   opponent:
@@ -59,10 +59,11 @@ interface WizardProgressProps {
 }
 
 const WizardProgress: React.FC<WizardProgressProps> = ({ currentStep }) => {
-  // Show all wizard steps (arbitrator step only appears for paid challenges)
   const steps: QuickChallengeStep[] = [
-    'activity_config',
-    'arbitrator',
+    'select_activity',
+    'select_metric',
+    'select_duration',
+    'select_wager',
     'review',
   ];
   const currentIndex = steps.indexOf(currentStep);
@@ -89,15 +90,13 @@ export const QuickChallengeWizard: React.FC<QuickChallengeWizardProps> = ({
   onCancel,
 }) => {
   const [currentStep, setCurrentStep] =
-    useState<QuickChallengeStep>('activity_config');
-  const [configuration, setConfiguration] = useState<
-    Partial<ActivityConfiguration>
-  >({});
+    useState<QuickChallengeStep>('select_activity');
+  const [activityType, setActivityType] = useState<ActivityType | undefined>();
+  const [metric, setMetric] = useState<MetricType | undefined>();
+  const [duration, setDuration] = useState<DurationOption | undefined>();
+  const [wagerAmount, setWagerAmount] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lightningAddress, setLightningAddress] = useState('');
-  const [arbitratorTeam, setArbitratorTeam] = useState<ArbitratorTeam | null>(
-    null
-  );
 
   // Normalize opponent data to DiscoveredNostrUser format
   const normalizedOpponent: DiscoveredNostrUser = {
@@ -112,23 +111,21 @@ export const QuickChallengeWizard: React.FC<QuickChallengeWizardProps> = ({
   // Step validation
   const validateCurrentStep = useCallback((): boolean => {
     switch (currentStep) {
-      case 'activity_config':
-        return !!(
-          configuration.activityType &&
-          configuration.metric &&
-          configuration.duration !== undefined &&
-          configuration.wagerAmount !== undefined
-        );
-      case 'arbitrator':
-        // Require arbitrator selection for paid challenges
-        return configuration.wagerAmount === 0 || !!arbitratorTeam;
+      case 'select_activity':
+        return !!activityType;
+      case 'select_metric':
+        return !!metric;
+      case 'select_duration':
+        return !!duration;
+      case 'select_wager':
+        return wagerAmount !== undefined;
       case 'review':
         // Require Lightning address for paid challenges
-        return configuration.wagerAmount === 0 || !!lightningAddress?.trim();
+        return wagerAmount === 0 || !!lightningAddress?.trim();
       default:
         return false;
     }
-  }, [currentStep, configuration, lightningAddress, arbitratorTeam]);
+  }, [currentStep, activityType, metric, duration, wagerAmount, lightningAddress]);
 
   // Navigation handlers
   const handleNext = useCallback(async () => {
@@ -137,46 +134,50 @@ export const QuickChallengeWizard: React.FC<QuickChallengeWizardProps> = ({
     }
 
     switch (currentStep) {
-      case 'activity_config':
-        // Skip arbitrator step for free challenges
-        if (configuration.wagerAmount === 0) {
-          setCurrentStep('review');
-        } else {
-          setCurrentStep('arbitrator');
-        }
+      case 'select_activity':
+        setCurrentStep('select_metric');
         break;
-      case 'arbitrator':
+      case 'select_metric':
+        setCurrentStep('select_duration');
+        break;
+      case 'select_duration':
+        setCurrentStep('select_wager');
+        break;
+      case 'select_wager':
         setCurrentStep('review');
         break;
       case 'review':
-        // Send challenge directly (no payment needed from creator)
         await handleSendChallenge();
         break;
     }
-  }, [currentStep, validateCurrentStep, configuration.wagerAmount]);
+  }, [currentStep, validateCurrentStep, handleSendChallenge]);
 
   const handleBack = useCallback(() => {
-    if (currentStep === 'review') {
-      // Go back to arbitrator for paid challenges, activity_config for free
-      if (configuration.wagerAmount === 0) {
-        setCurrentStep('activity_config');
-      } else {
-        setCurrentStep('arbitrator');
-      }
-    } else if (currentStep === 'arbitrator') {
-      setCurrentStep('activity_config');
+    switch (currentStep) {
+      case 'select_metric':
+        setCurrentStep('select_activity');
+        break;
+      case 'select_duration':
+        setCurrentStep('select_metric');
+        break;
+      case 'select_wager':
+        setCurrentStep('select_duration');
+        break;
+      case 'review':
+        setCurrentStep('select_wager');
+        break;
     }
-  }, [currentStep, configuration.wagerAmount]);
+  }, [currentStep]);
 
   /**
    * Send challenge request with Lightning address
    */
   const handleSendChallenge = useCallback(async () => {
     if (
-      !configuration.activityType ||
-      !configuration.metric ||
-      configuration.duration === undefined ||
-      configuration.wagerAmount === undefined
+      !activityType ||
+      !metric ||
+      duration === undefined ||
+      wagerAmount === undefined
     ) {
       Alert.alert('Error', 'Please complete all required fields');
       return;
@@ -203,18 +204,11 @@ export const QuickChallengeWizard: React.FC<QuickChallengeWizardProps> = ({
       const result = await challengeRequestService.createChallengeRequest(
         {
           challengedPubkey: opponent.pubkey,
-          activityType: configuration.activityType,
-          metric: configuration.metric,
-          duration: configuration.duration,
-          wagerAmount: configuration.wagerAmount,
+          activityType: activityType,
+          metric: metric,
+          duration: duration,
+          wagerAmount: wagerAmount,
           creatorLightningAddress: lightningAddress || undefined,
-          // Include arbitrator data if paid challenge
-          ...(arbitratorTeam && {
-            arbitratorTeamId: arbitratorTeam.id,
-            arbitratorCaptainPubkey: arbitratorTeam.captainPubkey,
-            arbitratorCaptainName: arbitratorTeam.captainName,
-            arbitratorLightningAddress: arbitratorTeam.captainLightningAddress,
-          }),
         },
         signer
       );
@@ -261,13 +255,13 @@ export const QuickChallengeWizard: React.FC<QuickChallengeWizardProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  }, [opponent, configuration, onComplete, onCancel]);
+  }, [opponent, activityType, metric, duration, wagerAmount, lightningAddress, onComplete, onCancel]);
 
   const handleEditConfiguration = () => {
-    setCurrentStep('activity_config');
+    setCurrentStep('select_activity');
   };
 
-  const canGoBack = currentStep === 'review' || currentStep === 'arbitrator';
+  const canGoBack = currentStep !== 'select_activity';
   const isValid = validateCurrentStep();
 
   // Get opponent display name
@@ -309,35 +303,60 @@ export const QuickChallengeWizard: React.FC<QuickChallengeWizardProps> = ({
 
       {/* Step Content */}
       <View style={styles.content}>
-        {currentStep === 'activity_config' && (
+        {currentStep === 'select_activity' && (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Challenge Details</Text>
+            <Text style={styles.stepTitle}>Select Activity</Text>
             <Text style={styles.stepSubtitle}>
-              Choose activity, metric, and duration
+              Choose the activity type for your challenge
             </Text>
-            <ActivityConfigurationStep
-              configuration={configuration as ActivityConfiguration}
-              onUpdateConfiguration={(updates) =>
-                setConfiguration((prev) => ({ ...prev, ...updates }))
-              }
+            <SelectActivityStep
+              selectedActivity={activityType}
+              onSelectActivity={setActivityType}
             />
           </View>
         )}
 
-        {currentStep === 'arbitrator' && (
+        {currentStep === 'select_metric' && activityType && (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Select Arbitrator</Text>
+            <Text style={styles.stepTitle}>Select Metric</Text>
             <Text style={styles.stepSubtitle}>
-              Choose team captain to hold wagers
+              Choose what to compete on
             </Text>
-            <ArbitratorSelectionStep
-              selectedTeam={arbitratorTeam}
-              onSelect={setArbitratorTeam}
+            <SelectMetricStep
+              activityType={activityType}
+              selectedMetric={metric}
+              onSelectMetric={setMetric}
             />
           </View>
         )}
 
-        {currentStep === 'review' && configuration.activityType && (
+        {currentStep === 'select_duration' && (
+          <View style={styles.stepContainer}>
+            <Text style={styles.stepTitle}>Select Duration</Text>
+            <Text style={styles.stepSubtitle}>
+              How long should the challenge last?
+            </Text>
+            <SelectDurationStep
+              selectedDuration={duration}
+              onSelectDuration={setDuration}
+            />
+          </View>
+        )}
+
+        {currentStep === 'select_wager' && (
+          <View style={styles.stepContainer}>
+            <Text style={styles.stepTitle}>Select Wager</Text>
+            <Text style={styles.stepSubtitle}>
+              Choose the wager amount in sats
+            </Text>
+            <SelectWagerStep
+              wagerAmount={wagerAmount}
+              onSelectWager={setWagerAmount}
+            />
+          </View>
+        )}
+
+        {currentStep === 'review' && activityType && metric && duration !== undefined && (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Review Challenge</Text>
             <Text style={styles.stepSubtitle}>
@@ -345,7 +364,12 @@ export const QuickChallengeWizard: React.FC<QuickChallengeWizardProps> = ({
             </Text>
             <ChallengeReviewStep
               opponent={normalizedOpponent}
-              configuration={configuration as ActivityConfiguration}
+              configuration={{
+                activityType,
+                metric,
+                duration,
+                wagerAmount,
+              }}
               lightningAddress={lightningAddress}
               onLightningAddressChange={setLightningAddress}
               onEditConfiguration={handleEditConfiguration}

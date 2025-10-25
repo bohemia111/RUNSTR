@@ -25,6 +25,8 @@ export interface Workout {
   duration: number; // in seconds
   calories?: number;
   timestamp: number; // Unix timestamp
+  splits?: Map<number, number>; // km -> elapsed time in seconds (e.g., km 5 -> 1440s)
+  splitPaces?: Map<number, number>; // km -> pace in seconds per km
 }
 
 export class SimpleLeaderboardService {
@@ -136,6 +138,28 @@ export class SimpleLeaderboardService {
       console.log(
         `   ${relevantWorkouts.length} workouts meet distance requirement`
       );
+
+      // Use split data to extract time at target distance for accurate scoring
+      // This ensures runners who go beyond target aren't penalized
+      relevantWorkouts = relevantWorkouts.map((workout) => {
+        const targetTime = this.extractTargetDistanceTime(
+          workout,
+          event.targetDistance!
+        );
+
+        // Log split data usage for transparency
+        if (workout.splits && workout.splits.size > 0 && targetTime !== workout.duration) {
+          console.log(
+            `   ✅ Using split data for ${workout.npub.slice(0, 8)}: ${targetTime}s (was ${workout.duration}s)`
+          );
+        }
+
+        // Return adjusted workout with target distance time
+        return {
+          ...workout,
+          duration: targetTime, // Override with split-based time
+        };
+      });
     }
 
     // Calculate scores
@@ -320,6 +344,28 @@ export class SimpleLeaderboardService {
 
       const caloriesStr = getTag('calories');
 
+      // Parse split data (multiple split tags: ["split", "1", "00:05:12"])
+      const splits = new Map<number, number>();
+      const splitTags = event.tags.filter((t) => t[0] === 'split');
+      for (const splitTag of splitTags) {
+        const km = parseInt(splitTag[1]);
+        const elapsedTime = this.parseDuration(splitTag[2]);
+        if (!isNaN(km) && elapsedTime > 0) {
+          splits.set(km, elapsedTime);
+        }
+      }
+
+      // Parse split pace data (multiple split_pace tags: ["split_pace", "1", "360"])
+      const splitPaces = new Map<number, number>();
+      const splitPaceTags = event.tags.filter((t) => t[0] === 'split_pace');
+      for (const paceTag of splitPaceTags) {
+        const km = parseInt(paceTag[1]);
+        const pace = parseInt(paceTag[2]);
+        if (!isNaN(km) && !isNaN(pace)) {
+          splitPaces.set(km, pace);
+        }
+      }
+
       return {
         id: event.id,
         npub: event.pubkey,
@@ -328,6 +374,8 @@ export class SimpleLeaderboardService {
         duration,
         calories: caloriesStr ? parseInt(caloriesStr) : undefined,
         timestamp: event.created_at,
+        splits: splits.size > 0 ? splits : undefined,
+        splitPaces: splitPaces.size > 0 ? splitPaces : undefined,
       };
     } catch (error) {
       console.error('Failed to parse workout event:', error);
@@ -347,6 +395,53 @@ export class SimpleLeaderboardService {
       return hours * 3600 + minutes * 60 + seconds;
     }
     return 0;
+  }
+
+  /**
+   * Extract time at target distance using split data
+   * Returns the elapsed time when runner reached the target distance
+   * Falls back to full workout time if splits unavailable
+   */
+  private extractTargetDistanceTime(
+    workout: Workout,
+    targetDistanceKm: number
+  ): number {
+    // If no splits available, use full workout time
+    if (!workout.splits || workout.splits.size === 0) {
+      return workout.duration;
+    }
+
+    // Check if we have an exact split at target distance
+    const exactSplit = workout.splits.get(targetDistanceKm);
+    if (exactSplit !== undefined) {
+      return exactSplit;
+    }
+
+    // If no exact match, find closest split <= target distance
+    // (e.g., for 5k target with splits at 1,2,3,4, use split 4)
+    let closestKm = 0;
+    let closestTime = 0;
+
+    for (const [km, time] of workout.splits.entries()) {
+      if (km <= targetDistanceKm && km > closestKm) {
+        closestKm = km;
+        closestTime = time;
+      }
+    }
+
+    // If we found a close split, interpolate to target distance
+    if (closestKm > 0 && closestTime > 0) {
+      // Calculate remaining distance and estimated time
+      const remainingDistance = targetDistanceKm - closestKm;
+      const avgPacePerKm = closestTime / closestKm; // Average pace up to this point
+      const estimatedTime = closestTime + remainingDistance * avgPacePerKm;
+
+      // Don't exceed total workout time
+      return Math.min(estimatedTime, workout.duration);
+    }
+
+    // Fall back to full workout time
+    return workout.duration;
   }
 
   /**

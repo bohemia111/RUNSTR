@@ -247,6 +247,18 @@ export const EventJoinRequestsSection: React.FC<
                   });
 
                   onMemberApproved?.(eventId, requesterPubkey);
+
+                  // Invalidate event snapshot - participants changed
+                  try {
+                    const { EventSnapshotStore } = await import(
+                      '../../services/event/EventSnapshotStore'
+                    );
+                    await EventSnapshotStore.deleteSnapshot(eventId);
+                    console.log('🗑️ Event snapshot invalidated after list creation');
+                  } catch (error) {
+                    console.warn('⚠️ Failed to invalidate snapshot (non-critical):', error);
+                  }
+
                   Alert.alert(
                     'Success',
                     'Participant list created and user approved'
@@ -310,6 +322,17 @@ export const EventJoinRequestsSection: React.FC<
 
       // Notify parent component
       onMemberApproved?.(eventId, requesterPubkey);
+
+      // Invalidate event snapshot - participants changed
+      try {
+        const { EventSnapshotStore } = await import(
+          '../../services/event/EventSnapshotStore'
+        );
+        await EventSnapshotStore.deleteSnapshot(eventId);
+        console.log('🗑️ Event snapshot invalidated after approval');
+      } catch (error) {
+        console.warn('⚠️ Failed to invalidate snapshot (non-critical):', error);
+      }
 
       Alert.alert('Success', 'Participant approved and added to event');
     } catch (error) {

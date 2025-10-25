@@ -90,15 +90,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // ✅ ANDROID FIX: Initialize cache (now non-blocking with lazy loading)
         await unifiedCache.initialize();
 
-        // Load from UnifiedCache (already prefetched by SplashInit)
-        const cachedUser = unifiedCache.getCached<User>(
+        // ✅ PROFILE CACHE FIX: Try memory cache first (instant)
+        let cachedUser = unifiedCache.getCached<User>(
           CacheKeys.USER_PROFILE(hexPubkey)
         );
 
+        // ✅ PROFILE CACHE FIX: If memory cache empty, try AsyncStorage (with timeout)
+        if (!cachedUser) {
+          console.log('⚡ AuthContext: Memory cache miss, checking AsyncStorage...');
+          try {
+            cachedUser = await Promise.race([
+              unifiedCache.getCachedAsync<User>(CacheKeys.USER_PROFILE(hexPubkey)),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 300))
+            ]);
+            if (cachedUser) {
+              console.log('✅ AuthContext: Loaded user from AsyncStorage');
+            }
+          } catch (asyncCacheError) {
+            console.warn('⚠️ AuthContext: AsyncStorage cache check failed:', asyncCacheError);
+          }
+        } else {
+          console.log('⚡ AuthContext: Loaded user from memory cache (instant)');
+        }
+
         if (cachedUser) {
-          console.log(
-            '⚡ AuthContext: Loaded user from UnifiedCache (instant)'
-          );
           setCurrentUser(cachedUser);
           setIsConnected(true);
           setConnectionStatus('Connected');

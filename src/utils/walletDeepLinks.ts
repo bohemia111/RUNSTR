@@ -119,6 +119,218 @@ export async function openInStrike(invoice: string): Promise<WalletDeepLinkResul
 }
 
 /**
+ * Open Lightning invoice in Zeus wallet
+ * Uses Zeus custom URL scheme for direct wallet opening
+ *
+ * @param invoice - BOLT11 Lightning invoice
+ * @returns Promise with success status
+ */
+export async function openInZeus(invoice: string): Promise<WalletDeepLinkResult> {
+  try {
+    // Zeus uses custom URL scheme: zeus:lightning={invoice}
+    const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
+    const uri = `zeus:lightning=${cleanInvoice}`;
+
+    console.log('[WalletDeepLinks] Opening Zeus with invoice');
+
+    const canOpen = await Linking.canOpenURL(uri);
+
+    if (canOpen) {
+      await Linking.openURL(uri);
+      return { success: true };
+    } else {
+      // Zeus not installed
+      Alert.alert(
+        'Zeus Not Installed',
+        'Install Zeus from the App Store to pay with Zeus.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Install',
+            onPress: () => {
+              const appStoreUrl = Platform.select({
+                ios: 'https://apps.apple.com/app/zeus-ln/id1456038895',
+                android: 'https://play.google.com/store/apps/details?id=app.zeusln.zeus',
+              });
+              if (appStoreUrl) {
+                Linking.openURL(appStoreUrl);
+              }
+            },
+          },
+        ]
+      );
+      return { success: false, error: 'Zeus not installed' };
+    }
+  } catch (error) {
+    console.error('[WalletDeepLinks] Zeus error:', error);
+    Alert.alert(
+      'Error',
+      'Failed to open Zeus. Please copy the invoice and paste it manually in Zeus.'
+    );
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Open Lightning invoice in Phoenix wallet
+ * Uses Phoenix custom URL scheme for direct wallet opening
+ *
+ * @param invoice - BOLT11 Lightning invoice
+ * @returns Promise with success status
+ */
+export async function openInPhoenix(invoice: string): Promise<WalletDeepLinkResult> {
+  try {
+    // Phoenix uses custom URL scheme: phoenix://pay?invoice={invoice}
+    const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
+    const uri = `phoenix://pay?invoice=${cleanInvoice}`;
+
+    console.log('[WalletDeepLinks] Opening Phoenix with invoice');
+
+    const canOpen = await Linking.canOpenURL(uri);
+
+    if (canOpen) {
+      await Linking.openURL(uri);
+      return { success: true };
+    } else {
+      // Phoenix not installed
+      Alert.alert(
+        'Phoenix Not Installed',
+        'Install Phoenix from the App Store to pay with Phoenix.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Install',
+            onPress: () => {
+              const appStoreUrl = Platform.select({
+                ios: 'https://apps.apple.com/app/phoenix-wallet/id1544097028',
+                android: 'https://play.google.com/store/apps/details?id=fr.acinq.phoenix.mainnet',
+              });
+              if (appStoreUrl) {
+                Linking.openURL(appStoreUrl);
+              }
+            },
+          },
+        ]
+      );
+      return { success: false, error: 'Phoenix not installed' };
+    }
+  } catch (error) {
+    console.error('[WalletDeepLinks] Phoenix error:', error);
+    Alert.alert(
+      'Error',
+      'Failed to open Phoenix. Please copy the invoice and paste it manually in Phoenix.'
+    );
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Open Lightning invoice in Wallet of Satoshi
+ * Uses Wallet of Satoshi custom URL scheme for direct wallet opening
+ *
+ * @param invoice - BOLT11 Lightning invoice
+ * @returns Promise with success status
+ */
+export async function openInWalletOfSatoshi(invoice: string): Promise<WalletDeepLinkResult> {
+  try {
+    // Wallet of Satoshi uses custom URL scheme: walletofsatoshi:lightning={invoice}
+    const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
+    const uri = `walletofsatoshi:lightning=${cleanInvoice}`;
+
+    console.log('[WalletDeepLinks] Opening Wallet of Satoshi with invoice');
+
+    const canOpen = await Linking.canOpenURL(uri);
+
+    if (canOpen) {
+      await Linking.openURL(uri);
+      return { success: true };
+    } else {
+      // Wallet of Satoshi not installed
+      Alert.alert(
+        'Wallet of Satoshi Not Installed',
+        'Install Wallet of Satoshi from the App Store to pay with WOS.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Install',
+            onPress: () => {
+              const appStoreUrl = Platform.select({
+                ios: 'https://apps.apple.com/app/wallet-of-satoshi/id1438599608',
+                android: 'https://play.google.com/store/apps/details?id=com.livingroomofsatoshi.wallet',
+              });
+              if (appStoreUrl) {
+                Linking.openURL(appStoreUrl);
+              }
+            },
+          },
+        ]
+      );
+      return { success: false, error: 'Wallet of Satoshi not installed' };
+    }
+  } catch (error) {
+    console.error('[WalletDeepLinks] Wallet of Satoshi error:', error);
+    Alert.alert(
+      'Error',
+      'Failed to open Wallet of Satoshi. Please copy the invoice and paste it manually.'
+    );
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Open Lightning invoice in Breez wallet
+ * Uses Breez custom URL scheme for direct wallet opening
+ *
+ * @param invoice - BOLT11 Lightning invoice
+ * @returns Promise with success status
+ */
+export async function openInBreez(invoice: string): Promise<WalletDeepLinkResult> {
+  try {
+    // Breez uses custom URL scheme: breez:lightning:{invoice}
+    const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
+    const uri = `breez:lightning:${cleanInvoice}`;
+
+    console.log('[WalletDeepLinks] Opening Breez with invoice');
+
+    const canOpen = await Linking.canOpenURL(uri);
+
+    if (canOpen) {
+      await Linking.openURL(uri);
+      return { success: true };
+    } else {
+      // Breez not installed
+      Alert.alert(
+        'Breez Not Installed',
+        'Install Breez from the App Store to pay with Breez.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Install',
+            onPress: () => {
+              const appStoreUrl = Platform.select({
+                ios: 'https://apps.apple.com/app/breez/id1463506703',
+                android: 'https://play.google.com/store/apps/details?id=com.breez.client',
+              });
+              if (appStoreUrl) {
+                Linking.openURL(appStoreUrl);
+              }
+            },
+          },
+        ]
+      );
+      return { success: false, error: 'Breez not installed' };
+    }
+  } catch (error) {
+    console.error('[WalletDeepLinks] Breez error:', error);
+    Alert.alert(
+      'Error',
+      'Failed to open Breez. Please copy the invoice and paste it manually in Breez.'
+    );
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
  * Open Lightning invoice in generic Lightning wallet
  * Uses standard lightning: URI scheme (works with Alby, BlueWallet, Zeus, Phoenix, Breez, etc.)
  *

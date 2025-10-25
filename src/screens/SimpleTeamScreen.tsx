@@ -99,23 +99,22 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
           return;
         }
 
-        // ✅ INSTANT: Check cache synchronously (no await) and display immediately
-        const cachedEvents = unifiedCache.getCached(CacheKeys.COMPETITIONS);
+        // ✅ PERFORMANCE FIX: Check team-specific cache (no global filtering needed)
+        const cachedEvents = unifiedCache.getCached(CacheKeys.TEAM_EVENTS(team.id));
         if (cachedEvents && Array.isArray(cachedEvents)) {
-          // Filter cached events for this specific team
-          const teamCachedEvents = cachedEvents.filter(
-            (event: any) => event.teamId === team.id
-          );
           console.log(
             '[SimpleTeamScreen] ⚡ Cache hit: Displaying',
-            teamCachedEvents.length,
-            'cached events INSTANTLY'
+            cachedEvents.length,
+            'cached events INSTANTLY for team',
+            team.id
           );
-          setEvents(teamCachedEvents);
+          setEvents(cachedEvents);
           setLoadingEvents(false); // ✅ Hide spinner immediately - UI is instant
         } else {
           console.log(
-            '[SimpleTeamScreen] 📱 Cache miss: No cached events, will show spinner'
+            '[SimpleTeamScreen] 📱 Cache miss: No cached events for team',
+            team.id,
+            '- will show spinner'
           );
           setLoadingEvents(true); // Only show spinner on first load when no cache
         }

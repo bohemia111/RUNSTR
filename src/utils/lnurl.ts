@@ -51,13 +51,16 @@ export async function fetchLNURLPayDetails(
 
   console.log('[LNURL] Fetching details from:', lnurlUrl);
 
+  // Create AbortController for manual timeout (React Native compatible)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
     const response = await fetch(lnurlUrl, {
       headers: {
         Accept: 'application/json',
       },
-      // 5 second timeout
-      signal: AbortSignal.timeout(5000),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -88,6 +91,8 @@ export async function fetchLNURLPayDetails(
 
     console.error('[LNURL] ❌ Failed to fetch details:', error);
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -128,13 +133,16 @@ export async function requestInvoiceFromLNURL(
 
   console.log('[LNURL] Requesting invoice for', amountMillisats, 'msats');
 
+  // Create AbortController for manual timeout (React Native compatible)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   try {
     const response = await fetch(url.toString(), {
       headers: {
         Accept: 'application/json',
       },
-      // 10 second timeout for invoice generation
-      signal: AbortSignal.timeout(10000),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -163,6 +171,8 @@ export async function requestInvoiceFromLNURL(
 
     console.error('[LNURL] ❌ Failed to get invoice:', error);
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
