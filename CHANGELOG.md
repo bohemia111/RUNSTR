@@ -6,6 +6,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.8] - 2025-10-25
+
+### Added
+- **Session Persistence System**: Complete workout session recovery architecture
+  - **HybridDurationTracker State Export**: Full tracker state serialization for crash recovery
+  - **Session Restoration**: Automatic session recovery when app returns from background
+  - **In-Memory GPS Cache**: GPS points cached in memory for instant metrics updates
+  - **Foreground Sync**: Automatic GPS data synchronization when app resumes
+  - Workouts now survive app switching, backgrounding, and interruptions
+
+### Fixed
+- **Session Loss on App Switch**: Fixed workouts being lost when switching apps
+  - Sessions automatically restore when returning to RunningTrackerScreen
+  - Complete tracker state persists across app lifecycle events
+  - No more "lost workout" scenarios from accidental app switching
+- **Async Metrics Delays**: Eliminated async storage reads on every UI update
+  - `getCurrentSession()` now synchronous using in-memory cache
+  - Instant metrics updates with zero lag
+  - Smoother real-time workout display
+
+### Improved
+- **Tracking Reliability**: Sessions survive complete app lifecycle
+  - App backgrounding no longer interrupts tracking state
+  - Timer continues accurately across foreground/background transitions
+  - GPS data syncs immediately when returning to app
+- **Performance**: Dramatic improvement in metrics update responsiveness
+  - In-memory cache eliminates 100+ async reads per workout
+  - Zero-latency metrics display during tracking
+  - Smoother UI updates throughout workout session
+- **State Management**: Robust session state persistence
+  - Complete `HybridDurationTracker` state export/restore
+  - Session state includes all timer, pause, and GPS data
+  - Crash recovery maintains workout integrity
+
+### Technical
+- Version numbers updated across all platforms:
+  - app.json: 0.4.8 (versionCode 39)
+  - android/app/build.gradle: 0.4.8 (versionCode 39)
+  - package.json: 0.4.8
+- Modified files:
+  - `src/services/activity/SimpleRunTracker.ts` - Session persistence system (182 lines added)
+    - `HybridDurationTracker.exportState()` - State serialization
+    - `HybridDurationTracker.restoreState()` - State deserialization
+    - `cachedGpsPoints` - In-memory GPS cache
+    - `syncGpsPointsFromStorage()` - Cache synchronization
+    - `restoreSession()` - Complete session recovery
+  - `src/screens/activity/RunningTrackerScreen.tsx` - Session restoration UI (126 lines changed)
+    - `restoreActiveSession()` - Auto-restore on mount
+    - `handleAppStateChange()` - Foreground sync logic
+    - Synchronous `getCurrentSession()` integration
+    - Real-time metrics updates without async delays
+
 ## [0.4.7] - 2025-10-25
 
 ### Added

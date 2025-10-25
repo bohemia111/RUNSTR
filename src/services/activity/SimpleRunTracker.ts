@@ -33,6 +33,13 @@ export interface GPSPoint {
   speed?: number;
 }
 
+export interface Split {
+  splitNumber: number; // 1, 2, 3, etc.
+  distance: number; // meters
+  duration: number; // seconds (cumulative time at this split)
+  pace: number; // seconds per km/mile
+}
+
 export interface RunSession {
   id: string;
   activityType: 'running' | 'walking' | 'cycling';
@@ -51,6 +58,13 @@ interface SessionState {
   isTracking: boolean;
   isPaused: boolean;
   startTime: number;
+  pauseCount: number;
+  // HybridDurationTracker state (for session recovery)
+  jsTimerSeconds: number;
+  gpsBasedDuration: number;
+  totalPausedTime: number;
+  pauseStartTime: number;
+  lastGpsTimestamp: number;
 }
 
 /**
@@ -132,6 +146,51 @@ class HybridDurationTracker {
     const currentPause = this.pauseStartTime > 0 ? Date.now() - this.pauseStartTime : 0;
     return Math.floor((this.totalPausedTime + currentPause) / 1000);
   }
+
+  /**
+   * Export tracker state for session persistence
+   */
+  exportState() {
+    return {
+      jsTimerSeconds: this.jsTimerSeconds,
+      gpsBasedDuration: this.gpsBasedDuration,
+      totalPausedTime: this.totalPausedTime,
+      pauseStartTime: this.pauseStartTime,
+      lastGpsTimestamp: this.lastGpsTimestamp,
+      startTime: this.startTime,
+    };
+  }
+
+  /**
+   * Restore tracker state from saved session
+   */
+  restoreState(state: {
+    jsTimerSeconds: number;
+    gpsBasedDuration: number;
+    totalPausedTime: number;
+    pauseStartTime: number;
+    lastGpsTimestamp: number;
+    startTime: number;
+  }) {
+    this.jsTimerSeconds = state.jsTimerSeconds;
+    this.gpsBasedDuration = state.gpsBasedDuration;
+    this.totalPausedTime = state.totalPausedTime;
+    this.pauseStartTime = state.pauseStartTime;
+    this.lastGpsTimestamp = state.lastGpsTimestamp;
+    this.startTime = state.startTime;
+
+    // Restart JS timer if not paused
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
+    this.timerInterval = setInterval(() => {
+      if (this.pauseStartTime === 0) {
+        this.jsTimerSeconds++;
+      }
+    }, 1000);
+
+    console.log('[HybridDurationTracker] State restored - timer resuming');
+  }
 }
 
 /**
@@ -152,6 +211,10 @@ export class SimpleRunTracker {
 
   // Start time
   private startTime: number = 0;
+
+  // In-memory GPS points cache (synced from AsyncStorage)
+  // This prevents async reads on every UI update (fixes duration bug)
+  private cachedGpsPoints: GPSPoint[] = [];
 
   private constructor() {
     console.log('[SimpleRunTracker] Initialized');
@@ -197,8 +260,9 @@ export class SimpleRunTracker {
       this.isPaused = false;
       this.pauseCount = 0;
 
-      // Clear previous GPS points
+      // Clear previous GPS points (both storage and cache)
       await AsyncStorage.removeItem(GPS_POINTS_KEY);
+      this.cachedGpsPoints = [];
 
       // Save session state
       await this.saveSessionState();
@@ -298,14 +362,14 @@ export class SimpleRunTracker {
     // Stop duration tracker
     this.durationTracker.stop();
 
-    // Get stored GPS points
-    const gpsPoints = await this.getStoredPoints();
-    console.log(`[SimpleRunTracker] Retrieved ${gpsPoints.length} GPS points`);
+    // Sync final GPS points from storage to cache
+    await this.syncGpsPointsFromStorage();
+    console.log(`[SimpleRunTracker] Retrieved ${this.cachedGpsPoints.length} GPS points`);
 
     // Calculate distance from GPS points (post-processing)
-    const distance = this.calculateTotalDistance(gpsPoints);
+    const distance = this.calculateTotalDistance(this.cachedGpsPoints);
 
-    // Create final session
+    // Create final session (using cached GPS points)
     const session: RunSession = {
       id: this.sessionId || `run_${Date.now()}`,
       activityType: this.activityType,
@@ -315,7 +379,7 @@ export class SimpleRunTracker {
       duration: this.durationTracker.getDuration(),
       pausedDuration: this.durationTracker.getTotalPausedTime(),
       pauseCount: this.pauseCount,
-      gpsPoints,
+      gpsPoints: this.cachedGpsPoints,
     };
 
     // Reset state
@@ -334,15 +398,15 @@ export class SimpleRunTracker {
 
   /**
    * Get current session data (for live UI updates)
+   * NOW SYNCHRONOUS - uses in-memory cache instead of AsyncStorage
    */
-  async getCurrentSession(): Promise<Partial<RunSession> | null> {
+  getCurrentSession(): Partial<RunSession> | null {
     if (!this.isTracking) {
       return null;
     }
 
-    // Get current GPS points for live distance updates
-    const gpsPoints = await this.getStoredPoints();
-    const distance = this.calculateTotalDistance(gpsPoints);
+    // Use cached GPS points (no async read needed!)
+    const distance = this.calculateTotalDistance(this.cachedGpsPoints);
 
     return {
       id: this.sessionId || `run_${Date.now()}`,
@@ -352,8 +416,28 @@ export class SimpleRunTracker {
       duration: this.durationTracker.getDuration(),
       pausedDuration: this.durationTracker.getTotalPausedTime(),
       pauseCount: this.pauseCount,
-      gpsPoints: gpsPoints.slice(-100), // Last 100 points for route display
+      gpsPoints: this.cachedGpsPoints.slice(-100), // Last 100 points for route display
     };
+  }
+
+  /**
+   * Sync GPS points from AsyncStorage to in-memory cache
+   * Call this when app returns to foreground or background task adds new points
+   */
+  async syncGpsPointsFromStorage(): Promise<void> {
+    try {
+      const points = await this.getStoredPoints();
+      this.cachedGpsPoints = points;
+      console.log(`[SimpleRunTracker] Synced ${points.length} GPS points to cache`);
+
+      // Update duration tracker with latest GPS timestamp
+      if (points.length > 0) {
+        const latestPoint = points[points.length - 1];
+        this.durationTracker.updateWithGPS(latestPoint.timestamp);
+      }
+    } catch (error) {
+      console.error('[SimpleRunTracker] Error syncing GPS points:', error);
+    }
   }
 
   /**
@@ -420,17 +504,30 @@ export class SimpleRunTracker {
   }
 
   /**
-   * Save session state to AsyncStorage
+   * Save session state to AsyncStorage (includes complete tracker state)
    */
   private async saveSessionState() {
-    const state: SessionState = {
-      sessionId: this.sessionId || '',
-      activityType: this.activityType,
-      isTracking: this.isTracking,
-      isPaused: this.isPaused,
-      startTime: this.startTime,
-    };
-    await AsyncStorage.setItem(SESSION_STATE_KEY, JSON.stringify(state));
+    try {
+      const trackerState = this.durationTracker.exportState();
+      const state: SessionState = {
+        sessionId: this.sessionId || '',
+        activityType: this.activityType,
+        isTracking: this.isTracking,
+        isPaused: this.isPaused,
+        startTime: this.startTime,
+        pauseCount: this.pauseCount,
+        // Include tracker state for session recovery
+        jsTimerSeconds: trackerState.jsTimerSeconds,
+        gpsBasedDuration: trackerState.gpsBasedDuration,
+        totalPausedTime: trackerState.totalPausedTime,
+        pauseStartTime: trackerState.pauseStartTime,
+        lastGpsTimestamp: trackerState.lastGpsTimestamp,
+      };
+      await AsyncStorage.setItem(SESSION_STATE_KEY, JSON.stringify(state));
+      console.log('[SimpleRunTracker] Session state saved');
+    } catch (error) {
+      console.error('[SimpleRunTracker] Error saving session state:', error);
+    }
   }
 
   /**
@@ -453,6 +550,49 @@ export class SimpleRunTracker {
    */
   isCurrentlyPaused(): boolean {
     return this.isPaused;
+  }
+
+  /**
+   * Check for active session and restore if found
+   * Call this when app returns to foreground or on screen mount
+   */
+  async restoreSession(): Promise<boolean> {
+    try {
+      const sessionStateStr = await AsyncStorage.getItem(SESSION_STATE_KEY);
+      if (!sessionStateStr) {
+        console.log('[SimpleRunTracker] No active session to restore');
+        return false;
+      }
+
+      const sessionState: SessionState = JSON.parse(sessionStateStr);
+
+      // Restore session data
+      this.sessionId = sessionState.sessionId;
+      this.activityType = sessionState.activityType as 'running' | 'walking' | 'cycling';
+      this.isTracking = sessionState.isTracking;
+      this.isPaused = sessionState.isPaused;
+      this.startTime = sessionState.startTime;
+      this.pauseCount = sessionState.pauseCount;
+
+      // Restore duration tracker state
+      this.durationTracker.restoreState({
+        jsTimerSeconds: sessionState.jsTimerSeconds,
+        gpsBasedDuration: sessionState.gpsBasedDuration,
+        totalPausedTime: sessionState.totalPausedTime,
+        pauseStartTime: sessionState.pauseStartTime,
+        lastGpsTimestamp: sessionState.lastGpsTimestamp,
+        startTime: sessionState.startTime,
+      });
+
+      // Sync GPS points from storage to cache
+      await this.syncGpsPointsFromStorage();
+
+      console.log(`[SimpleRunTracker] ✅ Session restored: ${sessionState.sessionId}`);
+      return true;
+    } catch (error) {
+      console.error('[SimpleRunTracker] Error restoring session:', error);
+      return false;
+    }
   }
 }
 

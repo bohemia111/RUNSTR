@@ -21,13 +21,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../../styles/theme';
 import { CustomAlert } from '../../components/ui/CustomAlert';
 import { simpleRunTracker } from '../../services/activity/SimpleRunTracker';
-import type { RunSession, GPSPoint } from '../../services/activity/SimpleRunTracker';
+import type { RunSession, GPSPoint, Split } from '../../services/activity/SimpleRunTracker';
 import { activityMetricsService } from '../../services/activity/ActivityMetricsService';
 import type { FormattedMetrics } from '../../services/activity/ActivityMetricsService';
 import { gpsHealthMonitor } from '../../services/activity/GPSHealthMonitor';
-
-// Legacy import for type compatibility
-import type { Split } from '../../services/activity/SimpleLocationTrackingService';
 import {
   GPSStatusIndicator,
   type GPSSignalStrength,
@@ -135,9 +132,75 @@ export const RunningTrackerScreen: React.FC = () => {
   const routeCheckRef = useRef<NodeJS.Timeout | null>(null); // For route matching interval
   // NOTE: Timer refs removed - SimpleRunTracker handles all timing internally via hybrid timer
 
+  // Extract metrics update logic to reusable function (defined early for useEffect)
+  const updateMetrics = () => {
+    const session = simpleRunTracker.getCurrentSession(); // NOW SYNCHRONOUS!
+
+    if (session && session.distance !== undefined && session.duration !== undefined) {
+      const formattedDuration = formatElapsedTime(session.duration);
+
+      const currentMetrics = {
+        distance: session.distance,
+        duration: session.duration,
+        pace: activityMetricsService.calculatePace(
+          session.distance,
+          session.duration
+        ),
+        elevationGain: 0, // TODO: SimpleRunTracker doesn't track elevation yet
+      };
+
+      const formatted = activityMetricsService.getFormattedMetrics(
+        currentMetrics,
+        'running'
+      );
+      formatted.duration = formattedDuration;
+
+      setMetrics(formatted);
+      setElapsedTime(session.duration);
+
+      // Update GPS signal from health monitor
+      const lastPoint = session.gpsPoints?.[session.gpsPoints.length - 1];
+      const gpsStatus = gpsHealthMonitor.assessSignalQuality(lastPoint?.accuracy);
+      setGpsSignal(
+        gpsStatus.quality === 'excellent' || gpsStatus.quality === 'good'
+          ? 'strong'
+          : gpsStatus.quality === 'poor'
+          ? 'weak'
+          : 'none'
+      );
+      setGpsAccuracy(lastPoint?.accuracy);
+      setIsBackgroundTracking(false);
+    }
+  };
+
+  // Check for active session on mount (fixes session loss on app switch)
   useEffect(() => {
+    const restoreActiveSession = async () => {
+      console.log('[RunningTrackerScreen] Checking for active session...');
+      const restored = await simpleRunTracker.restoreSession();
+
+      if (restored) {
+        // Session was restored - update UI state
+        setIsTracking(true);
+        setIsPaused(simpleRunTracker.isCurrentlyPaused());
+
+        // Start metrics update interval
+        updateMetrics(); // Call immediately
+        metricsUpdateRef.current = setInterval(() => {
+          updateMetrics();
+        }, METRICS_UPDATE_INTERVAL_MS);
+
+        // Start route checking
+        routeCheckRef.current = setInterval(checkForRouteMatch, ROUTE_CHECK_INTERVAL_MS);
+
+        console.log('[RunningTrackerScreen] ✅ Active session restored');
+      }
+    };
+
+    restoreActiveSession();
+
     return () => {
-      // Cleanup timers on unmount (duration now GPS-timestamp-based from service)
+      // Cleanup timers on unmount
       if (metricsUpdateRef.current) clearInterval(metricsUpdateRef.current);
       if (routeCheckRef.current) clearInterval(routeCheckRef.current);
     };
@@ -147,10 +210,14 @@ export const RunningTrackerScreen: React.FC = () => {
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active' && isTracking) {
-        // App returned to foreground - SimpleRunTracker automatically syncs background data
+        // App returned to foreground - sync GPS points from storage
         console.log('[RunningTrackerScreen] App returned to foreground, syncing...');
 
-        const session = await simpleRunTracker.getCurrentSession();
+        // Sync GPS points from AsyncStorage to cache
+        await simpleRunTracker.syncGpsPointsFromStorage();
+
+        // getCurrentSession() is now synchronous!
+        const session = simpleRunTracker.getCurrentSession();
         if (session && session.distance !== undefined && session.duration !== undefined) {
           const formattedDuration = formatElapsedTime(session.duration);
 
@@ -283,44 +350,11 @@ export const RunningTrackerScreen: React.FC = () => {
     setTimeout(checkForRouteMatch, 5000); // Check after 5 seconds to get initial GPS points
 
     // Start metrics update timer - SimpleRunTracker handles all timing internally
-    metricsUpdateRef.current = setInterval(async () => {
-      const session = await simpleRunTracker.getCurrentSession();
+    // Call once immediately (fixes "duration doesn't move on start" bug)
+    updateMetrics();
 
-      if (session && session.distance !== undefined && session.duration !== undefined) {
-        const formattedDuration = formatElapsedTime(session.duration);
-
-        const currentMetrics = {
-          distance: session.distance,
-          duration: session.duration,
-          pace: activityMetricsService.calculatePace(
-            session.distance,
-            session.duration
-          ),
-          elevationGain: 0, // TODO: SimpleRunTracker doesn't track elevation yet
-        };
-
-        const formatted = activityMetricsService.getFormattedMetrics(
-          currentMetrics,
-          'running'
-        );
-        formatted.duration = formattedDuration;
-
-        setMetrics(formatted);
-        setElapsedTime(session.duration);
-
-        // Update GPS signal from health monitor
-        const lastPoint = session.gpsPoints?.[session.gpsPoints.length - 1];
-        const gpsStatus = gpsHealthMonitor.assessSignalQuality(lastPoint?.accuracy);
-        setGpsSignal(
-          gpsStatus.quality === 'excellent' || gpsStatus.quality === 'good'
-            ? 'strong'
-            : gpsStatus.quality === 'poor'
-            ? 'weak'
-            : 'none'
-        );
-        setGpsAccuracy(lastPoint?.accuracy);
-        setIsBackgroundTracking(false);
-      }
+    metricsUpdateRef.current = setInterval(() => {
+      updateMetrics();
     }, METRICS_UPDATE_INTERVAL_MS);
   };
 
@@ -344,7 +378,7 @@ export const RunningTrackerScreen: React.FC = () => {
   };
 
   const checkForRouteMatch = async () => {
-    const session = await simpleRunTracker.getCurrentSession();
+    const session = simpleRunTracker.getCurrentSession(); // NOW SYNCHRONOUS!
     if (!session || !session.gpsPoints || session.gpsPoints.length < 10) {
       return; // Need at least 10 GPS points to attempt matching
     }
