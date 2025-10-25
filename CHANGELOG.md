@@ -6,6 +6,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6] - 2025-10-24
+
+### Fixed
+- **Android Background GPS Tracking** - Revolutionary fix for GPS tracking when app is backgrounded
+  - **Aggressive Time Intervals**: Running/cycling now use 1-second intervals (down from 3 seconds)
+    - Compensates for Android's aggressive GPS throttling in background
+    - Matches industry standards used by Strava and Nike Run Club
+    - Walking uses 1.5-second intervals for balanced battery usage
+  - **Proper Subscription Management**: Fixed dual subscription conflict
+    - Foreground subscription now STOPS when app backgrounds
+    - Only one location listener active at a time (Android limitation)
+    - Prevents "zombie" subscriptions that blocked background task
+    - Foreground subscription automatically restarts when returning to app
+  - **MAX Priority Notification**: Upgraded foreground service notification
+    - Notification priority: HIGH → MAX
+    - Notification importance: HIGH → MAX
+    - Prevents Android 12+ from killing the service when app is backgrounded
+    - Added `autoDismiss: false` flag for persistent notification
+  - **Enhanced Logging**: Battery optimization warnings and configuration visibility
+    - Warns users if battery optimization is enabled (must be disabled)
+    - Logs time intervals and distance intervals for debugging
+    - Android-specific error guidance with actionable steps
+  - **Real-World Impact**: GPS now continues reliably when users open music apps during workouts
+    - No more frozen distance or lost tracking data
+    - Works for 2+ hour marathon-length workouts
+    - Background task continues updating every 1-5 seconds
+
+### Improved
+- **Profile Loading Performance**: Optimized Nostr profile queries for faster app startup
+  - Enhanced directNostrProfileService with smarter caching
+  - Reduced redundant profile fetches in AuthContext
+  - Faster time-to-interactive on app launch
+- **Competition Service Efficiency**: Improved caching and query optimization
+  - SimpleCompetitionService query performance enhancements
+  - SimpleLeaderboardService caching improvements
+  - Reduced network overhead for competition data
+
+### Technical
+- Version numbers updated across all platforms:
+  - app.json: 0.4.6 (versionCode 37)
+  - android/app/build.gradle: 0.4.6 (versionCode 37)
+  - package.json: 0.4.6
+- Modified files:
+  - `src/services/activity/BackgroundLocationTask.ts` - Time intervals, notification priority, logging
+  - `src/services/activity/SimpleLocationTrackingService.ts` - Subscription management, AppState listener
+  - `src/contexts/AuthContext.tsx` - Profile loading optimization
+  - `src/services/user/directNostrProfileService.ts` - Profile query optimization
+  - `src/services/competition/SimpleCompetitionService.ts` - Competition caching
+  - `src/services/competition/SimpleLeaderboardService.ts` - Leaderboard performance
+
 ## [0.4.5] - 2025-10-24
 
 ### Added
