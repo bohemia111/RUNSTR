@@ -6,6 +6,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2025-10-24
+
+### Added
+- **Individual Lightning Wallet Buttons**: External payment modal now shows 5 specific wallet options
+  - Cash App button with universal link deeplink
+  - Zeus button with custom deeplink (`zeus:lightning=`)
+  - Phoenix button with custom deeplink (`phoenix://pay?invoice=`)
+  - Wallet of Satoshi button with custom deeplink (`walletofsatoshi:lightning=`)
+  - Breez button with custom deeplink (`breez:lightning:`)
+  - Each wallet opens directly in that specific app instead of OS chooser
+  - Install prompts with App Store/Play Store links if wallet not installed
+  - Users can now explicitly choose which Lightning wallet to use
+
+### Fixed
+- **External Wallet Payment Modal Layout**: Fixed QR code and wallet buttons not displaying in external wallet payment flow
+  - Changed modal container from `maxHeight: '85%'` to `height: '85%'` to establish proper flex context
+  - ScrollView with `flex: 1` now properly expands to fill available space between header and footer
+  - Users can now see QR code, copy invoice button, and wallet deeplink buttons
+  - Affects charity donations and team member zapping with external wallets
+- **Wallet Button Layout**: Converted from 2-column grid to full-width vertical stack
+  - Changed from 2 buttons per row to 1 full-width button per row (like iOS standard)
+  - Each wallet button now ~2x wider, easily fitting full wallet names
+  - Increased button size: 80px minHeight (from 100px 2-col), larger padding (22px vertical, 24px horizontal)
+  - Increased icon size: 48x48 circles (from 42x42), 24px icons (from 22px)
+  - Increased font size: 15px (from 11px cramped size)
+  - Added proper spacing: 12px marginBottom between buttons
+  - Left-aligned icons: All icons now align vertically on the left edge (changed justifyContent from 'center' to 'flex-start')
+  - All wallet names display fully: "Cash App", "Zeus", "Phoenix", "Wallet of Satoshi" (full name!), "Breez"
+  - Much easier to tap with bigger touch targets
+  - Cleaner, more professional vertical layout matching iOS design patterns
+
+### Removed
+- **Strike Button**: Removed non-functional Strike deeplink button
+  - Strike uses standard `lightning:` URI scheme, not custom `strike://` scheme
+  - Users with Strike can still pay via standard Lightning invoice or QR code scan
+
+## [0.4.4] - 2025-10-24
+
+### Fixed
+- **Social Post Authentication**: EnhancedSocialShareModal now supports BOTH Amber (Android) and nsec (iOS)
+  - Previously only supported nsec, blocking Amber users on Android
+  - Added UnifiedSigningService integration with nsec fallback for iOS compatibility
+  - iOS users can post kind 1 social workouts with nsec
+  - Android users can post with Amber signer
+- **Background GPS Tracking**: Increased background sync interval from 3 seconds to 10 seconds
+  - Previous 3-second interval triggered Android battery optimization, killing tracker after 3 seconds
+  - New 10-second interval allows tracking to continue for full workout duration (2+ hours)
+  - GPS tracking now continues reliably when app is backgrounded or user switches to music apps
+  - Only the stop button stops tracking - navigation away no longer interrupts workouts
+- **Build System**: Complete cache clearing and APK rebuild
+  - Cleaned Metro bundler cache to ensure all code changes take effect
+  - Cleaned Gradle cache to eliminate stale Android build artifacts
+  - Fresh APK (build 35) includes all previous fixes
+
+### Improved
+- **Tracker Persistence**: GPS service is singleton, continues independently of UI navigation
+  - UI timers pause on navigation (correct behavior)
+  - GPS tracking service continues in background (correct behavior)
+  - AppState listener syncs data when returning to app
+- **Route Selection**: RouteSelectionModal correctly loads routes from RouteStorageService
+  - No code changes needed - already working correctly
+  - Will function properly once new APK is installed
+
+### Technical
+- Version numbers updated across all platforms:
+  - app.json: 0.4.4 (versionCode 35)
+  - android/app/build.gradle: 0.4.4 (versionCode 35)
+  - package.json: 0.4.4
+
 ## [0.4.3] - 2025-10-24
 
 ### Added

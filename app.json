@@ -2,7 +2,7 @@
   "expo": {
     "name": "RUNSTR",
     "slug": "runstr.project",
-    "version": "0.4.3",
+    "version": "0.4.5",
     "orientation": "portrait",
     "icon": "./assets/images/adaptive-icon.png",
     "scheme": "runstr",
@@ -11,7 +11,9 @@
     "ios": {
       "supportsTablet": true,
       "userInterfaceStyle": "dark",
-      "associatedDomains": ["applinks:www.runstr.club"],
+      "associatedDomains": [
+        "applinks:www.runstr.club"
+      ],
       "entitlements": {
         "com.apple.developer.applesignin": [
           "Default",
@@ -30,8 +32,14 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "RUNSTR needs location access to track your running, walking, and cycling activities accurately, even when the app is in the background.",
         "NSLocationWhenInUseUsageDescription": "RUNSTR needs location access to track your running, walking, and cycling activities.",
         "NSLocationAlwaysUsageDescription": "RUNSTR needs location access to continue tracking your workout when the app is in the background.",
-        "BGTaskSchedulerPermittedIdentifiers": ["runstr-background-location"],
-        "UIBackgroundModes": ["location", "fetch", "processing"],
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "runstr-background-location"
+        ],
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "processing"
+        ],
         "UIUserInterfaceStyle": "Dark"
       },
       "bundleIdentifier": "com.anonymous.runstr.project",
@@ -39,28 +47,33 @@
         "image": "./assets/images/splash-icon.png",
         "resizeMode": "contain",
         "backgroundColor": "#000000"
-      }
+      },
+      "appleTeamId": "SF8967F5M9"
     },
     "android": {
-      "versionCode": 34,
+      "versionCode": 36,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
       "permissions": [
-        "ACCESS_BACKGROUND_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "WAKE_LOCK"
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECORD_AUDIO"
       ],
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.runstr.project",
       "intentFilters": [
         {
           "action": "VIEW",
-          "category": ["DEFAULT", "BROWSABLE"],
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ],
           "data": {
             "scheme": "runstrproject",
             "host": "amber-callback"
@@ -69,7 +82,10 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "category": ["DEFAULT", "BROWSABLE"],
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ],
           "data": [
             {
               "scheme": "https",
