@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { theme } from '../../styles/theme';
@@ -19,8 +18,8 @@ import NostrCompetitionParticipantService, {
   JoinRequest,
   CompetitionParticipantList,
 } from '../../services/nostr/NostrCompetitionParticipantService';
-import { getAuthenticationData } from '../../utils/nostrAuth';
-import { nsecToPrivateKey } from '../../utils/nostr';
+import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
+import { CustomAlert } from '../ui/CustomAlert';
 
 interface CompetitionParticipantsSectionProps {
   competitionId: string;
@@ -81,14 +80,12 @@ export const CompetitionParticipantsSection: React.FC<
     setIsProcessing(request.id);
 
     try {
-      // Get authentication data
-      const authData = await getAuthenticationData();
-      if (!authData || !authData.nsec) {
-        Alert.alert('Error', 'Authentication required. Please log in again.');
+      // Get private key hex (supports both nsec and Amber)
+      const privateKeyHex = await UnifiedSigningService.getLegacyPrivateKeyHex();
+      if (!privateKeyHex) {
+        CustomAlert.alert('Error', 'Authentication required. Please log in again.', [{ text: 'OK' }]);
         return;
       }
-
-      const privateKeyHex = nsecToPrivateKey(authData.nsec);
 
       // Approve the participant
       const result = await participantService.approveParticipant(
@@ -98,9 +95,10 @@ export const CompetitionParticipantsSection: React.FC<
       );
 
       if (result.success) {
-        Alert.alert(
+        CustomAlert.alert(
           'Success',
-          `${request.userName || 'User'} has been approved!`
+          `${request.userName || 'User'} has been approved!`,
+          [{ text: 'OK' }]
         );
         // Refresh data
         await loadParticipantData();
@@ -109,7 +107,7 @@ export const CompetitionParticipantsSection: React.FC<
         throw new Error(result.error || 'Failed to approve participant');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to approve participant. Please try again.');
+      CustomAlert.alert('Error', 'Failed to approve participant. Please try again.', [{ text: 'OK' }]);
       console.error('Error approving participant:', error);
     } finally {
       setIsProcessing(null);
@@ -120,14 +118,12 @@ export const CompetitionParticipantsSection: React.FC<
     setIsProcessing(request.id);
 
     try {
-      // Get authentication data
-      const authData = await getAuthenticationData();
-      if (!authData || !authData.nsec) {
-        Alert.alert('Error', 'Authentication required. Please log in again.');
+      // Get private key hex (supports both nsec and Amber)
+      const privateKeyHex = await UnifiedSigningService.getLegacyPrivateKeyHex();
+      if (!privateKeyHex) {
+        CustomAlert.alert('Error', 'Authentication required. Please log in again.', [{ text: 'OK' }]);
         return;
       }
-
-      const privateKeyHex = nsecToPrivateKey(authData.nsec);
 
       // Reject the participant
       const result = await participantService.rejectParticipant(
@@ -137,9 +133,10 @@ export const CompetitionParticipantsSection: React.FC<
       );
 
       if (result.success) {
-        Alert.alert(
+        CustomAlert.alert(
           'Success',
-          `Request from ${request.userName || 'User'} has been rejected.`
+          `Request from ${request.userName || 'User'} has been rejected.`,
+          [{ text: 'OK' }]
         );
         // Refresh data
         await loadParticipantData();
@@ -148,7 +145,7 @@ export const CompetitionParticipantsSection: React.FC<
         throw new Error(result.error || 'Failed to reject participant');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to reject participant. Please try again.');
+      CustomAlert.alert('Error', 'Failed to reject participant. Please try again.', [{ text: 'OK' }]);
       console.error('Error rejecting participant:', error);
     } finally {
       setIsProcessing(null);
@@ -159,7 +156,7 @@ export const CompetitionParticipantsSection: React.FC<
     participantPubkey: string,
     participantName?: string
   ) => {
-    Alert.alert(
+    CustomAlert.alert(
       'Remove Participant',
       `Are you sure you want to remove ${
         participantName || 'this participant'
@@ -173,16 +170,16 @@ export const CompetitionParticipantsSection: React.FC<
             setIsProcessing(participantPubkey);
 
             try {
-              const authData = await getAuthenticationData();
-              if (!authData || !authData.nsec) {
-                Alert.alert(
+              // Get private key hex (supports both nsec and Amber)
+              const privateKeyHex = await UnifiedSigningService.getLegacyPrivateKeyHex();
+              if (!privateKeyHex) {
+                CustomAlert.alert(
                   'Error',
-                  'Authentication required. Please log in again.'
+                  'Authentication required. Please log in again.',
+                  [{ text: 'OK' }]
                 );
                 return;
               }
-
-              const privateKeyHex = nsecToPrivateKey(authData.nsec);
 
               const result = await participantService.removeParticipant(
                 competitionId,
@@ -191,9 +188,10 @@ export const CompetitionParticipantsSection: React.FC<
               );
 
               if (result.success) {
-                Alert.alert(
+                CustomAlert.alert(
                   'Success',
-                  `${participantName || 'Participant'} has been removed.`
+                  `${participantName || 'Participant'} has been removed.`,
+                  [{ text: 'OK' }]
                 );
                 await loadParticipantData();
                 onParticipantUpdate?.();
@@ -201,9 +199,10 @@ export const CompetitionParticipantsSection: React.FC<
                 throw new Error(result.error || 'Failed to remove participant');
               }
             } catch (error) {
-              Alert.alert(
+              CustomAlert.alert(
                 'Error',
-                'Failed to remove participant. Please try again.'
+                'Failed to remove participant. Please try again.',
+                [{ text: 'OK' }]
               );
               console.error('Error removing participant:', error);
             } finally {

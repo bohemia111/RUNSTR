@@ -5,19 +5,19 @@
  * Service coordinates Nostr join requests with payment proof
  */
 
-import { Alert } from 'react-native';
 import eventJoinRequestService, {
   EventJoinRequestData,
 } from '../events/EventJoinRequestService';
-import { NostrProtocolHandler } from '../nostr/NostrProtocolHandler';
-import { nostrRelayManager } from '../nostr/NostrRelayManager';
-import { getAuthenticationData } from '../../utils/nostrAuth';
+import { GlobalNDKService } from '../nostr/GlobalNDKService';
+import { UnifiedSigningService } from '../auth/UnifiedSigningService';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import {
   validateInvoiceAmount,
   isInvoiceExpired,
 } from '../../utils/bolt11Parser';
 import type { QREventData } from './QREventService';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { CustomAlert } from '../../components/ui/CustomAlert';
 
 export interface EventJoinResult {
   success: boolean;
@@ -45,13 +45,19 @@ export class EventJoinService {
    * Join a free event (send join request only)
    */
   public async joinFreeEvent(eventData: QREventData): Promise<EventJoinResult> {
+    let alertVisible = false;
     try {
       console.log(`📝 Joining free event: ${eventData.event_name}`);
 
-      // Get user authentication data
-      const authData = await getAuthenticationData();
-      if (!authData?.nsec || !authData?.hexPubkey) {
-        throw new Error('Cannot access user credentials for signing');
+      // Get signer (supports both nsec and Amber)
+      const signer = await UnifiedSigningService.getSigner();
+      if (!signer) {
+        throw new Error('Authentication required to join event');
+      }
+
+      const userHexPubkey = await UnifiedSigningService.getHexPubkey();
+      if (!userHexPubkey) {
+        throw new Error('Could not determine user public key');
       }
 
       // Prepare join request data
@@ -66,29 +72,24 @@ export class EventJoinService {
       // Create event template
       const eventTemplate = eventJoinRequestService.prepareEventJoinRequest(
         requestData,
-        authData.hexPubkey
+        userHexPubkey
       );
 
       // Sign and publish event
-      const protocolHandler = new NostrProtocolHandler();
-      const signedEvent = await protocolHandler.signEvent(
-        eventTemplate as any,
-        authData.nsec
-      );
-      const publishResult = await nostrRelayManager.publishEvent(signedEvent);
-
-      if (publishResult.successful.length === 0) {
-        throw new Error('Failed to publish join request');
-      }
+      const ndk = await GlobalNDKService.getInstance();
+      const ndkEvent = new NDKEvent(ndk, eventTemplate);
+      await ndkEvent.sign(signer);
+      await ndkEvent.publish();
 
       console.log(
         `✅ Free event join request sent for: ${eventData.event_name}`
       );
 
-      Alert.alert(
+      alertVisible = true;
+      CustomAlert.alert(
         'Request Sent!',
         `Your join request has been sent to the captain. You'll be notified when approved.`,
-        [{ text: 'OK' }]
+        [{ text: 'OK', onPress: () => { alertVisible = false; } }]
       );
 
       return {
@@ -100,7 +101,9 @@ export class EventJoinService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
 
-      Alert.alert('Join Failed', errorMessage, [{ text: 'OK' }]);
+      if (!alertVisible) {
+        CustomAlert.alert('Join Failed', errorMessage, [{ text: 'OK' }]);
+      }
 
       return {
         success: false,
@@ -176,6 +179,7 @@ export class EventJoinService {
     eventData: QREventData,
     paymentInvoice: string
   ): Promise<EventJoinResult> {
+    let alertVisible = false;
     try {
       console.log(
         `📝 Submitting paid join request for: ${eventData.event_name}`
@@ -207,9 +211,15 @@ export class EventJoinService {
 
       console.log('✅ Invoice expiration check passed');
 
-      const authData = await getAuthenticationData();
-      if (!authData?.nsec || !authData?.hexPubkey) {
-        throw new Error('Cannot access user credentials for signing');
+      // Get signer (supports both nsec and Amber)
+      const signer = await UnifiedSigningService.getSigner();
+      if (!signer) {
+        throw new Error('Authentication required to join event');
+      }
+
+      const userHexPubkey = await UnifiedSigningService.getHexPubkey();
+      if (!userHexPubkey) {
+        throw new Error('Could not determine user public key');
       }
 
       // Prepare join request with payment proof
@@ -224,7 +234,7 @@ export class EventJoinService {
       // Create event template
       const eventTemplate = eventJoinRequestService.prepareEventJoinRequest(
         requestData,
-        authData.hexPubkey
+        userHexPubkey
       );
 
       // Add payment proof tags
@@ -238,23 +248,18 @@ export class EventJoinService {
       }
 
       // Sign and publish event
-      const protocolHandler = new NostrProtocolHandler();
-      const signedEvent = await protocolHandler.signEvent(
-        eventTemplate as any,
-        authData.nsec
-      );
-      const publishResult = await nostrRelayManager.publishEvent(signedEvent);
-
-      if (publishResult.successful.length === 0) {
-        throw new Error('Failed to publish join request');
-      }
+      const ndk = await GlobalNDKService.getInstance();
+      const ndkEvent = new NDKEvent(ndk, eventTemplate);
+      await ndkEvent.sign(signer);
+      await ndkEvent.publish();
 
       console.log(`✅ Paid join request sent for: ${eventData.event_name}`);
 
-      Alert.alert(
+      alertVisible = true;
+      CustomAlert.alert(
         'Request Sent!',
         `Your payment and join request have been sent to the captain. You'll be notified when approved.`,
-        [{ text: 'OK' }]
+        [{ text: 'OK', onPress: () => { alertVisible = false; } }]
       );
 
       return {
@@ -266,7 +271,9 @@ export class EventJoinService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
 
-      Alert.alert('Request Failed', errorMessage, [{ text: 'OK' }]);
+      if (!alertVisible) {
+        CustomAlert.alert('Request Failed', errorMessage, [{ text: 'OK' }]);
+      }
 
       return {
         success: false,

@@ -48,9 +48,9 @@ import { getUserNostrIdentifiers } from '../utils/nostr';
 import type { QRData } from '../services/qr/QRCodeService';
 import JoinRequestService from '../services/competition/JoinRequestService';
 import { EventJoinRequestService } from '../services/events/EventJoinRequestService';
-import { getAuthenticationData } from '../utils/nostrAuth';
-import { nsecToPrivateKey } from '../utils/nostr';
-import { NDKPrivateKeySigner, NDKEvent } from '@nostr-dev-kit/ndk';
+import { UnifiedSigningService } from '../services/auth/UnifiedSigningService';
+import { GlobalNDKService } from '../services/nostr/GlobalNDKService';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { Alert } from 'react-native';
 
 interface ProfileScreenProps {
@@ -340,9 +340,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         Alert.alert('Success', 'Challenge acceptance request sent!');
       } else if (qrData.type === 'event') {
         // Handle event join using EventJoinRequestService (kind 1105)
-        const authData = await getAuthenticationData();
-        if (!authData?.nsec) {
+        const signer = await UnifiedSigningService.getSigner();
+        if (!signer) {
           Alert.alert('Error', 'Authentication required to join events');
+          return;
+        }
+
+        const userHexPubkey = await UnifiedSigningService.getHexPubkey();
+        if (!userHexPubkey) {
+          Alert.alert('Error', 'Could not determine user public key');
           return;
         }
 
@@ -359,14 +365,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         const eventTemplate = eventJoinService.prepareEventJoinRequest(
           requestData,
-          authData.hexPubkey
+          userHexPubkey
         );
 
-        // Sign and publish the event join request
-        const g = globalThis as any;
-        const ndk = g.__RUNSTR_NDK_INSTANCE__;
-        const privateKeyHex = nsecToPrivateKey(authData.nsec);
-        const signer = new NDKPrivateKeySigner(privateKeyHex);
+        // Sign and publish the event join request using UnifiedSigningService
+        const ndk = await GlobalNDKService.getInstance();
         const ndkEvent = new NDKEvent(ndk, eventTemplate);
         await ndkEvent.sign(signer);
         await ndkEvent.publish();

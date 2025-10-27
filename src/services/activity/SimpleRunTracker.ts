@@ -50,6 +50,7 @@ export interface RunSession {
   pausedDuration: number; // seconds
   pauseCount: number;
   gpsPoints: GPSPoint[];
+  presetDistance?: number; // Optional race preset distance in meters
 }
 
 interface SessionState {
@@ -59,6 +60,7 @@ interface SessionState {
   isPaused: boolean;
   startTime: number;
   pauseCount: number;
+  presetDistance?: number; // Optional race preset distance in meters
   // SimpleDurationTracker state (for session recovery)
   trackerStartTime: number;
   trackerTotalPausedTime: number;
@@ -190,6 +192,7 @@ export class SimpleRunTracker {
   private isTracking = false;
   private isPaused = false;
   private pauseCount = 0;
+  private presetDistance: number | null = null; // Race preset distance in meters
 
   // Duration tracker (simple Date.now() calculation)
   private durationTracker = new SimpleDurationTracker();
@@ -200,6 +203,9 @@ export class SimpleRunTracker {
   // In-memory GPS points cache (synced from AsyncStorage)
   // This prevents async reads on every UI update (fixes duration bug)
   private cachedGpsPoints: GPSPoint[] = [];
+
+  // Auto-stop callback (for UI notification when preset distance reached)
+  private autoStopCallback: (() => void) | null = null;
 
   private constructor() {
     console.log('[SimpleRunTracker] Initialized');
@@ -215,8 +221,13 @@ export class SimpleRunTracker {
   /**
    * Start tracking - INSTANT UI RESPONSE (like reference implementation)
    * Sets state immediately, GPS initializes in background
+   * @param activityType - Type of activity (running, walking, cycling)
+   * @param presetDistance - Optional race preset distance in meters (for auto-stop)
    */
-  async startTracking(activityType: 'running' | 'walking' | 'cycling'): Promise<boolean> {
+  async startTracking(
+    activityType: 'running' | 'walking' | 'cycling',
+    presetDistance?: number
+  ): Promise<boolean> {
     // INSTANT: Set state immediately (no await blocking)
     this.sessionId = `run_${Date.now()}`;
     this.activityType = activityType;
@@ -224,11 +235,15 @@ export class SimpleRunTracker {
     this.isTracking = true;
     this.isPaused = false;
     this.pauseCount = 0;
+    this.presetDistance = presetDistance || null;
     this.cachedGpsPoints = []; // Clear cache immediately
 
     // INSTANT: Start timer immediately (user sees 1, 2, 3... right away!)
     this.durationTracker.start(this.startTime);
     console.log('[SimpleRunTracker] ⏱️ INSTANT START - Stopwatch counting 1, 2, 3, 4, 5...');
+    if (presetDistance) {
+      console.log(`[SimpleRunTracker] 🎯 Preset distance: ${(presetDistance / 1000).toFixed(2)} km`);
+    }
 
     // Background tasks (don't block UI)
     this.initializeGPS(activityType).catch(error => {
@@ -362,12 +377,15 @@ export class SimpleRunTracker {
       pausedDuration: this.durationTracker.getTotalPausedTime(),
       pauseCount: this.pauseCount,
       gpsPoints: this.cachedGpsPoints,
+      presetDistance: this.presetDistance || undefined,
     };
 
     // Reset state
     this.isTracking = false;
     this.isPaused = false;
     this.sessionId = null;
+    this.presetDistance = null;
+    this.autoStopCallback = null;
 
     // Clear session state
     await AsyncStorage.removeItem(SESSION_STATE_KEY);
@@ -399,6 +417,7 @@ export class SimpleRunTracker {
       pausedDuration: this.durationTracker.getTotalPausedTime(),
       pauseCount: this.pauseCount,
       gpsPoints: this.cachedGpsPoints.slice(-100), // Last 100 points for route display
+      presetDistance: this.presetDistance || undefined,
     };
   }
 
@@ -415,6 +434,41 @@ export class SimpleRunTracker {
     } catch (error) {
       console.error('[SimpleRunTracker] Error syncing GPS points:', error);
     }
+  }
+
+  /**
+   * Set callback for auto-stop when preset distance is reached
+   * @param callback - Function to call when auto-stop is triggered
+   */
+  setAutoStopCallback(callback: () => void): void {
+    this.autoStopCallback = callback;
+  }
+
+  /**
+   * Check if auto-stop should be triggered (preset distance reached)
+   * @returns true if auto-stop was triggered
+   */
+  private checkAutoStop(): boolean {
+    if (!this.presetDistance || !this.isTracking) {
+      return false;
+    }
+
+    const currentDistance = this.calculateTotalDistance(this.cachedGpsPoints);
+
+    if (currentDistance >= this.presetDistance) {
+      console.log(
+        `[SimpleRunTracker] 🎯 AUTO-STOP: Reached preset distance ${(this.presetDistance / 1000).toFixed(2)} km`
+      );
+
+      // Trigger callback if set (UI will call stopTracking)
+      if (this.autoStopCallback) {
+        this.autoStopCallback();
+      }
+
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -437,6 +491,9 @@ export class SimpleRunTracker {
     if (this.cachedGpsPoints.length > 10000) {
       this.cachedGpsPoints = this.cachedGpsPoints.slice(-10000);
     }
+
+    // Check for auto-stop (preset distance reached)
+    this.checkAutoStop();
 
     // DO NOT update duration - timer runs independently like a stopwatch!
     // GPS is ONLY for distance calculation
@@ -525,6 +582,7 @@ export class SimpleRunTracker {
         isPaused: this.isPaused,
         startTime: this.startTime,
         pauseCount: this.pauseCount,
+        presetDistance: this.presetDistance || undefined,
         // Include tracker state for session recovery
         trackerStartTime: trackerState.startTime,
         trackerTotalPausedTime: trackerState.totalPausedTime,
@@ -581,6 +639,7 @@ export class SimpleRunTracker {
       this.isPaused = sessionState.isPaused;
       this.startTime = sessionState.startTime;
       this.pauseCount = sessionState.pauseCount;
+      this.presetDistance = sessionState.presetDistance || null;
 
       // Restore duration tracker state
       this.durationTracker.restoreState({
@@ -594,6 +653,9 @@ export class SimpleRunTracker {
       await this.syncGpsPointsFromStorage();
 
       console.log(`[SimpleRunTracker] ✅ Session restored: ${sessionState.sessionId}`);
+      if (this.presetDistance) {
+        console.log(`[SimpleRunTracker] 🎯 Restored preset distance: ${(this.presetDistance / 1000).toFixed(2)} km`);
+      }
       return true;
     } catch (error) {
       console.error('[SimpleRunTracker] Error restoring session:', error);

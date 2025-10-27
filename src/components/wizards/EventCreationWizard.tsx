@@ -1,6 +1,6 @@
 /**
- * EventCreationWizard - Single-day event creation with cascading dropdowns
- * Activity Type → Competition Type → Date Selection → Additional Settings
+ * EventCreationWizard - Preset-based event creation (2-step flow)
+ * Step 1: Select Preset → Step 2: Date + Prize Pool + Entry Fee
  */
 
 import React, { useState, useEffect } from 'react';
@@ -11,16 +11,13 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  Switch,
-  Alert,
 } from 'react-native';
 import { theme } from '../../styles/theme';
 import { WizardStepContainer, WizardStep } from './WizardStepContainer';
+import { CustomAlert } from '../ui/CustomAlert';
 import { NostrCompetitionService } from '../../services/nostr/NostrCompetitionService';
 import { NostrListService } from '../../services/nostr/NostrListService';
-import { npubToHex } from '../../utils/ndkConversion';
 import { useUserStore } from '../../store/userStore';
-import { getAuthenticationData } from '../../utils/nostrAuth';
 import { DirectNostrProfileService } from '../../services/user/directNostrProfileService';
 import UnifiedSigningService from '../../services/auth/UnifiedSigningService';
 import { GlobalNDKService } from '../../services/nostr/GlobalNDKService';
@@ -33,55 +30,154 @@ import { getCharityById } from '../../constants/charities';
 import nostrTeamService from '../../services/nostr/NostrTeamService';
 import { ProfileService } from '../../services/user/profileService';
 
-// Activity types and their specific competition options
-const ACTIVITY_COMPETITION_MAP = {
-  Running: [
-    '5K Race',
-    '10K Race',
-    'Half Marathon',
-    'Marathon',
-    'Distance Challenge',
-    'Speed Challenge',
-    'Duration Challenge',
-    'Consistency Streak',
-  ],
-  Walking: [
-    'Step Count',
-    'Distance Challenge',
-    'Duration Challenge',
-    'Consistency Streak',
-  ],
-  Cycling: [
-    'Distance Challenge',
-    'Speed Challenge',
-    'Duration Challenge',
-    'Elevation Gain',
-  ],
-  'Strength Training': [
-    'Workout Count',
-    'Duration Challenge',
-    'Personal Records',
-    'Consistency Streak',
-  ],
-  Meditation: [
-    'Duration Challenge',
-    'Session Count',
-    'Consistency Streak',
-    'Mindfulness Points',
-  ],
-  Yoga: [
-    'Duration Challenge',
-    'Session Count',
-    'Pose Mastery',
-    'Consistency Streak',
-  ],
-  Diet: ['Calorie Tracking', 'Macro Goals', 'Meal Logging', 'Nutrition Score'],
-} as const;
+// Event Preset Interface
+interface EventPreset {
+  id: string;
+  name: string;
+  category: 'Running' | 'Strength' | 'Diet' | 'Meditation';
+  activityType: NostrActivityType;
+  competitionType: NostrEventCompetitionType;
+  targetValue?: number;
+  targetUnit?: string;
+  description: string;
+}
+
+// 11 Event Presets
+const EVENT_PRESETS: EventPreset[] = [
+  // Running (4 presets)
+  {
+    id: '5k',
+    name: '5K Race',
+    category: 'Running',
+    activityType: 'Running',
+    competitionType: '5K Race',
+    targetValue: 5,
+    targetUnit: 'km',
+    description: '5 kilometers (3.1 miles)',
+  },
+  {
+    id: '10k',
+    name: '10K Race',
+    category: 'Running',
+    activityType: 'Running',
+    competitionType: '10K Race',
+    targetValue: 10,
+    targetUnit: 'km',
+    description: '10 kilometers (6.2 miles)',
+  },
+  {
+    id: 'half-marathon',
+    name: 'Half Marathon',
+    category: 'Running',
+    activityType: 'Running',
+    competitionType: 'Half Marathon',
+    targetValue: 21.1,
+    targetUnit: 'km',
+    description: '21.1 kilometers (13.1 miles)',
+  },
+  {
+    id: 'marathon',
+    name: 'Marathon',
+    category: 'Running',
+    activityType: 'Running',
+    competitionType: 'Marathon',
+    targetValue: 42.2,
+    targetUnit: 'km',
+    description: '42.2 kilometers (26.2 miles)',
+  },
+
+  // Strength (3 presets)
+  {
+    id: 'pushups-100',
+    name: '100 Push-ups',
+    category: 'Strength',
+    activityType: 'Strength Training',
+    competitionType: 'Workout Count',
+    targetValue: 100,
+    targetUnit: 'reps',
+    description: 'Complete 100 push-ups',
+  },
+  {
+    id: 'pullups-50',
+    name: '50 Pull-ups',
+    category: 'Strength',
+    activityType: 'Strength Training',
+    competitionType: 'Workout Count',
+    targetValue: 50,
+    targetUnit: 'reps',
+    description: 'Complete 50 pull-ups',
+  },
+  {
+    id: 'situps-100',
+    name: '100 Sit-ups',
+    category: 'Strength',
+    activityType: 'Strength Training',
+    competitionType: 'Workout Count',
+    targetValue: 100,
+    targetUnit: 'reps',
+    description: 'Complete 100 sit-ups',
+  },
+
+  // Diet (3 presets)
+  {
+    id: 'carnivore-1d',
+    name: 'Carnivore Challenge',
+    category: 'Diet',
+    activityType: 'Diet',
+    competitionType: 'Meal Logging',
+    targetValue: 1,
+    targetUnit: 'day',
+    description: '1 day carnivore diet',
+  },
+  {
+    id: 'fast-24hr',
+    name: '24hr Fast',
+    category: 'Diet',
+    activityType: 'Diet',
+    competitionType: 'Nutrition Score',
+    targetValue: 24,
+    targetUnit: 'hours',
+    description: '24 hour water fast',
+  },
+  {
+    id: 'fast-12hr',
+    name: '12hr Fast',
+    category: 'Diet',
+    activityType: 'Diet',
+    competitionType: 'Nutrition Score',
+    targetValue: 12,
+    targetUnit: 'hours',
+    description: '12 hour intermittent fast',
+  },
+
+  // Meditation (2 presets)
+  {
+    id: 'meditation-30min',
+    name: '30min Meditation',
+    category: 'Meditation',
+    activityType: 'Meditation',
+    competitionType: 'Duration Challenge',
+    targetValue: 30,
+    targetUnit: 'minutes',
+    description: '30 minute meditation session',
+  },
+  {
+    id: 'meditation-1hr',
+    name: '1hr Meditation',
+    category: 'Meditation',
+    activityType: 'Meditation',
+    competitionType: 'Duration Challenge',
+    targetValue: 60,
+    targetUnit: 'minutes',
+    description: '1 hour meditation session',
+  },
+];
 
 type ActivityType = NostrActivityType;
 type CompetitionType = NostrEventCompetitionType;
 
 interface EventData {
+  selectedPreset: EventPreset | null;
   activityType: ActivityType | null;
   competitionType: CompetitionType | null;
   eventDate: Date | null;
@@ -92,9 +188,9 @@ interface EventData {
   description: string;
   targetValue?: number;
   targetUnit?: string;
-  prizePoolSats: number | undefined; // Prize pool amount in sats
-  lightningAddress?: string; // Lightning address for receiving payments
-  paymentDestination: 'captain' | 'charity'; // Where entry fees go
+  prizePoolSats: number | undefined;
+  lightningAddress?: string;
+  paymentDestination: 'captain' | 'charity';
 }
 
 interface EventCreationWizardProps {
@@ -119,6 +215,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
   const [captainLightningAddress, setCaptainLightningAddress] =
     useState<string>('');
   const [eventData, setEventData] = useState<EventData>({
+    selectedPreset: null,
     activityType: null,
     competitionType: null,
     eventDate: null,
@@ -132,11 +229,20 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
     paymentDestination: 'captain',
   });
 
+  // Alert state for CustomAlert
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<
+    Array<{ text: string; onPress?: () => void }>
+  >([]);
+
   // Reset wizard when opened and fetch team/captain data
   useEffect(() => {
     if (visible) {
       setCurrentStep(0);
       setEventData({
+        selectedPreset: null,
         activityType: null,
         competitionType: null,
         eventDate: null,
@@ -160,7 +266,6 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
       ProfileService.getUserProfile(captainPubkey).then((profile) => {
         if (profile?.lud16) {
           setCaptainLightningAddress(profile.lud16);
-          // Set as default if captain has Lightning address
           setEventData((prev) => ({
             ...prev,
             lightningAddress: profile.lud16,
@@ -170,27 +275,17 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
     }
   }, [visible, teamId, captainPubkey]);
 
-  // Wizard steps configuration
+  // Wizard steps configuration (2 steps only)
   const steps: WizardStep[] = [
     {
-      id: 'activity',
-      title: 'Choose Activity Type',
-      isValid: !!eventData.activityType,
-    },
-    {
-      id: 'competition',
-      title: 'Select Competition Type',
-      isValid: !!eventData.competitionType,
-    },
-    {
-      id: 'date',
-      title: 'Set Event Date',
-      isValid: !!eventData.eventDate,
+      id: 'preset',
+      title: 'Choose Event Type',
+      isValid: !!eventData.selectedPreset,
     },
     {
       id: 'settings',
-      title: 'Additional Settings',
-      isValid: eventData.eventName.length > 0,
+      title: 'Event Details',
+      isValid: eventData.eventName.length > 0 && !!eventData.eventDate,
     },
   ];
 
@@ -216,7 +311,10 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
       try {
         currentUser = await DirectNostrProfileService.getCurrentUserProfile();
         if (!currentUser) {
-          Alert.alert('Error', 'User not found. Please log in again.');
+          setAlertTitle('Error');
+          setAlertMessage('User not found. Please log in again.');
+          setAlertButtons([{ text: 'OK' }]);
+          setAlertVisible(true);
           return;
         }
       } catch (error) {
@@ -224,7 +322,10 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
           'Failed to get user from DirectNostrProfileService:',
           error
         );
-        Alert.alert('Error', 'User not found. Please log in again.');
+        setAlertTitle('Error');
+        setAlertMessage('User not found. Please log in again.');
+        setAlertButtons([{ text: 'OK' }]);
+        setAlertVisible(true);
         return;
       }
     }
@@ -232,51 +333,36 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
     setIsCreating(true);
 
     try {
-      console.log('🎯 Creating event with Nostr Competition Service');
+      console.log('🎯 Creating preset event with Nostr Competition Service');
 
       // Check for existing active events before proceeding
       const activeCompetitions =
         await NostrCompetitionService.checkActiveCompetitions(teamId);
 
       if (activeCompetitions.activeEvents > 0) {
-        Alert.alert(
-          'Active Event Exists',
-          `Your team already has an active event: "${activeCompetitions.activeEventDetails?.name}"\n\nIt is scheduled for ${activeCompetitions.activeEventDetails?.eventDate}.\n\nOnly one event can be active at a time.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => setIsCreating(false),
-            },
-          ]
+        setAlertTitle('Active Event Exists');
+        setAlertMessage(
+          `Your team already has an active event: "${activeCompetitions.activeEventDetails?.name}"\n\nIt is scheduled for ${activeCompetitions.activeEventDetails?.eventDate}.\n\nOnly one event can be active at a time.`
         );
+        setAlertButtons([{ text: 'OK', onPress: () => setIsCreating(false) }]);
+        setAlertVisible(true);
         return;
       }
 
-      // Get authentication data from unified auth system
-      const authData = await getAuthenticationData();
-      if (!authData || !authData.nsec) {
-        Alert.alert(
-          'Authentication Required',
-          'Please log in again to create competitions.',
-          [{ text: 'OK' }]
-        );
-        setIsCreating(false);
-        return;
-      }
-
-      console.log(
-        '✅ Retrieved auth data for:',
-        authData.npub.slice(0, 20) + '...'
-      );
-
-      // Get signer (works for both nsec and Amber)
+      // Get signer using UnifiedSigningService (handles both nsec and Amber)
       const signingService = UnifiedSigningService.getInstance();
       const signer = await signingService.getSigner();
+
       if (!signer) {
-        Alert.alert('Error', 'No authentication found. Please login first.');
+        setAlertTitle('Authentication Required');
+        setAlertMessage('Unable to sign event. Please ensure you are logged in.');
+        setAlertButtons([{ text: 'OK' }]);
+        setAlertVisible(true);
         setIsCreating(false);
         return;
       }
+
+      console.log('✅ Signer ready for event creation');
 
       // Prepare event data for Nostr
       const eventCreationData = {
@@ -323,8 +409,8 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
             );
             const listService = NostrListService.getInstance();
 
-            // Get captain's hex pubkey from npub
-            const captainHexPubkey = npubToHex(authData.npub);
+            // Get captain's hex pubkey from signer
+            const captainHexPubkey = captainPubkey; // Already provided as prop
 
             // Prepare empty participant list (kind 30000)
             const participantListData = {
@@ -375,7 +461,9 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
           ? `Event "${eventData.eventName}" has been created, but participant list creation failed.\n\n⚠️ ${participantListError}\n\nYou may need to create the participant list manually from the Captain Dashboard.`
           : `Event "${eventData.eventName}" has been created and published to Nostr relays.`;
 
-        Alert.alert('Success!', successMessage, [
+        setAlertTitle('Success!');
+        setAlertMessage(successMessage);
+        setAlertButtons([
           {
             text: 'OK',
             onPress: () => {
@@ -384,37 +472,36 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
             },
           },
         ]);
+        setAlertVisible(true);
       } else {
         throw new Error(result.message || 'Failed to create event');
       }
     } catch (error) {
       console.error('❌ Failed to create event:', error);
-      Alert.alert(
-        'Error',
+      setAlertTitle('Error');
+      setAlertMessage(
         `Failed to create event: ${
           error instanceof Error ? error.message : 'Unknown error'
-        }`,
-        [{ text: 'OK' }]
+        }`
       );
+      setAlertButtons([{ text: 'OK' }]);
+      setAlertVisible(true);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const selectActivityType = (activity: ActivityType) => {
+  const selectPreset = (preset: EventPreset) => {
     setEventData((prev) => ({
       ...prev,
-      activityType: activity,
-      competitionType: null, // Reset competition type when activity changes
+      selectedPreset: preset,
+      activityType: preset.activityType,
+      competitionType: preset.competitionType,
+      targetValue: preset.targetValue,
+      targetUnit: preset.targetUnit,
+      eventName: preset.name,
+      description: preset.description,
     }));
-  };
-
-  const selectCompetitionType = (competition: CompetitionType) => {
-    setEventData((prev) => ({ ...prev, competitionType: competition }));
-  };
-
-  const setEventDate = (date: Date) => {
-    setEventData((prev) => ({ ...prev, eventDate: date }));
   };
 
   const updateSettings = (field: keyof EventData, value: any) => {
@@ -428,14 +515,11 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
-    // Fix weekend calculation - if today is weekend, use today
     const thisWeekend = new Date(today);
     const currentDay = today.getDay();
     if (currentDay === 0 || currentDay === 6) {
-      // Today is Sunday (0) or Saturday (6)
-      // Keep it as today
+      // Today is weekend
     } else {
-      // Calculate days until Saturday
       const daysUntilSaturday = 6 - currentDay;
       thisWeekend.setDate(today.getDate() + daysUntilSaturday);
     }
@@ -459,472 +543,324 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 0: // Activity Type Selection
+      case 0: // Preset Selection
         return (
           <ScrollView
             style={styles.stepContent}
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.stepDescription}>
-              Choose the primary activity type for this event
+              Choose a preset event to get started quickly
             </Text>
-            <View style={styles.optionsGrid}>
-              {Object.keys(ACTIVITY_COMPETITION_MAP).map((activity) => (
-                <TouchableOpacity
-                  key={activity}
-                  style={[
-                    styles.optionCard,
-                    eventData.activityType === activity &&
-                      styles.optionCardSelected,
-                  ]}
-                  onPress={() => selectActivityType(activity as ActivityType)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.optionCardText,
-                      eventData.activityType === activity &&
-                        styles.optionCardTextSelected,
-                    ]}
-                  >
-                    {activity}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        );
 
-      case 1: // Competition Type Selection
-        if (!eventData.activityType) return null;
-        const competitionOptions =
-          ACTIVITY_COMPETITION_MAP[eventData.activityType];
-
-        return (
-          <ScrollView
-            style={styles.stepContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.stepDescription}>
-              Select the competition format for {eventData.activityType}
-            </Text>
-            <View style={styles.optionsList}>
-              {competitionOptions.map((competition) => {
-                // Add descriptions for race types
-                let description = '';
-                if (competition === '5K Race')
-                  description = '5 kilometers (3.1 miles) - Fastest time wins';
-                if (competition === '10K Race')
-                  description = '10 kilometers (6.2 miles) - Fastest time wins';
-                if (competition === 'Half Marathon')
-                  description =
-                    '21.1 kilometers (13.1 miles) - Fastest time wins';
-                if (competition === 'Marathon')
-                  description =
-                    '42.2 kilometers (26.2 miles) - Fastest time wins';
-
-                return (
+            {/* Running Category */}
+            <Text style={styles.categoryTitle}>Running</Text>
+            <View style={styles.presetsGrid}>
+              {EVENT_PRESETS.filter((p) => p.category === 'Running').map(
+                (preset) => (
                   <TouchableOpacity
-                    key={competition}
+                    key={preset.id}
                     style={[
-                      styles.competitionOption,
-                      eventData.competitionType === competition &&
-                        styles.competitionOptionSelected,
+                      styles.presetCard,
+                      eventData.selectedPreset?.id === preset.id &&
+                        styles.presetCardSelected,
                     ]}
-                    onPress={() => {
-                      selectCompetitionType(competition);
-                      // Auto-set target values for standard races
-                      if (competition === '5K Race') {
-                        updateSettings('targetValue', 5);
-                        updateSettings('targetUnit', 'km');
-                      } else if (competition === '10K Race') {
-                        updateSettings('targetValue', 10);
-                        updateSettings('targetUnit', 'km');
-                      } else if (competition === 'Half Marathon') {
-                        updateSettings('targetValue', 21.1);
-                        updateSettings('targetUnit', 'km');
-                      } else if (competition === 'Marathon') {
-                        updateSettings('targetValue', 42.2);
-                        updateSettings('targetUnit', 'km');
-                      }
-                    }}
+                    onPress={() => selectPreset(preset)}
                     activeOpacity={0.7}
                   >
-                    <View>
-                      <Text
-                        style={[
-                          styles.competitionOptionText,
-                          eventData.competitionType === competition &&
-                            styles.competitionOptionTextSelected,
-                        ]}
-                      >
-                        {competition}
-                      </Text>
-                      {description ? (
-                        <Text style={styles.competitionOptionDescription}>
-                          {description}
-                        </Text>
-                      ) : null}
-                    </View>
+                    <Text
+                      style={[
+                        styles.presetName,
+                        eventData.selectedPreset?.id === preset.id &&
+                          styles.presetNameSelected,
+                      ]}
+                    >
+                      {preset.name}
+                    </Text>
+                    <Text style={styles.presetDescription}>
+                      {preset.description}
+                    </Text>
                   </TouchableOpacity>
-                );
-              })}
+                )
+              )}
+            </View>
+
+            {/* Strength Category */}
+            <Text style={styles.categoryTitle}>Strength</Text>
+            <View style={styles.presetsGrid}>
+              {EVENT_PRESETS.filter((p) => p.category === 'Strength').map(
+                (preset) => (
+                  <TouchableOpacity
+                    key={preset.id}
+                    style={[
+                      styles.presetCard,
+                      eventData.selectedPreset?.id === preset.id &&
+                        styles.presetCardSelected,
+                    ]}
+                    onPress={() => selectPreset(preset)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.presetName,
+                        eventData.selectedPreset?.id === preset.id &&
+                          styles.presetNameSelected,
+                      ]}
+                    >
+                      {preset.name}
+                    </Text>
+                    <Text style={styles.presetDescription}>
+                      {preset.description}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </View>
+
+            {/* Diet Category */}
+            <Text style={styles.categoryTitle}>Diet</Text>
+            <View style={styles.presetsGrid}>
+              {EVENT_PRESETS.filter((p) => p.category === 'Diet').map(
+                (preset) => (
+                  <TouchableOpacity
+                    key={preset.id}
+                    style={[
+                      styles.presetCard,
+                      eventData.selectedPreset?.id === preset.id &&
+                        styles.presetCardSelected,
+                    ]}
+                    onPress={() => selectPreset(preset)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.presetName,
+                        eventData.selectedPreset?.id === preset.id &&
+                          styles.presetNameSelected,
+                      ]}
+                    >
+                      {preset.name}
+                    </Text>
+                    <Text style={styles.presetDescription}>
+                      {preset.description}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </View>
+
+            {/* Meditation Category */}
+            <Text style={styles.categoryTitle}>Meditation</Text>
+            <View style={styles.presetsGrid}>
+              {EVENT_PRESETS.filter((p) => p.category === 'Meditation').map(
+                (preset) => (
+                  <TouchableOpacity
+                    key={preset.id}
+                    style={[
+                      styles.presetCard,
+                      eventData.selectedPreset?.id === preset.id &&
+                        styles.presetCardSelected,
+                    ]}
+                    onPress={() => selectPreset(preset)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.presetName,
+                        eventData.selectedPreset?.id === preset.id &&
+                          styles.presetNameSelected,
+                      ]}
+                    >
+                      {preset.name}
+                    </Text>
+                    <Text style={styles.presetDescription}>
+                      {preset.description}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
             </View>
           </ScrollView>
         );
 
-      case 2: // Date Selection
+      case 1: // Settings (Date + Prize Pool + Entry Fee)
         return (
           <ScrollView
             style={styles.stepContent}
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.stepDescription}>
-              When should this event take place?
+              Configure your {eventData.selectedPreset?.name} event
             </Text>
 
-            <Text style={styles.sectionTitle}>Quick Options</Text>
-            <View style={styles.quickDateOptions}>
-              {getQuickDateOptions().map((option, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.quickDateOption,
-                    eventData.eventDate?.toDateString() ===
-                      option.date.toDateString() &&
-                      styles.quickDateOptionSelected,
-                  ]}
-                  onPress={() => setEventDate(option.date)}
-                  activeOpacity={0.7}
-                >
-                  <Text
+            {/* Event Name */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Event Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={eventData.eventName}
+                onChangeText={(text) => updateSettings('eventName', text)}
+                placeholder="Enter event name"
+                placeholderTextColor={theme.colors.textMuted}
+              />
+            </View>
+
+            {/* Date Selection */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Event Date</Text>
+              <View style={styles.quickDateOptions}>
+                {getQuickDateOptions().map((option, index) => (
+                  <TouchableOpacity
+                    key={index}
                     style={[
-                      styles.quickDateOptionText,
+                      styles.quickDateOption,
                       eventData.eventDate?.toDateString() ===
                         option.date.toDateString() &&
-                        styles.quickDateOptionTextSelected,
+                        styles.quickDateOptionSelected,
                     ]}
+                    onPress={() =>
+                      setEventData((prev) => ({ ...prev, eventDate: option.date }))
+                    }
+                    activeOpacity={0.7}
                   >
-                    {option.label}
-                  </Text>
-                  <Text style={styles.quickDateOptionDate}>
-                    {option.date.toLocaleDateString()}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.quickDateOptionText,
+                        eventData.eventDate?.toDateString() ===
+                          option.date.toDateString() &&
+                          styles.quickDateOptionTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    <Text style={styles.quickDateOptionDate}>
+                      {option.date.toLocaleDateString()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
-            {eventData.eventDate && (
-              <View style={styles.selectedDateDisplay}>
-                <Text style={styles.selectedDateLabel}>Selected Date:</Text>
-                <Text style={styles.selectedDateText}>
-                  {eventData.eventDate.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </Text>
-              </View>
-            )}
-          </ScrollView>
-        );
-
-      case 3: // Additional Settings
-        return (
-          <ScrollView
-            style={styles.stepContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.stepDescription}>
-              Configure event details and settings
-            </Text>
-
-            <View style={styles.settingsForm}>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Event Name *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={eventData.eventName}
-                  onChangeText={(text) => updateSettings('eventName', text)}
-                  placeholder="Enter event name"
-                  placeholderTextColor={theme.colors.textMuted}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Description</Text>
-                <TextInput
-                  style={[styles.textInput, styles.textArea]}
-                  value={eventData.description}
-                  onChangeText={(text) => updateSettings('description', text)}
-                  placeholder="Event description (optional)"
-                  placeholderTextColor={theme.colors.textMuted}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              {/* Entry Fee Section */}
-              <View style={styles.formGroup}>
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Charge Entry Fee</Text>
-                  <Switch
-                    value={eventData.entryFeesSats > 0}
-                    onValueChange={(enabled) =>
-                      updateSettings('entryFeesSats', enabled ? 100 : 0)
-                    }
-                    trackColor={{
-                      false: theme.colors.border,
-                      true: theme.colors.accent,
-                    }}
-                    thumbColor={theme.colors.text}
-                  />
-                </View>
-
-                {eventData.entryFeesSats > 0 && (
-                  <>
-                    <Text style={styles.formHelper}>
-                      Participants will pay this amount to join the event
-                    </Text>
-                    <TextInput
-                      style={[styles.textInput, { marginTop: 12 }]}
-                      value={eventData.entryFeesSats.toString()}
-                      onChangeText={(text) =>
-                        updateSettings('entryFeesSats', parseInt(text) || 0)
-                      }
-                      placeholder="Enter amount in sats"
-                      placeholderTextColor={theme.colors.textMuted}
-                      keyboardType="numeric"
-                    />
-
-                    {/* Payment Destination Dropdown */}
-                    <Text style={[styles.formLabel, { marginTop: 16 }]}>
-                      Entry Fees Go To:
-                    </Text>
-                    <View style={styles.destinationOptions}>
-                      <TouchableOpacity
-                        style={[
-                          styles.destinationOption,
-                          eventData.paymentDestination === 'captain' &&
-                            styles.destinationOptionSelected,
-                        ]}
-                        onPress={() => {
-                          updateSettings('paymentDestination', 'captain');
-                          updateSettings(
-                            'lightningAddress',
-                            captainLightningAddress
-                          );
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.destinationOptionText,
-                            eventData.paymentDestination === 'captain' &&
-                              styles.destinationOptionTextSelected,
-                          ]}
-                        >
-                          Captain's Wallet
-                        </Text>
-                      </TouchableOpacity>
-
-                      {teamCharityId && (
-                        <TouchableOpacity
-                          style={[
-                            styles.destinationOption,
-                            eventData.paymentDestination === 'charity' &&
-                              styles.destinationOptionSelected,
-                          ]}
-                          onPress={() => {
-                            const charity = getCharityById(teamCharityId);
-                            if (charity) {
-                              updateSettings('paymentDestination', 'charity');
-                              updateSettings(
-                                'lightningAddress',
-                                charity.lightningAddress
-                              );
-                            }
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <Text
-                            style={[
-                              styles.destinationOptionText,
-                              eventData.paymentDestination === 'charity' &&
-                                styles.destinationOptionTextSelected,
-                            ]}
-                          >
-                            Team Charity
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-
-                    {/* Show selected destination info */}
-                    {eventData.paymentDestination === 'captain' ? (
-                      <>
-                        <Text style={styles.formHelper}>
-                          💰 You'll receive {eventData.entryFeesSats} sats per
-                          participant
-                        </Text>
-                        {!captainLightningAddress && (
-                          <>
-                            <Text style={[styles.formLabel, { marginTop: 16 }]}>
-                              Your Lightning Address (Required)
-                            </Text>
-                            <TextInput
-                              style={styles.textInput}
-                              value={eventData.lightningAddress}
-                              onChangeText={(text) =>
-                                updateSettings('lightningAddress', text)
-                              }
-                              placeholder="captain@getalby.com"
-                              placeholderTextColor={theme.colors.textMuted}
-                              keyboardType="email-address"
-                              autoCapitalize="none"
-                              autoCorrect={false}
-                            />
-                            <Text style={styles.formHelper}>
-                              ⚡ Add a Lightning address to your profile to
-                              receive payments
-                            </Text>
-                          </>
-                        )}
-                        {captainLightningAddress && (
-                          <Text style={styles.formHelper}>
-                            ⚡ Payments will go to: {captainLightningAddress}
-                          </Text>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.formHelper}>
-                          💝 All entry fees will be donated to{' '}
-                          {getCharityById(teamCharityId)?.name}
-                        </Text>
-                        <Text style={styles.formHelper}>
-                          ⚡ Payments will go to:{' '}
-                          {getCharityById(teamCharityId)?.lightningAddress}
-                        </Text>
-                      </>
-                    )}
-                  </>
-                )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Prize Pool (sats)</Text>
-                <View style={styles.prizePoolOptions}>
-                  {[
-                    { label: 'None', value: 0 },
-                    { label: '10k', value: 10000 },
-                    { label: '20k', value: 20000 },
-                    { label: '30k', value: 30000 },
-                  ].map((option) => (
-                    <TouchableOpacity
-                      key={option.label}
-                      style={[
-                        styles.prizeOption,
-                        eventData.prizePoolSats === option.value &&
-                          styles.prizeOptionSelected,
-                      ]}
-                      onPress={() =>
-                        updateSettings('prizePoolSats', option.value)
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.prizeOptionText,
-                          eventData.prizePoolSats === option.value &&
-                            styles.prizeOptionTextSelected,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+            {/* Prize Pool */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Prize Pool (sats)</Text>
+              <View style={styles.prizePoolOptions}>
+                {[
+                  { label: 'None', value: 0 },
+                  { label: '10k', value: 10000 },
+                  { label: '20k', value: 20000 },
+                  { label: '30k', value: 30000 },
+                ].map((option) => (
                   <TouchableOpacity
+                    key={option.label}
                     style={[
                       styles.prizeOption,
-                      eventData.prizePoolSats !== undefined &&
-                        eventData.prizePoolSats !== 0 &&
-                        eventData.prizePoolSats !== 10000 &&
-                        eventData.prizePoolSats !== 20000 &&
-                        eventData.prizePoolSats !== 30000 &&
+                      eventData.prizePoolSats === option.value &&
                         styles.prizeOptionSelected,
                     ]}
-                    onPress={() => updateSettings('prizePoolSats', -1)}
+                    onPress={() =>
+                      updateSettings('prizePoolSats', option.value)
+                    }
                     activeOpacity={0.7}
                   >
                     <Text
                       style={[
                         styles.prizeOptionText,
-                        eventData.prizePoolSats !== undefined &&
-                          eventData.prizePoolSats !== 0 &&
-                          eventData.prizePoolSats !== 10000 &&
-                          eventData.prizePoolSats !== 20000 &&
-                          eventData.prizePoolSats !== 30000 &&
+                        eventData.prizePoolSats === option.value &&
                           styles.prizeOptionTextSelected,
                       ]}
                     >
-                      Custom
+                      {option.label}
                     </Text>
                   </TouchableOpacity>
-                </View>
-                {eventData.prizePoolSats !== undefined &&
-                  eventData.prizePoolSats !== 0 &&
-                  eventData.prizePoolSats !== 10000 &&
-                  eventData.prizePoolSats !== 20000 &&
-                  eventData.prizePoolSats !== 30000 && (
-                    <TextInput
-                      style={[styles.textInput, { marginTop: 12 }]}
-                      value={
-                        eventData.prizePoolSats === -1
-                          ? ''
-                          : eventData.prizePoolSats.toString()
-                      }
-                      onChangeText={(text) => {
-                        const value = parseInt(text) || 0;
-                        updateSettings('prizePoolSats', value);
-                      }}
-                      placeholder="Enter custom amount"
-                      placeholderTextColor={theme.colors.textMuted}
-                      keyboardType="numeric"
-                    />
-                  )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Max Participants</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={eventData.maxParticipants.toString()}
-                  onChangeText={(text) =>
-                    updateSettings('maxParticipants', parseInt(text) || 50)
-                  }
-                  placeholder="50"
-                  placeholderTextColor={theme.colors.textMuted}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>Require Captain Approval</Text>
-                <Switch
-                  value={eventData.requireApproval}
-                  onValueChange={(value) =>
-                    updateSettings('requireApproval', value)
-                  }
-                  trackColor={{
-                    false: theme.colors.border,
-                    true: theme.colors.accent,
-                  }}
-                  thumbColor={theme.colors.text}
-                />
+                ))}
               </View>
             </View>
+
+            {/* Entry Fee */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Entry Fee (sats)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={eventData.entryFeesSats.toString()}
+                onChangeText={(text) =>
+                  updateSettings('entryFeesSats', parseInt(text) || 0)
+                }
+                placeholder="0"
+                placeholderTextColor={theme.colors.textMuted}
+                keyboardType="numeric"
+              />
+              {eventData.entryFeesSats > 0 && (
+                <Text style={styles.formHelper}>
+                  Participants will pay {eventData.entryFeesSats} sats to join
+                </Text>
+              )}
+            </View>
+
+            {/* Payment Destination (only if entry fee > 0) */}
+            {eventData.entryFeesSats > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Entry Fees Go To:</Text>
+                <View style={styles.destinationOptions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.destinationOption,
+                      eventData.paymentDestination === 'captain' &&
+                        styles.destinationOptionSelected,
+                    ]}
+                    onPress={() => {
+                      updateSettings('paymentDestination', 'captain');
+                      updateSettings(
+                        'lightningAddress',
+                        captainLightningAddress
+                      );
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.destinationOptionText,
+                        eventData.paymentDestination === 'captain' &&
+                          styles.destinationOptionTextSelected,
+                      ]}
+                    >
+                      Captain's Wallet
+                    </Text>
+                  </TouchableOpacity>
+
+                  {teamCharityId && (
+                    <TouchableOpacity
+                      style={[
+                        styles.destinationOption,
+                        eventData.paymentDestination === 'charity' &&
+                          styles.destinationOptionSelected,
+                      ]}
+                      onPress={() => {
+                        const charity = getCharityById(teamCharityId);
+                        if (charity) {
+                          updateSettings('paymentDestination', 'charity');
+                          updateSettings(
+                            'lightningAddress',
+                            charity.lightningAddress
+                          );
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.destinationOptionText,
+                          eventData.paymentDestination === 'charity' &&
+                            styles.destinationOptionTextSelected,
+                        ]}
+                      >
+                        Team Charity
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
           </ScrollView>
         );
 
@@ -934,23 +870,34 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
   };
 
   return (
-    <WizardStepContainer
-      visible={visible}
-      currentStep={currentStep}
-      steps={steps}
-      wizardTitle="Create Event"
-      onClose={onClose}
-      onNext={handleNext}
-      onPrevious={handlePrevious}
-      onComplete={handleComplete}
-      canGoNext={steps[currentStep]?.isValid}
-      canGoPrevious={currentStep > 0}
-      isLastStep={currentStep === steps.length - 1}
-      isProcessing={isCreating}
-      processingText="Creating Event..."
-    >
-      {renderStepContent()}
-    </WizardStepContainer>
+    <>
+      <WizardStepContainer
+        visible={visible}
+        currentStep={currentStep}
+        steps={steps}
+        wizardTitle="Create Event"
+        onClose={onClose}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+        onComplete={handleComplete}
+        canGoNext={steps[currentStep]?.isValid}
+        canGoPrevious={currentStep > 0}
+        isLastStep={currentStep === steps.length - 1}
+        isProcessing={isCreating}
+        processingText="Creating Event..."
+      >
+        {renderStepContent()}
+      </WizardStepContainer>
+
+      {/* Custom Alert Modal */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        onClose={() => setAlertVisible(false)}
+      />
+    </>
   );
 };
 
@@ -966,84 +913,86 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Activity selection styles
-  optionsGrid: {
+  // Category styles
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.text,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+
+  // Preset grid styles
+  presetsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    marginBottom: 16,
   },
 
-  optionCard: {
+  presetCard: {
     flexBasis: '47%',
     backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: 8,
     padding: 16,
-    alignItems: 'center',
   },
 
-  optionCardSelected: {
+  presetCardSelected: {
     borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.accent + '20',
+    backgroundColor: theme.colors.background,
   },
 
-  optionCardText: {
+  presetName: {
     fontSize: 14,
-    fontWeight: theme.typography.weights.medium,
+    fontWeight: theme.typography.weights.semiBold,
     color: theme.colors.text,
-    textAlign: 'center',
+    marginBottom: 4,
   },
 
-  optionCardTextSelected: {
+  presetNameSelected: {
     color: theme.colors.accent,
   },
 
-  // Competition selection styles
-  optionsList: {
-    gap: 12,
+  presetDescription: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    lineHeight: 16,
   },
 
-  competitionOption: {
+  // Form styles
+  formGroup: {
+    marginBottom: 20,
+  },
+
+  formLabel: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+
+  textInput: {
     backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: 8,
-    padding: 16,
-  },
-
-  competitionOptionSelected: {
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.accent + '20',
-  },
-
-  competitionOptionText: {
+    padding: 12,
     fontSize: 14,
-    fontWeight: theme.typography.weights.medium,
     color: theme.colors.text,
   },
 
-  competitionOptionTextSelected: {
-    color: theme.colors.accent,
-  },
-
-  competitionOptionDescription: {
+  formHelper: {
     fontSize: 12,
     color: theme.colors.textMuted,
     marginTop: 4,
+    lineHeight: 16,
   },
 
   // Date selection styles
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: theme.typography.weights.semiBold,
-    color: theme.colors.text,
-    marginBottom: 12,
-  },
-
   quickDateOptions: {
     gap: 12,
-    marginBottom: 24,
   },
 
   quickDateOption: {
@@ -1059,7 +1008,7 @@ const styles = StyleSheet.create({
 
   quickDateOptionSelected: {
     borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.accent + '20',
+    backgroundColor: theme.colors.background,
   },
 
   quickDateOptionText: {
@@ -1077,56 +1026,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
   },
 
-  selectedDateDisplay: {
-    backgroundColor: theme.colors.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
-    borderRadius: 8,
-    padding: 16,
-  },
-
-  selectedDateLabel: {
-    fontSize: 12,
-    color: theme.colors.textMuted,
-    marginBottom: 4,
-  },
-
-  selectedDateText: {
-    fontSize: 16,
-    fontWeight: theme.typography.weights.semiBold,
-    color: theme.colors.accent,
-  },
-
-  // Settings form styles
-  settingsForm: {
-    gap: 20,
-  },
-
-  formGroup: {
-    gap: 8,
-  },
-
-  formLabel: {
-    fontSize: 14,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.text,
-  },
-
-  textInput: {
-    backgroundColor: theme.colors.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    color: theme.colors.text,
-  },
-
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-
+  // Prize pool styles
   prizePoolOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1144,7 +1044,7 @@ const styles = StyleSheet.create({
 
   prizeOptionSelected: {
     borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.accent + '20',
+    backgroundColor: theme.colors.background,
   },
 
   prizeOptionText: {
@@ -1157,30 +1057,10 @@ const styles = StyleSheet.create({
     color: theme.colors.accent,
   },
 
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-
-  switchLabel: {
-    fontSize: 14,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.text,
-  },
-
-  formHelper: {
-    fontSize: 12,
-    color: theme.colors.textMuted,
-    marginTop: 4,
-    lineHeight: 16,
-  },
-
+  // Payment destination styles
   destinationOptions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
   },
 
   destinationOption: {
@@ -1196,7 +1076,7 @@ const styles = StyleSheet.create({
 
   destinationOptionSelected: {
     borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.accent + '20',
+    backgroundColor: theme.colors.background,
   },
 
   destinationOptionText: {

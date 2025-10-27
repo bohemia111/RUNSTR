@@ -12,7 +12,6 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
@@ -22,11 +21,10 @@ import type { PaymentStatus } from './PaymentVerificationBadge';
 import { EventJoinRequestService } from '../../services/events/EventJoinRequestService';
 import type { EventJoinRequest } from '../../services/events/EventJoinRequestService';
 import { NostrListService } from '../../services/nostr/NostrListService';
-import { getAuthenticationData } from '../../utils/nostrAuth';
-import { nsecToPrivateKey } from '../../utils/nostr';
-import { npubToHex } from '../../utils/ndkConversion';
+import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
+import { CustomAlert } from '../ui/CustomAlert';
+import { GlobalNDKService } from '../../services/nostr/GlobalNDKService';
 import {
-  NDKPrivateKeySigner,
   NDKEvent,
   NDKSubscription,
 } from '@nostr-dev-kit/ndk';
@@ -162,19 +160,18 @@ export const EventJoinRequestsSection: React.FC<
     eventId: string,
     eventName: string
   ) => {
+    let alertVisible = false;
     try {
-      // Get auth data for signing
-      const authData = await getAuthenticationData();
-      if (!authData?.nsec) {
-        Alert.alert('Error', 'Authentication required to approve requests');
+      // Get signer (supports both nsec and Amber)
+      const signer = await UnifiedSigningService.getSigner();
+      if (!signer) {
+        CustomAlert.alert('Error', 'Authentication required to approve requests', [{ text: 'OK' }]);
         return;
       }
 
-      const privateKeyHex = nsecToPrivateKey(authData.nsec);
-      const captainHexPubkey = npubToHex(authData.npub);
-
+      const captainHexPubkey = await UnifiedSigningService.getHexPubkey();
       if (!captainHexPubkey) {
-        Alert.alert('Error', 'Invalid captain public key');
+        CustomAlert.alert('Error', 'Invalid captain public key', [{ text: 'OK' }]);
         return;
       }
 
@@ -185,7 +182,8 @@ export const EventJoinRequestsSection: React.FC<
       if (!currentList) {
         // ⚠️ Participant list is missing - this shouldn't happen!
         // Show confirmation dialog explaining the issue
-        Alert.alert(
+        alertVisible = true;
+        CustomAlert.alert(
           'Participant List Missing',
           `The participant list for "${eventName}" was not found. This might have happened if event creation was interrupted.\n\nWould you like to create the participant list now and approve this request?`,
           [
@@ -194,6 +192,7 @@ export const EventJoinRequestsSection: React.FC<
               style: 'cancel',
               onPress: () => {
                 console.log('❌ Captain cancelled participant list creation');
+                alertVisible = false;
               },
             },
             {
@@ -219,10 +218,8 @@ export const EventJoinRequestsSection: React.FC<
                     captainHexPubkey
                   );
 
-                  // Sign and publish
-                  const g = globalThis as any;
-                  const ndk = g.__RUNSTR_NDK_INSTANCE__;
-                  const signer = new NDKPrivateKeySigner(privateKeyHex);
+                  // Sign and publish using UnifiedSigningService
+                  const ndk = await GlobalNDKService.getInstance();
                   const ndkEvent = new NDKEvent(ndk, eventTemplate);
                   await ndkEvent.sign(signer);
                   await ndkEvent.publish();
@@ -259,18 +256,20 @@ export const EventJoinRequestsSection: React.FC<
                     console.warn('⚠️ Failed to invalidate snapshot (non-critical):', error);
                   }
 
-                  Alert.alert(
+                  CustomAlert.alert(
                     'Success',
-                    'Participant list created and user approved'
+                    'Participant list created and user approved',
+                    [{ text: 'OK', onPress: () => { alertVisible = false; } }]
                   );
                 } catch (createError) {
                   console.error(
                     '❌ Failed to create participant list:',
                     createError
                   );
-                  Alert.alert(
+                  CustomAlert.alert(
                     'Error',
-                    'Failed to create participant list. Please try again.'
+                    'Failed to create participant list. Please try again.',
+                    [{ text: 'OK', onPress: () => { alertVisible = false; } }]
                   );
                 }
               },
@@ -288,10 +287,8 @@ export const EventJoinRequestsSection: React.FC<
         );
 
         if (eventTemplate) {
-          // Sign and publish updated list
-          const g = globalThis as any;
-          const ndk = g.__RUNSTR_NDK_INSTANCE__;
-          const signer = new NDKPrivateKeySigner(privateKeyHex);
+          // Sign and publish updated list using UnifiedSigningService
+          const ndk = await GlobalNDKService.getInstance();
           const ndkEvent = new NDKEvent(ndk, eventTemplate);
           await ndkEvent.sign(signer);
           await ndkEvent.publish();
@@ -334,10 +331,15 @@ export const EventJoinRequestsSection: React.FC<
         console.warn('⚠️ Failed to invalidate snapshot (non-critical):', error);
       }
 
-      Alert.alert('Success', 'Participant approved and added to event');
+      alertVisible = true;
+      CustomAlert.alert('Success', 'Participant approved and added to event', [
+        { text: 'OK', onPress: () => { alertVisible = false; } }
+      ]);
     } catch (error) {
       console.error('Failed to approve event join request:', error);
-      Alert.alert('Error', 'Failed to approve request');
+      if (!alertVisible) {
+        CustomAlert.alert('Error', 'Failed to approve request', [{ text: 'OK' }]);
+      }
     }
   };
 
@@ -358,11 +360,11 @@ export const EventJoinRequestsSection: React.FC<
       return updated;
     });
 
-    Alert.alert('Request Declined', 'The join request has been declined');
+    CustomAlert.alert('Request Declined', 'The join request has been declined', [{ text: 'OK' }]);
   };
 
   const handleMarkAsPaid = async (requestId: string, eventId: string) => {
-    Alert.alert(
+    CustomAlert.alert(
       'Mark as Paid',
       'Did you receive payment for this entry fee via cash, Venmo, or other method?',
       [
@@ -387,9 +389,10 @@ export const EventJoinRequestsSection: React.FC<
               return updated;
             });
 
-            Alert.alert(
+            CustomAlert.alert(
               'Marked as Paid',
-              'This request has been marked as paid'
+              'This request has been marked as paid',
+              [{ text: 'OK' }]
             );
           },
         },

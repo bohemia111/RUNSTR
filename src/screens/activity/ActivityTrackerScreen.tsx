@@ -32,7 +32,7 @@ type ActivityTab =
   | 'diet'
   | 'meditation'
   | 'manual';
-type MoreOption = 'strength' | 'diet' | 'meditation' | 'manual';
+type MoreOption = 'strength' | 'diet' | 'meditation';
 
 interface TabButtonProps {
   label: string;
@@ -159,21 +159,6 @@ const MoreMenu: React.FC<MoreMenuProps> = ({
               color={theme.colors.textMuted}
             />
           </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity
-            style={styles.moreMenuItem}
-            onPress={() => handleSelectOption('manual')}
-          >
-            <Ionicons name="create" size={24} color={theme.colors.text} />
-            <Text style={styles.moreMenuLabel}>Manual Entry</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={theme.colors.textMuted}
-            />
-          </TouchableOpacity>
         </Animated.View>
       </TouchableOpacity>
     </Modal>
@@ -235,7 +220,7 @@ export const ActivityTrackerScreen: React.FC = () => {
         />
         <TabButton
           label="More"
-          isActive={['strength', 'diet', 'meditation', 'manual'].includes(
+          isActive={['strength', 'diet', 'meditation'].includes(
             activeTab
           )}
           onPress={() => setShowMoreMenu(true)}

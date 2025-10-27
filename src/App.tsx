@@ -84,13 +84,7 @@ import { EventCaptainDashboardScreen } from './screens/EventCaptainDashboardScre
 import { LeagueDetailScreen } from './screens/LeagueDetailScreen';
 import { ChallengeDetailScreen } from './screens/ChallengeDetailScreen';
 // Use SimpleTeamScreen instead of EnhancedTeamScreen to avoid freeze issues
-const SimpleTeamScreen = React.lazy(() => {
-  console.log('[App.tsx] 🔄 Starting lazy import of SimpleTeamScreen');
-  return import('./screens/SimpleTeamScreen').then((module) => {
-    console.log('[App.tsx] ✅ SimpleTeamScreen module loaded');
-    return module;
-  });
-});
+const SimpleTeamScreen = React.lazy(() => import('./screens/SimpleTeamScreen'));
 import { CaptainDashboardScreen } from './screens/CaptainDashboardScreen';
 import { HelpSupportScreen } from './screens/HelpSupportScreen';
 import { ContactSupportScreen } from './screens/ContactSupportScreen';

@@ -1,10 +1,11 @@
 /**
  * WalkingTrackerScreen - Walking activity tracker with step estimation
  * Displays distance, time, steps, and elevation
+ * Now includes daily step counter with goal tracking
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Platform, AppState, AppStateStatus } from 'react-native';
+import { Platform, AppState, AppStateStatus, ScrollView, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { BaseTrackerComponent } from '../../components/activity/BaseTrackerComponent';
 import { CustomAlert } from '../../components/ui/CustomAlert';
@@ -16,6 +17,13 @@ import LocalWorkoutStorageService from '../../services/fitness/LocalWorkoutStora
 import { RouteSelectionModal } from '../../components/routes/RouteSelectionModal';
 import routeMatchingService from '../../services/routes/RouteMatchingService';
 import type { SavedRoute } from '../../services/routes/RouteStorageService';
+import { DailyStepGoalCard, type PostingState } from '../../components/activity/DailyStepGoalCard';
+import { dailyStepCounterService } from '../../services/activity/DailyStepCounterService';
+import { dailyStepGoalService } from '../../services/activity/DailyStepGoalService';
+import type { DailyStepData } from '../../services/activity/DailyStepCounterService';
+import type { StepGoalProgress } from '../../services/activity/DailyStepGoalService';
+
+const STEP_UPDATE_INTERVAL = 5 * 60 * 1000; // Update every 5 minutes
 
 export const WalkingTrackerScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -67,12 +75,106 @@ export const WalkingTrackerScreen: React.FC = () => {
   const totalPausedTimeRef = useRef<number>(0); // Cumulative pause duration in ms
   const isPausedRef = useRef<boolean>(false); // Ref to avoid stale closure in timer
 
+  // Daily step counter state
+  const [dailySteps, setDailySteps] = useState<number | null>(null);
+  const [stepGoal, setStepGoal] = useState<number>(10000);
+  const [stepProgress, setStepProgress] = useState<StepGoalProgress | null>(null);
+  const [stepCounterLoading, setStepCounterLoading] = useState(true);
+  const [stepCounterError, setStepCounterError] = useState<string | null>(null);
+  const [postingState, setPostingState] = useState<PostingState>('idle');
+  const stepUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (metricsUpdateRef.current) clearInterval(metricsUpdateRef.current);
+      if (stepUpdateIntervalRef.current) clearInterval(stepUpdateIntervalRef.current);
     };
   }, []);
+
+  // Daily step counter initialization and polling
+  useEffect(() => {
+    const fetchDailySteps = async () => {
+      try {
+        setStepCounterLoading(true);
+        setStepCounterError(null);
+
+        // Check if pedometer is available
+        const available = await dailyStepCounterService.isAvailable();
+        if (!available) {
+          setStepCounterError('Step counter not available on this device');
+          setStepCounterLoading(false);
+          return;
+        }
+
+        // Request permissions
+        const permissionsGranted = await dailyStepCounterService.requestPermissions();
+        if (!permissionsGranted) {
+          setStepCounterError('Motion permissions not granted');
+          setStepCounterLoading(false);
+          return;
+        }
+
+        // Get today's steps
+        const stepData = await dailyStepCounterService.getTodaySteps();
+        if (stepData) {
+          setDailySteps(stepData.steps);
+        }
+
+        // Get goal
+        const goal = await dailyStepGoalService.getGoal();
+        setStepGoal(goal);
+
+        // Calculate progress
+        if (stepData) {
+          const progress = dailyStepGoalService.calculateProgress(stepData.steps, goal);
+          setStepProgress(progress);
+        }
+
+        setStepCounterLoading(false);
+        console.log(`[WalkingTrackerScreen] ✅ Daily steps loaded: ${stepData?.steps || 0}`);
+      } catch (error) {
+        console.error('[WalkingTrackerScreen] Error fetching daily steps:', error);
+        setStepCounterError('Failed to load step count');
+        setStepCounterLoading(false);
+      }
+    };
+
+    // Initial fetch
+    fetchDailySteps();
+
+    // Set up polling (every 5 minutes)
+    stepUpdateIntervalRef.current = setInterval(() => {
+      fetchDailySteps();
+    }, STEP_UPDATE_INTERVAL);
+
+    return () => {
+      if (stepUpdateIntervalRef.current) {
+        clearInterval(stepUpdateIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Check if daily steps already posted today
+  useEffect(() => {
+    const checkIfPosted = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const alreadyPosted = await LocalWorkoutStorageService.hasDailyStepsForDate(today);
+
+        if (alreadyPosted) {
+          setPostingState('posted');
+          console.log('[WalkingTrackerScreen] Daily steps already posted today');
+        } else {
+          setPostingState('idle');
+        }
+      } catch (error) {
+        console.error('[WalkingTrackerScreen] Error checking posted status:', error);
+      }
+    };
+
+    checkIfPosted();
+  }, [dailySteps]); // Re-check when daily steps update
 
   // AppState listener for background/foreground transitions
   useEffect(() => {
@@ -314,6 +416,71 @@ export const WalkingTrackerScreen: React.FC = () => {
     setElapsedTime(0);
   };
 
+  const handlePostDailySteps = async () => {
+    if (!dailySteps || dailySteps === 0) {
+      console.warn('[WalkingTrackerScreen] Cannot post - no steps available');
+      return;
+    }
+
+    if (postingState === 'posted') {
+      console.warn('[WalkingTrackerScreen] Steps already posted today');
+      return;
+    }
+
+    try {
+      setPostingState('posting');
+      console.log(`[WalkingTrackerScreen] Preparing to post ${dailySteps} daily steps`);
+
+      // Calculate time from midnight to now
+      const now = new Date();
+      const midnight = new Date();
+      midnight.setHours(0, 0, 0, 0);
+
+      const duration = Math.floor((now.getTime() - midnight.getTime()) / 1000); // seconds
+
+      // Estimate calories for walking steps (rough estimate: 0.04 cal per step)
+      const calories = Math.round(dailySteps * 0.04);
+
+      // Save to local storage
+      const workoutId = await LocalWorkoutStorageService.saveDailyStepsWorkout({
+        steps: dailySteps,
+        startTime: midnight.toISOString(),
+        endTime: now.toISOString(),
+        duration,
+        calories,
+      });
+
+      console.log(`[WalkingTrackerScreen] ✅ Daily steps saved: ${workoutId}`);
+
+      // Prepare workout data for modal
+      setWorkoutData({
+        type: 'walking',
+        distance: 0, // No distance for daily steps
+        duration,
+        calories,
+        steps: dailySteps,
+        localWorkoutId: workoutId,
+      });
+
+      // Show workout summary modal
+      setSummaryModalVisible(true);
+
+      // Mark as posted
+      setPostingState('posted');
+    } catch (error) {
+      console.error('[WalkingTrackerScreen] ❌ Failed to post daily steps:', error);
+      setPostingState('idle');
+
+      // Show error alert
+      setAlertConfig({
+        title: 'Failed to Post Steps',
+        message: 'Could not save daily steps. Please try again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
+    }
+  };
+
   useEffect(() => {
     if (isTracking && !isPaused) {
       updateMetrics();
@@ -321,7 +488,20 @@ export const WalkingTrackerScreen: React.FC = () => {
   }, [elapsedTime]);
 
   return (
-    <>
+    <ScrollView style={{ flex: 1 }}>
+      {/* Daily Step Counter */}
+      {!isTracking && (
+        <DailyStepGoalCard
+          steps={dailySteps}
+          progress={stepProgress}
+          loading={stepCounterLoading}
+          error={stepCounterError}
+          onPostSteps={handlePostDailySteps}
+          postingState={postingState}
+        />
+      )}
+
+      {/* Walking Tracker */}
       <BaseTrackerComponent
         metrics={{
           primary: {
@@ -387,6 +567,6 @@ export const WalkingTrackerScreen: React.FC = () => {
         }}
         onClose={() => setRouteSelectionVisible(false)}
       />
-    </>
+    </ScrollView>
   );
 };

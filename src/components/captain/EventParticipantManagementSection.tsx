@@ -12,15 +12,15 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { NostrListService } from '../../services/nostr/NostrListService';
-import { getAuthenticationData } from '../../utils/nostrAuth';
-import { nsecToPrivateKey } from '../../utils/nostr';
-import { NDKPrivateKeySigner, NDKEvent } from '@nostr-dev-kit/ndk';
+import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
+import { GlobalNDKService } from '../../services/nostr/GlobalNDKService';
+import { CustomAlert } from '../ui/CustomAlert';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { ZappableUserRow } from '../ui/ZappableUserRow';
 
 interface EventParticipantManagementSectionProps {
@@ -66,17 +66,17 @@ export const EventParticipantManagementSection: React.FC<
 
   const handleAddParticipant = async () => {
     if (!newParticipantPubkey.trim()) {
-      Alert.alert('Error', 'Please enter a valid npub or hex pubkey');
+      CustomAlert.alert('Error', 'Please enter a valid npub or hex pubkey', [{ text: 'OK' }]);
       return;
     }
 
     try {
       setIsAddingParticipant(true);
 
-      // Get auth data for signing
-      const authData = await getAuthenticationData();
-      if (!authData?.nsec) {
-        Alert.alert('Error', 'Authentication required');
+      // Get signer (supports both nsec and Amber)
+      const signer = await UnifiedSigningService.getSigner();
+      if (!signer) {
+        CustomAlert.alert('Error', 'Authentication required', [{ text: 'OK' }]);
         return;
       }
 
@@ -98,11 +98,8 @@ export const EventParticipantManagementSection: React.FC<
           captainPubkey
         );
 
-        // Sign and publish
-        const g = globalThis as any;
-        const ndk = g.__RUNSTR_NDK_INSTANCE__;
-        const privateKeyHex = nsecToPrivateKey(authData.nsec);
-        const signer = new NDKPrivateKeySigner(privateKeyHex);
+        // Sign and publish using UnifiedSigningService
+        const ndk = await GlobalNDKService.getInstance();
         const ndkEvent = new NDKEvent(ndk, eventTemplate);
         await ndkEvent.sign(signer);
         await ndkEvent.publish();
@@ -111,7 +108,7 @@ export const EventParticipantManagementSection: React.FC<
       } else {
         // Check if already a participant
         if (currentList.members.includes(newParticipantPubkey.trim())) {
-          Alert.alert('Info', 'This user is already a participant');
+          CustomAlert.alert('Info', 'This user is already a participant', [{ text: 'OK' }]);
           setIsAddingParticipant(false);
           return;
         }
@@ -125,11 +122,8 @@ export const EventParticipantManagementSection: React.FC<
         );
 
         if (eventTemplate) {
-          // Sign and publish updated list
-          const g = globalThis as any;
-          const ndk = g.__RUNSTR_NDK_INSTANCE__;
-          const privateKeyHex = nsecToPrivateKey(authData.nsec);
-          const signer = new NDKPrivateKeySigner(privateKeyHex);
+          // Sign and publish updated list using UnifiedSigningService
+          const ndk = await GlobalNDKService.getInstance();
           const ndkEvent = new NDKEvent(ndk, eventTemplate);
           await ndkEvent.sign(signer);
           await ndkEvent.publish();
@@ -149,18 +143,18 @@ export const EventParticipantManagementSection: React.FC<
 
       setNewParticipantPubkey('');
       setShowAddModal(false);
-      Alert.alert('Success', 'Participant added to event!');
+      CustomAlert.alert('Success', 'Participant added to event!', [{ text: 'OK' }]);
       onParticipantUpdate?.();
     } catch (error) {
       console.error('Failed to add participant:', error);
-      Alert.alert('Error', 'Failed to add participant. Please try again.');
+      CustomAlert.alert('Error', 'Failed to add participant. Please try again.', [{ text: 'OK' }]);
     } finally {
       setIsAddingParticipant(false);
     }
   };
 
   const handleRemoveParticipant = async (participantPubkey: string) => {
-    Alert.alert(
+    CustomAlert.alert(
       'Remove Participant',
       'Are you sure you want to remove this participant from the event?',
       [
@@ -170,10 +164,10 @@ export const EventParticipantManagementSection: React.FC<
           style: 'destructive',
           onPress: async () => {
             try {
-              // Get auth data
-              const authData = await getAuthenticationData();
-              if (!authData?.nsec) {
-                Alert.alert('Error', 'Authentication required');
+              // Get signer (supports both nsec and Amber)
+              const signer = await UnifiedSigningService.getSigner();
+              if (!signer) {
+                CustomAlert.alert('Error', 'Authentication required', [{ text: 'OK' }]);
                 return;
               }
 
@@ -199,11 +193,8 @@ export const EventParticipantManagementSection: React.FC<
                 return;
               }
 
-              // Sign and publish
-              const g = globalThis as any;
-              const ndk = g.__RUNSTR_NDK_INSTANCE__;
-              const privateKeyHex = nsecToPrivateKey(authData.nsec);
-              const signer = new NDKPrivateKeySigner(privateKeyHex);
+              // Sign and publish using UnifiedSigningService
+              const ndk = await GlobalNDKService.getInstance();
               const ndkEvent = new NDKEvent(ndk, eventTemplate);
               await ndkEvent.sign(signer);
               await ndkEvent.publish();
@@ -218,11 +209,11 @@ export const EventParticipantManagementSection: React.FC<
               );
               setParticipants(updatedMembers);
 
-              Alert.alert('Success', 'Participant removed from event');
+              CustomAlert.alert('Success', 'Participant removed from event', [{ text: 'OK' }]);
               onParticipantUpdate?.();
             } catch (error) {
               console.error('Failed to remove participant:', error);
-              Alert.alert('Error', 'Failed to remove participant');
+              CustomAlert.alert('Error', 'Failed to remove participant', [{ text: 'OK' }]);
             }
           },
         },

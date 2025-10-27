@@ -1,7 +1,7 @@
 {
   "name": "runstr.project",
   "main": "index.js",
-  "version": "0.4.10",
+  "version": "0.4.11",
   "description": "Bitcoin-powered fitness competition platform",
   "scripts": {
     "start": "expo start",
@@ -66,6 +66,7 @@
     "expo-media-library": "~17.0.6",
     "expo-notifications": "~0.29.14",
     "expo-secure-store": "~14.0.1",
+    "expo-sensors": "~14.0.2",
     "expo-speech": "~13.0.1",
     "expo-splash-screen": "~0.29.24",
     "expo-status-bar": "~2.0.1",

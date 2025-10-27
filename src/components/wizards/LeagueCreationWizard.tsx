@@ -19,7 +19,6 @@ import { CustomAlert } from '../ui/CustomAlert';
 import { NostrCompetitionService } from '../../services/nostr/NostrCompetitionService';
 import NostrCompetitionParticipantService from '../../services/nostr/NostrCompetitionParticipantService';
 import { useUserStore } from '../../store/userStore';
-import { getAuthenticationData } from '../../utils/nostrAuth';
 import unifiedSigningService from '../../services/auth/UnifiedSigningService';
 import type {
   NostrActivityType,
@@ -227,32 +226,18 @@ export const LeagueCreationWizard: React.FC<LeagueCreationWizardProps> = ({
         return;
       }
 
-      // Get authentication data from unified auth system
-      const authData = await getAuthenticationData();
-      if (!authData || !authData.nsec) {
-        setAlertTitle('Authentication Required');
-        setAlertMessage('Please log in again to create competitions.');
-        setAlertButtons([{ text: 'OK' }]);
-        setAlertVisible(true);
-        setIsCreating(false);
-        return;
-      }
-
-      console.log(
-        '✅ Retrieved auth data for:',
-        authData.npub.slice(0, 20) + '...'
-      );
-
-      // Get signer (works for both nsec and Amber)
+      // Get signer using UnifiedSigningService (handles both nsec and Amber)
       const signer = await unifiedSigningService.getSigner();
       if (!signer) {
-        setAlertTitle('Error');
-        setAlertMessage('No authentication found. Please login first.');
+        setAlertTitle('Authentication Required');
+        setAlertMessage('Unable to sign league. Please ensure you are logged in.');
         setAlertButtons([{ text: 'OK' }]);
         setAlertVisible(true);
         setIsCreating(false);
         return;
       }
+
+      console.log('✅ Signer ready for league creation');
 
       // Prepare league data for Nostr
       const leagueCreationData = {

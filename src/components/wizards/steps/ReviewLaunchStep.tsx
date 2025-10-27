@@ -10,12 +10,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { theme } from '../../../styles/theme';
+import { CustomAlert } from '../../ui/CustomAlert';
 import { TeamCreationStepProps, User } from '../../../types';
 import NostrTeamCreationService from '../../../services/nostr/NostrTeamCreationService';
-import { getAuthenticationData } from '../../../utils/nostrAuth';
+import UnifiedSigningService from '../../../services/auth/UnifiedSigningService';
 import { nip19 } from 'nostr-tools';
 
 interface ReviewLaunchStepProps extends TeamCreationStepProps {
@@ -40,6 +40,14 @@ export const ReviewLaunchStep: React.FC<ReviewLaunchStepProps> = ({
   const [teamCode, setTeamCode] = useState('');
   const [createdTeamId, setCreatedTeamId] = useState<string>('');
 
+  // Alert state for CustomAlert
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<
+    Array<{ text: string; onPress?: () => void }>
+  >([]);
+
   // Generate team invite code
   const generateTeamCode = (): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -61,40 +69,22 @@ export const ReviewLaunchStep: React.FC<ReviewLaunchStepProps> = ({
       console.log('User npub:', currentUser.npub);
       console.log('User name:', currentUser.name);
 
-      // Get user's authentication data from unified system
-      const authData = await getAuthenticationData();
-      if (!authData || !authData.nsec) {
-        Alert.alert(
-          'Authentication Required',
-          'Please log in again to create a team'
-        );
+      // Get signer using UnifiedSigningService (handles both nsec and Amber)
+      const signingService = UnifiedSigningService.getInstance();
+
+      // For team creation, we need the legacy private key (only works for nsec users)
+      const privateKey = await signingService.getLegacyPrivateKeyHex();
+
+      if (!privateKey) {
+        setAlertTitle('Authentication Required');
+        setAlertMessage('Team creation requires direct key access. Amber authentication is not yet supported for team creation.');
+        setAlertButtons([{ text: 'OK' }]);
+        setAlertVisible(true);
         setIsLaunching(false);
         return;
       }
 
-      console.log(
-        '✅ Retrieved auth data for:',
-        authData.npub.slice(0, 20) + '...'
-      );
-
-      // Decode nsec to get private key
-      let privateKey: string;
-      try {
-        const decoded = nip19.decode(authData.nsec);
-        if (decoded.type === 'nsec') {
-          privateKey = decoded.data as string;
-        } else {
-          throw new Error('Invalid nsec format');
-        }
-      } catch (e) {
-        console.error('Failed to decode nsec:', e);
-        Alert.alert(
-          'Error',
-          'Invalid authentication data. Please log in again.'
-        );
-        setIsLaunching(false);
-        return;
-      }
+      console.log('✅ Retrieved private key for team creation');
 
       // Decode npub to get hex pubkey
       let captainHexPubkey = currentUser.npub;
@@ -137,17 +127,20 @@ export const ReviewLaunchStep: React.FC<ReviewLaunchStepProps> = ({
         }
       } else {
         console.error('ReviewLaunchStep: Team creation failed:', result.error);
-        Alert.alert(
-          'Team Creation Failed',
-          result.error || 'Unknown error occurred'
-        );
+        setAlertTitle('Team Creation Failed');
+        setAlertMessage(result.error || 'Unknown error occurred');
+        setAlertButtons([{ text: 'OK' }]);
+        setAlertVisible(true);
       }
     } catch (error) {
       console.error(
         'ReviewLaunchStep: Unexpected error during team creation:',
         error
       );
-      Alert.alert('Error', 'Failed to create team. Please try again.');
+      setAlertTitle('Error');
+      setAlertMessage('Failed to create team. Please try again.');
+      setAlertButtons([{ text: 'OK' }]);
+      setAlertVisible(true);
     } finally {
       setIsLaunching(false);
     }
@@ -165,7 +158,10 @@ export const ReviewLaunchStep: React.FC<ReviewLaunchStepProps> = ({
       console.error(
         'ReviewLaunchStep: Cannot navigate - missing teamId or navigation callback'
       );
-      Alert.alert('Navigation Error', 'Unable to navigate to team dashboard');
+      setAlertTitle('Navigation Error');
+      setAlertMessage('Unable to navigate to team dashboard');
+      setAlertButtons([{ text: 'OK' }]);
+      setAlertVisible(true);
     }
   };
 
@@ -445,6 +441,15 @@ export const ReviewLaunchStep: React.FC<ReviewLaunchStepProps> = ({
         Once launched, your team will be discoverable by other users and you can
         start inviting members.
       </Text>
+
+      {/* Custom Alert Modal */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        onClose={() => setAlertVisible(false)}
+      />
     </ScrollView>
   );
 };

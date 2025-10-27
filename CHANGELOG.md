@@ -6,6 +6,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.11] - 2025-10-26
+
+### Added
+- **Hold-to-Start Button**: 2-second press-and-hold button with circular progress indicator
+  - Prevents accidental workout starts
+  - Visual circular progress feedback during hold
+  - Haptic feedback on completion (success vibration)
+  - Component: `HoldToStartButton.tsx` (199 lines)
+
+- **Race Countdown Timer**: 3, 2, 1, GO! countdown sequence before workout starts
+  - Builds anticipation and prevents premature starts
+  - 1-second intervals with clear visual display
+  - Integrated into RunningTrackerScreen
+
+- **Race Distance Presets**: Pre-configured race distances with auto-stop functionality
+  - 5K, 10K, Half Marathon, Marathon distance options
+  - Horizontal scrollable preset selector
+  - Auto-stop triggers when target distance reached
+  - Distance saved in workout metadata for analysis
+
+- **Daily Step Counter**: Pedometer integration for walking activity tracking
+  - `DailyStepCounterService.ts` - Cross-platform step counting via Expo Pedometer API
+  - `DailyStepGoalService.ts` - Daily step goal management and progress tracking
+  - `DailyStepGoalCard.tsx` - Visual step progress card with goal editing
+  - Works on both iOS (HealthKit) and Android (Google Fit)
+  - 5-minute cache for step data to reduce battery usage
+  - Live step updates during walking activities
+  - Files: 3 new (DailyStepCounterService.ts, DailyStepGoalService.ts, DailyStepGoalCard.tsx)
+
+- **Event Rewards Modal**: New modal for managing event rewards and prize distribution
+  - Component: `EventRewardsModal.tsx` (348 lines)
+  - Enhanced reward management for captains
+
+### Changed
+- **Event Creation Redesign**: Complete overhaul from cascading dropdowns to preset-based flow
+  - **11 Event Presets**: Pre-configured events for popular activities
+    - **Running**: 5K Race, 10K Race, Half Marathon, Marathon
+    - **Strength**: Workout Count Challenge, PR Challenge
+    - **Diet**: Calorie Tracking Challenge, Macro Goals Challenge
+    - **Meditation**: Duration Challenge, Mindfulness Streak, Daily Practice
+  - **2-Step Wizard**: Simplified from complex cascading to "Select Preset → Configure Details"
+  - Step 1: Select from 11 preset templates
+  - Step 2: Set date, prize pool, entry fee
+  - Reduced wizard from 1,188 complex lines to streamlined preset selection
+  - Faster event creation (30 seconds vs 2-3 minutes)
+  - Files: EventCreationWizard.tsx (major refactor), LeagueCreationWizard.tsx (simplified)
+
+### Removed
+- **Manual Entry Mode**: Removed to focus on GPS-tracked and structured activities
+  - Focus shifted to Running, Strength, Diet, Meditation
+  - Manual cardio entry removed in favor of actual GPS tracking
+  - Strength/Diet/Meditation use structured preset challenges
+  - Simplifies UX by removing confusing manual vs automatic distinction
+
+### Fixed
+- **Event Management Bugs**: Multiple captain dashboard improvements
+  - **CompetitionParticipantsSection.tsx**: Fixed participant management (63 line changes)
+  - **EventJoinRequestsSection.tsx**: Improved join request handling (67 line changes)
+  - **EventParticipantManagementSection.tsx**: Enhanced participant administration (59 line changes)
+  - Better error handling and state management
+
+- **Event Card Display**: EventCard.tsx improvements (130 line changes)
+  - Fixed event information rendering
+  - Better handling of event metadata
+  - Improved visual consistency
+
+- **Event Join Service**: EventJoinService.ts enhancements (85 line changes)
+  - More reliable join request submission
+  - Better payment proof handling
+  - Improved error recovery
+
+### Improved
+- **Activity Tracker UX**: Enhanced workout tracking experience
+  - **RunningTrackerScreen.tsx**: Added race presets, countdown, hold-to-start (166 line changes)
+  - **WalkingTrackerScreen.tsx**: Integrated daily step counter and goal tracking (186 line changes)
+  - **ActivityTrackerScreen.tsx**: Simplified activity selection (19 line changes)
+  - Better visual feedback and user control
+
+- **SimpleRunTracker Architecture**: Enhanced race preset support
+  - Added `presetDistance` field for auto-stop functionality
+  - Auto-stop callback system for race completion
+  - Better session state persistence with preset distance
+  - Files: SimpleRunTracker.ts (64 line changes)
+
+- **Workout Storage**: LocalWorkoutStorageService.ts improvements (67 line changes)
+  - Enhanced race distance metadata tracking
+  - Better workout categorization
+  - Improved local storage reliability
+
+### Technical
+- Version numbers updated across all platforms:
+  - app.json: 0.4.11 (versionCode 42)
+  - android/app/build.gradle: 0.4.11 (versionCode 42)
+  - package.json: 0.4.11
+- New dependency: `expo-sensors` (~14.0.2) for pedometer/step counting
+- iOS permissions added: `NSMotionUsageDescription` for step tracking
+- Android permissions added: `ACTIVITY_RECOGNITION` for step counting
+- Modified files:
+  - **New Files**: 5 (HoldToStartButton.tsx, DailyStepGoalCard.tsx, EventRewardsModal.tsx, DailyStepCounterService.ts, DailyStepGoalService.ts)
+  - **Major Refactors**: EventCreationWizard.tsx (1,188 line refactor), RunningTrackerScreen.tsx, WalkingTrackerScreen.tsx
+  - **Captain Sections**: CompetitionParticipantsSection.tsx, EventJoinRequestsSection.tsx, EventParticipantManagementSection.tsx
+  - **Services**: SimpleRunTracker.ts, EventJoinService.ts, LocalWorkoutStorageService.ts
+  - **UI Components**: EventCard.tsx, ReviewLaunchStep.tsx, ProfileScreen.tsx
+  - **Config**: App.tsx, app.json, package.json, iOS Podfile.lock, iOS project files
+- 22 files changed: 1,360 additions, 958 deletions
+- Major UX improvements: Hold-to-start + Countdown + Race presets = Professional workout experience
+
 ## [0.4.10] - 2025-10-25
 
 ### Fixed

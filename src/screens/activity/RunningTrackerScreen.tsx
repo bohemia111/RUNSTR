@@ -12,6 +12,7 @@ import {
   Platform,
   AppState,
   AppStateStatus,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -42,6 +43,7 @@ import { RouteRecognitionBadge } from '../../components/activity/RouteRecognitio
 import { RoutePRComparison } from '../../components/activity/RoutePRComparison';
 import { RouteSelectionModal } from '../../components/routes/RouteSelectionModal';
 import type { SavedRoute } from '../../services/routes/RouteStorageService';
+import { HoldToStartButton } from '../../components/activity/HoldToStartButton';
 
 // Constants
 const TIMER_INTERVAL_MS = 1000; // Update timer every second
@@ -51,6 +53,16 @@ const ZOMBIE_SESSION_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours
 const ANDROID_BACKGROUND_WARNING_KEY =
   '@runstr:android_background_warning_shown';
 const ROUTE_CHECK_INTERVAL_MS = 30000; // Check for route match every 30 seconds
+
+// Race distance presets (in meters)
+const RACE_PRESETS = {
+  '5k': { distance: 5000, label: '5K' },
+  '10k': { distance: 10000, label: '10K' },
+  'half': { distance: 21097, label: 'Half Marathon' },
+  'marathon': { distance: 42195, label: 'Marathon' },
+} as const;
+
+type RacePreset = keyof typeof RACE_PRESETS | null;
 
 interface MetricCardProps {
   label: string;
@@ -89,6 +101,8 @@ export const RunningTrackerScreen: React.FC = () => {
   const [isBackgroundTracking, setIsBackgroundTracking] = useState(false);
   const [summaryModalVisible, setSummaryModalVisible] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [racePreset, setRacePreset] = useState<RacePreset>(null);
+  const [countdown, setCountdown] = useState<3 | 2 | 1 | 'GO' | null>(null);
   const [workoutData, setWorkoutData] = useState<{
     type: 'running' | 'walking' | 'cycling';
     distance: number;
@@ -266,8 +280,8 @@ export const RunningTrackerScreen: React.FC = () => {
     };
   }, [isTracking]); // Re-subscribe when tracking state changes
 
-  const startTracking = async () => {
-    console.log('[RunningTrackerScreen] Starting tracking...');
+  const handleHoldComplete = async () => {
+    console.log('[RunningTrackerScreen] Hold complete, starting countdown...');
 
     // First check if we have required permissions
     const permissionStatus = await appPermissionService.checkAllPermissions();
@@ -279,14 +293,31 @@ export const RunningTrackerScreen: React.FC = () => {
       return;
     }
 
-    // Permissions granted, proceed with tracking
-    proceedWithTracking();
+    // Start countdown: 3 → 2 → 1 → GO!
+    setCountdown(3);
+    setTimeout(() => {
+      setCountdown(2);
+      setTimeout(() => {
+        setCountdown(1);
+        setTimeout(() => {
+          setCountdown('GO');
+          setTimeout(() => {
+            setCountdown(null);
+            // Start tracking after countdown completes
+            proceedWithTracking();
+          }, 500); // Show "GO!" for 0.5 seconds
+        }, 1000);
+      }, 1000);
+    }, 1000);
   };
 
   const proceedWithTracking = async () => {
     try {
+      // Get preset distance if selected
+      const presetDistance = racePreset ? RACE_PRESETS[racePreset].distance : undefined;
+
       // Start tracking with SimpleRunTracker
-      await simpleRunTracker.startTracking('running');
+      await simpleRunTracker.startTracking('running', presetDistance);
       initializeTracking();
     } catch (error) {
       // Get detailed error message from service
@@ -327,6 +358,14 @@ export const RunningTrackerScreen: React.FC = () => {
     setIsPaused(false);
     setGpsSignal('searching'); // Show GPS initializing when tracking starts
     gpsHealthMonitor.reset(); // Reset GPS health monitor for new session
+
+    // Set auto-stop callback if preset distance is selected
+    if (racePreset) {
+      simpleRunTracker.setAutoStopCallback(() => {
+        console.log('[RunningTrackerScreen] Auto-stop triggered - stopping workout');
+        stopTracking();
+      });
+    }
 
     // Reset route matching state (unless we pre-selected a route)
     if (!selectedRoute) {
@@ -503,6 +542,15 @@ export const RunningTrackerScreen: React.FC = () => {
       timestamp: point.timestamp,
     }));
 
+    // Convert preset distance (meters) to race key ('5k', '10k', etc.)
+    const getRaceDistanceKey = (distanceMeters?: number): string | undefined => {
+      if (!distanceMeters) return undefined;
+      const entry = Object.entries(RACE_PRESETS).find(
+        ([_, { distance }]) => distance === distanceMeters
+      );
+      return entry ? entry[0] : undefined;
+    };
+
     // Save workout to local storage BEFORE showing modal
     // This ensures data persists even if user dismisses modal
     try {
@@ -517,6 +565,7 @@ export const RunningTrackerScreen: React.FC = () => {
         elevation: 0, // TODO: SimpleRunTracker doesn't calculate elevation yet
         pace,
         splits: undefined, // TODO: SimpleRunTracker doesn't calculate splits yet
+        raceDistance: getRaceDistanceKey(session.presetDistance),
         // Pass GPS coordinates for weather lookup
         startLatitude: startPosition?.latitude,
         startLongitude: startPosition?.longitude,
@@ -623,9 +672,46 @@ export const RunningTrackerScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Race Preset Selection */}
+      {!isTracking && !countdown && (
+        <View style={styles.presetContainer}>
+          <Text style={styles.presetLabel}>Race Distance (Optional)</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.presetScrollContent}
+          >
+            {Object.entries(RACE_PRESETS).map(([key, { label }]) => (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  styles.presetButton,
+                  racePreset === key && styles.presetButtonActive,
+                ]}
+                onPress={() => setRacePreset(racePreset === key ? null : (key as RacePreset))}
+              >
+                <Text
+                  style={[
+                    styles.presetButtonText,
+                    racePreset === key && styles.presetButtonTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {racePreset && (
+            <Text style={styles.presetHint}>
+              Workout will auto-stop at {RACE_PRESETS[racePreset].label}
+            </Text>
+          )}
+        </View>
+      )}
+
       {/* Control Buttons */}
       <View style={styles.controlsContainer}>
-        {!isTracking ? (
+        {!isTracking && !countdown ? (
           <>
             <TouchableOpacity
               style={styles.routesButton}
@@ -643,13 +729,17 @@ export const RunningTrackerScreen: React.FC = () => {
                 {selectedRoute ? selectedRoute.name : 'Routes'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.startButton}
-              onPress={startTracking}
-            >
-              <Text style={styles.startButtonText}>Start Run</Text>
-            </TouchableOpacity>
+            <HoldToStartButton
+              label="Start Run"
+              onHoldComplete={handleHoldComplete}
+              disabled={false}
+              holdDuration={2000}
+            />
           </>
+        ) : !isTracking && countdown ? (
+          <View style={styles.countdownContainer}>
+            <Text style={styles.countdownText}>{countdown}</Text>
+          </View>
         ) : (
           <>
             {!isPaused ? (
@@ -890,5 +980,57 @@ const styles = StyleSheet.create({
   },
   splitIconContainer: {
     marginLeft: 8,
+  },
+  presetContainer: {
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  presetLabel: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.textMuted,
+    marginBottom: 12,
+  },
+  presetScrollContent: {
+    gap: 12,
+    paddingRight: 20,
+  },
+  presetButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: theme.colors.card,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  presetButtonActive: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+  presetButtonText: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text,
+  },
+  presetButtonTextActive: {
+    color: theme.colors.background,
+  },
+  presetHint: {
+    fontSize: 12,
+    color: theme.colors.accent,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  countdownContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 40,
+  },
+  countdownText: {
+    fontSize: 120,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.accent,
+    textAlign: 'center',
   },
 });

@@ -16,13 +16,15 @@ export interface LocalWorkout {
   duration: number; // seconds
   distance?: number; // meters
   calories?: number;
-  source: 'gps_tracker' | 'manual_entry';
+  steps?: number; // Step count (for daily steps workouts)
+  source: 'gps_tracker' | 'manual_entry' | 'daily_steps';
 
   // GPS-specific fields
   elevation?: number; // meters
   pace?: number; // minutes per km
   speed?: number; // km/h
   splits?: Split[];
+  raceDistance?: string; // Race preset (e.g., '5k', '10k', 'half', 'marathon')
 
   // Manual entry fields
   reps?: number;
@@ -129,6 +131,7 @@ export class LocalWorkoutStorageService {
     pace?: number; // minutes per km
     speed?: number; // km/h
     splits?: Split[];
+    raceDistance?: string; // Race preset (e.g., '5k', '10k', 'half', 'marathon')
     // Optional: GPS coordinates for weather lookup
     startLatitude?: number;
     startLongitude?: number;
@@ -184,6 +187,7 @@ export class LocalWorkoutStorageService {
         pace: workout.pace,
         speed: workout.speed,
         splits: workout.splits,
+        raceDistance: workout.raceDistance,
         weather, // Add weather data
         source: 'gps_tracker',
         createdAt: now,
@@ -280,6 +284,67 @@ export class LocalWorkoutStorageService {
     } catch (error) {
       console.error('❌ Failed to save manual workout:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Save daily steps workout to local storage
+   */
+  async saveDailyStepsWorkout(workout: {
+    steps: number;
+    startTime: string; // ISO timestamp (midnight today)
+    endTime: string; // ISO timestamp (now)
+    duration: number; // seconds from midnight to now
+    calories?: number;
+  }): Promise<string> {
+    try {
+      const workoutId = await this.generateWorkoutId();
+
+      const localWorkout: LocalWorkout = {
+        id: workoutId,
+        type: 'walking',
+        startTime: workout.startTime,
+        endTime: workout.endTime,
+        duration: workout.duration,
+        steps: workout.steps,
+        calories: workout.calories,
+        source: 'daily_steps',
+        createdAt: new Date().toISOString(),
+        syncedToNostr: false,
+      };
+
+      await this.saveWorkout(localWorkout);
+      console.log(
+        `✅ Saved daily steps workout locally: ${workoutId} (${workout.steps} steps)`
+      );
+      return workoutId;
+    } catch (error) {
+      console.error('❌ Failed to save daily steps workout:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if daily steps have already been posted for a specific date
+   * @param date - ISO date string (YYYY-MM-DD)
+   */
+  async hasDailyStepsForDate(date: string): Promise<boolean> {
+    try {
+      const workouts = await this.getAllWorkouts();
+
+      // Find any daily_steps workout for this date
+      const hasSteps = workouts.some((workout) => {
+        if (workout.source !== 'daily_steps') return false;
+
+        // Extract date from startTime (YYYY-MM-DD)
+        const workoutDate = workout.startTime.split('T')[0];
+        return workoutDate === date;
+      });
+
+      return hasSteps;
+    } catch (error) {
+      console.error('❌ Failed to check daily steps for date:', error);
+      return false;
     }
   }
 

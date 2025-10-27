@@ -3,9 +3,10 @@
  * Shows event details like name, type, date, participants, and prize pool
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../styles/theme';
+import { EventRewardsModal } from '../event/EventRewardsModal';
 import type {
   NostrLeagueDefinition,
   NostrEventDefinition,
@@ -17,6 +18,7 @@ interface EventCardProps {
 }
 
 export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
+  const [showRewardsModal, setShowRewardsModal] = useState(false);
   const isLeague = 'duration' in event;
   const eventType = isLeague ? 'League' : 'Event';
 
@@ -96,6 +98,40 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
       onPress={() => onPress(event)}
       activeOpacity={0.7}
     >
+      {/* Prize Pool Badge - Top Left */}
+      {event.prizePoolSats && event.prizePoolSats > 0 && (
+        <TouchableOpacity
+          style={styles.prizePoolBadge}
+          activeOpacity={0.7}
+          onPress={(e) => {
+            e.stopPropagation();
+            setShowRewardsModal(true);
+          }}
+        >
+          <Text style={styles.badgeText}>
+            {event.prizePoolSats.toLocaleString()} sats
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Entry Fee Badge - Top Right */}
+      {event.entryFeesSats > 0 && (
+        <TouchableOpacity
+          style={styles.entryFeeBadge}
+          activeOpacity={0.7}
+          onPress={(e) => {
+            e.stopPropagation();
+            if (event.prizePoolSats && event.prizePoolSats > 0) {
+              setShowRewardsModal(true);
+            }
+          }}
+        >
+          <Text style={styles.badgeTextOrange}>
+            {event.entryFeesSats.toLocaleString()} sats
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.eventName}>{event.name}</Text>
@@ -116,40 +152,20 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
 
       <View style={styles.details}>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📅</Text>
+          <Text style={styles.detailLabel}>Date:</Text>
           <Text style={styles.detailValue}>{getDateDisplay()}</Text>
         </View>
 
-        {event.teamId && (
+        {event.entryFeesSats === 0 && (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>👥</Text>
-            <Text style={styles.detailValue}>
-              Team: {event.teamId.slice(0, 20)}...
-            </Text>
+            <Text style={styles.detailLabel}>Entry:</Text>
+            <Text style={styles.detailValue}>Free</Text>
           </View>
         )}
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>🎟️</Text>
+          <Text style={styles.detailLabel}>Max:</Text>
           <Text style={styles.detailValue}>
-            Entry:{' '}
-            {event.entryFeesSats > 0 ? `${event.entryFeesSats} sats` : 'Free'}
-          </Text>
-        </View>
-
-        {event.prizePoolSats && event.prizePoolSats > 0 && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>🏆</Text>
-            <Text style={styles.prizeValue}>
-              {event.prizePoolSats.toLocaleString()} sats
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>👤</Text>
-          <Text style={styles.detailValue}>
-            Max:{' '}
             {event.maxParticipants === 0 ? 'Unlimited' : event.maxParticipants}{' '}
             participants
           </Text>
@@ -165,6 +181,27 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
       <TouchableOpacity style={styles.joinButton} activeOpacity={0.7}>
         <Text style={styles.joinButtonText}>View Details</Text>
       </TouchableOpacity>
+
+      {/* Rewards Distribution Modal */}
+      {event.prizePoolSats && event.prizePoolSats > 0 && (
+        <EventRewardsModal
+          visible={showRewardsModal}
+          onClose={() => setShowRewardsModal(false)}
+          prizePoolSats={event.prizePoolSats}
+          entryFeesSats={event.entryFeesSats}
+          participantCount={event.maxParticipants || 0}
+          paymentDestination={
+            'paymentDestination' in event
+              ? event.paymentDestination
+              : undefined
+          }
+          paymentRecipientName={
+            'paymentRecipientName' in event
+              ? event.paymentRecipientName
+              : undefined
+          }
+        />
+      )}
     </TouchableOpacity>
   );
 };
@@ -177,6 +214,44 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    position: 'relative',
+  },
+
+  // Badge overlays
+  prizePoolBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: '#000',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    zIndex: 10,
+  },
+
+  entryFeeBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: theme.colors.accent,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+
+  badgeText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.bold,
+    color: '#fff', // White text on black badge
+  },
+
+  badgeTextOrange: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.accentText, // Black text on orange badge
   },
   header: {
     flexDirection: 'row',
@@ -237,7 +312,8 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 14,
     marginRight: 8,
-    width: 20,
+    color: theme.colors.textMuted,
+    fontWeight: theme.typography.weights.medium,
   },
   detailValue: {
     fontSize: 14,
