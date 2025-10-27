@@ -97,16 +97,20 @@ class QRCodeService {
    */
   parseQR(qrString: string): QRData | null {
     try {
-      // Check if it's a raw NWC connection string (not JSON)
-      if (qrString.startsWith('nostr+walletconnect://')) {
+      // Normalize: trim whitespace and decode URL encoding
+      const normalized = qrString.trim();
+      const decoded = normalized.includes('%') ? decodeURIComponent(normalized) : normalized;
+
+      // Check for NWC connection string (case-insensitive for robustness)
+      if (decoded.toLowerCase().startsWith('nostr+walletconnect://')) {
         return {
           type: 'nwc',
-          connectionString: qrString,
+          connectionString: decoded,
         };
       }
 
       // Otherwise try to parse as JSON (challenge/event)
-      const data = JSON.parse(qrString);
+      const data = JSON.parse(decoded);
       return this.validateQRData(data) ? data : null;
     } catch (error) {
       console.error('Failed to parse QR code:', error);

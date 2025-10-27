@@ -144,7 +144,8 @@ class NWCStorageServiceClass {
 
   /**
    * Save NWC connection string
-   * Validates and tests connection before saving
+   * Validates format and saves directly to SecureStore
+   * Connection test happens when wallet is actually used
    */
   async saveNWCString(
     nwcString: string
@@ -152,7 +153,7 @@ class NWCStorageServiceClass {
     try {
       console.log('[NWC] Attempting to save connection string');
 
-      // Validate format
+      // Validate format only
       if (!this.validateFormat(nwcString)) {
         return {
           success: false,
@@ -160,17 +161,7 @@ class NWCStorageServiceClass {
         };
       }
 
-      // Test connection
-      const connectionWorks = await this.testConnection(nwcString);
-      if (!connectionWorks) {
-        return {
-          success: false,
-          error:
-            'Could not connect to wallet. Please check your connection string.',
-        };
-      }
-
-      // Save to SecureStore (hardware-backed encryption)
+      // Save directly to SecureStore (hardware-backed encryption)
       await SecureStore.setItemAsync(SECURE_KEYS.NWC_STRING, nwcString);
 
       // Save connection status
