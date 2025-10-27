@@ -452,7 +452,13 @@ export class UnifiedNostrCache {
         return data;
       })
       .catch((error) => {
-        console.error(`[UnifiedCache] Fetch failed for: ${key}`, error);
+        // ✅ FIX: AbortErrors are expected when canceling fetches - don't log as errors
+        if (error?.name === 'AbortError' || error?.message?.includes('abort')) {
+          console.log(`[UnifiedCache] Fetch cancelled for: ${key} (user navigated away)`);
+        } else {
+          // Real errors should be logged
+          console.error(`[UnifiedCache] Fetch failed for: ${key}`, error);
+        }
 
         // Clean up pending fetch
         this.pendingFetches.delete(key);
@@ -478,7 +484,12 @@ export class UnifiedNostrCache {
     console.log(`[UnifiedCache] Background refresh started: ${key}`);
 
     this.fetchAndCache(key, fetcher, ttl, persist).catch((error) => {
-      console.warn(`[UnifiedCache] Background refresh failed: ${key}`, error);
+      // ✅ FIX: AbortErrors are expected - don't log them even for background refresh
+      if (error?.name === 'AbortError' || error?.message?.includes('abort')) {
+        console.log(`[UnifiedCache] Background refresh cancelled for: ${key}`);
+      } else {
+        console.warn(`[UnifiedCache] Background refresh failed: ${key}`, error);
+      }
     });
   }
 

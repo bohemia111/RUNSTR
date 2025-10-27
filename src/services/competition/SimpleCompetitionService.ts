@@ -28,7 +28,8 @@ export interface CompetitionEvent {
   name: string;
   description?: string;
   activityType: string;
-  metric: string;
+  scoringType?: string; // NEW: 'completion' | 'fastest_time'
+  metric: string; // Deprecated: Use scoringType instead
   eventDate: string; // ISO date
   targetDistance?: number;
   targetUnit?: string;
@@ -330,8 +331,10 @@ export class SimpleCompetitionService {
       console.log(`✅ Fetched ${competitionEvents.length} events from Nostr for team ${teamId}`);
       return competitionEvents;
     } catch (error: any) {
-      if (error?.message === 'Request aborted') {
-        throw new Error('AbortError');
+      // ✅ FIX: Handle abort errors gracefully
+      if (error?.message === 'Request aborted' || error?.name === 'AbortError' || error?.message?.includes('abort')) {
+        console.log(`[SimpleCompetitionService] Fetch cancelled for team: ${teamId} (user navigated away)`);
+        throw new Error('AbortError'); // Re-throw for upstream handling
       }
       console.error(`Failed to fetch team events from Nostr: ${teamId}`, error);
       return [];
@@ -542,14 +545,19 @@ export class SimpleCompetitionService {
       const targetValue = getTag('target_value');
       const entryFee = getTag('entry_fee');
 
+      // ✅ FIX: Read scoring_type with fallback to competition_type for backward compatibility
+      const scoringType = getTag('scoring_type') || getTag('competition_type') || 'fastest_time';
+      const activityType = getTag('activity_type') || 'Running';
+
       return {
         id,
         teamId,
         captainPubkey: event.pubkey,
         name: getTag('name') || 'Unnamed Event',
         description: getTag('description'),
-        activityType: getTag('activity_type') || 'running',
-        metric: getTag('competition_type') || 'fastest_time',
+        activityType, // ✅ FIX: Properly read from tags
+        scoringType, // ✅ NEW: Read simplified scoring type
+        metric: getTag('competition_type') || scoringType, // Deprecated: backward compat
         eventDate: getTag('event_date') || new Date().toISOString(),
         targetDistance: targetValue ? parseFloat(targetValue) : undefined,
         targetUnit: getTag('target_unit'),
