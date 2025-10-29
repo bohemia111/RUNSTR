@@ -56,6 +56,9 @@ import { NDKPrivateKeySigner, NDKEvent } from '@nostr-dev-kit/ndk';
 import { npubToHex } from '../utils/ndkConversion';
 import unifiedCache from '../services/cache/UnifiedNostrCache';
 import { CacheKeys } from '../constants/cacheTTL';
+import { CaptainEventStore } from '../services/event/CaptainEventStore';
+import type { CaptainEventRecord } from '../services/event/CaptainEventStore';
+import { EventAnnouncementPreview } from '../components/events/EventAnnouncementPreview';
 
 // Type definitions for captain dashboard data
 export interface CaptainDashboardData {
@@ -158,15 +161,32 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
   );
   const [bannerPreviewLoading, setBannerPreviewLoading] = useState(false);
 
+  // Captain events state for re-announcement
+  const [captainEvents, setCaptainEvents] = useState<CaptainEventRecord[]>([]);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [selectedEventForAnnouncement, setSelectedEventForAnnouncement] =
+    useState<any>(null);
+
   // Initialize team data on mount
   React.useEffect(() => {
     const initializeTeam = async () => {
       await loadActiveCompetitions();
       await loadTeamData();
+      await loadCaptainEvents();
     };
 
     initializeTeam();
   }, [teamId, captainId]);
+
+  const loadCaptainEvents = async () => {
+    try {
+      const events = await CaptainEventStore.getTeamEvents(teamId);
+      setCaptainEvents(events);
+      console.log(`📋 Loaded ${events.length} captain-created events for team ${teamId}`);
+    } catch (error) {
+      console.error('Error loading captain events:', error);
+    }
+  };
 
   const loadActiveCompetitions = async () => {
     try {
@@ -400,8 +420,9 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
     );
     setEventWizardVisible(false);
 
-    // Reload active competitions to show the new event
+    // Reload active competitions and captain events to show the new event
     await loadActiveCompetitions();
+    await loadCaptainEvents();
 
     onEventCreated?.(eventData);
   };
@@ -1191,6 +1212,125 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
           // onManageFlash={() => setShowFlashModal(true)} // REMOVED: Removing Flash subscription management
         />
 
+        {/* My Events Section - Captain-created events with announcement buttons */}
+        {captainEvents.length > 0 && (
+          <View style={styles.managementSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>My Events</Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: theme.colors.textMuted,
+                }}
+              >
+                {captainEvents.length} event{captainEvents.length !== 1 ? 's' : ''}
+              </Text>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 12 }}
+            >
+              {captainEvents.map((record) => {
+                const event = record.eventData;
+                const eventDate = new Date(event.eventDate);
+                const isPast = eventDate < new Date();
+
+                return (
+                  <View
+                    key={record.eventId}
+                    style={{
+                      backgroundColor: theme.colors.cardBackground,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                      borderRadius: 12,
+                      padding: 16,
+                      width: 200,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '600',
+                        color: theme.colors.text,
+                        marginBottom: 8,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {event.name}
+                    </Text>
+
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: isPast
+                          ? theme.colors.textMuted
+                          : theme.colors.text,
+                        marginBottom: 4,
+                      }}
+                    >
+                      📅 {eventDate.toLocaleDateString()}
+                    </Text>
+
+                    {event.activityType && (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: theme.colors.textSecondary,
+                          marginBottom: 4,
+                        }}
+                      >
+                        🏃 {event.activityType}
+                      </Text>
+                    )}
+
+                    {event.entryFeesSats && event.entryFeesSats > 0 && (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: theme.colors.textSecondary,
+                          marginBottom: 12,
+                        }}
+                      >
+                        💰 {event.entryFeesSats.toLocaleString()} sats
+                      </Text>
+                    )}
+
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: theme.colors.accent,
+                        paddingVertical: 8,
+                        paddingHorizontal: 12,
+                        borderRadius: 6,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                      }}
+                      onPress={() => {
+                        setSelectedEventForAnnouncement(event);
+                        setShowAnnouncementModal(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '600',
+                          color: theme.colors.accentText,
+                        }}
+                      >
+                        📣 Announce Event
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Active Events with QR */}
         <ActiveEventsSection
           events={activeCompetitions}
@@ -1434,6 +1574,23 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       )}
 
       {/* REMOVED: Add Member Modal - teams no longer require member management */}
+
+      {/* Event Announcement Modal */}
+      {selectedEventForAnnouncement && (
+        <EventAnnouncementPreview
+          visible={showAnnouncementModal}
+          eventData={selectedEventForAnnouncement}
+          onClose={() => {
+            setShowAnnouncementModal(false);
+            setSelectedEventForAnnouncement(null);
+          }}
+          onSuccess={() => {
+            console.log('✅ Event announced successfully');
+            setShowAnnouncementModal(false);
+            setSelectedEventForAnnouncement(null);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 };

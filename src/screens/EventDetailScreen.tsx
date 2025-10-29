@@ -146,6 +146,16 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       console.log('✅ Event loaded:', event.name);
       setEventData(event);
 
+      // ✅ CRITICAL: Validate event has captain pubkey before querying participants
+      if (!event.captainPubkey || event.captainPubkey.trim() === '') {
+        console.error(`❌ Event ${eventId} has no captain pubkey - cannot load participants`);
+        setParticipants([]);
+        setLoadingMembers(false);
+        setLoadingLeaderboard(false);
+        setError('This event has incomplete data. The event captain information is missing. Please contact the event organizer or try refreshing.');
+        return;
+      }
+
       // PHASE 2: Event participants (show participant count ASAP)
       setLoadingMembers(true);
       console.log('⏳ Fetching event participants...');

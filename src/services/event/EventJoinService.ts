@@ -50,12 +50,12 @@ export class EventJoinService {
       console.log(`📝 Joining free event: ${eventData.event_name}`);
 
       // Get signer (supports both nsec and Amber)
-      const signer = await UnifiedSigningService.getSigner();
+      const signer = await UnifiedSigningService.getInstance().getSigner();
       if (!signer) {
         throw new Error('Authentication required to join event');
       }
 
-      const userHexPubkey = await UnifiedSigningService.getHexPubkey();
+      const userHexPubkey = await UnifiedSigningService.getInstance().getHexPubkey();
       if (!userHexPubkey) {
         throw new Error('Could not determine user public key');
       }
@@ -212,12 +212,12 @@ export class EventJoinService {
       console.log('✅ Invoice expiration check passed');
 
       // Get signer (supports both nsec and Amber)
-      const signer = await UnifiedSigningService.getSigner();
+      const signer = await UnifiedSigningService.getInstance().getSigner();
       if (!signer) {
         throw new Error('Authentication required to join event');
       }
 
-      const userHexPubkey = await UnifiedSigningService.getHexPubkey();
+      const userHexPubkey = await UnifiedSigningService.getInstance().getHexPubkey();
       if (!userHexPubkey) {
         throw new Error('Could not determine user public key');
       }

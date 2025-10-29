@@ -6,6 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2025-01-28
+
+### Added
+- **Captain Event Management** - New "My Events" section in Captain Dashboard
+  - `CaptainEventStore.ts`: Local storage service for captain-created events (200+ lines)
+  - View all events created by the captain in a horizontal scrollable list
+  - Re-announcement capability for existing events
+  - Event preview cards showing name, date, activity type, and participant count
+  - Automatic saving of events upon creation for future management
+
+- **Event Re-announcement** - Captains can now broadcast their events again
+  - Generate fresh event announcement cards
+  - Reach new potential participants
+  - Increase event visibility over time
+
+### Fixed
+- **Event Publishing Reliability** - Fixed event publishing to use Global NDK instance instead of creating disconnected relay managers
+  - Prevents "No connected relays available" errors during event creation
+  - Ensures events publish successfully to all configured relays
+  - Better error handling and relay connection stability
+
+- **Event Data Validation** - Added validation for events with incomplete data
+  - Prevents crashes when loading events with missing captain information
+  - Clear error messages for users when event data is incomplete
+  - Improved error handling in EventDetailScreen
+
+### Improved
+- **Event Persistence** - All created events now automatically saved locally for captain dashboard access
+- **Event Service Architecture** - Enhanced NostrCompetitionService with local event tracking
+- **Event Join Service** - Improved event participation flow and data handling
+- **Nostr List Service** - Better participant list management and querying
+
 ## [0.5.1] - 2025-01-28
 
 ### Fixed

@@ -109,6 +109,12 @@ export class NostrListService {
    * Get a specific list by author and dTag
    */
   async getList(authorPubkey: string, dTag: string): Promise<NostrList | null> {
+    // ✅ CRITICAL: Validate authorPubkey is not empty
+    if (!authorPubkey || authorPubkey.trim() === '') {
+      console.error(`❌ Cannot fetch list with empty authorPubkey. dTag: ${dTag}`);
+      return null;
+    }
+
     // Convert npub to hex if needed (Nostr relays expect hex format)
     let hexAuthorPubkey = authorPubkey;
     if (authorPubkey.startsWith('npub')) {

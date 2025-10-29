@@ -557,6 +557,12 @@ export class SimpleCompetitionService {
       const scoringModeTag = getTag('scoring_mode');
       const teamGoalTag = getTag('team_goal');
 
+      // ✅ CRITICAL: Validate event has a valid pubkey (captain)
+      if (!event.pubkey || event.pubkey.trim() === '') {
+        console.error(`❌ Event ${id} has invalid/empty pubkey - skipping event`);
+        return null;
+      }
+
       return {
         id,
         teamId,

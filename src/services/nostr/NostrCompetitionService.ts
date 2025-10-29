@@ -346,6 +346,36 @@ export class NostrCompetitionService {
 
       if (publishedRelayCount > 0) {
         console.log(`✅ Event published successfully to ${publishedRelayCount} relays:`, competitionId);
+
+        // ✅ NEW: Save event locally for captain dashboard re-announcement
+        try {
+          const { CaptainEventStore } = await import('../event/CaptainEventStore');
+          const competitionEvent = {
+            id: competitionId,
+            teamId: eventData.teamId,
+            captainPubkey,
+            name: eventData.name,
+            description: eventData.description,
+            activityType: eventData.activityType,
+            scoringType: eventData.scoringType,
+            metric: eventData.competitionType,
+            eventDate: eventData.eventDate,
+            durationMinutes: eventData.durationMinutes,
+            targetDistance: eventData.targetValue,
+            targetUnit: eventData.targetUnit,
+            entryFeesSats: eventData.entryFeesSats,
+            lightningAddress: eventData.lightningAddress,
+            paymentDestination: eventData.paymentDestination,
+            paymentRecipientName: eventData.paymentRecipientName,
+            scoringMode: eventData.scoringMode,
+            teamGoal: eventData.teamGoal,
+          };
+          await CaptainEventStore.saveCreatedEvent(competitionId, competitionEvent);
+        } catch (error) {
+          console.warn('⚠️ Failed to save event locally (non-critical):', error);
+          // Don't fail the whole operation if local save fails
+        }
+
         return {
           eventId: ndkEvent.id,
           success: true,
