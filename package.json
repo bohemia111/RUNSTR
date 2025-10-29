@@ -21,6 +21,7 @@
     "find:wallet": "npx tsx scripts/find-nostr-wallet.ts",
     "test:amber-flow": "npx tsx scripts/test-amber-wallet-flow.ts",
     "test:amber-solutions": "npx tsx scripts/test-amber-solutions.ts",
+    "verify:events": "npx tsx scripts/verify-nostr-events.ts",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },

@@ -7,6 +7,8 @@
 import { EventTemplate, Event, getPublicKey } from 'nostr-tools';
 import { NostrProtocolHandler } from './NostrProtocolHandler';
 import { NostrRelayManager, nostrRelayManager } from './NostrRelayManager';
+import { GlobalNDKService } from './GlobalNDKService';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import type {
   NostrLeagueDefinition,
@@ -130,40 +132,45 @@ export class NostrCompetitionService {
         created_at: now,
       };
 
-      // Sign and publish event based on auth method
-      const service = NostrCompetitionService.getInstance();
-      let signedEvent: Event;
+      // ✅ FIX: Use Global NDK for publishing (same relays as rest of app)
+      console.log('📤 Publishing league to Global NDK relays...');
+
+      // Get global NDK instance
+      const ndk = await GlobalNDKService.getInstance();
+
+      // Create NDK event
+      const ndkEvent = new NDKEvent(ndk, eventTemplate);
+
+      // Sign event based on auth method
       if (isSigner) {
-        signedEvent = await service.protocolHandler.signEventWithSigner(
-          eventTemplate,
-          captainPrivateKeyOrSigner as NDKSigner
-        );
+        await ndkEvent.sign(captainPrivateKeyOrSigner as NDKSigner);
       } else {
-        signedEvent = await service.protocolHandler.signEvent(
-          eventTemplate,
-          captainPrivateKeyOrSigner as string
-        );
+        // For nsec users, create a signer from the private key
+        const { NDKPrivateKeySigner } = await import('@nostr-dev-kit/ndk');
+        const signer = new NDKPrivateKeySigner(captainPrivateKeyOrSigner as string);
+        await ndkEvent.sign(signer);
       }
-      const publishResult = await service.relayManager.publishEvent(
-        signedEvent
+
+      // Publish to relays with timeout
+      const publishPromise = ndkEvent.publish();
+      const timeoutPromise = new Promise<Set<any>>((resolve) =>
+        setTimeout(() => resolve(new Set()), 10000) // 10s timeout
       );
 
-      // Check if any relays were successful
-      const hasSuccess =
-        publishResult.successful && publishResult.successful.length > 0;
+      const relaySet = await Promise.race([publishPromise, timeoutPromise]);
+      const publishedRelayCount = relaySet.size;
 
-      if (hasSuccess) {
-        console.log('✅ League published successfully:', competitionId);
+      if (publishedRelayCount > 0) {
+        console.log(`✅ League published successfully to ${publishedRelayCount} relays:`, competitionId);
         return {
-          eventId: signedEvent.id,
+          eventId: ndkEvent.id,
           success: true,
           competitionId,
-          message: 'League created and published to Nostr relays',
+          message: `League created and published to ${publishedRelayCount} Nostr relays`,
         };
       } else {
-        const failedRelays = publishResult.failed || [];
         throw new Error(
-          `Failed to publish league to relays: ${failedRelays.length} failed`
+          'Failed to publish league to any relays. Please check your connection and try again.'
         );
       }
     } catch (error) {
@@ -309,40 +316,45 @@ export class NostrCompetitionService {
         created_at: now,
       };
 
-      // Sign and publish event based on auth method
-      const service = NostrCompetitionService.getInstance();
-      let signedEvent: Event;
+      // ✅ FIX: Use Global NDK for publishing (same relays as rest of app)
+      console.log('📤 Publishing event to Global NDK relays...');
+
+      // Get global NDK instance
+      const ndk = await GlobalNDKService.getInstance();
+
+      // Create NDK event
+      const ndkEvent = new NDKEvent(ndk, eventTemplate);
+
+      // Sign event based on auth method
       if (isSigner) {
-        signedEvent = await service.protocolHandler.signEventWithSigner(
-          eventTemplate,
-          captainPrivateKeyOrSigner as NDKSigner
-        );
+        await ndkEvent.sign(captainPrivateKeyOrSigner as NDKSigner);
       } else {
-        signedEvent = await service.protocolHandler.signEvent(
-          eventTemplate,
-          captainPrivateKeyOrSigner as string
-        );
+        // For nsec users, create a signer from the private key
+        const { NDKPrivateKeySigner } = await import('@nostr-dev-kit/ndk');
+        const signer = new NDKPrivateKeySigner(captainPrivateKeyOrSigner as string);
+        await ndkEvent.sign(signer);
       }
-      const publishResult = await service.relayManager.publishEvent(
-        signedEvent
+
+      // Publish to relays with timeout
+      const publishPromise = ndkEvent.publish();
+      const timeoutPromise = new Promise<Set<any>>((resolve) =>
+        setTimeout(() => resolve(new Set()), 10000) // 10s timeout
       );
 
-      // Check if any relays were successful
-      const hasSuccess =
-        publishResult.successful && publishResult.successful.length > 0;
+      const relaySet = await Promise.race([publishPromise, timeoutPromise]);
+      const publishedRelayCount = relaySet.size;
 
-      if (hasSuccess) {
-        console.log('✅ Event published successfully:', competitionId);
+      if (publishedRelayCount > 0) {
+        console.log(`✅ Event published successfully to ${publishedRelayCount} relays:`, competitionId);
         return {
-          eventId: signedEvent.id,
+          eventId: ndkEvent.id,
           success: true,
           competitionId,
-          message: 'Event created and published to Nostr relays',
+          message: `Event created and published to ${publishedRelayCount} Nostr relays`,
         };
       } else {
-        const failedRelays = publishResult.failed || [];
         throw new Error(
-          `Failed to publish event to relays: ${failedRelays.length} failed`
+          'Failed to publish event to any relays. Please check your connection and try again.'
         );
       }
     } catch (error) {
