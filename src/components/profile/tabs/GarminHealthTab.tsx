@@ -12,8 +12,8 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
+import { CustomAlertManager } from '../../ui/CustomAlert';
 import { theme } from '../../../styles/theme';
 import { Card } from '../../ui/Card';
 import { LoadingOverlay } from '../../ui/LoadingStates';
@@ -69,20 +69,20 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
 
       if (result.success) {
         // OAuth flow opened browser, callback will be handled by deep link
-        Alert.alert(
+        CustomAlertManager.alert(
           'Authorize Garmin',
           'Please authorize RUNSTR in your browser. Once authorized, you will be redirected back to the app.',
           [{ text: 'OK' }]
         );
       } else {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Connection Failed',
           result.error || 'Failed to connect to Garmin. Please try again.'
         );
       }
     } catch (error) {
       console.error('Garmin connection failed:', error);
-      Alert.alert(
+      CustomAlertManager.alert(
         'Error',
         'Failed to connect to Garmin. Please try again later.'
       );
@@ -100,7 +100,7 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
         setLastSyncAt(new Date());
         await loadGarminWorkouts();
 
-        Alert.alert(
+        CustomAlertManager.alert(
           'Sync Complete',
           `Synced ${result.newWorkouts} new workout${result.newWorkouts === 1 ? '' : 's'} from Garmin. ${result.skippedWorkouts} already synced.`
         );
@@ -113,7 +113,7 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
         error instanceof Error ? error.message : 'Unknown error';
 
       if (errorMessage.includes('not authenticated')) {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Authentication Required',
           'Please reconnect your Garmin account to sync workouts.',
           [
@@ -122,7 +122,7 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
           ]
         );
       } else {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Sync Failed',
           `Failed to sync workouts: ${errorMessage}`
         );
@@ -174,7 +174,7 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
   };
 
   const disconnectGarmin = async () => {
-    Alert.alert(
+    CustomAlertManager.alert(
       'Disconnect Garmin',
       'Are you sure you want to disconnect your Garmin account? Your synced workouts will remain available.',
       [
@@ -188,10 +188,10 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
               setIsConnected(false);
               setWorkouts([]);
               setLastSyncAt(null);
-              Alert.alert('Success', 'Garmin account disconnected');
+              CustomAlertManager.alert('Success', 'Garmin account disconnected');
             } catch (error) {
               console.error('Failed to disconnect Garmin:', error);
-              Alert.alert('Error', 'Failed to disconnect Garmin account');
+              CustomAlertManager.alert('Error', 'Failed to disconnect Garmin account');
             }
           },
         },
@@ -201,31 +201,31 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
 
   const handleCompete = async (workout: Workout) => {
     if (!onCompete) {
-      Alert.alert('Error', 'Competition entry functionality not available');
+      CustomAlertManager.alert('Error', 'Competition entry functionality not available');
       return;
     }
 
     try {
       await onCompete(workout);
-      Alert.alert('Success', 'Workout entered into competition!');
+      CustomAlertManager.alert('Success', 'Workout entered into competition!');
     } catch (error) {
       console.error('Competition entry failed:', error);
-      Alert.alert('Error', 'Failed to enter workout into competition');
+      CustomAlertManager.alert('Error', 'Failed to enter workout into competition');
     }
   };
 
   const handleSocialShare = async (workout: Workout) => {
     if (!onSocialShare) {
-      Alert.alert('Error', 'Social sharing functionality not available');
+      CustomAlertManager.alert('Error', 'Social sharing functionality not available');
       return;
     }
 
     try {
       await onSocialShare(workout);
-      Alert.alert('Success', 'Workout shared to social feeds!');
+      CustomAlertManager.alert('Success', 'Workout shared to social feeds!');
     } catch (error) {
       console.error('Social share failed:', error);
-      Alert.alert('Error', 'Failed to share workout');
+      CustomAlertManager.alert('Error', 'Failed to share workout');
     }
   };
 

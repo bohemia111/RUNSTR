@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
 
   // New request badge
   newBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF9D42',
     paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 4,

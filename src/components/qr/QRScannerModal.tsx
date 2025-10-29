@@ -1,6 +1,7 @@
 /**
  * QRScannerModal - Camera-based QR code scanner
- * Clean black and white minimalistic design with camera permission handling
+ * Uses modern DataScannerViewController on iOS 16+ for better QR detection
+ * Falls back to continuous camera scanning on older devices
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,8 +13,10 @@ import {
   TouchableOpacity,
   Alert,
   Linking,
+  Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Device from 'expo-device';
 import { theme } from '../../styles/theme';
 import type { QRData } from '../../services/qr/QRCodeService';
 import QRCodeService from '../../services/qr/QRCodeService';
@@ -31,25 +34,95 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [useNativeScanner, setUseNativeScanner] = useState(true);
 
   useEffect(() => {
     if (visible) {
       setScanned(false);
+      // Check if device supports native scanner (iOS 16+ or Android)
+      checkNativeScannerSupport();
     }
   }, [visible]);
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
-    if (scanned) return;
+  const checkNativeScannerSupport = async () => {
+    if (Platform.OS === 'android') {
+      // Android uses Google Code Scanner - available on most devices
+      setUseNativeScanner(true);
+      return;
+    }
 
-    setScanned(true);
+    if (Platform.OS === 'ios') {
+      // iOS 16+ required for DataScannerViewController
+      const osVersion = Platform.Version;
+      const majorVersion = typeof osVersion === 'string' ? parseInt(osVersion.split('.')[0], 10) : osVersion;
+      setUseNativeScanner(majorVersion >= 16);
+    } else {
+      // Web or other platforms - use fallback
+      setUseNativeScanner(false);
+    }
+  };
 
+  /**
+   * Launch native scanner modal (iOS 16+ DataScannerViewController / Android Google Code Scanner)
+   * Much more reliable for high-density QR codes like NWC connection strings
+   */
+  const handleLaunchNativeScanner = async () => {
     try {
-      const qrData = QRCodeService.parseQR(data);
+      // Set up listener for scan results
+      const subscription = CameraView.onModernBarcodeScanned((result) => {
+        console.log('[QRScanner] Native scanner detected barcode:', result.type);
+
+        // Process the scanned data
+        handleScanResult(result.data);
+
+        // Dismiss the scanner
+        CameraView.dismissScanner().catch((err) => {
+          console.warn('[QRScanner] Failed to dismiss scanner:', err);
+        });
+
+        // Clean up subscription
+        subscription.remove();
+      });
+
+      // Launch the native scanner modal
+      await CameraView.launchScanner({
+        barcodeTypes: ['qr'],
+        isGuidanceEnabled: true,
+        isHighlightingEnabled: true,
+        isPinchToZoomEnabled: true,
+      });
+    } catch (error) {
+      console.error('[QRScanner] Native scanner error:', error);
+      Alert.alert(
+        'Scanner Error',
+        'Unable to launch native scanner. Please try the manual scanner.',
+        [
+          {
+            text: 'Try Manual Scanner',
+            onPress: () => setUseNativeScanner(false),
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: onClose,
+          },
+        ]
+      );
+    }
+  };
+
+  /**
+   * Process scanned QR data (shared by both native scanner and fallback camera scanner)
+   */
+  const handleScanResult = (data: string) => {
+    try {
+      const service = QRCodeService.getInstance();
+      const qrData = service.parseQR(data);
 
       if (!qrData) {
         Alert.alert(
           'Invalid QR Code',
-          'This QR code is not a valid RUNSTR challenge or event invitation.',
+          'This QR code is not a valid RUNSTR challenge, event, or wallet connection.',
           [
             {
               text: 'Try Again',
@@ -85,6 +158,15 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         ]
       );
     }
+  };
+
+  /**
+   * Fallback handler for continuous camera scanning (older iOS / web)
+   */
+  const handleBarCodeScanned = ({ data }: { data: string }) => {
+    if (scanned) return;
+    setScanned(true);
+    handleScanResult(data);
   };
 
   const handlePermissionRequest = async () => {
@@ -140,6 +222,49 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     );
   }
 
+  // Modern native scanner (iOS 16+ / Android)
+  if (useNativeScanner) {
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.nativeScannerContainer}>
+            <Text style={styles.nativeScannerTitle}>Scan QR Code</Text>
+            <Text style={styles.nativeScannerText}>
+              Open your device's camera to scan QR codes for challenges, events, or wallet connections
+            </Text>
+
+            <TouchableOpacity
+              style={styles.launchScannerButton}
+              onPress={handleLaunchNativeScanner}
+            >
+              <Text style={styles.launchScannerButtonText}>Open Camera Scanner</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.useFallbackButton}
+              onPress={() => setUseNativeScanner(false)}
+            >
+              <Text style={styles.useFallbackButtonText}>Use Manual Scanner Instead</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={onClose}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Fallback continuous camera scanner (older iOS / web)
   return (
     <Modal
       visible={visible}
@@ -304,6 +429,58 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#000',
+    textAlign: 'center',
+  },
+  nativeScannerContainer: {
+    backgroundColor: '#0a0a0a',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1a1a1a',
+    padding: 24,
+    width: '80%',
+    maxWidth: 350,
+  },
+  nativeScannerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  nativeScannerText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  launchScannerButton: {
+    backgroundColor: theme.colors.orangeDeep,
+    paddingVertical: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  launchScannerButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.accentText,
+    textAlign: 'center',
+  },
+  useFallbackButton: {
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  useFallbackButtonText: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+  },
+  cancelButton: {
+    paddingVertical: 12,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
     textAlign: 'center',
   },
 });

@@ -10,9 +10,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Image,
 } from 'react-native';
+import { CustomAlertManager } from '../ui/CustomAlert';
 import { theme } from '../../styles/theme';
 import {
   challengeNotificationHandler,
@@ -85,20 +85,20 @@ export const ChallengeNotificationsBox: React.FC = () => {
       if (result.success) {
         // Remove from pending list
         setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-        Alert.alert('Success', 'Challenge accepted! Good luck!');
+        CustomAlertManager.alert('Success', 'Challenge accepted! Good luck!');
       } else {
-        Alert.alert('Error', result.error || 'Failed to accept challenge');
+        CustomAlertManager.alert('Error', result.error || 'Failed to accept challenge');
       }
     } catch (error) {
       console.error('Error accepting challenge:', error);
-      Alert.alert('Error', 'An unexpected error occurred');
+      CustomAlertManager.alert('Error', 'An unexpected error occurred');
     } finally {
       setProcessingId(null);
     }
   };
 
   const handleDecline = async (notificationId: string) => {
-    Alert.alert(
+    CustomAlertManager.alert(
       'Decline Challenge',
       'Are you sure you want to decline this challenge?',
       [
@@ -123,14 +123,14 @@ export const ChallengeNotificationsBox: React.FC = () => {
                   prev.filter((n) => n.id !== notificationId)
                 );
               } else {
-                Alert.alert(
+                CustomAlertManager.alert(
                   'Error',
                   result.error || 'Failed to decline challenge'
                 );
               }
             } catch (error) {
               console.error('Error declining challenge:', error);
-              Alert.alert('Error', 'An unexpected error occurred');
+              CustomAlertManager.alert('Error', 'An unexpected error occurred');
             } finally {
               setProcessingId(null);
             }
@@ -182,7 +182,7 @@ export const ChallengeNotificationsBox: React.FC = () => {
       console.log('⚡ Payment modal shown for QR challenge creator...');
     } catch (error) {
       console.error('Failed to initiate payment:', error);
-      Alert.alert(
+      CustomAlertManager.alert(
         'Payment Setup Failed',
         error instanceof Error ? error.message : 'An error occurred'
       );
@@ -203,7 +203,7 @@ export const ChallengeNotificationsBox: React.FC = () => {
       prev.filter((n) => n.challengeId !== paymentChallengeId)
     );
 
-    Alert.alert(
+    CustomAlertManager.alert(
       'Challenge Activated!',
       `Your ${paymentWagerAmount} sats payment confirmed. The challenge is now active!`
     );
@@ -214,7 +214,7 @@ export const ChallengeNotificationsBox: React.FC = () => {
    */
   const handlePaymentCancelled = () => {
     setShowPaymentModal(false);
-    Alert.alert('Payment Cancelled', 'Challenge was not activated.');
+    CustomAlertManager.alert('Payment Cancelled', 'Challenge was not activated.');
   };
 
   /**
@@ -222,7 +222,7 @@ export const ChallengeNotificationsBox: React.FC = () => {
    */
   const handlePaymentTimeout = () => {
     setShowPaymentModal(false);
-    Alert.alert(
+    CustomAlertManager.alert(
       'Payment Timeout',
       'Challenge was not activated due to payment timeout.'
     );

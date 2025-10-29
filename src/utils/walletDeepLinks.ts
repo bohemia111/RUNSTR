@@ -4,7 +4,8 @@
  * Supports Cash App, Strike, and generic Lightning wallets
  */
 
-import { Linking, Alert, Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
+import { CustomAlertManager } from '../components/ui/CustomAlert';
 
 export interface WalletDeepLinkResult {
   success: boolean;
@@ -34,7 +35,7 @@ export async function openInCashApp(invoice: string): Promise<WalletDeepLinkResu
       return { success: true };
     } else {
       // Cash App not installed
-      Alert.alert(
+      CustomAlertManager.alert(
         'Cash App Not Installed',
         'Install Cash App from the App Store to pay with Cash App.',
         [
@@ -57,7 +58,7 @@ export async function openInCashApp(invoice: string): Promise<WalletDeepLinkResu
     }
   } catch (error) {
     console.error('[WalletDeepLinks] Cash App error:', error);
-    Alert.alert(
+    CustomAlertManager.alert(
       'Error',
       'Failed to open Cash App. Please copy the invoice and paste it manually in Cash App.'
     );
@@ -87,7 +88,7 @@ export async function openInStrike(invoice: string): Promise<WalletDeepLinkResul
       return { success: true };
     } else {
       // Strike not installed
-      Alert.alert(
+      CustomAlertManager.alert(
         'Strike Not Installed',
         'Install Strike from the App Store to pay with Strike.',
         [
@@ -110,7 +111,7 @@ export async function openInStrike(invoice: string): Promise<WalletDeepLinkResul
     }
   } catch (error) {
     console.error('[WalletDeepLinks] Strike error:', error);
-    Alert.alert(
+    CustomAlertManager.alert(
       'Error',
       'Failed to open Strike. Please copy the invoice and paste it manually in Strike.'
     );
@@ -140,7 +141,7 @@ export async function openInZeus(invoice: string): Promise<WalletDeepLinkResult>
       return { success: true };
     } else {
       // Zeus not installed
-      Alert.alert(
+      CustomAlertManager.alert(
         'Zeus Not Installed',
         'Install Zeus from the App Store to pay with Zeus.',
         [
@@ -163,7 +164,7 @@ export async function openInZeus(invoice: string): Promise<WalletDeepLinkResult>
     }
   } catch (error) {
     console.error('[WalletDeepLinks] Zeus error:', error);
-    Alert.alert(
+    CustomAlertManager.alert(
       'Error',
       'Failed to open Zeus. Please copy the invoice and paste it manually in Zeus.'
     );
@@ -193,7 +194,7 @@ export async function openInPhoenix(invoice: string): Promise<WalletDeepLinkResu
       return { success: true };
     } else {
       // Phoenix not installed
-      Alert.alert(
+      CustomAlertManager.alert(
         'Phoenix Not Installed',
         'Install Phoenix from the App Store to pay with Phoenix.',
         [
@@ -216,7 +217,7 @@ export async function openInPhoenix(invoice: string): Promise<WalletDeepLinkResu
     }
   } catch (error) {
     console.error('[WalletDeepLinks] Phoenix error:', error);
-    Alert.alert(
+    CustomAlertManager.alert(
       'Error',
       'Failed to open Phoenix. Please copy the invoice and paste it manually in Phoenix.'
     );
@@ -246,7 +247,7 @@ export async function openInWalletOfSatoshi(invoice: string): Promise<WalletDeep
       return { success: true };
     } else {
       // Wallet of Satoshi not installed
-      Alert.alert(
+      CustomAlertManager.alert(
         'Wallet of Satoshi Not Installed',
         'Install Wallet of Satoshi from the App Store to pay with WOS.',
         [
@@ -269,7 +270,7 @@ export async function openInWalletOfSatoshi(invoice: string): Promise<WalletDeep
     }
   } catch (error) {
     console.error('[WalletDeepLinks] Wallet of Satoshi error:', error);
-    Alert.alert(
+    CustomAlertManager.alert(
       'Error',
       'Failed to open Wallet of Satoshi. Please copy the invoice and paste it manually.'
     );
@@ -299,7 +300,7 @@ export async function openInBreez(invoice: string): Promise<WalletDeepLinkResult
       return { success: true };
     } else {
       // Breez not installed
-      Alert.alert(
+      CustomAlertManager.alert(
         'Breez Not Installed',
         'Install Breez from the App Store to pay with Breez.',
         [
@@ -322,7 +323,7 @@ export async function openInBreez(invoice: string): Promise<WalletDeepLinkResult
     }
   } catch (error) {
     console.error('[WalletDeepLinks] Breez error:', error);
-    Alert.alert(
+    CustomAlertManager.alert(
       'Error',
       'Failed to open Breez. Please copy the invoice and paste it manually in Breez.'
     );
@@ -352,7 +353,7 @@ export async function openInGenericWallet(invoice: string): Promise<WalletDeepLi
       return { success: true };
     } else {
       // No Lightning wallet installed
-      Alert.alert(
+      CustomAlertManager.alert(
         'No Lightning Wallet Found',
         'Install a Lightning wallet like Alby, BlueWallet, Zeus, Phoenix, or Breez to pay.\n\nOr copy the invoice and paste it in your wallet manually.',
         [{ text: 'OK' }]
@@ -361,7 +362,7 @@ export async function openInGenericWallet(invoice: string): Promise<WalletDeepLi
     }
   } catch (error) {
     console.error('[WalletDeepLinks] Generic wallet error:', error);
-    Alert.alert(
+    CustomAlertManager.alert(
       'Error',
       'Failed to open Lightning wallet. Please copy the invoice and paste it manually in your wallet.'
     );
@@ -407,7 +408,7 @@ export async function openInBestAvailableWallet(invoice: string): Promise<Wallet
     }
 
     // No wallet found
-    Alert.alert(
+    CustomAlertManager.alert(
       'No Lightning Wallet Found',
       'Install Cash App, Strike, or a Lightning wallet (Alby, BlueWallet, Zeus) to pay.\n\nOr copy the invoice below and paste it in your wallet manually.',
       [{ text: 'OK' }]

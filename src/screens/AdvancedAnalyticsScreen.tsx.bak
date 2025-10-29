@@ -326,6 +326,417 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
         </View>
 
         {/* Last Updated */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Overall Health Score</Text>
+              {analytics?.holisticScore ? (
+                <>
+                  <View style={styles.scoreCard}>
+                    <View style={styles.scoreCircle}>
+                      <Text style={styles.scoreValue}>
+                        {analytics.holisticScore.overall}
+                      </Text>
+                      <Text style={styles.scoreLabel}>/ 100</Text>
+                    </View>
+                    <View style={styles.scoreDetails}>
+                      <Text style={styles.categoryLabel}>
+                        {analytics.holisticScore.category.toUpperCase()}
+                      </Text>
+                      <Text style={styles.trendLabel}>
+                        Trend:{' '}
+                        {analytics.holisticScore.trend === 'improving'
+                          ? '📈'
+                          : analytics.holisticScore.trend === 'declining'
+                          ? '📉'
+                          : '➡️'}{' '}
+                        {analytics.holisticScore.trend}
+                      </Text>
+                    </View>
+                  </View>
+
+                {/* Category Breakdown */}
+                <View style={styles.categoryBreakdown}>
+                  {analytics.holisticScore.cardio > 0 && (
+                    <View style={styles.categoryRow}>
+                      <Text style={styles.categoryName}>Cardio</Text>
+                      <View style={styles.progressBar}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${analytics.holisticScore.cardio}%` },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.categoryScore}>
+                        {analytics.holisticScore.cardio}
+                      </Text>
+                    </View>
+                  )}
+                  {analytics.holisticScore.strength > 0 && (
+                    <View style={styles.categoryRow}>
+                      <Text style={styles.categoryName}>Strength</Text>
+                      <View style={styles.progressBar}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${analytics.holisticScore.strength}%` },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.categoryScore}>
+                        {analytics.holisticScore.strength}
+                      </Text>
+                    </View>
+                  )}
+                  {analytics.holisticScore.wellness > 0 && (
+                    <View style={styles.categoryRow}>
+                      <Text style={styles.categoryName}>Wellness</Text>
+                      <View style={styles.progressBar}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${analytics.holisticScore.wellness}%` },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.categoryScore}>
+                        {analytics.holisticScore.wellness}
+                      </Text>
+                    </View>
+                  )}
+                  {analytics.holisticScore.nutrition > 0 && (
+                    <View style={styles.categoryRow}>
+                      <Text style={styles.categoryName}>Nutrition</Text>
+                      <View style={styles.progressBar}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${analytics.holisticScore.nutrition}%` },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.categoryScore}>
+                        {analytics.holisticScore.nutrition}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.categoryRow}>
+                    <Text style={styles.categoryName}>Balance</Text>
+                    <View style={styles.progressBar}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { width: `${analytics.holisticScore.balance}%` },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.categoryScore}>
+                      {analytics.holisticScore.balance}
+                    </Text>
+                  </View>
+                </View>
+
+                  {/* Recommendations */}
+                  {analytics.holisticScore.recommendations.length > 0 && (
+                    <View style={styles.recommendations}>
+                      <Text style={styles.recommendationsTitle}>
+                        Recommendations
+                      </Text>
+                      {analytics.holisticScore.recommendations.map(
+                        (rec, index) => (
+                          <View key={index} style={styles.recommendationRow}>
+                            <Ionicons
+                              name="bulb-outline"
+                              size={16}
+                              color="#FF9D42"
+                            />
+                            <Text style={styles.recommendationText}>{rec}</Text>
+                          </View>
+                        )
+                      )}
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.metricCard}>
+                  <View style={styles.emptyMetricState}>
+                    <Ionicons
+                      name="bar-chart-outline"
+                      size={48}
+                      color={theme.colors.textMuted}
+                    />
+                    <Text style={styles.emptyMetricTitle}>
+                      Track workouts to see your score
+                    </Text>
+                    <Text style={styles.emptyMetricText}>
+                      Your overall health score will appear here once you start tracking workouts
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Cardio Performance Section - Always visible */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Cardio Performance</Text>
+              {analytics?.cardio ? (
+                <View style={styles.metricCard}>
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>Average Pace</Text>
+                    <Text style={styles.metricValue}>
+                      {Math.floor(
+                        analytics.cardio.paceImprovement.currentAvgPace / 60
+                      )}
+                      :
+                      {String(
+                        Math.round(
+                          analytics.cardio.paceImprovement.currentAvgPace % 60
+                        )
+                      ).padStart(2, '0')}{' '}
+                      /km
+                    </Text>
+                    {analytics.cardio.paceImprovement.percentChange !== 0 && (
+                      <Text
+                        style={[
+                          styles.metricTrend,
+                          analytics.cardio.paceImprovement.trend ===
+                            'improving' && styles.metricTrendPositive,
+                        ]}
+                      >
+                        {analytics.cardio.paceImprovement.percentChange > 0
+                          ? '+'
+                          : ''}
+                        {analytics.cardio.paceImprovement.percentChange.toFixed(
+                          1
+                        )}
+                        %
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>Weekly Distance</Text>
+                    <Text style={styles.metricValue}>
+                      {analytics.cardio.distanceProgression.currentWeeklyAvg.toFixed(
+                        1
+                      )}{' '}
+                      km
+                    </Text>
+                    {analytics.cardio.distanceProgression.percentChange !== 0 && (
+                      <Text
+                        style={[
+                          styles.metricTrend,
+                          analytics.cardio.distanceProgression.trend ===
+                            'increasing' && styles.metricTrendPositive,
+                        ]}
+                      >
+                        {analytics.cardio.distanceProgression.percentChange > 0
+                          ? '+'
+                          : ''}
+                        {analytics.cardio.distanceProgression.percentChange.toFixed(
+                          1
+                        )}
+                        %
+                      </Text>
+                    )}
+                  </View>
+                  {analytics.cardio.vo2MaxEstimate && (
+                    <View style={styles.metricRow}>
+                      <Text style={styles.metricLabel}>VO₂ Max Estimate</Text>
+                      <Text style={styles.metricValue}>
+                        {analytics.cardio.vo2MaxEstimate.estimate.toFixed(1)}{' '}
+                        ml/kg/min
+                      </Text>
+                      <Text style={styles.metricSubtext}>
+                        {analytics.cardio.vo2MaxEstimate.category}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.metricCard}>
+                  <View style={styles.emptyMetricState}>
+                    <Ionicons
+                      name="walk-outline"
+                      size={48}
+                      color={theme.colors.textMuted}
+                    />
+                    <Text style={styles.emptyMetricTitle}>
+                      Track your first run
+                    </Text>
+                    <Text style={styles.emptyMetricText}>
+                      Record cardio workouts to see pace, distance, and VO₂ Max estimates
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Strength Training Section - Always visible */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Strength Training</Text>
+              {analytics?.strength &&
+              analytics.strength.volumeProgression.currentMonthlyVolume > 0 ? (
+                <View style={styles.metricCard}>
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>Monthly Volume</Text>
+                    <Text style={styles.metricValue}>
+                      {
+                        analytics.strength.volumeProgression
+                          .currentMonthlyVolume
+                      }{' '}
+                      reps
+                    </Text>
+                    {analytics.strength.volumeProgression.percentChange !==
+                      0 && (
+                      <Text
+                        style={[
+                          styles.metricTrend,
+                          analytics.strength.volumeProgression.trend ===
+                            'increasing' && styles.metricTrendPositive,
+                        ]}
+                      >
+                        {analytics.strength.volumeProgression.percentChange >
+                        0
+                          ? '+'
+                          : ''}
+                        {analytics.strength.volumeProgression.percentChange.toFixed(
+                          1
+                        )}
+                        %
+                      </Text>
+                    )}
+                  </View>
+                  {analytics.strength.workoutDensity.avgRepsPerMinute > 0 && (
+                    <View style={styles.metricRow}>
+                      <Text style={styles.metricLabel}>Workout Density</Text>
+                      <Text style={styles.metricValue}>
+                        {analytics.strength.workoutDensity.avgRepsPerMinute.toFixed(
+                          1
+                        )}{' '}
+                        reps/min
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.metricCard}>
+                  <View style={styles.emptyMetricState}>
+                    <Ionicons
+                      name="barbell-outline"
+                      size={48}
+                      color={theme.colors.textMuted}
+                    />
+                    <Text style={styles.emptyMetricTitle}>
+                      Log your first strength workout
+                    </Text>
+                    <Text style={styles.emptyMetricText}>
+                      Track sets, reps, and exercises to see volume progression and workout density
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Wellness Section - Always visible */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Wellness & Recovery</Text>
+              {analytics?.wellness ? (
+                <View style={styles.metricCard}>
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>Meditation Streak</Text>
+                    <Text style={styles.metricValue}>
+                      {analytics.wellness.meditationConsistency.streak} days
+                    </Text>
+                    <Text style={styles.metricSubtext}>
+                      Best:{' '}
+                      {analytics.wellness.meditationConsistency.longestStreak}{' '}
+                      days
+                    </Text>
+                  </View>
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>Average Session</Text>
+                    <Text style={styles.metricValue}>
+                      {Math.floor(
+                        analytics.wellness.sessionDuration.avgDuration / 60
+                      )}{' '}
+                      min{' '}
+                      {Math.round(
+                        analytics.wellness.sessionDuration.avgDuration % 60
+                      )}{' '}
+                      sec
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.metricCard}>
+                  <View style={styles.emptyMetricState}>
+                    <Ionicons
+                      name="flower-outline"
+                      size={48}
+                      color={theme.colors.textMuted}
+                    />
+                    <Text style={styles.emptyMetricTitle}>
+                      Try meditation or recovery activities
+                    </Text>
+                    <Text style={styles.emptyMetricText}>
+                      Track meditation, yoga, and recovery sessions to see wellness patterns
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Insights & Correlations Section */}
+            {(() => {
+              // Check if ANY correlation exists before rendering section
+              const hasAnyCorrelation =
+                analytics.correlations &&
+                (analytics.correlations.meditationVsRecovery ||
+                  analytics.correlations.strengthVsCardio ||
+                  analytics.correlations.consistencyVsPerformance ||
+                  analytics.correlations.mealTimingVsAdherence);
+
+              if (!hasAnyCorrelation) return null;
+
+              return (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>
+                    Insights & Correlations
+                  </Text>
+                  {analytics.correlations!.meditationVsRecovery && (
+                    <CorrelationInsightCard
+                      title="Meditation → Recovery Time"
+                      correlation={analytics.correlations!.meditationVsRecovery}
+                      icon="fitness-outline"
+                    />
+                  )}
+                  {analytics.correlations!.strengthVsCardio && (
+                    <CorrelationInsightCard
+                      title="Strength → Cardio Performance"
+                      correlation={analytics.correlations!.strengthVsCardio}
+                      icon="barbell-outline"
+                    />
+                  )}
+                  {analytics.correlations!.consistencyVsPerformance && (
+                    <CorrelationInsightCard
+                      title="Workout Frequency → Performance"
+                      correlation={
+                        analytics.correlations!.consistencyVsPerformance
+                      }
+                      icon="trending-up-outline"
+                    />
+                  )}
+                  {analytics.correlations!.mealTimingVsAdherence && (
+                    <CorrelationInsightCard
+                      title="Meal Timing → Diet Adherence"
+                      correlation={analytics.correlations!.mealTimingVsAdherence}
+                      icon="restaurant-outline"
+                    />
+                  )}
+                </View>
+              );
+            })()}
+
+        {/* Last Updated */}
         {analytics && (
           <Text style={styles.lastUpdated}>
             Last updated: {new Date(analytics.lastUpdated).toLocaleString()}

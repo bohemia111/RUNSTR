@@ -113,8 +113,8 @@ export const PaymentVerificationBadge: React.FC<
       case 'verified':
         return {
           icon: 'checkmark-circle' as const,
-          color: '#4CAF50',
-          bgColor: 'rgba(76, 175, 80, 0.1)',
+          color: '#FF9D42',
+          bgColor: 'rgba(255, 157, 66, 0.1)',
           text: `Paid ${amountPaid ? amountPaid.toLocaleString() : ''} sats`,
         };
       case 'not_found':
@@ -127,8 +127,8 @@ export const PaymentVerificationBadge: React.FC<
       case 'manual_paid':
         return {
           icon: 'checkmark-done' as const,
-          color: '#4CAF50',
-          bgColor: 'rgba(76, 175, 80, 0.1)',
+          color: '#FF9D42',
+          bgColor: 'rgba(255, 157, 66, 0.1)',
           text: 'Marked as Paid',
         };
       default:

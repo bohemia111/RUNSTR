@@ -6,6 +6,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2025-01-29
+
+### Added
+- **Smart Payment Matching** - Captains can approve join requests directly from transaction history
+  - Intelligent matching algorithm (payment hash exact match + timestamp/amount fuzzy match)
+  - One-click "Approve Join" button in transaction cards
+  - "Approved" badge for already-approved participants
+  - Reduces captain workflow from 4 steps to 1 click
+  - `EventTransactionHistory.tsx`: +259 lines of matching logic and UI
+  - `EventCaptainDashboardScreen.tsx`: +134 lines for complete approval workflow
+
+- **Activity Streaks Analytics** - New streak tracking system
+  - `ActivityStreaksCard.tsx`: Visual display of workout consistency
+  - `StreakAnalyticsService.ts`: Calculate current and longest streaks per activity type
+
+### Fixed
+- **NWC QR Code Scanning** - Critical reliability improvement for high-density QR codes
+  - Dual-path scanning: Native modal scanner (iOS 16+ DataScannerViewController / Android Google Code Scanner) + fallback continuous scanner
+  - iOS 16+ uses Apple's DataScannerViewController for significantly better detection
+  - Android uses Google Code Scanner with native optimization
+  - Manual scanner fallback for older devices
+  - User guidance, highlighting, and pinch-to-zoom support
+  - `QRScannerModal.tsx`: +189 lines
+
+- **Settings Toggle Visibility** - Fixed invisible Switch components
+  - Updated 5 Switch components with brand colors
+  - OFF state: Gold track (#fbbf24) + Bright orange thumb (#FF9D42)
+  - ON state: Deep orange track (#FF7B1C) + Bright orange thumb
+  - Affected: Background Step Tracking, Voice Announcements, Workout Summary, Split Details, Live Split Announcements
+
+- **Health Profile Navigation** - Fixed broken navigation from Settings screen
+  - Added HealthProfileScreen to navigation stack
+  - Added HealthProfile route to AuthenticatedStackParamList
+  - Health Profile button now successfully navigates
+
+### Improved
+- **Private Workouts Tab** - Now shows complete local workout history
+  - Changed from `getUnsyncedWorkouts()` to `getAllWorkouts()`
+  - Displays GPS tracked, manual, daily steps, AND imported Nostr workouts
+  - Updated UI text: "Stored on your device" instead of "Not posted to Nostr yet"
+  - Enhanced empty state guidance to mention importing from Advanced Analytics
+
+- **Advanced Analytics** - Simplified to 3 essential sections
+  - Section 1: Health Metrics (BMI / VO2 Max / Fitness Age)
+  - Section 2: Weekly Caloric Balance
+  - Section 3: Activity Streaks
+  - Removed unnecessary complex sections
+  - Cleaner UI with focus on actionable insights
+  - Net -527 lines (major simplification)
+
+- **Payment UI** - Consistent icon colors across all payment modals
+  - Updated EventPaymentModal, ChallengePaymentModal, CharityPaymentModal
+  - Orange theme consistency for all Lightning payment flows
+
 ## [0.5.3] - 2025-01-29
 
 ### Added

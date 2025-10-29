@@ -97,6 +97,7 @@ import { MyTeamsScreen } from './screens/MyTeamsScreen';
 import { ProfileEditScreen } from './screens/ProfileEditScreen';
 import { SavedRoutesScreen } from './screens/routes/SavedRoutesScreen';
 import { AdvancedAnalyticsScreen } from './screens/AdvancedAnalyticsScreen';
+import { HealthProfileScreen } from './screens/HealthProfileScreen';
 import { User } from './types';
 import { useWalletStore } from './store/walletStore';
 import { appInitializationService } from './services/initialization/AppInitializationService';
@@ -153,6 +154,7 @@ type AuthenticatedStackParamList = {
   ProfileEdit: undefined;
   SavedRoutes: { activityType?: 'running' | 'cycling' | 'walking' };
   AdvancedAnalytics: undefined;
+  HealthProfile: undefined;
 };
 
 const AuthenticatedStack = createStackNavigator<AuthenticatedStackParamList>();
@@ -1025,6 +1027,15 @@ const AppContent: React.FC = () => {
             presentation: 'modal',
           }}
           component={AdvancedAnalyticsScreen}
+        />
+
+        {/* Health Profile Screen - Health data for analytics */}
+        <AuthenticatedStack.Screen
+          name="HealthProfile"
+          options={{
+            headerShown: false,
+          }}
+          component={HealthProfileScreen}
         />
 
         {/* Challenge Wizard Screen */}

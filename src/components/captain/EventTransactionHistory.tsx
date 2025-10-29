@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { NWCWalletService } from '../../services/wallet/NWCWalletService';
+import type { EventJoinRequest } from '../../services/events/EventJoinRequestService';
 
 interface Transaction {
   type: 'incoming' | 'outgoing';
@@ -36,12 +37,24 @@ interface EventTransactionHistoryProps {
   eventName: string;
   eventStartDate: number; // Unix timestamp
   entryFee: number; // Amount in sats
+  pendingJoinRequests?: EventJoinRequest[]; // Join requests awaiting approval
+  approvedParticipants?: string[]; // List of approved participant pubkeys
+  onApproveJoinRequest?: (request: EventJoinRequest) => Promise<void>; // Approval callback
   style?: any;
 }
 
 export const EventTransactionHistory: React.FC<
   EventTransactionHistoryProps
-> = ({ eventId, eventName, eventStartDate, entryFee, style }) => {
+> = ({
+  eventId,
+  eventName,
+  eventStartDate,
+  entryFee,
+  pendingJoinRequests,
+  approvedParticipants,
+  onApproveJoinRequest,
+  style
+}) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasNWC, setHasNWC] = useState(false);
@@ -111,6 +124,62 @@ export const EventTransactionHistory: React.FC<
 
   const formatAmount = (amount: number): string => {
     return `${amount.toLocaleString()} sats`;
+  };
+
+  /**
+   * Find matching join request for a transaction
+   * Priority 1: Exact payment hash match
+   * Priority 2: Timestamp + amount match (within 5 minutes)
+   */
+  const findMatchingRequest = (tx: Transaction): EventJoinRequest | null => {
+    if (!pendingJoinRequests || pendingJoinRequests.length === 0) return null;
+
+    // Priority 1: Exact payment hash match
+    if (tx.payment_hash) {
+      const hashMatch = pendingJoinRequests.find(
+        (r) => r.paymentHash === tx.payment_hash
+      );
+      if (hashMatch) return hashMatch;
+    }
+
+    // Priority 2: Timestamp + amount match (within 5 minutes)
+    const timeTolerance = 5 * 60; // 5 minutes in seconds
+    const txTimestamp = tx.settled_at || tx.created_at;
+
+    const timeAmountMatch = pendingJoinRequests.find((r) => {
+      if (!r.paymentTimestamp || !r.amountPaid) return false;
+
+      const timeDiff = Math.abs(r.paymentTimestamp - txTimestamp);
+      const amountMatch = r.amountPaid === tx.amount; // Already filtered to ±1% in loadTransactions
+
+      return timeDiff <= timeTolerance && amountMatch;
+    });
+
+    return timeAmountMatch || null;
+  };
+
+  /**
+   * Check if a join request's user is already approved
+   */
+  const isAlreadyApproved = (request: EventJoinRequest): boolean => {
+    return approvedParticipants?.includes(request.requesterId) || false;
+  };
+
+  /**
+   * Handle approval from transaction history
+   */
+  const handleApproveMatch = async (request: EventJoinRequest) => {
+    if (!onApproveJoinRequest) return;
+
+    try {
+      setIsLoading(true);
+      await onApproveJoinRequest(request);
+      console.log('✅ Join request approved from transaction history');
+    } catch (error) {
+      console.error('❌ Failed to approve join request:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Don't show if captain doesn't have NWC
@@ -183,42 +252,102 @@ export const EventTransactionHistory: React.FC<
                 />
               }
             >
-              {transactions.map((tx, index) => (
-                <View
-                  key={tx.payment_hash || index}
-                  style={styles.transactionCard}
-                >
-                  <View style={styles.transactionHeader}>
-                    <View style={styles.transactionIcon}>
-                      <Ionicons name="arrow-down" size={16} color="#4CAF50" />
+              {transactions.map((tx, index) => {
+                const matchedRequest = findMatchingRequest(tx);
+                const alreadyApproved =
+                  matchedRequest && isAlreadyApproved(matchedRequest);
+
+                return (
+                  <View
+                    key={tx.payment_hash || index}
+                    style={styles.transactionCard}
+                  >
+                    <View style={styles.transactionHeader}>
+                      <View style={styles.transactionIcon}>
+                        <Ionicons name="arrow-down" size={16} color="#FF9D42" />
+                      </View>
+                      <View style={styles.transactionDetails}>
+                        <Text style={styles.transactionAmount}>
+                          +{formatAmount(tx.amount)}
+                        </Text>
+                        <Text style={styles.transactionDate}>
+                          {formatDate(tx.settled_at || tx.created_at)}
+                        </Text>
+                      </View>
+                      <View style={styles.verifiedBadge}>
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={14}
+                          color="#FF9D42"
+                        />
+                        <Text style={styles.verifiedText}>Verified</Text>
+                      </View>
                     </View>
-                    <View style={styles.transactionDetails}>
-                      <Text style={styles.transactionAmount}>
-                        +{formatAmount(tx.amount)}
+
+                    {/* Matched participant section */}
+                    {matchedRequest && (
+                      <View style={styles.matchedRequestSection}>
+                        <View style={styles.matchedRequestHeader}>
+                          <Ionicons
+                            name="person-circle-outline"
+                            size={16}
+                            color={theme.colors.textMuted}
+                          />
+                          <Text style={styles.matchedRequestName}>
+                            {matchedRequest.requesterName ||
+                              `${matchedRequest.requesterId.slice(0, 8)}...`}
+                          </Text>
+                          {matchedRequest.message && (
+                            <Text
+                              style={styles.matchedRequestMessage}
+                              numberOfLines={1}
+                            >
+                              • {matchedRequest.message}
+                            </Text>
+                          )}
+                        </View>
+
+                        {alreadyApproved ? (
+                          <View style={styles.alreadyApprovedBadge}>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={14}
+                              color="#FF9D42"
+                            />
+                            <Text style={styles.alreadyApprovedText}>
+                              Approved
+                            </Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.approveButton}
+                            onPress={() => handleApproveMatch(matchedRequest)}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons
+                              name="add-circle"
+                              size={16}
+                              color={theme.colors.accentText}
+                            />
+                            <Text style={styles.approveButtonText}>
+                              Approve Join
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+
+                    {tx.description && (
+                      <Text
+                        style={styles.transactionDescription}
+                        numberOfLines={1}
+                      >
+                        {tx.description}
                       </Text>
-                      <Text style={styles.transactionDate}>
-                        {formatDate(tx.settled_at || tx.created_at)}
-                      </Text>
-                    </View>
-                    <View style={styles.verifiedBadge}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={14}
-                        color="#4CAF50"
-                      />
-                      <Text style={styles.verifiedText}>Verified</Text>
-                    </View>
+                    )}
                   </View>
-                  {tx.description && (
-                    <Text
-                      style={styles.transactionDescription}
-                      numberOfLines={1}
-                    >
-                      {tx.description}
-                    </Text>
-                  )}
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
           )}
 
@@ -346,7 +475,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    backgroundColor: 'rgba(255, 157, 66, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -356,7 +485,7 @@ const styles = StyleSheet.create({
   transactionAmount: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#FF9D42',
     marginBottom: 2,
   },
   transactionDate: {
@@ -367,7 +496,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    backgroundColor: 'rgba(255, 157, 66, 0.1)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -375,7 +504,7 @@ const styles = StyleSheet.create({
   verifiedText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#FF9D42',
   },
   transactionDescription: {
     fontSize: 12,
@@ -392,5 +521,59 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.colors.textTertiary,
     textAlign: 'center',
+  },
+  matchedRequestSection: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  matchedRequestHeader: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  matchedRequestName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  matchedRequestMessage: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    flex: 1,
+  },
+  approveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.accent, // #FF7B1C orange
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  approveButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.accentText, // #000000 black on orange
+  },
+  alreadyApprovedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 157, 66, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  alreadyApprovedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF9D42',
   },
 });

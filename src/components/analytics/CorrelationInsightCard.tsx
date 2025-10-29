@@ -20,7 +20,7 @@ export const CorrelationInsightCard: React.FC<
 > = ({ title, correlation, icon = 'link' }) => {
   // Get color based on correlation strength and direction
   const getCorrelationColor = () => {
-    if (correlation.strength === 'strong') return '#4CAF50';
+    if (correlation.strength === 'strong') return '#FFB366'; // Light orange for strong
     if (correlation.strength === 'moderate') return '#FF9D42';
     return theme.colors.textMuted;
   };

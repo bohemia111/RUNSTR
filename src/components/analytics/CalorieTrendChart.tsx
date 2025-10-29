@@ -47,7 +47,7 @@ export const CalorieTrendChart: React.FC<CalorieTrendChartProps> = ({
                     styles.barFill,
                     {
                       height: `${heightPercent}%`,
-                      backgroundColor: isSurplus ? '#FF9D42' : '#4CAF50',
+                      backgroundColor: isSurplus ? '#FF9D42' : '#FF7B1C',
                     },
                   ]}
                 />
@@ -64,7 +64,7 @@ export const CalorieTrendChart: React.FC<CalorieTrendChartProps> = ({
         <Text
           style={[
             styles.summaryValue,
-            { color: weeklyAverage.net >= 0 ? '#FF9D42' : '#4CAF50' },
+            { color: weeklyAverage.net >= 0 ? '#FF9D42' : '#FF7B1C' },
           ]}
         >
           {weeklyAverage.net >= 0 ? '+' : ''}

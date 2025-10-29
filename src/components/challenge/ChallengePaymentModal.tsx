@@ -144,7 +144,7 @@ export const ChallengePaymentModal: React.FC<ChallengePaymentModalProps> = ({
                 <Ionicons
                   name={copied ? 'checkmark-circle' : 'copy-outline'}
                   size={18}
-                  color={copied ? '#4CAF50' : theme.colors.accent}
+                  color={copied ? '#FF9D42' : theme.colors.accent}
                 />
                 <Text style={[styles.copyText, copied && styles.copiedText]}>
                   {copied ? 'Copied!' : 'Tap to copy'}
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   },
 
   copiedText: {
-    color: '#4CAF50',
+    color: '#FF9D42',
   },
 
   // Instructions

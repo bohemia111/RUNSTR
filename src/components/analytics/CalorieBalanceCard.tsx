@@ -1,6 +1,6 @@
 /**
- * CalorieBalanceCard - Today's calorie intake vs burn with visual bars
- * Shows net balance (surplus/deficit)
+ * CalorieBalanceCard - Weekly calorie balance with today highlighted
+ * Shows 7-day average intake, burn, and net balance
  */
 
 import React from 'react';
@@ -10,41 +10,54 @@ import type { DailyCalorieBalance } from '../../services/analytics/CaloricAnalyt
 
 interface CalorieBalanceCardProps {
   dailyBalance: DailyCalorieBalance;
+  weeklyAverage?: { in: number; out: number; net: number };
 }
 
 export const CalorieBalanceCard: React.FC<CalorieBalanceCardProps> = ({
   dailyBalance,
+  weeklyAverage,
 }) => {
   const maxCalories = Math.max(
     dailyBalance.caloriesIn,
     dailyBalance.caloriesOut,
+    weeklyAverage?.in || 0,
+    weeklyAverage?.out || 0,
     1000
   ); // Min 1000 for scale
 
-  const inPercentage = (dailyBalance.caloriesIn / maxCalories) * 100;
-  const outPercentage = (dailyBalance.caloriesOut / maxCalories) * 100;
+  const todayInPercentage = (dailyBalance.caloriesIn / maxCalories) * 100;
+  const todayOutPercentage = (dailyBalance.caloriesOut / maxCalories) * 100;
 
-  const isSurplus = dailyBalance.netBalance > 0;
-  const balanceLabel = isSurplus ? 'Surplus' : 'Deficit';
-  const balanceColor = isSurplus ? '#FF9D42' : '#4CAF50';
+  const weeklyInPercentage = weeklyAverage
+    ? (weeklyAverage.in / maxCalories) * 100
+    : 0;
+  const weeklyOutPercentage = weeklyAverage
+    ? (weeklyAverage.out / maxCalories) * 100
+    : 0;
+
+  const isTodaySurplus = dailyBalance.netBalance > 0;
+  const isWeeklySurplus = (weeklyAverage?.net || 0) > 0;
+  const balanceColor = '#FF9D42'; // Always orange theme
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <Text style={styles.title}>Today</Text>
+      {/* Today's Balance */}
+      <Text style={styles.sectionTitle}>Today</Text>
 
-      {/* Calories In */}
       <View style={styles.row}>
         <Text style={styles.label}>In:</Text>
         <View style={styles.barContainer}>
           <View
-            style={[styles.barFill, styles.barIn, { width: `${inPercentage}%` }]}
+            style={[
+              styles.barFill,
+              styles.barIn,
+              { width: `${todayInPercentage}%` },
+            ]}
           />
         </View>
         <Text style={styles.value}>{dailyBalance.caloriesIn} kcal</Text>
       </View>
 
-      {/* Calories Out */}
       <View style={styles.row}>
         <Text style={styles.label}>Out:</Text>
         <View style={styles.barContainer}>
@@ -52,22 +65,65 @@ export const CalorieBalanceCard: React.FC<CalorieBalanceCardProps> = ({
             style={[
               styles.barFill,
               styles.barOut,
-              { width: `${outPercentage}%` },
+              { width: `${todayOutPercentage}%` },
             ]}
           />
         </View>
         <Text style={styles.value}>{dailyBalance.caloriesOut} kcal</Text>
       </View>
 
-      {/* Net Balance */}
-      <View style={styles.netContainer}>
+      <View style={styles.netRow}>
         <Text style={styles.netLabel}>Net:</Text>
         <Text style={[styles.netValue, { color: balanceColor }]}>
-          {isSurplus ? '+' : ''}
+          {isTodaySurplus ? '+' : ''}
           {dailyBalance.netBalance.toLocaleString()} kcal
         </Text>
-        <Text style={styles.balanceLabel}>({balanceLabel})</Text>
       </View>
+
+      {/* Weekly Average */}
+      {weeklyAverage && (
+        <>
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionTitle}>7-Day Average</Text>
+
+          <View style={styles.row}>
+            <Text style={styles.label}>In:</Text>
+            <View style={styles.barContainer}>
+              <View
+                style={[
+                  styles.barFill,
+                  styles.barIn,
+                  { width: `${weeklyInPercentage}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.value}>{weeklyAverage.in} kcal</Text>
+          </View>
+
+          <View style={styles.row}>
+            <Text style={styles.label}>Out:</Text>
+            <View style={styles.barContainer}>
+              <View
+                style={[
+                  styles.barFill,
+                  styles.barOut,
+                  { width: `${weeklyOutPercentage}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.value}>{weeklyAverage.out} kcal</Text>
+          </View>
+
+          <View style={styles.netRow}>
+            <Text style={styles.netLabel}>Net:</Text>
+            <Text style={[styles.netValue, { color: balanceColor }]}>
+              {isWeeklySurplus ? '+' : ''}
+              {weeklyAverage.net.toLocaleString()} kcal
+            </Text>
+          </View>
+        </>
+      )}
     </View>
   );
 };
@@ -82,11 +138,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  title: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
     color: '#FFB366',
-    marginBottom: 16,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   row: {
@@ -117,11 +175,11 @@ const styles = StyleSheet.create({
   },
 
   barIn: {
-    backgroundColor: '#FF9D42',
+    backgroundColor: '#FF9D42', // Orange for calories in
   },
 
   barOut: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF7B1C', // Darker orange for calories out (NO GREEN)
   },
 
   value: {
@@ -132,30 +190,27 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  netContainer: {
+  netRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#1a1a1a',
+    marginTop: 4,
   },
 
   netLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
     color: theme.colors.text,
     marginRight: 12,
   },
 
   netValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: theme.typography.weights.bold,
   },
 
-  balanceLabel: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
-    marginLeft: 8,
+  divider: {
+    height: 1,
+    backgroundColor: '#1a1a1a',
+    marginVertical: 16,
   },
 });

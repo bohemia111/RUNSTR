@@ -11,8 +11,8 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
+import { CustomAlertManager } from '../../ui/CustomAlert';
 import { theme } from '../../../styles/theme';
 import { Card } from '../../ui/Card';
 import { LoadingOverlay } from '../../ui/LoadingStates';
@@ -92,7 +92,7 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
           await loadAppleHealthWorkouts();
         } else {
           setHasPermission(false);
-          Alert.alert(
+          CustomAlertManager.alert(
             'Permission Required',
             'HealthKit permissions are needed to sync your Apple Health workouts. Please enable them in iPhone Settings → Privacy & Security → Health → RUNSTR.'
           );
@@ -103,7 +103,7 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
           permissionResult.error || 'Permission request failed';
 
         if (errorMessage.includes('not available')) {
-          Alert.alert(
+          CustomAlertManager.alert(
             'HealthKit Unavailable',
             'Apple Health is not available on this device or in the simulator.'
           );
@@ -111,12 +111,12 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
           errorMessage.includes('timeout') ||
           errorMessage.includes('taking too long')
         ) {
-          Alert.alert(
+          CustomAlertManager.alert(
             'Request Timed Out',
             'The permission request is taking too long. Please try again or check that HealthKit is properly configured.'
           );
         } else {
-          Alert.alert(
+          CustomAlertManager.alert(
             'Permission Error',
             `Could not request HealthKit permissions: ${errorMessage}`
           );
@@ -133,17 +133,17 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
         errorMessage.includes('timed out') ||
         errorMessage.includes('timeout')
       ) {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Request Timed Out',
           'The permission request is taking too long. Please try again.'
         );
       } else if (errorMessage.includes('native module')) {
-        Alert.alert(
+        CustomAlertManager.alert(
           'HealthKit Unavailable',
           "Apple Health integration is not available in this build. Please ensure you're running on a physical iOS device."
         );
       } else {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Error',
           'Failed to request HealthKit permission. Please try again later.'
         );
@@ -225,31 +225,31 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
 
   const handleCompete = async (workout: Workout) => {
     if (!onCompete) {
-      Alert.alert('Error', 'Competition entry functionality not available');
+      CustomAlertManager.alert('Error', 'Competition entry functionality not available');
       return;
     }
 
     try {
       await onCompete(workout);
-      Alert.alert('Success', 'Workout entered into competition!');
+      CustomAlertManager.alert('Success', 'Workout entered into competition!');
     } catch (error) {
       console.error('Competition entry failed:', error);
-      Alert.alert('Error', 'Failed to enter workout into competition');
+      CustomAlertManager.alert('Error', 'Failed to enter workout into competition');
     }
   };
 
   const handleSocialShare = async (workout: Workout) => {
     if (!onSocialShare) {
-      Alert.alert('Error', 'Social sharing functionality not available');
+      CustomAlertManager.alert('Error', 'Social sharing functionality not available');
       return;
     }
 
     try {
       await onSocialShare(workout);
-      Alert.alert('Success', 'Workout shared to social feeds!');
+      CustomAlertManager.alert('Success', 'Workout shared to social feeds!');
     } catch (error) {
       console.error('Social share failed:', error);
-      Alert.alert('Error', 'Failed to share workout');
+      CustomAlertManager.alert('Error', 'Failed to share workout');
     }
   };
 

@@ -27,6 +27,12 @@ import QRCodeService from '../services/qr/QRCodeService';
 import type { EventQRData } from '../services/qr/QRCodeService';
 import type { RootStackParamList } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { EventJoinRequestService } from '../services/events/EventJoinRequestService';
+import type { EventJoinRequest } from '../services/events/EventJoinRequestService';
+import { NostrListService } from '../services/nostr/NostrListService';
+import { UnifiedSigningService } from '../services/auth/UnifiedSigningService';
+import { GlobalNDKService } from '../services/nostr/GlobalNDKService';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 
 type EventCaptainDashboardRouteProp = RouteProp<
   RootStackParamList,
@@ -52,6 +58,7 @@ export const EventCaptainDashboardScreen: React.FC<
   const [participants, setParticipants] = useState<string[]>([]);
   const [isLoadingParticipants, setIsLoadingParticipants] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pendingJoinRequests, setPendingJoinRequests] = useState<EventJoinRequest[]>([]);
 
   // Participant profile interface
   interface ParticipantProfile {
@@ -82,6 +89,7 @@ export const EventCaptainDashboardScreen: React.FC<
 
   useEffect(() => {
     loadParticipants();
+    loadPendingJoinRequests();
   }, [eventId]);
 
   const loadParticipants = async () => {
@@ -138,9 +146,130 @@ export const EventCaptainDashboardScreen: React.FC<
     }
   };
 
+  const loadPendingJoinRequests = async () => {
+    try {
+      const requests = await EventJoinRequestService.getInstance().getEventJoinRequests(
+        eventData.captainPubkey,
+        eventId
+      );
+      setPendingJoinRequests(requests);
+      console.log(`📊 Loaded ${requests.length} pending join requests for event`);
+    } catch (error) {
+      console.error('❌ Failed to load pending join requests:', error);
+    }
+  };
+
+  const handleApproveFromTransaction = async (request: EventJoinRequest) => {
+    try {
+      console.log('🔄 Approving join request from transaction history');
+
+      // Get signer
+      const signer = await UnifiedSigningService.getSigner();
+      if (!signer) {
+        setAlertConfig({
+          title: 'Error',
+          message: 'Authentication required to approve requests',
+          buttons: [{ text: 'OK', style: 'default' }],
+        });
+        setAlertVisible(true);
+        return;
+      }
+
+      const captainHexPubkey = await UnifiedSigningService.getHexPubkey();
+      if (!captainHexPubkey) {
+        setAlertConfig({
+          title: 'Error',
+          message: 'Invalid captain public key',
+          buttons: [{ text: 'OK', style: 'default' }],
+        });
+        setAlertVisible(true);
+        return;
+      }
+
+      // Get participant list
+      const listService = NostrListService.getInstance();
+      const dTag = `event-${eventId}-participants`;
+      const currentList = await listService.getList(captainHexPubkey, dTag);
+
+      if (!currentList) {
+        // Create new participant list
+        console.log('🔧 Creating participant list for event');
+        const listData = {
+          name: `${eventData.name} Participants`,
+          description: `Participants for ${eventData.name}`,
+          members: [request.requesterId],
+          dTag,
+          listType: 'people' as const,
+        };
+
+        const eventTemplate = listService.prepareListCreation(listData, captainHexPubkey);
+        const ndk = await GlobalNDKService.getInstance();
+        const ndkEvent = new NDKEvent(ndk, eventTemplate);
+        await ndkEvent.sign(signer);
+        await ndkEvent.publish();
+      } else {
+        // Add to existing list
+        console.log('➕ Adding participant to existing list');
+        const eventTemplate = listService.prepareAddMember(
+          captainHexPubkey,
+          dTag,
+          request.requesterId,
+          currentList
+        );
+
+        if (eventTemplate) {
+          const ndk = await GlobalNDKService.getInstance();
+          const ndkEvent = new NDKEvent(ndk, eventTemplate);
+          await ndkEvent.sign(signer);
+          await ndkEvent.publish();
+
+          // Update cache
+          listService.updateCachedList(`${captainHexPubkey}:${dTag}`, [
+            ...currentList.members,
+            request.requesterId,
+          ]);
+        }
+      }
+
+      // Invalidate event snapshot
+      try {
+        const { EventSnapshotStore } = await import(
+          '../services/event/EventSnapshotStore'
+        );
+        await EventSnapshotStore.deleteSnapshot(eventId);
+        console.log('🗑️ Event snapshot invalidated after approval');
+      } catch (error) {
+        console.warn('⚠️ Failed to invalidate snapshot (non-critical):', error);
+      }
+
+      // Remove from pending requests
+      setPendingJoinRequests((prev) => prev.filter((r) => r.id !== request.id));
+
+      // Refresh participant list
+      await loadParticipants();
+
+      console.log('✅ Join request approved successfully');
+
+      setAlertConfig({
+        title: 'Success',
+        message: `${request.requesterName || 'Participant'} has been added to the event`,
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
+    } catch (error) {
+      console.error('❌ Failed to approve join request:', error);
+      setAlertConfig({
+        title: 'Error',
+        message: 'Failed to approve join request. Please try again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await loadParticipants();
+    await Promise.all([loadParticipants(), loadPendingJoinRequests()]);
     setIsRefreshing(false);
   };
 
@@ -424,6 +553,9 @@ export const EventCaptainDashboardScreen: React.FC<
               new Date(eventData.eventDate).getTime() / 1000
             )}
             entryFee={eventData.entryFeesSats}
+            pendingJoinRequests={pendingJoinRequests}
+            approvedParticipants={participants}
+            onApproveJoinRequest={handleApproveFromTransaction}
             style={styles.transactionHistory}
           />
         )}

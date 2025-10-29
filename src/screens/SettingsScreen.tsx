@@ -667,8 +667,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Switch
                 value={backgroundTrackingEnabled}
                 onValueChange={handleBackgroundTrackingToggle}
-                trackColor={{ false: '#000000', true: theme.colors.accent }}
-                thumbColor="#000000"
+                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                thumbColor={theme.colors.orangeBright}
               />
             </View>
           </Card>
@@ -713,8 +713,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onValueChange={(value) =>
                   handleTTSSettingChange('enabled', value)
                 }
-                trackColor={{ false: '#000000', true: theme.colors.accent }}
-                thumbColor="#000000"
+                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                thumbColor={theme.colors.orangeBright}
               />
             </View>
 
@@ -731,8 +731,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onValueChange={(value) =>
                   handleTTSSettingChange('announceOnSummary', value)
                 }
-                trackColor={{ false: '#000000', true: theme.colors.accent }}
-                thumbColor="#000000"
+                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                thumbColor={theme.colors.orangeBright}
                 disabled={!ttsSettings.enabled}
               />
             </View>
@@ -750,8 +750,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onValueChange={(value) =>
                   handleTTSSettingChange('includeSplits', value)
                 }
-                trackColor={{ false: '#000000', true: theme.colors.accent }}
-                thumbColor="#000000"
+                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                thumbColor={theme.colors.orangeBright}
                 disabled={!ttsSettings.enabled}
               />
             </View>
@@ -771,8 +771,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onValueChange={(value) =>
                   handleTTSSettingChange('announceLiveSplits', value)
                 }
-                trackColor={{ false: '#000000', true: theme.colors.accent }}
-                thumbColor="#000000"
+                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                thumbColor={theme.colors.orangeBright}
                 disabled={!ttsSettings.enabled}
               />
             </View>

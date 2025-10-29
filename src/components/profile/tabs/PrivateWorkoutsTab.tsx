@@ -1,8 +1,8 @@
 /**
- * PrivateWorkoutsTab - Display local Activity Tracker workouts (unsynced)
- * Shows only workouts stored locally that haven't been posted to Nostr yet
+ * PrivateWorkoutsTab - Display all local workouts stored on device
+ * Shows ALL workouts in local storage: GPS tracked, manual, daily steps, AND imported Nostr
  * Zero loading time - instant display from local AsyncStorage
- * When workout is posted to Nostr, it's marked as synced and disappears from this tab
+ * Provides complete local workout history with post/delete actions
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -73,15 +73,16 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
 
   const loadPrivateWorkouts = async () => {
     try {
-      console.log('🔍 Loading local (unsynced) workouts from local storage...');
+      console.log('🔍 Loading all local workouts from local storage...');
 
       // Zero loading time - instant from AsyncStorage
-      const unsyncedWorkouts = await localWorkoutStorage.getUnsyncedWorkouts();
+      // Shows ALL locally stored workouts (GPS, manual, daily steps, AND imported Nostr)
+      const allLocalWorkouts = await localWorkoutStorage.getAllWorkouts();
 
       console.log(
-        ` Loaded ${unsyncedWorkouts.length} local workouts (instant display)`
+        ` Loaded ${allLocalWorkouts.length} local workouts (instant display)`
       );
-      setWorkouts(unsyncedWorkouts);
+      setWorkouts(allLocalWorkouts);
     } catch (error) {
       console.error('❌ Failed to load local workouts:', error);
       setWorkouts([]);
@@ -116,7 +117,7 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
       setPostingType('nostr');
 
       await onPostToNostr(workout);
-      // Refresh to remove from local list (it's now synced)
+      // Refresh local workout list
       await loadPrivateWorkouts();
       setAlertConfig({
         title: 'Success',
@@ -324,7 +325,7 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
                   {workouts.length} local workout
                   {workouts.length !== 1 ? 's' : ''}
                 </Text>
-                <Text style={styles.headerSubtext}>Not posted to Nostr yet</Text>
+                <Text style={styles.headerSubtext}>Stored on your device</Text>
               </View>
             )}
           </>
@@ -338,11 +339,12 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
             />
             <Text style={styles.emptyStateTitle}>No Local Workouts Yet</Text>
             <Text style={styles.emptyStateText}>
-              Use the Activity Tracker to record your first workout. Track runs,
-              cycling, strength training, and more!
+              Use the Activity Tracker to record workouts, or import your Nostr
+              workout history from Advanced Analytics.
             </Text>
             <Text style={styles.emptyStateHint}>
-              Once posted to Nostr, workouts will move to the Public tab.
+              This tab shows all workouts stored on your device, including imported
+              Nostr workouts.
             </Text>
           </Card>
         }

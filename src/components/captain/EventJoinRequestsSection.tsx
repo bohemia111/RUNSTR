@@ -22,7 +22,7 @@ import { EventJoinRequestService } from '../../services/events/EventJoinRequestS
 import type { EventJoinRequest } from '../../services/events/EventJoinRequestService';
 import { NostrListService } from '../../services/nostr/NostrListService';
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
-import { CustomAlert } from '../ui/CustomAlert';
+import { CustomAlertManager } from '../ui/CustomAlert';
 import { GlobalNDKService } from '../../services/nostr/GlobalNDKService';
 import {
   NDKEvent,
@@ -165,13 +165,13 @@ export const EventJoinRequestsSection: React.FC<
       // Get signer (supports both nsec and Amber)
       const signer = await UnifiedSigningService.getSigner();
       if (!signer) {
-        CustomAlert.alert('Error', 'Authentication required to approve requests', [{ text: 'OK' }]);
+        CustomAlertManager.alert('Error', 'Authentication required to approve requests', [{ text: 'OK' }]);
         return;
       }
 
       const captainHexPubkey = await UnifiedSigningService.getHexPubkey();
       if (!captainHexPubkey) {
-        CustomAlert.alert('Error', 'Invalid captain public key', [{ text: 'OK' }]);
+        CustomAlertManager.alert('Error', 'Invalid captain public key', [{ text: 'OK' }]);
         return;
       }
 
@@ -183,7 +183,7 @@ export const EventJoinRequestsSection: React.FC<
         // ⚠️ Participant list is missing - this shouldn't happen!
         // Show confirmation dialog explaining the issue
         alertVisible = true;
-        CustomAlert.alert(
+        CustomAlertManager.alert(
           'Participant List Missing',
           `The participant list for "${eventName}" was not found. This might have happened if event creation was interrupted.\n\nWould you like to create the participant list now and approve this request?`,
           [
@@ -256,7 +256,7 @@ export const EventJoinRequestsSection: React.FC<
                     console.warn('⚠️ Failed to invalidate snapshot (non-critical):', error);
                   }
 
-                  CustomAlert.alert(
+                  CustomAlertManager.alert(
                     'Success',
                     'Participant list created and user approved',
                     [{ text: 'OK', onPress: () => { alertVisible = false; } }]
@@ -266,7 +266,7 @@ export const EventJoinRequestsSection: React.FC<
                     '❌ Failed to create participant list:',
                     createError
                   );
-                  CustomAlert.alert(
+                  CustomAlertManager.alert(
                     'Error',
                     'Failed to create participant list. Please try again.',
                     [{ text: 'OK', onPress: () => { alertVisible = false; } }]
@@ -332,13 +332,13 @@ export const EventJoinRequestsSection: React.FC<
       }
 
       alertVisible = true;
-      CustomAlert.alert('Success', 'Participant approved and added to event', [
+      CustomAlertManager.alert('Success', 'Participant approved and added to event', [
         { text: 'OK', onPress: () => { alertVisible = false; } }
       ]);
     } catch (error) {
       console.error('Failed to approve event join request:', error);
       if (!alertVisible) {
-        CustomAlert.alert('Error', 'Failed to approve request', [{ text: 'OK' }]);
+        CustomAlertManager.alert('Error', 'Failed to approve request', [{ text: 'OK' }]);
       }
     }
   };
@@ -360,11 +360,11 @@ export const EventJoinRequestsSection: React.FC<
       return updated;
     });
 
-    CustomAlert.alert('Request Declined', 'The join request has been declined', [{ text: 'OK' }]);
+    CustomAlertManager.alert('Request Declined', 'The join request has been declined', [{ text: 'OK' }]);
   };
 
   const handleMarkAsPaid = async (requestId: string, eventId: string) => {
-    CustomAlert.alert(
+    CustomAlertManager.alert(
       'Mark as Paid',
       'Did you receive payment for this entry fee via cash, Venmo, or other method?',
       [
@@ -389,7 +389,7 @@ export const EventJoinRequestsSection: React.FC<
               return updated;
             });
 
-            CustomAlert.alert(
+            CustomAlertManager.alert(
               'Marked as Paid',
               'This request has been marked as paid',
               [{ text: 'OK' }]
@@ -526,7 +526,7 @@ export const EventJoinRequestsSection: React.FC<
                             <Ionicons
                               name="checkmark-done"
                               size={16}
-                              color="#4CAF50"
+                              color="#FF9D42"
                             />
                             <Text style={styles.markPaidButtonText}>
                               Mark as Paid
@@ -641,17 +641,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    backgroundColor: 'rgba(255, 157, 66, 0.1)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: '#FF9D42',
     alignSelf: 'flex-start',
   },
   markPaidButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#FF9D42',
   },
 });

@@ -9,7 +9,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { CustomAlertManager } from '../components/ui/CustomAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../styles/theme';
@@ -126,7 +127,7 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       );
 
       if (!signer) {
-        Alert.alert('Error', 'No signer available. Please log in again.');
+        CustomAlertManager.alert('Error', 'No signer available. Please log in again.');
         return;
       }
 
@@ -161,19 +162,19 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
 
         // Show reward earned notification if applicable
         if (result.rewardEarned && result.rewardAmount) {
-          Alert.alert(
+          CustomAlertManager.alert(
             '🎉 Reward Earned!',
             `You earned ${result.rewardAmount} sats for today's workout!`
           );
         } else {
-          Alert.alert('Success', 'Workout entered into competition!');
+          CustomAlertManager.alert('Success', 'Workout entered into competition!');
         }
       } else {
         throw new Error(result.error || 'Failed to publish workout');
       }
     } catch (error) {
       console.error('[WorkoutHistory] ❌ Competition entry failed:', error);
-      Alert.alert(
+      CustomAlertManager.alert(
         'Error',
         'Failed to enter workout into competition. Please try again.'
       );
@@ -190,7 +191,7 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       );
 
       if (!signer) {
-        Alert.alert('Error', 'No signer available. Please log in again.');
+        CustomAlertManager.alert('Error', 'No signer available. Please log in again.');
         return;
       }
 
@@ -222,13 +223,13 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
         console.log(
           `[WorkoutHistory] ✅ HealthKit workout shared as kind 1: ${result.eventId}`
         );
-        Alert.alert('Success', 'Workout shared to social feeds!');
+        CustomAlertManager.alert('Success', 'Workout shared to social feeds!');
       } else {
         throw new Error(result.error || 'Failed to publish workout');
       }
     } catch (error) {
       console.error('[WorkoutHistory] ❌ Social share failed:', error);
-      Alert.alert('Error', 'Failed to share workout. Please try again.');
+      CustomAlertManager.alert('Error', 'Failed to share workout. Please try again.');
     }
   };
 
@@ -255,7 +256,7 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       );
 
       if (!signer) {
-        Alert.alert('Error', 'No signer available. Please log in again.');
+        CustomAlertManager.alert('Error', 'No signer available. Please log in again.');
         return;
       }
 
@@ -298,7 +299,7 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       }
     } catch (error) {
       console.error('[WorkoutHistory] ❌ Post to Nostr (1301) failed:', error);
-      Alert.alert(
+      CustomAlertManager.alert(
         'Error',
         'Failed to post workout to Nostr. Please try again.'
       );

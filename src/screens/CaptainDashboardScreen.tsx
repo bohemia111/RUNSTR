@@ -11,7 +11,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Modal,
   TextInput,
   Image,
@@ -26,6 +25,7 @@ import {
   validateFlashUrl,
 } from '../utils/validation';
 import { theme } from '../styles/theme';
+import { CustomAlertManager } from '../components/ui/CustomAlert';
 // BottomNavigation removed - Captain Dashboard has back button
 // import { ZappableUserRow } from '../components/ui/ZappableUserRow'; // REMOVED: No longer needed without member list
 import { QuickActionsSection } from '../components/team/QuickActionsSection';
@@ -189,7 +189,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
   };
 
   const handleDeleteEvent = async (eventId: string, eventName: string) => {
-    Alert.alert(
+    CustomAlertManager.alert(
       'Delete Event',
       `Remove "${eventName}" from your local storage? This will not delete the event from Nostr.`,
       [
@@ -204,7 +204,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
               console.log(`🗑️ Deleted event: ${eventName}`);
             } catch (error) {
               console.error('Failed to delete event:', error);
-              Alert.alert('Error', 'Failed to delete event. Please try again.');
+              CustomAlertManager.alert('Error', 'Failed to delete event. Please try again.');
             }
           },
         },
@@ -400,7 +400,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const activeCompetitions =
         await NostrCompetitionService.checkActiveCompetitions(teamId);
       if (activeCompetitions.activeEvents > 0) {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Active Event Exists',
           `Your team already has an active event: "${activeCompetitions.activeEventDetails?.name}"\n\nScheduled for ${activeCompetitions.activeEventDetails?.eventDate}.\n\nOnly one event can be active at a time.`,
           [{ text: 'OK' }]
@@ -424,7 +424,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const activeCompetitions =
         await NostrCompetitionService.checkActiveCompetitions(teamId);
       if (activeCompetitions.activeLeagues > 0) {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Active League Exists',
           `Your team already has an active league: "${activeCompetitions.activeLeagueDetails?.name}"\n\nEnds on ${activeCompetitions.activeLeagueDetails?.endDate}.\n\nOnly one league can be active at a time.`,
           [{ text: 'OK' }]
@@ -480,7 +480,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       setShowEventQRModal(true);
     } catch (error) {
       console.error('Failed to generate event QR:', error);
-      Alert.alert('Error', 'Failed to generate QR code for event');
+      CustomAlertManager.alert('Error', 'Failed to generate QR code for event');
     }
   };
 
@@ -575,14 +575,14 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const signer = await signingService.getSigner();
 
       if (!signer) {
-        Alert.alert('Error', 'Unable to sign event. Please ensure you are logged in.');
+        CustomAlertManager.alert('Error', 'Unable to sign event. Please ensure you are logged in.');
         return;
       }
 
       // Get user's hex pubkey for captain tag
       const userHexPubkey = await signingService.getUserPubkey();
       if (!userHexPubkey) {
-        Alert.alert('Error', 'Unable to get user pubkey. Please try logging in again.');
+        CustomAlertManager.alert('Error', 'Unable to get user pubkey. Please try logging in again.');
         return;
       }
 
@@ -590,7 +590,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const ndk = await GlobalNDKService.getInstance();
 
       if (!ndk) {
-        Alert.alert('Error', 'Unable to connect to Nostr network');
+        CustomAlertManager.alert('Error', 'Unable to connect to Nostr network');
         return;
       }
 
@@ -688,7 +688,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
           console.log('✅ Team data reloaded with fresh cache');
         }, 3000);
 
-        Alert.alert('Success', 'Team information updated successfully!', [
+        CustomAlertManager.alert('Success', 'Team information updated successfully!', [
           {
             text: 'View Team',
             onPress: async () => {
@@ -732,7 +732,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       }
     } catch (error) {
       console.error('Error updating team information:', error);
-      Alert.alert(
+      CustomAlertManager.alert(
         'Error',
         'Failed to update team information. Please try again.'
       );
@@ -751,14 +751,14 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const signer = await signingService.getSigner();
 
       if (!signer) {
-        Alert.alert('Error', 'Unable to sign event. Please ensure you are logged in.');
+        CustomAlertManager.alert('Error', 'Unable to sign event. Please ensure you are logged in.');
         return;
       }
 
       // Get user's hex pubkey for captain tag
       const userHexPubkey = await signingService.getUserPubkey();
       if (!userHexPubkey) {
-        Alert.alert('Error', 'Unable to get user pubkey. Please try logging in again.');
+        CustomAlertManager.alert('Error', 'Unable to get user pubkey. Please try logging in again.');
         return;
       }
 
@@ -766,7 +766,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const ndk = await GlobalNDKService.getInstance();
 
       if (!ndk) {
-        Alert.alert('Error', 'Unable to connect to Nostr network');
+        CustomAlertManager.alert('Error', 'Unable to connect to Nostr network');
         return;
       }
 
@@ -825,7 +825,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       console.log('✅ Team shop URL updated successfully');
     } catch (error) {
       console.error('Error updating team shop URL:', error);
-      Alert.alert('Error', 'Failed to update team shop URL');
+      CustomAlertManager.alert('Error', 'Failed to update team shop URL');
     }
   };
 
@@ -924,7 +924,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
         console.error('[Captain] Authentication retrieval failed completely');
 
         // Provide helpful error with recovery options
-        Alert.alert(
+        CustomAlertManager.alert(
           'Authentication Required',
           'Your authentication data could not be retrieved. This can happen if you logged in on a different device or if your session expired.',
           [
@@ -965,7 +965,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
         console.error('[Captain] User is not the captain of this team!');
         console.error(`  User hex: ${authData.hexPubkey}`);
         console.error(`  Captain hex: ${captainId}`);
-        Alert.alert('Error', 'You are not the captain of this team');
+        CustomAlertManager.alert('Error', 'You are not the captain of this team');
         setIsCreatingList(false);
         return;
       }
@@ -996,16 +996,16 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
         setHasKind30000List(true);
         // Reload members after creating the list
         await loadTeamMembers();
-        Alert.alert(
+        CustomAlertManager.alert(
           'Success',
           'Team member list created! You can now run competitions and manage members.'
         );
       } else {
-        Alert.alert('Error', result.error || 'Failed to create member list');
+        CustomAlertManager.alert('Error', result.error || 'Failed to create member list');
       }
     } catch (error) {
       console.error('Error creating member list:', error);
-      Alert.alert('Error', 'Failed to create member list. Please try again.');
+      CustomAlertManager.alert('Error', 'Failed to create member list. Please try again.');
     } finally {
       setIsCreatingList(false);
     }
@@ -1013,7 +1013,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
 
   // Handle member removal
   const handleRemoveMember = async (memberPubkey: string) => {
-    Alert.alert(
+    CustomAlertManager.alert(
       'Remove Member',
       'Are you sure you want to remove this member from the team?',
       [
@@ -1100,10 +1100,10 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
               const memberCache = TeamMemberCache.getInstance();
               memberCache.invalidateTeam(teamId, captainId);
 
-              Alert.alert('Success', 'Member has been removed from the team');
+              CustomAlertManager.alert('Success', 'Member has been removed from the team');
             } catch (error) {
               console.error('Failed to remove member:', error);
-              Alert.alert(
+              CustomAlertManager.alert(
                 'Error',
                 'Failed to remove member. Please try again.'
               );
@@ -1117,7 +1117,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
   // Add member to team
   const handleAddMember = async () => {
     if (!newMemberNpub.trim()) {
-      Alert.alert('Error', 'Please enter a member npub or hex pubkey');
+      CustomAlertManager.alert('Error', 'Please enter a member npub or hex pubkey');
       return;
     }
 
@@ -1125,7 +1125,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       // Get authentication data
       const authData = await getAuthenticationData();
       if (!authData) {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Authentication Required',
           'Please re-authenticate to add members.'
         );
@@ -1138,7 +1138,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const currentList = await listService.getList(captainId, memberListDTag);
 
       if (!currentList) {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Error',
           'Member list not found. Please create a member list first.'
         );
@@ -1147,7 +1147,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
 
       // Check if member already exists
       if (currentList.members.includes(newMemberNpub)) {
-        Alert.alert('Info', 'This member is already part of the team');
+        CustomAlertManager.alert('Info', 'This member is already part of the team');
         return;
       }
 
@@ -1160,7 +1160,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       );
 
       if (!eventTemplate) {
-        Alert.alert('Info', 'Failed to prepare member addition');
+        CustomAlertManager.alert('Info', 'Failed to prepare member addition');
         return;
       }
 
@@ -1193,10 +1193,10 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const memberCache = TeamMemberCache.getInstance();
       memberCache.invalidateTeam(teamId, captainId);
 
-      Alert.alert('Success', 'Member added to the team successfully');
+      CustomAlertManager.alert('Success', 'Member added to the team successfully');
     } catch (error) {
       console.error('Failed to add member:', error);
-      Alert.alert('Error', 'Failed to add member. Please try again.');
+      CustomAlertManager.alert('Error', 'Failed to add member. Please try again.');
     }
   };
 

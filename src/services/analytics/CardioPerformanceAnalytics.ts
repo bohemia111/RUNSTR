@@ -380,7 +380,8 @@ export class CardioPerformanceAnalytics {
   }
 
   /**
-   * Estimate VO2 Max from race times (Cooper test method)
+   * Estimate VO2 Max from race times
+   * Uses time-based formula for 5K races
    */
   private static estimateVO2Max(
     workouts: LocalWorkout[],
@@ -402,14 +403,14 @@ export class CardioPerformanceAnalytics {
       return currentPace < fastestPace ? current : fastest;
     });
 
-    // VO2 Max estimation formula (simplified Cooper test)
-    // VO2max = (Distance in meters - 504.9) / 44.73
-    const distance5K = fastest5K.distance || 5000;
-    const vo2Max = (distance5K - 504.9) / 44.73;
+    // VO2 Max estimation formula (time-based for 5K)
+    // VO2max = (483 / time_in_minutes) + 3.5
+    const timeInMinutes = fastest5K.duration / 60;
+    const vo2Max = 483 / timeInMinutes + 3.5;
 
-    // Adjust for age and gender
+    // Adjust for age (VO2 max declines ~1% per year after 25)
     const age = healthProfile.age || 30;
-    const ageFactor = 1 - (age - 25) * 0.01; // -1% per year after 25
+    const ageFactor = age > 25 ? 1 - (age - 25) * 0.01 : 1;
     const adjustedVO2Max = vo2Max * ageFactor;
 
     // Calculate percentile (simplified)

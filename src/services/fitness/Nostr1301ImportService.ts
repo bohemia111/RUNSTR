@@ -50,24 +50,6 @@ export class Nostr1301ImportService {
     try {
       console.log('🚀 Starting Nostr workout history import...');
 
-      // Check if already imported
-      const alreadyImported =
-        await LocalWorkoutStorageService.hasImportedNostrWorkouts();
-      if (alreadyImported) {
-        console.log('⚠️ Nostr workouts already imported');
-        const stats =
-          await LocalWorkoutStorageService.getNostrImportStats();
-        if (stats) {
-          return {
-            success: true,
-            totalImported: stats.totalImported,
-            oldestDate: stats.oldestDate,
-            newestDate: stats.newestDate,
-            activityTypes: stats.activityTypes,
-          };
-        }
-      }
-
       // Fetch ALL 1301 events from Nostr
       console.log('📡 Fetching all kind 1301 events from Nostr...');
       const nuclear1301Service = Nuclear1301Service.getInstance();
