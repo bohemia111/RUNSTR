@@ -189,12 +189,13 @@ export class NostrCompetitionService {
   /**
    * Create and publish an event to Nostr relays
    * Supports both direct privateKeyHex (nsec users) and NDKSigner (Amber users)
+   * ✅ FIX: Accepts optional id to prevent wizard/service ID mismatch
    */
   static async createEvent(
     eventData: Omit<
       NostrEventDefinition,
-      'id' | 'captainPubkey' | 'createdAt' | 'updatedAt' | 'status'
-    >,
+      'captainPubkey' | 'createdAt' | 'updatedAt' | 'status'
+    > & { id?: string }, // ✅ FIX: Allow optional id from wizard
     captainPrivateKeyOrSigner: string | NDKSigner
   ): Promise<CompetitionPublishResult> {
     try {
@@ -202,12 +203,14 @@ export class NostrCompetitionService {
 
       const isSigner = typeof captainPrivateKeyOrSigner !== 'string';
 
-      // Generate unique competition ID
-      const competitionId = NostrCompetitionService.generateCompetitionId(
+      // ✅ FIX: Use provided ID if available (from wizard), otherwise generate new one
+      const competitionId = eventData.id || NostrCompetitionService.generateCompetitionId(
         'event',
         eventData.name
       );
       const now = Math.floor(Date.now() / 1000);
+
+      console.log(`📋 Using event ID: ${competitionId}${eventData.id ? ' (from wizard)' : ' (generated)'}`);
 
       // Get captain's public key based on auth method
       let captainPubkey: string;

@@ -34,166 +34,53 @@ import nostrTeamService from '../../services/nostr/NostrTeamService';
 import { ProfileService } from '../../services/user/profileService';
 import unifiedCache from '../../services/cache/UnifiedNostrCache';
 import { CacheKeys } from '../../constants/cacheTTL';
-import {
-  ALL_DURATION_OPTIONS,
-  type DurationOption,
-} from '../../constants/eventDurations';
+// Duration options removed - now auto-set to 24 hours
 import { EventAnnouncementPreview } from '../events/EventAnnouncementPreview';
 import type { EventAnnouncementData } from '../../services/nostr/eventAnnouncementCardGenerator';
 
-// Event Preset Interface
+// Event Preset Interface (Simplified for Running-only events)
 interface EventPreset {
   id: string;
   name: string;
-  category: 'Running' | 'Strength' | 'Diet' | 'Meditation';
-  activityType: NostrActivityType;
-  scoringType: EventScoringType; // NEW: Simplified scoring
-  competitionType: NostrEventCompetitionType; // Deprecated: keep for compat
-  targetValue?: number;
-  targetUnit?: string;
+  activityType: NostrActivityType; // Always 'Running'
+  scoringType: EventScoringType; // Always 'fastest_time'
+  competitionType: NostrEventCompetitionType;
+  targetValue: number;
+  targetUnit: string;
   description: string;
 }
 
-// 11 Event Presets
+// 3 Running Event Presets (Simplified from 11)
 const EVENT_PRESETS: EventPreset[] = [
-  // Running (4 presets) - Time-based races
   {
     id: '5k',
     name: '5K Race',
-    category: 'Running',
     activityType: 'Running',
-    scoringType: 'fastest_time', // ← NEW: Time-based ranking
+    scoringType: 'fastest_time',
     competitionType: '5K Race',
     targetValue: 5,
     targetUnit: 'km',
-    description: '5 kilometers race - fastest time wins',
+    description: '5 kilometers - fastest time wins',
   },
   {
     id: '10k',
     name: '10K Race',
-    category: 'Running',
     activityType: 'Running',
-    scoringType: 'fastest_time', // ← NEW: Time-based ranking
+    scoringType: 'fastest_time',
     competitionType: '10K Race',
     targetValue: 10,
     targetUnit: 'km',
-    description: '10 kilometers race - fastest time wins',
+    description: '10 kilometers - fastest time wins',
   },
   {
     id: 'half-marathon',
     name: 'Half Marathon',
-    category: 'Running',
     activityType: 'Running',
-    scoringType: 'fastest_time', // ← NEW: Time-based ranking
+    scoringType: 'fastest_time',
     competitionType: 'Half Marathon',
     targetValue: 21.1,
     targetUnit: 'km',
-    description: '21.1 kilometers race - fastest time wins',
-  },
-  {
-    id: 'marathon',
-    name: 'Marathon',
-    category: 'Running',
-    activityType: 'Running',
-    scoringType: 'fastest_time', // ← NEW: Time-based ranking
-    competitionType: 'Marathon',
-    targetValue: 42.2,
-    targetUnit: 'km',
-    description: '42.2 kilometers race - fastest time wins',
-  },
-
-  // Strength (3 presets) - Completion challenges
-  {
-    id: 'pushups-100',
-    name: '100 Push-ups',
-    category: 'Strength',
-    activityType: 'Strength Training',
-    scoringType: 'completion', // ← NEW: Completion-based
-    competitionType: 'Workout Count',
-    targetValue: 100,
-    targetUnit: 'reps',
-    description: 'Complete 100 push-ups in one workout',
-  },
-  {
-    id: 'pullups-50',
-    name: '50 Pull-ups',
-    category: 'Strength',
-    activityType: 'Strength Training',
-    scoringType: 'completion', // ← NEW: Completion-based
-    competitionType: 'Workout Count',
-    targetValue: 50,
-    targetUnit: 'reps',
-    description: 'Complete 50 pull-ups in one workout',
-  },
-  {
-    id: 'situps-100',
-    name: '100 Sit-ups',
-    category: 'Strength',
-    activityType: 'Strength Training',
-    scoringType: 'completion', // ← NEW: Completion-based
-    competitionType: 'Workout Count',
-    targetValue: 100,
-    targetUnit: 'reps',
-    description: 'Complete 100 sit-ups in one workout',
-  },
-
-  // Diet (3 presets) - Completion challenges
-  {
-    id: 'carnivore-1d',
-    name: 'Carnivore Challenge',
-    category: 'Diet',
-    activityType: 'Diet',
-    scoringType: 'completion', // ← NEW: Completion-based
-    competitionType: 'Meal Logging',
-    targetValue: 1,
-    targetUnit: 'day',
-    description: '1 day carnivore diet',
-  },
-  {
-    id: 'fast-24hr',
-    name: '24hr Fast',
-    category: 'Diet',
-    activityType: 'Diet',
-    scoringType: 'completion', // ← NEW: Completion-based
-    competitionType: 'Nutrition Score',
-    targetValue: 24,
-    targetUnit: 'hours',
-    description: '24 hour water fast',
-  },
-  {
-    id: 'fast-12hr',
-    name: '12hr Fast',
-    category: 'Diet',
-    activityType: 'Diet',
-    scoringType: 'completion', // ← NEW: Completion-based
-    competitionType: 'Nutrition Score',
-    targetValue: 12,
-    targetUnit: 'hours',
-    description: '12 hour intermittent fast',
-  },
-
-  // Meditation (2 presets) - Completion challenges
-  {
-    id: 'meditation-30min',
-    name: '30min Meditation',
-    category: 'Meditation',
-    activityType: 'Meditation',
-    scoringType: 'completion', // ← NEW: Completion-based
-    competitionType: 'Duration Challenge',
-    targetValue: 30,
-    targetUnit: 'minutes',
-    description: '30 minute meditation session',
-  },
-  {
-    id: 'meditation-1hr',
-    name: '1hr Meditation',
-    category: 'Meditation',
-    activityType: 'Meditation',
-    scoringType: 'completion', // ← NEW: Completion-based
-    competitionType: 'Duration Challenge',
-    targetValue: 60,
-    targetUnit: 'minutes',
-    description: '1 hour meditation session',
+    description: '21.1 kilometers - fastest time wins',
   },
 ];
 
@@ -202,14 +89,12 @@ type CompetitionType = NostrEventCompetitionType;
 
 interface EventData {
   selectedPreset: EventPreset | null;
-  activityType: ActivityType | null;
-  scoringType: EventScoringType | null; // NEW: Simplified scoring
-  competitionType: CompetitionType | null; // Deprecated: keep for compat
+  activityType: ActivityType; // Auto-set to 'Running'
+  scoringType: EventScoringType; // Auto-set to 'fastest_time'
+  competitionType: CompetitionType | null;
   eventDate: Date | null;
-  durationMinutes?: number; // NEW: Duration for short events (10 min, 2 hours)
+  eventTime: string; // NEW: Event start time (HH:MM format)
   entryFeesSats: number;
-  maxParticipants: number;
-  requireApproval: boolean;
   eventName: string;
   description: string;
   targetValue?: number;
@@ -217,10 +102,13 @@ interface EventData {
   prizePoolSats: number | undefined;
   lightningAddress?: string;
   paymentDestination: 'captain' | 'charity';
-  scoringMode: 'individual' | 'team-total'; // NEW: Scoring mode
-  teamGoal?: number; // NEW: Team goal for team-total mode
-  recurrence: RecurrenceFrequency; // NEW: Recurrence frequency
-  recurrenceDay?: RecurrenceDay; // NEW: Day of week for weekly recurrence
+  recurrence: RecurrenceFrequency;
+  recurrenceDay?: RecurrenceDay;
+  // Auto-set (hidden from user):
+  durationMinutes: number; // Always 1440 (24 hours)
+  maxParticipants: number; // Always 999 (unlimited)
+  requireApproval: boolean; // Always true
+  scoringMode: 'individual'; // Always 'individual'
 }
 
 interface EventCreationWizardProps {
@@ -246,23 +134,24 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
     useState<string>('');
   const [eventData, setEventData] = useState<EventData>({
     selectedPreset: null,
-    activityType: null,
-    scoringType: null,
+    activityType: 'Running', // Auto-set
+    scoringType: 'fastest_time', // Auto-set
     competitionType: null,
     eventDate: null,
-    durationMinutes: undefined,
+    eventTime: '09:00', // Default 9:00 AM
     entryFeesSats: 0,
-    maxParticipants: 50,
-    requireApproval: true,
     eventName: '',
     description: '',
     prizePoolSats: undefined,
     lightningAddress: '',
     paymentDestination: 'captain',
-    scoringMode: 'individual',
-    teamGoal: undefined,
     recurrence: 'none',
     recurrenceDay: undefined,
+    // Auto-set hidden fields:
+    durationMinutes: 1440, // 24 hours
+    maxParticipants: 999, // Unlimited
+    requireApproval: true,
+    scoringMode: 'individual',
   });
 
   // Alert state for CustomAlert
@@ -284,23 +173,23 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
       setCurrentStep(0);
       setEventData({
         selectedPreset: null,
-        activityType: null,
-        scoringType: null,
+        activityType: 'Running',
+        scoringType: 'fastest_time',
         competitionType: null,
         eventDate: null,
-        durationMinutes: undefined,
+        eventTime: '09:00',
         entryFeesSats: 0,
-        maxParticipants: 50,
-        requireApproval: true,
         eventName: '',
         description: '',
         prizePoolSats: undefined,
         lightningAddress: '',
         paymentDestination: 'captain',
-        scoringMode: 'individual',
-        teamGoal: undefined,
         recurrence: 'none',
         recurrenceDay: undefined,
+        durationMinutes: 1440,
+        maxParticipants: 999,
+        requireApproval: true,
+        scoringMode: 'individual',
       });
 
       // Fetch team charity info
@@ -322,22 +211,17 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
     }
   }, [visible, teamId, captainPubkey]);
 
-  // Wizard steps configuration (3 steps: preset, settings, recurrence)
+  // Wizard steps configuration (2 steps: details, payments)
   const steps: WizardStep[] = [
     {
-      id: 'preset',
-      title: 'Choose Event Type',
-      isValid: !!eventData.selectedPreset,
-    },
-    {
-      id: 'settings',
+      id: 'details',
       title: 'Event Details',
-      isValid: eventData.eventName.length > 0 && !!eventData.eventDate,
+      isValid: !!eventData.selectedPreset && eventData.eventName.length > 0 && !!eventData.eventDate,
     },
     {
-      id: 'recurrence',
-      title: 'Recurrence',
-      isValid: true, // Always valid (recurrence is optional)
+      id: 'payments',
+      title: 'Payments & Settings',
+      isValid: true, // Always valid (payments optional)
     },
   ];
 
@@ -416,19 +300,24 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
 
       console.log('✅ Signer ready for event creation');
 
+      // Combine event date and time into single ISO string
+      const eventDateTime = new Date(eventData.eventDate!);
+      const [hours, minutes] = eventData.eventTime.split(':').map(Number);
+      eventDateTime.setHours(hours, minutes, 0, 0);
+
       // Prepare event data for Nostr
       const eventCreationData = {
         teamId,
         name: eventData.eventName,
         description: eventData.description,
-        activityType: eventData.activityType!,
-        scoringType: eventData.scoringType!, // ← NEW: Pass scoring type
-        competitionType: eventData.competitionType!, // Keep for backward compat
-        eventDate: eventData.eventDate!.toISOString(),
-        durationMinutes: eventData.durationMinutes, // ← NEW: Pass duration
+        activityType: eventData.activityType, // Auto-set to 'Running'
+        scoringType: eventData.scoringType, // Auto-set to 'fastest_time'
+        competitionType: eventData.competitionType!, // From preset
+        eventDate: eventDateTime.toISOString(), // Combined date + time
+        durationMinutes: eventData.durationMinutes, // Auto-set to 1440 (24 hours)
         entryFeesSats: eventData.entryFeesSats,
-        maxParticipants: eventData.maxParticipants,
-        requireApproval: eventData.requireApproval,
+        maxParticipants: eventData.maxParticipants, // Auto-set to 999
+        requireApproval: eventData.requireApproval, // Auto-set to true
         targetValue: eventData.targetValue,
         targetUnit: eventData.targetUnit,
         prizePoolSats: eventData.prizePoolSats,
@@ -438,84 +327,74 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
           eventData.paymentDestination === 'charity'
             ? getCharityById(teamCharityId)?.name
             : currentUser?.name || 'Team Captain',
-        scoringMode: eventData.scoringMode, // ← NEW: Pass scoring mode
-        teamGoal: eventData.teamGoal, // ← NEW: Pass team goal
-        recurrence: eventData.recurrence, // ← NEW: Pass recurrence frequency
-        recurrenceDay: eventData.recurrenceDay, // ← NEW: Pass recurrence day
-        recurrenceStartDate: eventData.eventDate!.toISOString(), // ← NEW: First occurrence
+        scoringMode: eventData.scoringMode, // Auto-set to 'individual'
+        teamGoal: undefined, // Removed from wizard
+        recurrence: eventData.recurrence,
+        recurrenceDay: eventData.recurrenceDay,
+        recurrenceStartDate: eventDateTime.toISOString(), // First occurrence with time
       };
 
-      console.log('🎯 Creating event:', eventCreationData);
+      console.log('🎯 Creating event with participant list:', eventCreationData);
 
-      // Create event using Nostr Competition Service (works with both nsec and Amber)
+      // STEP 1: Generate event ID first (needed for participant list d-tag)
+      const timestamp = Math.floor(Date.now() / 1000).toString(36);
+      const random = Math.random().toString(36).substring(2, 8);
+      const sanitizedName = eventData.eventName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .substring(0, 10);
+      const eventId = `event_${sanitizedName}_${timestamp}_${random}`;
+
+      console.log('📋 Generated event ID:', eventId);
+
+      // STEP 2: Create participant list FIRST (with captain as first member)
+      console.log('📋 Creating participant list (kind 30000) FIRST...');
+      const listService = NostrListService.getInstance();
+
+      const participantListData = {
+        name: `${eventData.eventName} Participants`,
+        description: `Participants for ${eventData.eventName}`,
+        members: [captainPubkey], // Captain auto-joins their own event
+        dTag: `event-${eventId}-participants`,
+        listType: 'people' as const,
+      };
+
+      const listEventTemplate = listService.prepareListCreation(
+        participantListData,
+        captainPubkey
+      );
+
+      console.log('🔐 Signing participant list...');
+
+      const ndk = await GlobalNDKService.getInstance();
+      const listNdkEvent = new NDKEvent(ndk, listEventTemplate);
+      await listNdkEvent.sign(signer);
+
+      console.log('📤 Publishing participant list to Nostr...');
+      await listNdkEvent.publish();
+
+      console.log('✅ Participant list created successfully:', participantListData.dTag);
+
+      // STEP 3: Now create the event (kind 30101) - only if list succeeded
+      console.log('🎯 Creating event (kind 30101) now that list exists...');
+
+      // Add the pre-generated eventId to the event data
+      const eventCreationDataWithId = {
+        ...eventCreationData,
+        id: eventId, // ✅ FIX: Pass wizard's pre-generated eventId to prevent ID mismatch
+      };
+
       const result = await NostrCompetitionService.createEvent(
-        eventCreationData,
+        eventCreationDataWithId,
         signer
       );
 
       if (result.success) {
         console.log('✅ Event created successfully:', result.competitionId);
 
-        // Track participant list creation status
-        let participantListCreated = false;
-        let participantListError = '';
-
-        // Create empty participant list for opt-in participation
-        if (result.competitionId) {
-          try {
-            console.log(
-              '📋 Creating empty participant list for event (opt-in)'
-            );
-            const listService = NostrListService.getInstance();
-
-            // Get captain's hex pubkey from signer
-            const captainHexPubkey = captainPubkey; // Already provided as prop
-
-            // Prepare participant list with captain as first member (kind 30000)
-            const participantListData = {
-              name: `${eventData.eventName} Participants`,
-              description: `Participants for ${eventData.eventName}`,
-              members: [captainHexPubkey], // ✅ FIX: Captain auto-joins their own event
-              dTag: `event-${result.competitionId}-participants`,
-              listType: 'people' as const,
-            };
-
-            // Create the participant list event template
-            const listEventTemplate = listService.prepareListCreation(
-              participantListData,
-              captainHexPubkey
-            );
-
-            console.log('🔐 Signing participant list...');
-
-            // Get global NDK instance
-            const ndk = await GlobalNDKService.getInstance();
-
-            // Create NDK event and sign it
-            const ndkEvent = new NDKEvent(ndk, listEventTemplate);
-            await ndkEvent.sign(signer);
-
-            console.log('📤 Publishing participant list to Nostr...');
-
-            // Publish to relays
-            await ndkEvent.publish();
-
-            participantListCreated = true;
-            console.log(
-              '✅ Participant list created and published:',
-              participantListData.dTag
-            );
-          } catch (listError) {
-            console.error('⚠️ Failed to create participant list:', listError);
-            participantListError =
-              listError instanceof Error ? listError.message : 'Unknown error';
-            // Don't block event creation, just log the error
-          }
-        }
-
         // ✅ FIX: Invalidate team events cache so new event appears immediately
         console.log('🗑️ Invalidating team events cache for team:', teamId);
-        unifiedCache.delete(CacheKeys.TEAM_EVENTS(teamId));
+        unifiedCache.invalidate(CacheKeys.TEAM_EVENTS(teamId));
 
         // Prepare announcement data for preview modal
         const team = nostrTeamService.getTeamById(teamId);
@@ -532,15 +411,11 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
           durationMinutes: eventData.durationMinutes,
         };
 
-        // Show success alert first, then preview modal
-        const successMessage = participantListCreated
-          ? `Event "${eventData.eventName}" has been created and published to Nostr relays.\n\n✅ Participant list created successfully.`
-          : participantListError
-          ? `Event "${eventData.eventName}" has been created, but participant list creation failed.\n\n⚠️ ${participantListError}\n\nYou may need to create the participant list manually from the Captain Dashboard.`
-          : `Event "${eventData.eventName}" has been created and published to Nostr relays.`;
-
+        // Show success alert (participant list already created successfully)
         setAlertTitle('Success!');
-        setAlertMessage(successMessage);
+        setAlertMessage(
+          `Event "${eventData.eventName}" has been created and published to Nostr relays.\n\nParticipant list created successfully.`
+        );
         setAlertButtons([
           {
             text: 'Continue',
@@ -626,155 +501,45 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 0: // Preset Selection
+      case 0: // Event Details (Preset + Name/Bio + Date/Time)
         return (
           <ScrollView
             style={styles.stepContent}
             showsVerticalScrollIndicator={false}
           >
             <Text style={styles.stepDescription}>
-              Choose a preset event to get started quickly
+              Choose your race distance and set the date
             </Text>
 
-            {/* Running Category */}
-            <Text style={styles.categoryTitle}>Running</Text>
+            {/* Race Distance Presets */}
+            <Text style={styles.formLabel}>Race Distance</Text>
             <View style={styles.presetsGrid}>
-              {EVENT_PRESETS.filter((p) => p.category === 'Running').map(
-                (preset) => (
-                  <TouchableOpacity
-                    key={preset.id}
+              {EVENT_PRESETS.map((preset) => (
+                <TouchableOpacity
+                  key={preset.id}
+                  style={[
+                    styles.presetCard,
+                    eventData.selectedPreset?.id === preset.id &&
+                      styles.presetCardSelected,
+                  ]}
+                  onPress={() => selectPreset(preset)}
+                  activeOpacity={0.7}
+                >
+                  <Text
                     style={[
-                      styles.presetCard,
+                      styles.presetName,
                       eventData.selectedPreset?.id === preset.id &&
-                        styles.presetCardSelected,
+                        styles.presetNameSelected,
                     ]}
-                    onPress={() => selectPreset(preset)}
-                    activeOpacity={0.7}
                   >
-                    <Text
-                      style={[
-                        styles.presetName,
-                        eventData.selectedPreset?.id === preset.id &&
-                          styles.presetNameSelected,
-                      ]}
-                    >
-                      {preset.name}
-                    </Text>
-                    <Text style={styles.presetDescription}>
-                      {preset.description}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              )}
+                    {preset.name}
+                  </Text>
+                  <Text style={styles.presetDescription}>
+                    {preset.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-
-            {/* Strength Category */}
-            <Text style={styles.categoryTitle}>Strength</Text>
-            <View style={styles.presetsGrid}>
-              {EVENT_PRESETS.filter((p) => p.category === 'Strength').map(
-                (preset) => (
-                  <TouchableOpacity
-                    key={preset.id}
-                    style={[
-                      styles.presetCard,
-                      eventData.selectedPreset?.id === preset.id &&
-                        styles.presetCardSelected,
-                    ]}
-                    onPress={() => selectPreset(preset)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.presetName,
-                        eventData.selectedPreset?.id === preset.id &&
-                          styles.presetNameSelected,
-                      ]}
-                    >
-                      {preset.name}
-                    </Text>
-                    <Text style={styles.presetDescription}>
-                      {preset.description}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              )}
-            </View>
-
-            {/* Diet Category */}
-            <Text style={styles.categoryTitle}>Diet</Text>
-            <View style={styles.presetsGrid}>
-              {EVENT_PRESETS.filter((p) => p.category === 'Diet').map(
-                (preset) => (
-                  <TouchableOpacity
-                    key={preset.id}
-                    style={[
-                      styles.presetCard,
-                      eventData.selectedPreset?.id === preset.id &&
-                        styles.presetCardSelected,
-                    ]}
-                    onPress={() => selectPreset(preset)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.presetName,
-                        eventData.selectedPreset?.id === preset.id &&
-                          styles.presetNameSelected,
-                      ]}
-                    >
-                      {preset.name}
-                    </Text>
-                    <Text style={styles.presetDescription}>
-                      {preset.description}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              )}
-            </View>
-
-            {/* Meditation Category */}
-            <Text style={styles.categoryTitle}>Meditation</Text>
-            <View style={styles.presetsGrid}>
-              {EVENT_PRESETS.filter((p) => p.category === 'Meditation').map(
-                (preset) => (
-                  <TouchableOpacity
-                    key={preset.id}
-                    style={[
-                      styles.presetCard,
-                      eventData.selectedPreset?.id === preset.id &&
-                        styles.presetCardSelected,
-                    ]}
-                    onPress={() => selectPreset(preset)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.presetName,
-                        eventData.selectedPreset?.id === preset.id &&
-                          styles.presetNameSelected,
-                      ]}
-                    >
-                      {preset.name}
-                    </Text>
-                    <Text style={styles.presetDescription}>
-                      {preset.description}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              )}
-            </View>
-          </ScrollView>
-        );
-
-      case 1: // Settings (Date + Prize Pool + Entry Fee)
-        return (
-          <ScrollView
-            style={styles.stepContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.stepDescription}>
-              Configure your {eventData.selectedPreset?.name} event
-            </Text>
 
             {/* Event Name */}
             <View style={styles.formGroup}>
@@ -785,6 +550,20 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
                 onChangeText={(text) => updateSettings('eventName', text)}
                 placeholder="Enter event name"
                 placeholderTextColor={theme.colors.textMuted}
+              />
+            </View>
+
+            {/* Event Bio (optional) */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Event Bio (Optional)</Text>
+              <TextInput
+                style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
+                value={eventData.description}
+                onChangeText={(text) => updateSettings('description', text)}
+                placeholder="Describe your event..."
+                placeholderTextColor={theme.colors.textMuted}
+                multiline
+                numberOfLines={3}
               />
             </View>
 
@@ -824,28 +603,61 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
               </View>
             </View>
 
-            {/* Duration Selection (NEW) */}
+            {/* Time Selection */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Event Duration</Text>
-              <View style={styles.durationOptions}>
-                {ALL_DURATION_OPTIONS.map((option) => (
+              <Text style={styles.formLabel}>Start Time</Text>
+              <TextInput
+                style={styles.textInput}
+                value={eventData.eventTime}
+                onChangeText={(text) => updateSettings('eventTime', text)}
+                placeholder="09:00"
+                placeholderTextColor={theme.colors.textMuted}
+                keyboardType="numbers-and-punctuation"
+              />
+              <Text style={styles.formHelper}>
+                24-hour format (e.g., 09:00, 14:30)
+              </Text>
+            </View>
+          </ScrollView>
+        );
+
+      case 1: // Payments & Settings
+        return (
+          <ScrollView
+            style={styles.stepContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.stepDescription}>
+              Configure entry fees, prizes, and recurring options
+            </Text>
+
+            {/* Entry Fee with Preset Buttons */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Entry Fee</Text>
+              <View style={styles.entryFeeOptions}>
+                {[
+                  { label: 'Free', value: 0 },
+                  { label: '1,000 sats', value: 1000 },
+                  { label: '2,100 sats', value: 2100 },
+                  { label: '5,000 sats', value: 5000 },
+                ].map((option) => (
                   <TouchableOpacity
-                    key={option.minutes}
+                    key={option.label}
                     style={[
-                      styles.durationOption,
-                      eventData.durationMinutes === option.minutes &&
-                        styles.durationOptionSelected,
+                      styles.entryFeeOption,
+                      eventData.entryFeesSats === option.value &&
+                        styles.entryFeeOptionSelected,
                     ]}
                     onPress={() =>
-                      updateSettings('durationMinutes', option.minutes)
+                      updateSettings('entryFeesSats', option.value)
                     }
                     activeOpacity={0.7}
                   >
                     <Text
                       style={[
-                        styles.durationOptionText,
-                        eventData.durationMinutes === option.minutes &&
-                          styles.durationOptionTextSelected,
+                        styles.entryFeeOptionText,
+                        eventData.entryFeesSats === option.value &&
+                          styles.entryFeeOptionTextSelected,
                       ]}
                     >
                       {option.label}
@@ -853,84 +665,22 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
-
-            {/* Scoring Mode (NEW) */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Leaderboard Type</Text>
-              <View style={styles.scoringModeOptions}>
-                <TouchableOpacity
-                  style={[
-                    styles.scoringModeOption,
-                    eventData.scoringMode === 'individual' &&
-                      styles.scoringModeOptionSelected,
-                  ]}
-                  onPress={() => updateSettings('scoringMode', 'individual')}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.scoringModeOptionText,
-                      eventData.scoringMode === 'individual' &&
-                        styles.scoringModeOptionTextSelected,
-                    ]}
-                  >
-                    Individual Rankings
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.scoringModeOption,
-                    eventData.scoringMode === 'team-total' &&
-                      styles.scoringModeOptionSelected,
-                  ]}
-                  onPress={() => updateSettings('scoringMode', 'team-total')}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.scoringModeOptionText,
-                      eventData.scoringMode === 'team-total' &&
-                        styles.scoringModeOptionTextSelected,
-                    ]}
-                  >
-                    Team Goal
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Team Goal Input (only if team-total mode) */}
-            {eventData.scoringMode === 'team-total' && (
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>
-                  Team Goal ({eventData.targetUnit || 'km'})
-                </Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={eventData.teamGoal?.toString() || ''}
-                  onChangeText={(text) =>
-                    updateSettings('teamGoal', parseFloat(text) || 0)
-                  }
-                  placeholder={`e.g., 210 ${eventData.targetUnit || 'km'}`}
-                  placeholderTextColor={theme.colors.textMuted}
-                  keyboardType="numeric"
-                />
+              {eventData.entryFeesSats > 0 && (
                 <Text style={styles.formHelper}>
-                  Combined team total needed to complete the goal
+                  Participants will pay {eventData.entryFeesSats} sats to join
                 </Text>
-              </View>
-            )}
+              )}
+            </View>
 
             {/* Prize Pool */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Prize Pool (sats)</Text>
+              <Text style={styles.formLabel}>Prize Pool</Text>
               <View style={styles.prizePoolOptions}>
                 {[
                   { label: 'None', value: 0 },
-                  { label: '10k', value: 10000 },
-                  { label: '20k', value: 20000 },
-                  { label: '30k', value: 30000 },
+                  { label: '10k sats', value: 10000 },
+                  { label: '21k sats', value: 21000 },
+                  { label: '50k sats', value: 50000 },
                 ].map((option) => (
                   <TouchableOpacity
                     key={option.label}
@@ -956,26 +706,6 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
-
-            {/* Entry Fee */}
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Entry Fee (sats)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={eventData.entryFeesSats.toString()}
-                onChangeText={(text) =>
-                  updateSettings('entryFeesSats', parseInt(text) || 0)
-                }
-                placeholder="0"
-                placeholderTextColor={theme.colors.textMuted}
-                keyboardType="numeric"
-              />
-              {eventData.entryFeesSats > 0 && (
-                <Text style={styles.formHelper}>
-                  Participants will pay {eventData.entryFeesSats} sats to join
-                </Text>
-              )}
             </View>
 
             {/* Payment Destination (only if entry fee > 0) */}
@@ -1042,153 +772,88 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
                 </View>
               </View>
             )}
-          </ScrollView>
-        );
 
-      case 2: // Recurrence Settings
-        return (
-          <ScrollView
-            style={styles.stepContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.stepDescription}>
-              Make this event repeat automatically (optional)
-            </Text>
-
-            {/* Recurrence Toggle */}
+            {/* Recurring Event Options */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Event Type</Text>
-              <View style={styles.recurrenceTypeOptions}>
-                <TouchableOpacity
-                  style={[
-                    styles.recurrenceTypeOption,
-                    eventData.recurrence === 'none' &&
-                      styles.recurrenceTypeOptionSelected,
-                  ]}
-                  onPress={() => updateSettings('recurrence', 'none')}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.recurrenceTypeOptionText,
-                      eventData.recurrence === 'none' &&
-                        styles.recurrenceTypeOptionTextSelected,
-                    ]}
-                  >
-                    One-Time Event
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.recurrenceTypeOption,
-                    eventData.recurrence !== 'none' &&
-                      styles.recurrenceTypeOptionSelected,
-                  ]}
-                  onPress={() => updateSettings('recurrence', 'weekly')}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.recurrenceTypeOptionText,
-                      eventData.recurrence !== 'none' &&
-                        styles.recurrenceTypeOptionTextSelected,
-                    ]}
-                  >
-                    Recurring Event
-                  </Text>
-                </TouchableOpacity>
+              <Text style={styles.formLabel}>Recurring Event</Text>
+              <View style={styles.recurrenceOptions}>
+                {(['none', 'weekly', 'biweekly', 'monthly'] as const).map(
+                  (freq) => (
+                    <TouchableOpacity
+                      key={freq}
+                      style={[
+                        styles.recurrenceOption,
+                        eventData.recurrence === freq &&
+                          styles.recurrenceOptionSelected,
+                      ]}
+                      onPress={() => updateSettings('recurrence', freq)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.recurrenceOptionText,
+                          eventData.recurrence === freq &&
+                            styles.recurrenceOptionTextSelected,
+                        ]}
+                      >
+                        {freq === 'none' ? 'One-Time' : freq.charAt(0).toUpperCase() + freq.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                )}
               </View>
+              {eventData.recurrence !== 'none' && (
+                <Text style={styles.formHelper}>
+                  Event will automatically repeat {eventData.recurrence}
+                </Text>
+              )}
             </View>
 
-            {/* Frequency Selection (only if recurring) */}
-            {eventData.recurrence !== 'none' && (
-              <>
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Frequency</Text>
-                  <View style={styles.frequencyOptions}>
-                    {(['daily', 'weekly', 'biweekly', 'monthly'] as const).map(
-                      (freq) => (
-                        <TouchableOpacity
-                          key={freq}
-                          style={[
-                            styles.frequencyOption,
-                            eventData.recurrence === freq &&
-                              styles.frequencyOptionSelected,
-                          ]}
-                          onPress={() => updateSettings('recurrence', freq)}
-                          activeOpacity={0.7}
-                        >
-                          <Text
-                            style={[
-                              styles.frequencyOptionText,
-                              eventData.recurrence === freq &&
-                                styles.frequencyOptionTextSelected,
-                            ]}
-                          >
-                            {freq.charAt(0).toUpperCase() + freq.slice(1)}
-                          </Text>
-                        </TouchableOpacity>
-                      )
-                    )}
-                  </View>
+            {/* Day Selection (only for weekly/biweekly) */}
+            {(eventData.recurrence === 'weekly' ||
+              eventData.recurrence === 'biweekly') && (
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Reset Day</Text>
+                <View style={styles.dayOptions}>
+                  {(
+                    [
+                      'monday',
+                      'tuesday',
+                      'wednesday',
+                      'thursday',
+                      'friday',
+                      'saturday',
+                      'sunday',
+                    ] as const
+                  ).map((day) => (
+                    <TouchableOpacity
+                      key={day}
+                      style={[
+                        styles.dayOption,
+                        eventData.recurrenceDay === day &&
+                          styles.dayOptionSelected,
+                      ]}
+                      onPress={() => updateSettings('recurrenceDay', day)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.dayOptionText,
+                          eventData.recurrenceDay === day &&
+                            styles.dayOptionTextSelected,
+                        ]}
+                      >
+                        {day.slice(0, 3).toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-
-                {/* Day Selection (only for weekly/biweekly) */}
-                {(eventData.recurrence === 'weekly' ||
-                  eventData.recurrence === 'biweekly') && (
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Reset Day</Text>
-                    <View style={styles.dayOptions}>
-                      {(
-                        [
-                          'monday',
-                          'tuesday',
-                          'wednesday',
-                          'thursday',
-                          'friday',
-                          'saturday',
-                          'sunday',
-                        ] as const
-                      ).map((day) => (
-                        <TouchableOpacity
-                          key={day}
-                          style={[
-                            styles.dayOption,
-                            eventData.recurrenceDay === day &&
-                              styles.dayOptionSelected,
-                          ]}
-                          onPress={() => updateSettings('recurrenceDay', day)}
-                          activeOpacity={0.7}
-                        >
-                          <Text
-                            style={[
-                              styles.dayOptionText,
-                              eventData.recurrenceDay === day &&
-                                styles.dayOptionTextSelected,
-                            ]}
-                          >
-                            {day.slice(0, 3).toUpperCase()}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                    <Text style={styles.formHelper}>
-                      Leaderboard will reset every{' '}
-                      {eventData.recurrence === 'biweekly' ? 'other ' : ''}
-                      {eventData.recurrenceDay || 'selected day'} at midnight
-                    </Text>
-                  </View>
-                )}
-
-                {/* Info Box */}
-                <View style={styles.infoBox}>
-                  <Text style={styles.infoText}>
-                    Recurring events automatically reset the leaderboard on the
-                    specified schedule. The same event will run indefinitely
-                    until you manually end it.
-                  </Text>
-                </View>
-              </>
+                <Text style={styles.formHelper}>
+                  Leaderboard will reset every{' '}
+                  {eventData.recurrence === 'biweekly' ? 'other ' : ''}
+                  {eventData.recurrenceDay || 'selected day'} at midnight
+                </Text>
+              </View>
             )}
           </ScrollView>
         );
@@ -1255,15 +920,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     marginBottom: 24,
     lineHeight: 20,
-  },
-
-  // Category styles
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: theme.typography.weights.semiBold,
-    color: theme.colors.text,
-    marginTop: 16,
-    marginBottom: 12,
   },
 
   // Preset grid styles
@@ -1433,109 +1089,14 @@ const styles = StyleSheet.create({
     color: theme.colors.accent,
   },
 
-  // Duration selection styles (NEW)
-  durationOptions: {
+  // Entry fee options styles (NEW)
+  entryFeeOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
 
-  durationOption: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: theme.colors.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-  },
-
-  durationOptionSelected: {
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.background,
-  },
-
-  durationOptionText: {
-    fontSize: 14,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.text,
-  },
-
-  durationOptionTextSelected: {
-    color: theme.colors.accent,
-  },
-
-  // Scoring mode styles (NEW)
-  scoringModeOptions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-
-  scoringModeOption: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: theme.colors.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-
-  scoringModeOptionSelected: {
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.background,
-  },
-
-  scoringModeOptionText: {
-    fontSize: 14,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.text,
-  },
-
-  scoringModeOptionTextSelected: {
-    color: theme.colors.accent,
-  },
-
-  // Recurrence type styles (NEW)
-  recurrenceTypeOptions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-
-  recurrenceTypeOption: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: theme.colors.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-
-  recurrenceTypeOptionSelected: {
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.background,
-  },
-
-  recurrenceTypeOptionText: {
-    fontSize: 14,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.text,
-  },
-
-  recurrenceTypeOptionTextSelected: {
-    color: theme.colors.accent,
-  },
-
-  // Frequency options styles (NEW)
-  frequencyOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-
-  frequencyOption: {
+  entryFeeOption: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: theme.colors.cardBackground,
@@ -1544,18 +1105,49 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 
-  frequencyOptionSelected: {
+  entryFeeOptionSelected: {
     borderColor: theme.colors.accent,
     backgroundColor: theme.colors.background,
   },
 
-  frequencyOptionText: {
+  entryFeeOptionText: {
     fontSize: 14,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.text,
   },
 
-  frequencyOptionTextSelected: {
+  entryFeeOptionTextSelected: {
+    color: theme.colors.accent,
+  },
+
+  // Recurrence options styles (NEW - simplified)
+  recurrenceOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+
+  recurrenceOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.cardBackground,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+  },
+
+  recurrenceOptionSelected: {
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.background,
+  },
+
+  recurrenceOptionText: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text,
+  },
+
+  recurrenceOptionTextSelected: {
     color: theme.colors.accent,
   },
 
@@ -1590,21 +1182,5 @@ const styles = StyleSheet.create({
 
   dayOptionTextSelected: {
     color: theme.colors.accent,
-  },
-
-  // Info box styles (NEW)
-  infoBox: {
-    backgroundColor: theme.colors.cardBackground,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.accent,
-    padding: 12,
-    borderRadius: 4,
-    marginTop: 8,
-  },
-
-  infoText: {
-    fontSize: 13,
-    color: theme.colors.textMuted,
-    lineHeight: 18,
   },
 });

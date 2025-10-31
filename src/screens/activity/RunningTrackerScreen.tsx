@@ -613,103 +613,110 @@ export const RunningTrackerScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* GPS Status Indicator */}
-      {isTracking && (
-        <View style={styles.gpsContainer}>
-          <GPSStatusIndicator
-            signalStrength={gpsSignal}
-            accuracy={gpsAccuracy}
-            isBackgroundTracking={isBackgroundTracking}
-          />
+      <ScrollView
+        style={styles.scrollableContent}
+        contentContainerStyle={styles.scrollContentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* GPS Status Indicator */}
+        {isTracking && (
+          <View style={styles.gpsContainer}>
+            <GPSStatusIndicator
+              signalStrength={gpsSignal}
+              accuracy={gpsAccuracy}
+              isBackgroundTracking={isBackgroundTracking}
+            />
+          </View>
+        )}
+
+        {/* Battery Warning */}
+        {isTracking && <BatteryWarning />}
+
+        {/* Route Recognition Badge */}
+        <RouteRecognitionBadge
+          routeName={matchedRoute?.routeName || ''}
+          confidence={matchedRoute?.confidence || 0}
+          isVisible={isTracking && matchedRoute !== null}
+        />
+
+        {/* PR Comparison */}
+        <RoutePRComparison
+          isAheadOfPR={prComparison?.isAheadOfPR || false}
+          timeDifference={prComparison?.timeDifference || 0}
+          percentComplete={prComparison?.percentComplete || 0}
+          estimatedFinishTime={prComparison?.estimatedFinishTime || 0}
+          prFinishTime={prComparison?.prFinishTime || 0}
+          isVisible={isTracking && prComparison !== null}
+        />
+
+        {/* Metrics Display */}
+        <View style={styles.metricsContainer}>
+          <View style={styles.metricsRow}>
+            <MetricCard
+              label="Distance"
+              value={metrics.distance}
+              icon="navigate"
+            />
+            <MetricCard
+              label="Duration"
+              value={formatElapsedTime(elapsedTime)}
+              icon="time"
+            />
+          </View>
+          <View style={styles.metricsRow}>
+            <MetricCard
+              label="Pace"
+              value={metrics.pace ?? '--:--'}
+              icon="speedometer"
+            />
+            <MetricCard
+              label="Elevation"
+              value={metrics.elevation ?? '0 m'}
+              icon="trending-up"
+            />
+          </View>
         </View>
-      )}
 
-      {/* Battery Warning */}
-      {isTracking && <BatteryWarning />}
-
-      {/* Route Recognition Badge */}
-      <RouteRecognitionBadge
-        routeName={matchedRoute?.routeName || ''}
-        confidence={matchedRoute?.confidence || 0}
-        isVisible={isTracking && matchedRoute !== null}
-      />
-
-      {/* PR Comparison */}
-      <RoutePRComparison
-        isAheadOfPR={prComparison?.isAheadOfPR || false}
-        timeDifference={prComparison?.timeDifference || 0}
-        percentComplete={prComparison?.percentComplete || 0}
-        estimatedFinishTime={prComparison?.estimatedFinishTime || 0}
-        prFinishTime={prComparison?.prFinishTime || 0}
-        isVisible={isTracking && prComparison !== null}
-      />
-
-      {/* Metrics Display */}
-      <View style={styles.metricsContainer}>
-        <View style={styles.metricsRow}>
-          <MetricCard
-            label="Distance"
-            value={metrics.distance}
-            icon="navigate"
-          />
-          <MetricCard
-            label="Duration"
-            value={formatElapsedTime(elapsedTime)}
-            icon="time"
-          />
-        </View>
-        <View style={styles.metricsRow}>
-          <MetricCard
-            label="Pace"
-            value={metrics.pace ?? '--:--'}
-            icon="speedometer"
-          />
-          <MetricCard
-            label="Elevation"
-            value={metrics.elevation ?? '0 m'}
-            icon="trending-up"
-          />
-        </View>
-      </View>
-
-      {/* Race Preset Selection */}
-      {!isTracking && !countdown && (
-        <View style={styles.presetContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.presetScrollContent}
-          >
-            {Object.entries(RACE_PRESETS).map(([key, { label }]) => (
-              <TouchableOpacity
-                key={key}
-                style={[
-                  styles.presetButton,
-                  racePreset === key && styles.presetButtonActive,
-                ]}
-                onPress={() => setRacePreset(racePreset === key ? null : (key as RacePreset))}
-              >
-                <Text
+        {/* Race Preset Selection */}
+        {!isTracking && !countdown && (
+          <View style={styles.presetContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.presetScrollContent}
+            >
+              {Object.entries(RACE_PRESETS).map(([key, { label }]) => (
+                <TouchableOpacity
+                  key={key}
                   style={[
-                    styles.presetButtonText,
-                    racePreset === key && styles.presetButtonTextActive,
+                    styles.presetButton,
+                    racePreset === key && styles.presetButtonActive,
                   ]}
+                  onPress={() => setRacePreset(racePreset === key ? null : (key as RacePreset))}
                 >
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          {racePreset && (
-            <Text style={styles.presetHint}>
-              Workout will auto-stop at {RACE_PRESETS[racePreset].label}
-            </Text>
-          )}
-        </View>
-      )}
+                  <Text
+                    style={[
+                      styles.presetButtonText,
+                      racePreset === key && styles.presetButtonTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {racePreset && (
+              <Text style={styles.presetHint}>
+                Workout will auto-stop at {RACE_PRESETS[racePreset].label}
+              </Text>
+            )}
+          </View>
+        )}
+      </ScrollView>
 
-      {/* Control Buttons */}
-      <View style={styles.controlsContainer}>
+      {/* Fixed Control Buttons */}
+      <View style={styles.fixedControlsWrapper}>
+        <View style={styles.controlsContainer}>
         {!isTracking && !countdown ? (
           <>
             <TouchableOpacity
@@ -765,6 +772,7 @@ export const RunningTrackerScreen: React.FC = () => {
             </TouchableOpacity>
           </>
         )}
+        </View>
       </View>
 
       {/* Workout Summary Modal */}
@@ -822,6 +830,30 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     padding: 20,
   },
+  scrollableContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    paddingBottom: 120, // Space for fixed buttons (70px button + 50px padding)
+  },
+  fixedControlsWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: 24,
+    paddingTop: 16,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    // Subtle elevation for iOS
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    // Shadow for Android
+    elevation: 8,
+  },
   gpsContainer: {
     marginBottom: 16,
   },
@@ -862,7 +894,6 @@ const styles = StyleSheet.create({
   controlsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingBottom: 24,
     gap: 20,
   },
   routesButton: {

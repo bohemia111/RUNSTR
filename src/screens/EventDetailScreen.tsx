@@ -176,7 +176,7 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
 
       // Check if current user is a participant and/or captain
       const userHexPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
-      let userPaidLocally = false;
+      let userJoinedLocally = false;
 
       if (userHexPubkey) {
         const isUserParticipant = eventParticipants.includes(userHexPubkey);
@@ -190,17 +190,17 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         setIsCaptain(isUserCaptain);
         console.log(`User is${isUserCaptain ? '' : ' not'} the captain`);
 
-        // Check if user paid locally but not in official list yet
+        // Check if user joined locally (free or paid) but not in official list yet
         const { EventParticipationStore } = await import(
           '../services/event/EventParticipationStore'
         );
-        userPaidLocally = await EventParticipationStore.hasUserPaidForEvent(
+        userJoinedLocally = await EventParticipationStore.hasUserJoinedLocally(
           eventId
         );
 
-        if (userPaidLocally && !isUserParticipant) {
+        if (userJoinedLocally && !isUserParticipant) {
           console.log(
-            '💰 User paid locally but not in official list - will include in leaderboard'
+            '👤 User joined locally but not in official list - will include in leaderboard'
           );
           setIsParticipant(true); // Show as participant in UI
         }
@@ -210,10 +210,10 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       setLoadingLeaderboard(true);
       console.log('⏳ Calculating leaderboard...');
 
-      // Merge official participants with local paid user (if applicable)
+      // Merge official participants with local user (if applicable)
       const participantsForLeaderboard =
         userHexPubkey &&
-        userPaidLocally &&
+        userJoinedLocally &&
         !eventParticipants.includes(userHexPubkey)
           ? [...eventParticipants, userHexPubkey]
           : eventParticipants;
@@ -222,7 +222,7 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         console.log(
           `📊 Including ${
             participantsForLeaderboard.length - eventParticipants.length
-          } local paid participant(s) in leaderboard`
+          } local participant(s) in leaderboard (joined but not captain-approved yet)`
         );
       }
 

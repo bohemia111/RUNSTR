@@ -63,8 +63,38 @@ export const EventJoinRequestsSection: React.FC<
         captainPubkey
       );
 
-      // Group requests by event
-      const grouped = joinRequests.reduce((acc, request) => {
+      console.log(`📋 Found ${joinRequests.length} total join requests`);
+
+      // Filter out users already in participant lists
+      const filteredRequests: EventJoinRequest[] = [];
+
+      for (const request of joinRequests) {
+        const dTag = `event-${request.eventId}-participants`;
+
+        // Get participant list for this event
+        const participantList = await listService.getListMembers(
+          captainPubkey,
+          dTag
+        );
+
+        // Check if requester is already approved (in participant list)
+        const alreadyApproved = participantList.includes(request.requesterId);
+
+        if (alreadyApproved) {
+          console.log(
+            `⏭️ Skipping request from ${request.requesterId.slice(0, 8)}... (already approved)`
+          );
+        } else {
+          filteredRequests.push(request);
+        }
+      }
+
+      console.log(
+        `✅ Filtered to ${filteredRequests.length} pending requests (${joinRequests.length - filteredRequests.length} already approved)`
+      );
+
+      // Group filtered requests by event
+      const grouped = filteredRequests.reduce((acc, request) => {
         const existing = acc.find((g) => g.eventId === request.eventId);
         if (existing) {
           existing.requests.push(request);
@@ -163,13 +193,14 @@ export const EventJoinRequestsSection: React.FC<
     let alertVisible = false;
     try {
       // Get signer (supports both nsec and Amber)
-      const signer = await UnifiedSigningService.getSigner();
+      const signingService = UnifiedSigningService.getInstance();
+      const signer = await signingService.getSigner();
       if (!signer) {
         CustomAlertManager.alert('Error', 'Authentication required to approve requests', [{ text: 'OK' }]);
         return;
       }
 
-      const captainHexPubkey = await UnifiedSigningService.getHexPubkey();
+      const captainHexPubkey = await signingService.getUserPubkey();
       if (!captainHexPubkey) {
         CustomAlertManager.alert('Error', 'Invalid captain public key', [{ text: 'OK' }]);
         return;

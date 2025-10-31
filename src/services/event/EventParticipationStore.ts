@@ -112,6 +112,29 @@ export class EventParticipationStore {
   }
 
   /**
+   * Check if current user has joined an event locally (free or paid)
+   * Used to include local participants in leaderboards before captain approval
+   */
+  static async hasUserJoinedLocally(eventId: string): Promise<boolean> {
+    try {
+      const participation = await this.getParticipationByEventId(eventId);
+
+      // User must have participation record and not be rejected
+      if (!participation) return false;
+      if (participation.status === 'rejected') return false;
+
+      // Include both free and paid events
+      return true;
+    } catch (error) {
+      console.error(
+        '[EventParticipation] Failed to check local participation:',
+        error
+      );
+      return false;
+    }
+  }
+
+  /**
    * Update participation status (when captain approves)
    */
   static async updateStatus(

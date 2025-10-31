@@ -6,6 +6,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2025-01-30
+
+### Changed
+- **Event Creation Simplified** - Streamlined from 11 presets to 3 running-focused presets
+  - Removed strength training, diet, and meditation presets
+  - Kept 5K Race, 10K Race, and Half Marathon presets
+  - All events auto-set to 24-hour duration with fastest-time scoring
+  - `EventCreationWizard.tsx`: -719 lines (massive simplification)
+  - Cleaner wizard interface reduces decision fatigue for event creators
+
+### Fixed
+- **Running Tracker Overflow** - Made screen fully scrollable for all device sizes
+  - Wrapped entire content in ScrollView with proper styling
+  - Fixed UI overflow on smaller screens during workouts
+  - All controls (GPS status, battery, metrics, race presets) now accessible
+  - `RunningTrackerScreen.tsx`: +107 lines with ScrollView wrapper
+
+- **Join Request Filtering** - Captains no longer see already-approved participants
+  - Auto-filters participants already in event participant lists
+  - Reduces clutter in join requests section
+  - Added console logging for debugging captain workflows
+  - `EventJoinRequestsSection.tsx`: +39 lines with smart filtering logic
+
+### Improved
+- **Unified Authentication** - Enhanced UnifiedSigningService integration
+  - More reliable event publishing to Nostr
+  - Better support for both nsec and Amber authentication methods
+  - Improved error handling for signing operations
+  - `EventParticipationStore.ts`: +23 lines for enhanced participant tracking
+  - `NostrCompetitionService.ts`: +11 lines for improved event queries
+
 ## [0.5.4] - 2025-01-29
 
 ### Added
