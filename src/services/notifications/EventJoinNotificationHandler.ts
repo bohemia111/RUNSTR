@@ -4,11 +4,12 @@
  * Displays in-app notifications for incoming event join requests
  */
 
+import { TTLDeduplicator } from '../../utils/TTLDeduplicator';
 import {
   EventJoinRequestService,
   type EventJoinRequest,
 } from '../events/EventJoinRequestService';
-import { nostrProfileService } from '../nostr/NostrProfileService';
+import { getCachedProfile } from './profileHelper';
 import { getUserNostrIdentifiers } from '../../utils/nostr';
 import { unifiedNotificationStore } from './UnifiedNotificationStore';
 import type { EventJoinNotificationMetadata } from '../../types/unifiedNotifications';
@@ -38,7 +39,7 @@ export class EventJoinNotificationHandler {
   private callbacks: Set<EventJoinNotificationCallback> = new Set();
   private subscriptionId?: string;
   private isActive: boolean = false;
-  private processedEvents: Set<string> = new Set();
+  private deduplicator = new TTLDeduplicator(3600000, 1000); // 1hr TTL, 1000 max entries
 
   private constructor() {
     this.loadNotifications();
@@ -93,7 +94,7 @@ export class EventJoinNotificationHandler {
     request: EventJoinRequest
   ): Promise<EventJoinNotification | null> {
     try {
-      const profile = await nostrProfileService.getProfile(request.requesterId);
+      const profile = await getCachedProfile(request.requesterId);
 
       return {
         id: request.id,
@@ -141,14 +142,22 @@ export class EventJoinNotificationHandler {
       const requestService = EventJoinRequestService.getInstance();
 
       // Subscribe to incoming event join requests
-      this.subscriptionId = await requestService.subscribeToEventJoinRequests(
+      const subscription = await requestService.subscribeToEventJoinRequests(
         userIdentifiers.hexPubkey,
         async (request: EventJoinRequest) => {
-          if (this.processedEvents.has(request.id)) {
+          if (this.deduplicator.isDuplicate(request.id)) {
             return;
           }
 
-          this.processedEvents.add(request.id);
+          // Verify this is truly an event join request (has event-join-request tag)
+          const hasEventJoinTag = request.nostrEvent.tags.some(
+            t => t[0] === 't' && t[1] === 'event-join-request'
+          );
+
+          if (!hasEventJoinTag) {
+            // This is likely a challenge request, skip it
+            return;
+          }
 
           const notification = await this.requestToNotification(request);
           if (notification) {
@@ -164,6 +173,9 @@ export class EventJoinNotificationHandler {
           }
         }
       );
+
+      // Store subscription ID (NDKSubscription object has an id property)
+      this.subscriptionId = subscription.toString();
 
       this.isActive = true;
       console.log(
@@ -199,7 +211,7 @@ export class EventJoinNotificationHandler {
 
     this.subscriptionId = undefined;
     this.isActive = false;
-    this.processedEvents.clear();
+    this.deduplicator.clear();
 
     console.log('[EventJoinNotifications] Monitoring stopped');
   }

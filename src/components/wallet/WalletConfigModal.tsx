@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   ScrollView,
   Linking,
   KeyboardAvoidingView,
@@ -24,6 +23,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { NWCStorageService } from '../../services/wallet/NWCStorageService';
+import { CustomAlert } from '../ui/CustomAlert';
 
 interface WalletConfigModalProps {
   visible: boolean;
@@ -41,6 +41,18 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
   const [nwcString, setNwcString] = useState('');
   const [isValidating, setIsValidating] = useState(false);
 
+  // Alert state for CustomAlert
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<
+    Array<{
+      text: string;
+      onPress?: () => void;
+      style?: 'default' | 'cancel' | 'destructive';
+    }>
+  >([]);
+
   // Reset validation state when modal closes
   useEffect(() => {
     if (!visible) {
@@ -51,7 +63,10 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
 
   const handleSave = async () => {
     if (!nwcString.trim()) {
-      Alert.alert('Empty Input', 'Please paste your NWC connection string');
+      setAlertTitle('Empty Input');
+      setAlertMessage('Please paste your NWC connection string');
+      setAlertButtons([{ text: 'OK', style: 'default' }]);
+      setAlertVisible(true);
       return;
     }
 
@@ -61,84 +76,84 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
       const result = await NWCStorageService.saveNWCString(nwcString.trim());
 
       if (result.success) {
-        Alert.alert(
-          '✅ Wallet Connected',
-          'You can now send and receive Bitcoin!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setNwcString('');
-                onSuccess?.();
-                onClose();
-              },
+        setAlertTitle('Wallet Connected');
+        setAlertMessage('You can now send and receive Bitcoin!');
+        setAlertButtons([
+          {
+            text: 'OK',
+            style: 'default',
+            onPress: () => {
+              setNwcString('');
+              onSuccess?.();
+              onClose();
             },
-          ]
-        );
+          },
+        ]);
+        setAlertVisible(true);
       } else {
-        Alert.alert(
-          '❌ Connection Failed',
-          result.error || 'Please check your NWC string and try again.'
-        );
+        setAlertTitle('Connection Failed');
+        setAlertMessage(result.error || 'Please check your NWC string and try again.');
+        setAlertButtons([{ text: 'OK', style: 'default' }]);
+        setAlertVisible(true);
       }
     } catch (error) {
       console.error('[WalletConfig] Save error:', error);
-      Alert.alert('Error', 'Failed to save wallet configuration');
+      setAlertTitle('Error');
+      setAlertMessage('Failed to save wallet configuration');
+      setAlertButtons([{ text: 'OK', style: 'default' }]);
+      setAlertVisible(true);
     } finally {
       setIsValidating(false);
     }
   };
 
   const handleSkip = () => {
-    Alert.alert(
-      'Skip Wallet Setup?',
-      'You can still use the app to track workouts and join free events. Bitcoin features will be disabled.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Skip',
-          style: 'destructive',
-          onPress: onClose,
-        },
-      ]
-    );
+    setAlertTitle('Skip Wallet Setup?');
+    setAlertMessage('You can still use the app to track workouts and join free events. Bitcoin features will be disabled.');
+    setAlertButtons([
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Skip',
+        style: 'destructive',
+        onPress: onClose,
+      },
+    ]);
+    setAlertVisible(true);
   };
 
   const handleCancel = () => {
     Keyboard.dismiss();
     if (isValidating) {
-      Alert.alert(
-        'Cancel Validation?',
-        'Connection test is in progress. Are you sure you want to cancel?',
-        [
-          { text: 'Continue Testing', style: 'cancel' },
-          {
-            text: 'Cancel',
-            style: 'destructive',
-            onPress: () => {
-              setIsValidating(false);
-              onClose();
-            },
+      setAlertTitle('Cancel Validation?');
+      setAlertMessage('Connection test is in progress. Are you sure you want to cancel?');
+      setAlertButtons([
+        { text: 'Continue Testing', style: 'cancel' },
+        {
+          text: 'Cancel',
+          style: 'destructive',
+          onPress: () => {
+            setIsValidating(false);
+            onClose();
           },
-        ]
-      );
+        },
+      ]);
+      setAlertVisible(true);
     } else {
       onClose();
     }
   };
 
   const handleHelp = () => {
-    Alert.alert(
-      'What is NWC?',
-      'Nostr Wallet Connect lets you connect your Lightning wallet to RUNSTR. You can get an NWC connection string from:\n\n• Alby (getalby.com)\n• Mutiny Wallet\n• Other NWC-compatible wallets',
-      [
-        {
-          text: 'Open Alby',
-          onPress: () => Linking.openURL('https://getalby.com'),
-        },
-        { text: 'OK' },
-      ]
-    );
+    setAlertTitle('What is NWC?');
+    setAlertMessage('Nostr Wallet Connect lets you connect your Lightning wallet to RUNSTR. You can get an NWC connection string from:\n\n• Alby (getalby.com)\n• Mutiny Wallet\n• Other NWC-compatible wallets');
+    setAlertButtons([
+      {
+        text: 'Open Alby',
+        onPress: () => Linking.openURL('https://getalby.com'),
+      },
+      { text: 'OK', style: 'default' },
+    ]);
+    setAlertVisible(true);
   };
 
   return (
@@ -185,59 +200,14 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
               </View>
 
               <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="always"
+                contentContainerStyle={styles.scrollContent}
               >
                 {/* Subtitle */}
                 <Text style={styles.subtitle}>
                   Connect your Lightning wallet to send Bitcoin payments
                 </Text>
-
-                {/* NWC Explanation */}
-                <View style={styles.explanationBox}>
-                  <Text style={styles.explanationTitle}>What is NWC?</Text>
-                  <Text style={styles.explanationText}>
-                    Nostr Wallet Connect (NWC) lets you send Bitcoin payments
-                    directly from your Lightning wallet. It's like connecting
-                    your bank to an app - but with Bitcoin!
-                  </Text>
-                  <Text
-                    style={[styles.explanationText, styles.explanationNote]}
-                  >
-                    Note: You don't need NWC to receive Bitcoin. Set your
-                    Lightning address in your profile to receive payments from
-                    challenges, rewards, and zaps.
-                  </Text>
-                </View>
-
-                {/* Benefits List */}
-                <View style={styles.benefitsList}>
-                  <Text style={styles.benefitsTitle}>With NWC you can:</Text>
-                  <View style={styles.benefitItem}>
-                    <Ionicons name="send" size={20} color="#FF9D42" />
-                    <Text style={styles.benefitText}>
-                      Send zaps to teammates
-                    </Text>
-                  </View>
-                  <View style={styles.benefitItem}>
-                    <Ionicons name="ticket" size={20} color="#FF9D42" />
-                    <Text style={styles.benefitText}>
-                      Pay for event entry fees
-                    </Text>
-                  </View>
-                  <View style={styles.benefitItem}>
-                    <Ionicons name="trophy" size={20} color="#FF9D42" />
-                    <Text style={styles.benefitText}>
-                      Place wagers on 1v1 challenges
-                    </Text>
-                  </View>
-                  <View style={styles.benefitItem}>
-                    <Ionicons name="heart" size={20} color="#FF9D42" />
-                    <Text style={styles.benefitText}>
-                      Donate to team charities
-                    </Text>
-                  </View>
-                </View>
 
                 {/* Input Field */}
                 <View style={styles.inputSection}>
@@ -256,6 +226,7 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
                     returnKeyType="done"
                     blurOnSubmit={true}
                     onSubmitEditing={Keyboard.dismiss}
+                    textAlignVertical="top"
                   />
                   <Text style={styles.inputHint}>
                     Paste your NWC connection string from Alby or another wallet
@@ -292,24 +263,20 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
                     <Text style={styles.skipButtonText}>Skip for Now</Text>
                   </TouchableOpacity>
                 )}
-
-                {/* Info Note */}
-                <View style={styles.infoNote}>
-                  <Ionicons
-                    name="information-circle-outline"
-                    size={18}
-                    color={theme.colors.textMuted}
-                  />
-                  <Text style={styles.infoText}>
-                    Your wallet stays in your control. RUNSTR never has access
-                    to your funds.
-                  </Text>
-                </View>
               </ScrollView>
             </View>
           </KeyboardAvoidingView>
         </View>
       </TouchableWithoutFeedback>
+
+      {/* CustomAlert for themed alerts */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        onClose={() => setAlertVisible(false)}
+      />
     </Modal>
   );
 };
@@ -331,14 +298,19 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderRightWidth: 2,
     borderColor: '#FF9D42',
-    padding: 24,
+    paddingTop: 24,
+    paddingHorizontal: 24,
     maxHeight: '90%',
+  },
+  scrollContent: {
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    paddingBottom: 8,
   },
   headerLeft: {
     flexDirection: 'row',

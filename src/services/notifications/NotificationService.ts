@@ -687,3 +687,28 @@ export class NotificationService {
     console.log('✅ NotificationService cleanup complete');
   }
 }
+
+// Export the competition event monitoring function for standalone use
+export async function startCompetitionEventMonitoring(
+  userHexPubkey?: string
+): Promise<void> {
+  console.log(
+    '[Notifications] Starting competition event monitoring (standalone)...'
+  );
+
+  try {
+    // Get the NostrNotificationEventHandler instance directly
+    const handler = NostrNotificationEventHandler.getInstance();
+    await handler.startListening();
+
+    console.log(
+      '[Notifications] ✅ Competition event monitoring started successfully'
+    );
+  } catch (error) {
+    console.error(
+      '[Notifications] Failed to start competition event monitoring:',
+      error
+    );
+    throw error;
+  }
+}

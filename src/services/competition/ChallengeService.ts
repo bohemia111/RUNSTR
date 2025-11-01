@@ -15,6 +15,9 @@ import type {
 import { getUserNostrIdentifiers } from '../../utils/nostr';
 import { Competition1301QueryService } from './Competition1301QueryService';
 import type { Kind1301Event } from '../season/Season1Service';
+import { GlobalNDKService } from '../nostr/GlobalNDKService';
+import { NDKEvent, type NDKSigner } from '@nostr-dev-kit/ndk';
+import type { NostrChallengeDefinition } from '../../types/nostrCompetition';
 
 export class ChallengeService {
   private static instance: ChallengeService;
@@ -32,6 +35,80 @@ export class ChallengeService {
       ChallengeService.instance = new ChallengeService();
     }
     return ChallengeService.instance;
+  }
+
+  /**
+   * Publish kind 30102 challenge definition to Nostr
+   * @param challengeData - Challenge configuration
+   * @param signer - NDK signer for signing the event
+   * @returns Challenge ID and published event
+   */
+  async publishChallengeDefinition(
+    challengeData: {
+      name: string;
+      distance: number; // 5, 10, or 21.1 km
+      duration: number; // hours (24, 48, or 168)
+      wager: number; // sats
+      opponentPubkey?: string; // Optional for direct challenges
+    },
+    signer: NDKSigner
+  ): Promise<{ success: boolean; challengeId: string; event?: NDKEvent }> {
+    try {
+      const ndk = await GlobalNDKService.getInstance();
+
+      // Generate unique challenge ID
+      const challengeId = `challenge_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+      // Calculate timestamps
+      const startDate = new Date();
+      const endDate = new Date(startDate.getTime() + challengeData.duration * 60 * 60 * 1000);
+
+      // Get creator pubkey from signer
+      const creatorPubkey = signer.user?.pubkey || '';
+      if (!creatorPubkey) {
+        throw new Error('No pubkey available from signer');
+      }
+
+      // Build tags
+      const tags: string[][] = [
+        ['d', challengeId],
+        ['name', challengeData.name],
+        ['activity', 'running'],
+        ['distance', challengeData.distance.toString()],
+        ['metric', 'fastest_time'],
+        ['duration', challengeData.duration.toString()],
+        ['start_date', startDate.toISOString()],
+        ['end_date', endDate.toISOString()],
+        ['wager', challengeData.wager.toString()],
+        ['max_participants', '2'],
+        ['status', 'open'],
+        ['p', creatorPubkey], // Creator tagged as participant
+      ];
+
+      // If opponent specified, add them as participant
+      if (challengeData.opponentPubkey) {
+        tags.push(['p', challengeData.opponentPubkey]);
+      }
+
+      // Create kind 30102 event
+      const event = new NDKEvent(ndk);
+      event.kind = 30102;
+      event.content = `${challengeData.name} - ${challengeData.duration}h`;
+      event.tags = tags;
+
+      await event.sign(signer);
+      await event.publish();
+
+      console.log(`✅ Published challenge definition: ${challengeId}`);
+
+      return { success: true, challengeId, event };
+    } catch (error) {
+      console.error('Error publishing challenge definition:', error);
+      return {
+        success: false,
+        challengeId: '',
+      };
+    }
   }
 
   /**

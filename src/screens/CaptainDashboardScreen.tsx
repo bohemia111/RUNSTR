@@ -30,7 +30,7 @@ import { CustomAlertManager } from '../components/ui/CustomAlert';
 // import { ZappableUserRow } from '../components/ui/ZappableUserRow'; // REMOVED: No longer needed without member list
 import { QuickActionsSection } from '../components/team/QuickActionsSection';
 import { ActivityFeedSection } from '../components/team/ActivityFeedSection';
-// import { JoinRequestsSection } from '../components/team/JoinRequestsSection'; // REMOVED: Teams are bookmarks now
+import { JoinRequestsSection } from '../components/team/JoinRequestsSection'; // RESTORED: For team join requests with kind 30000 approval
 import { EventJoinRequestsSection } from '../components/captain/EventJoinRequestsSection';
 import { EventCreationWizard } from '../components/wizards/EventCreationWizard';
 import { LeagueCreationWizard } from '../components/wizards/LeagueCreationWizard';
@@ -167,12 +167,24 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
   const [selectedEventForAnnouncement, setSelectedEventForAnnouncement] =
     useState<any>(null);
 
+  // Team member management state (restored for kind 30000 lists)
+  const [teamMembers, setTeamMembers] = useState<string[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [hasKind30000List, setHasKind30000List] = useState(false);
+  const [isCreatingList, setIsCreatingList] = useState(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [newMemberNpub, setNewMemberNpub] = useState('');
+
   // Initialize team data on mount
   React.useEffect(() => {
     const initializeTeam = async () => {
       await loadActiveCompetitions();
       await loadTeamData();
       await loadCaptainEvents();
+      await checkForKind30000List(); // Check if team has member list
+      if (hasKind30000List) {
+        await loadTeamMembers(); // Load members if list exists
+      }
     };
 
     initializeTeam();
@@ -1386,7 +1398,16 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
           onShowQR={handleShowEventQR}
         />
 
-        {/* REMOVED: Team Join Requests - teams are bookmarks now, no approval needed */}
+        {/* Team Join Requests - For kind 30000 member list approval */}
+        <JoinRequestsSection
+          teamId={teamId}
+          captainPubkey={captainId}
+          onMemberApproved={(requesterPubkey) => {
+            console.log('Team member approved:', requesterPubkey);
+            // Refresh member list if needed
+            loadTeamMembers();
+          }}
+        />
 
         {/* Event Join Requests */}
         <EventJoinRequestsSection

@@ -23,7 +23,7 @@ import { NostrCompetitionDiscoveryService } from '../services/competition/NostrC
 import { getUserNostrIdentifiers } from '../utils/nostr';
 import type { UserCompetition } from '../types/challenge';
 import { theme } from '../styles/theme';
-import { OpenChallengeWizard } from '../components/wizards/OpenChallengeWizard';
+import { SimplifiedChallengeWizard } from '../components/wizards/SimplifiedChallengeWizard';
 import { EventParticipationStore } from '../services/event/EventParticipationStore';
 
 type RootStackParamList = {
@@ -335,23 +335,15 @@ export const CompetitionsListScreen: React.FC = () => {
         />
       )}
 
-      {/* Open Challenge Wizard Modal */}
-      {showOpenChallengeWizard && (
-        <Modal
-          visible={showOpenChallengeWizard}
-          animationType="slide"
-          presentationStyle="fullScreen"
-        >
-          <OpenChallengeWizard
-            onComplete={() => {
-              setShowOpenChallengeWizard(false);
-              // Refresh competitions after challenge is created
-              loadCompetitions(true);
-            }}
-            onCancel={() => setShowOpenChallengeWizard(false)}
-          />
-        </Modal>
-      )}
+      {/* Simplified Challenge Wizard Modal */}
+      <SimplifiedChallengeWizard
+        visible={showOpenChallengeWizard}
+        onClose={() => setShowOpenChallengeWizard(false)}
+        onChallengeCreated={() => {
+          // Refresh competitions after challenge is created
+          loadCompetitions(true);
+        }}
+      />
     </SafeAreaView>
   );
 };

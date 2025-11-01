@@ -10,6 +10,7 @@ import type { NostrList, Event } from '../nostr/NostrListService';
 import type { UserCompetition } from '../../types/challenge';
 import { npubToHex } from '../../utils/ndkConversion';
 import { appCache } from '../../utils/cache';
+import { SimpleCompetitionService } from './SimpleCompetitionService';
 
 export class NostrCompetitionDiscoveryService {
   private static instance: NostrCompetitionDiscoveryService;
@@ -129,6 +130,32 @@ export class NostrCompetitionDiscoveryService {
         }
       });
 
+      // Query 3: kind 30102 challenges where user is participant
+      const competitionService = SimpleCompetitionService.getInstance();
+      const challenges = await competitionService.getUserChallenges(hexPubkey);
+
+      challenges.forEach((challenge) => {
+        const challengeCompetition: UserCompetition = {
+          id: challenge.id,
+          name: challenge.name,
+          type: 'challenge',
+          status: this.mapChallengeStatus(challenge.status),
+          participantCount: challenge.participants.length,
+          yourRole: challenge.creatorPubkey === hexPubkey ? 'challenger' : 'challenged',
+          startsAt: new Date(challenge.startDate).getTime() / 1000,
+          endsAt: new Date(challenge.endDate).getTime() / 1000,
+          wager: challenge.wager,
+        };
+
+        if (!processedIds.has(challengeCompetition.id)) {
+          processedIds.add(challengeCompetition.id);
+          competitions.push(challengeCompetition);
+          console.log(
+            `✅ Found challenge: ${challengeCompetition.name} (${challengeCompetition.type})`
+          );
+        }
+      });
+
       // Wait for results
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -155,6 +182,19 @@ export class NostrCompetitionDiscoveryService {
     } catch (error) {
       console.error('Error discovering competitions:', error);
       return [];
+    }
+  }
+
+  /**
+   * Map kind 30102 challenge status to UserCompetition status
+   */
+  private mapChallengeStatus(status: string): 'upcoming' | 'active' | 'completed' {
+    switch (status) {
+      case 'open': return 'upcoming';
+      case 'active': return 'active';
+      case 'completed': return 'completed';
+      case 'cancelled': return 'completed';
+      default: return 'upcoming';
     }
   }
 

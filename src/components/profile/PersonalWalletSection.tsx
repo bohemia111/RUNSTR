@@ -76,12 +76,8 @@ export const PersonalWalletSection: React.FC<PersonalWalletSectionProps> = ({
   };
 
   const formatBalance = (sats: number): string => {
-    if (sats >= 1000000) {
-      return `${(sats / 1000000).toFixed(2)}M`;
-    } else if (sats >= 1000) {
-      return `${(sats / 1000).toFixed(1)}K`;
-    }
-    return sats.toString();
+    // Use locale string for comma formatting (e.g., 62,791 instead of 62.79M)
+    return sats.toLocaleString();
   };
 
   const getUsdValue = (sats: number): string => {

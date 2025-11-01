@@ -263,6 +263,23 @@ export class EventJoinRequestService {
    */
   private parseJoinRequest(event: Event): EventJoinRequest | null {
     try {
+      // Check if this is a challenge request, not an event join
+      const hasActivityTag = event.tags.some((t) => t[0] === 'activity');
+      const hasChallengeTypeTag = event.tags.some((t) => t[0] === 'challenge-type');
+      if (hasActivityTag || hasChallengeTypeTag) {
+        // This is a challenge request, not an event join - skip it
+        return null;
+      }
+
+      // Verify this is an event join request
+      const hasEventJoinTag = event.tags.some(
+        (t) => t[0] === 't' && t[1] === 'event-join-request'
+      );
+      if (!hasEventJoinTag) {
+        // Not properly tagged as event join request
+        return null;
+      }
+
       const eventIdTag = event.tags.find((t) => t[0] === 'event-id');
       const eventNameTag = event.tags.find((t) => t[0] === 'event-name');
       const teamIdTag = event.tags.find((t) => t[0] === 'team-id');

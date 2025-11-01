@@ -9,16 +9,17 @@ import 'text-encoding-polyfill';
 const DEBUG = __DEV__ && false; // Set to true to enable debug logs
 
 export function initializeWebSocketPolyfill(): void {
-  // Skip all logging in production
-  if (!DEBUG) {
-    // Just ensure polyfills are in place
-    if (typeof global.Buffer === 'undefined') {
-      try {
-        global.Buffer = require('buffer').Buffer;
-      } catch (error) {
-        // Silent fail
-      }
+  // Always ensure Buffer is available
+  if (typeof global.Buffer === 'undefined') {
+    try {
+      global.Buffer = require('buffer').Buffer;
+    } catch (error) {
+      // Silent fail
     }
+  }
+
+  // Skip debug logging in production
+  if (!DEBUG) {
     return;
   }
 

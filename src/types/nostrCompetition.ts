@@ -164,10 +164,46 @@ export interface NostrEventDefinition {
   updatedAt: number; // Unix timestamp
 }
 
+// Challenge Definition (Kind 30102)
+export interface NostrChallengeDefinition {
+  // Core identification
+  id: string; // d tag - unique identifier
+  creatorPubkey: string; // challenge creator (event author)
+
+  // Basic info
+  name: string;
+  description?: string;
+
+  // Challenge config (Running only for v1)
+  activityType: 'running';
+  distance: number; // 5, 10, or 21.1 km
+  metric: 'fastest_time'; // Always fastest time for running challenges
+
+  // Timing
+  startDate: string; // ISO timestamp
+  endDate: string; // ISO timestamp
+  duration: number; // hours (24, 48, or 168)
+
+  // Participants
+  participants: string[]; // All participating pubkeys (creator + opponents)
+  maxParticipants: number; // Default 2 for 1v1
+
+  // Bitcoin
+  wager: number; // sats per participant
+
+  // Status
+  status: 'open' | 'active' | 'completed' | 'cancelled';
+
+  // Metadata
+  createdAt: number; // Unix timestamp
+  updatedAt?: number; // Unix timestamp
+  rawEvent?: any; // Optional NDKEvent reference
+}
+
 // Competition Event Interface (generic)
 export interface NostrCompetitionEvent extends Event {
   kind: 30100 | 30101 | 30102;
-  parsedContent: NostrLeagueDefinition | NostrEventDefinition;
+  parsedContent: NostrLeagueDefinition | NostrEventDefinition | NostrChallengeDefinition;
 }
 
 // League Event Template

@@ -181,10 +181,22 @@ export class ChallengeRequestService {
    */
   private parseChallengeRequest(event: Event): PendingChallenge | null {
     try {
+      // Check if this is an event join request, not a challenge
+      const hasEventJoinTag = event.tags.some(
+        (t) => t[0] === 't' && t[1] === 'event-join-request'
+      );
+      if (hasEventJoinTag) {
+        // This is an event join request, not a challenge - skip it
+        return null;
+      }
+
       const challengedPubkey = event.tags.find((t) => t[0] === 'p')?.[1];
-      const activityType = event.tags.find(
+      // Note: Check both 'activity' and 'challenge-type' for backward compatibility
+      const activityType = (event.tags.find(
+        (t) => t[0] === 'activity'
+      )?.[1] || event.tags.find(
         (t) => t[0] === 'challenge-type'
-      )?.[1] as ActivityType;
+      )?.[1]) as ActivityType;
       const metric = event.tags.find(
         (t) => t[0] === 'metric'
       )?.[1] as MetricType;

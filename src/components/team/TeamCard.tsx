@@ -23,6 +23,8 @@ import { publishJoinRequest } from '../../utils/joinRequestPublisher';
 import leagueRankingService from '../../services/competition/leagueRankingService';
 import { TeamMemberCache } from '../../services/team/TeamMemberCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigationData } from '../../contexts/NavigationDataContext';
+import { CustomAlertManager } from '../ui/CustomAlert';
 
 // Helper to categorize team activity
 const categorizeTeam = (team: DiscoveryTeam): string => {
@@ -65,6 +67,7 @@ export const TeamCard: React.FC<TeamCardProps> = ({
     useState<MembershipButtonState>('loading');
   const [userRank, setUserRank] = useState<number | null>(null);
   const membershipService = TeamMembershipService.getInstance();
+  const navigationData = useNavigationData();
 
   // ✅ PERFORMANCE: Memoize handler to prevent recreation on every render
   const handleCardPress = useCallback(() => {
@@ -92,10 +95,7 @@ export const TeamCard: React.FC<TeamCardProps> = ({
     }
   }, [team.id, currentUserNpub, isCaptain]);
 
-  // Check membership status on mount
-  useEffect(() => {
-    checkMembershipStatus();
-  }, [checkMembershipStatus]);
+  // Check membership status on mount - moved after function definition
 
   // Fetch user's rank in this team
   // ✅ PERFORMANCE: Memoize expensive rank fetching function
@@ -178,6 +178,11 @@ export const TeamCard: React.FC<TeamCardProps> = ({
     }
   }, [currentUserNpub, isCaptain, team, membershipService]);
 
+  // Check membership status on mount
+  useEffect(() => {
+    checkMembershipStatus();
+  }, [checkMembershipStatus]);
+
   // ✅ PERFORMANCE: Memoize join handler
   const handleJoinPress = useCallback(async () => {
     if (!currentUserNpub || buttonState !== 'join') return;
@@ -198,19 +203,76 @@ export const TeamCard: React.FC<TeamCardProps> = ({
       // Instant member status - no waiting for approval
       setButtonState('member');
 
-      // REMOVED: publishJoinRequest() - teams are bookmarks now, no approval needed
+      // Publish join request to Nostr (for captain approval to official kind 30000 list)
+      // This runs async in background - doesn't block the UI
+      const publishRequest = async () => {
+        try {
+          const result = await publishJoinRequest(
+            team.id,
+            team.name,
+            team.captainId,
+            currentUserNpub,
+            `I'd like to join ${team.name}!`
+          );
 
-      // CRITICAL: Refresh teams cache so My Teams screen updates immediately
-      try {
-        const nostrPrefetchService = (
-          await import('../../services/nostr/NostrPrefetchService')
-        ).default;
-        await nostrPrefetchService.refreshUserTeamsCache();
-        console.log('✅ Teams cache refreshed after join');
-      } catch (cacheError) {
-        console.warn('⚠️ Failed to refresh teams cache:', cacheError);
-        // Don't block the join flow if cache refresh fails
+          if (result.success) {
+            console.log(`📤 Join request published for ${team.name} (event: ${result.eventId})`);
+          } else {
+            console.warn(`⚠️ Failed to publish join request: ${result.error}`);
+            // Don't show error to user - they're already "joined" locally
+          }
+        } catch (error) {
+          console.warn('Failed to publish join request:', error);
+          // Silent fail - user is already joined locally
+        }
+      };
+      publishRequest(); // Fire and forget - don't await
+
+      // ✅ IMPROVEMENT 1: Optimistic ProfileData Update
+      // Immediately add team to profileData so My Teams screen shows it instantly
+      if (navigationData.profileData?.teams && !navigationData.profileData.teams.some(t => t.id === team.id)) {
+        const optimisticTeam = {
+          id: team.id,
+          name: team.name,
+          description: team.description || team.about || '',
+          bannerImage: team.bannerImage,
+          captainId: team.captainId,
+          charityId: team.charityId,
+          memberCount: team.memberCount || 0,
+          prizePool: 0,
+          isActive: true,
+          role: 'member' as const,
+        };
+
+        // Direct state update for instant UI refresh
+        const profileDataRef = navigationData.profileData;
+        const currentTeams = profileDataRef.teams || [];
+        profileDataRef.teams = [...currentTeams, optimisticTeam];
+
+        console.log(`⚡ Optimistically added ${team.name} to profileData (instant My Teams update)`);
       }
+
+      // ✅ IMPROVEMENT 2: Success Feedback
+      CustomAlertManager.alert(
+        'Success!',
+        `You've joined ${team.name}. View it in My Teams.`
+      );
+
+      // ✅ IMPROVEMENT 3: Non-Blocking Cache Refresh
+      // Fire and forget - don't wait for cache refresh to complete
+      const refreshCache = async () => {
+        try {
+          const nostrPrefetchService = (
+            await import('../../services/nostr/NostrPrefetchService')
+          ).default;
+          await nostrPrefetchService.refreshUserTeamsCache();
+          console.log('✅ Teams cache refreshed after join (background)');
+        } catch (cacheError) {
+          console.warn('⚠️ Background cache refresh failed:', cacheError);
+          // Silently fail - optimistic update already happened
+        }
+      };
+      refreshCache(); // Don't await - let it run in background
 
       // Call external join request handler if provided (for backward compatibility)
       if (onJoinRequest) {
@@ -218,10 +280,10 @@ export const TeamCard: React.FC<TeamCardProps> = ({
       }
     } catch (error) {
       console.error('Failed to join team:', error);
-      Alert.alert('Error', 'Failed to bookmark team. Please try again.');
+      CustomAlertManager.alert('Error', 'Failed to join team. Please try again.');
       setButtonState('join');
     }
-  }, [currentUserNpub, buttonState, team, membershipService, onJoinRequest]);
+  }, [currentUserNpub, buttonState, team, membershipService, onJoinRequest, navigationData]);
 
   return (
     <View>

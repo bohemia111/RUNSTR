@@ -553,6 +553,13 @@ const AppContent: React.FC = () => {
     React.useEffect(() => {
       const initializeData = async () => {
         try {
+          // ✅ PERFORMANCE: Check if initialization already completed (prevents duplicate runs)
+          const initCompleted = await AsyncStorage.getItem('@runstr:app_init_completed');
+          if (initCompleted === 'true') {
+            console.log('[App] ℹ️  App already initialized, skipping duplicate initialization');
+            return;
+          }
+
           // CRITICAL FIX: Get actual hex pubkey from AsyncStorage, NOT synthetic user.id
           // user.id is 'nostr_hh6sr85uum' but we need actual hex for Nostr queries
           const hexPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
@@ -590,6 +597,18 @@ const AppContent: React.FC = () => {
           // This initialization triggered Amber signing prompts for Cashu wallet encryption
           // NWC wallet services now handle all Lightning payments independently
           console.log('[App] 💰 Cashu wallet initialization skipped (using NWC for Lightning payments)');
+
+          // ✅ NWC WALLET: Initialize NWC wallet connection if configured
+          try {
+            console.log('[App] 💳 Initializing NWC wallet connection...');
+            const { NWCWalletService } = await import('./services/wallet/NWCWalletService');
+            await NWCWalletService.initialize();
+            console.log('[App] ✅ NWC wallet initialization attempted');
+          } catch (nwcError) {
+            console.error('[App] ⚠️ NWC wallet initialization failed (non-critical):', nwcError);
+            // Don't block app - NWC wallet is optional
+          }
+
           /*
           if (!walletStore.isInitialized && !walletStore.isInitializing) {
             await walletStore.initialize();
@@ -603,6 +622,10 @@ const AppContent: React.FC = () => {
           console.log('[App] 🏁 Starting challenge completion monitoring...');
           challengeCompletionService.startMonitoring();
           console.log('[App] ✅ Challenge completion monitoring active');
+
+          // ✅ PERFORMANCE: Mark initialization as complete
+          await AsyncStorage.setItem('@runstr:app_init_completed', 'true');
+          console.log('[App] ✅ App initialization complete - flag set');
         } catch (error) {
           console.error('[App] ❌ App data initialization error:', error);
           // Don't block app - initialization errors are non-critical
@@ -938,6 +961,8 @@ const AppContent: React.FC = () => {
               onSignOut={async () => {
                 // Reset initialization state on logout
                 await appInitializationService.reset();
+                // ✅ PERFORMANCE: Clear initialization flag for next login
+                await AsyncStorage.removeItem('@runstr:app_init_completed');
                 await signOut();
                 // AuthContext state change will trigger App.tsx to show login screen
               }}
@@ -1279,6 +1304,18 @@ export default function App() {
         } catch (error) {
           console.error('🚨 WebSocket polyfill initialization failed:', error);
           // App can continue without polyfill in most cases
+        }
+
+        // Enable WebSocket debugging in development mode for NWC troubleshooting
+        if (__DEV__) {
+          try {
+            const { enableWebSocketDebugging } = await import('./utils/webSocketDebugger');
+            enableWebSocketDebugging();
+            console.log('[App] 🔍 WebSocket debugger enabled for NWC troubleshooting');
+          } catch (debugError) {
+            console.warn('[App] Failed to enable WebSocket debugger:', debugError);
+            // Non-critical - app continues without debugger
+          }
         }
 
         // 🔧 iOS FIX: Verify background location task is defined for distance tracking

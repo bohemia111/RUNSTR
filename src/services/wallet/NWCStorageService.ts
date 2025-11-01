@@ -7,7 +7,7 @@
 
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { nwc } from '@getalby/sdk';
+import { NWCClient } from '@getalby/sdk';
 
 // SecureStore has key length limits, use shorter keys
 const SECURE_KEYS = {
@@ -93,7 +93,7 @@ class NWCStorageServiceClass {
    * Returns true if connection works, false otherwise
    */
   async testConnection(nwcString: string): Promise<boolean> {
-    let testClient: nwc.NWCClient | null = null;
+    let testClient: NWCClient | null = null;
 
     try {
       // Format check first
@@ -105,13 +105,13 @@ class NWCStorageServiceClass {
       console.log('[NWC] Testing connection with Alby SDK...');
 
       // Create temporary NWC client
-      testClient = new nwc.NWCClient({
+      testClient = new NWCClient({
         nostrWalletConnectUrl: nwcString,
       });
 
-      // Test connection with 10-second timeout
+      // Test connection with 15-second timeout
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Connection test timeout')), 10000)
+        setTimeout(() => reject(new Error('Connection test timeout')), 15000)
       );
 
       const infoPromise = testClient.getInfo();

@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../styles/theme';
 import { CompactTeamCard } from '../components/profile/CompactTeamCard';
+import { TeammatesView } from '../components/teammates/TeammatesView';
 import { useNavigationData } from '../contexts/NavigationDataContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Team } from '../types';
@@ -29,6 +30,7 @@ export const MyTeamsScreen: React.FC = () => {
   const [userNpub, setUserNpub] = useState<string>('');
   const [userHexPubkey, setUserHexPubkey] = useState<string>('');
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [activeTab, setActiveTab] = useState<'teams' | 'teammates'>('teams');
 
   // Load user npub and hex pubkey on mount
   useEffect(() => {
@@ -176,22 +178,48 @@ export const MyTeamsScreen: React.FC = () => {
         <View style={styles.headerSpacer} />
       </View>
 
+      {/* Tab Switcher */}
+      <View style={styles.tabHeader}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'teams' && styles.activeTab]}
+          onPress={() => setActiveTab('teams')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'teams' && styles.activeTabText]}>
+            Teams
+          </Text>
+          {activeTab === 'teams' && <View style={styles.activeIndicator} />}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'teammates' && styles.activeTab]}
+          onPress={() => setActiveTab('teammates')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'teammates' && styles.activeTabText]}>
+            Teammates
+          </Text>
+          {activeTab === 'teammates' && <View style={styles.activeIndicator} />}
+        </TouchableOpacity>
+      </View>
+
       {/* Content */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.text}
-            colors={[theme.colors.text]}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Show loading state only on initial load */}
-        {isInitialLoad && teams.length === 0 ? (
+      {activeTab === 'teams' ? (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.text}
+              colors={[theme.colors.text]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Show loading state only on initial load */}
+          {isInitialLoad && teams.length === 0 ? (
           <View style={styles.loadingState}>
             <ActivityIndicator size="large" color={theme.colors.text} />
             <Text style={styles.loadingText}>Loading your teams...</Text>
@@ -237,7 +265,15 @@ export const MyTeamsScreen: React.FC = () => {
             )}
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      ) : (
+        /* Teammates Tab */
+        <TeammatesView
+          teams={teams}
+          userNpub={userNpub}
+          onRefresh={handleRefresh}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -351,5 +387,46 @@ const styles = StyleSheet.create({
   refreshingText: {
     fontSize: 12,
     color: theme.colors.textMuted,
+  },
+
+  // Tab styles
+  tabHeader: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.cardBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    paddingHorizontal: 16,
+  },
+
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    position: 'relative',
+  },
+
+  activeTab: {
+    backgroundColor: theme.colors.cardBackground + '20',
+  },
+
+  tabText: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.textMuted,
+  },
+
+  activeTabText: {
+    color: theme.colors.text,
+    fontWeight: theme.typography.weights.semiBold,
+  },
+
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: '25%',
+    right: '25%',
+    height: 3,
+    backgroundColor: theme.colors.accent,
+    borderRadius: 2,
   },
 });

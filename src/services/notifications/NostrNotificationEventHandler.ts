@@ -19,6 +19,7 @@ import type {
 } from '../../types';
 import { unifiedNotificationStore } from './UnifiedNotificationStore';
 import type { CompetitionNotificationMetadata } from '../../types/unifiedNotifications';
+import { TTLDeduplicator } from '../../utils/TTLDeduplicator';
 
 // Competition event interfaces based on NIP-101e
 interface CompetitionAnnouncement {
@@ -61,7 +62,7 @@ export class NostrNotificationEventHandler {
   private teamContextService: TeamContextService;
   private teamFormatter: TeamNotificationFormatter;
   private notificationProvider: ExpoNotificationProvider;
-  private processedEvents: Set<string> = new Set(); // Prevent duplicate processing
+  private deduplicator = new TTLDeduplicator(3600000, 1000); // 1hr TTL, 1000 max entries
   private isActive: boolean = false;
 
   private constructor() {
@@ -93,11 +94,13 @@ export class NostrNotificationEventHandler {
       // Get GlobalNDK instance
       const ndk = await GlobalNDKService.getInstance();
 
-      // Subscribe to competition events (kinds 1101, 1102, 1103)
+      // Subscribe to competition events (kinds 1101, 1102)
+      // ⚠️ PERFORMANCE: Kind 1103 disabled due to spam (200+ invalid events on startup)
+      // Re-enable after fixing event parsing to handle actual Nostr relay events
       this.subscription = ndk.subscribe(
         {
-          kinds: [1101, 1102, 1103], // Competition events
-          limit: 100, // Get recent events
+          kinds: [1101, 1102], // Competition announcements and results only
+          limit: 50, // Reduced from 100 to minimize startup load
         },
         { closeOnEose: false }
       );
@@ -122,7 +125,7 @@ export class NostrNotificationEventHandler {
 
       analytics.track('notification_scheduled', {
         event: 'competition_monitoring_started',
-        eventKinds: [1101, 1102, 1103],
+        eventKinds: [1101, 1102], // Kind 1103 disabled
       });
 
       console.log('✅ Competition event monitoring active');
@@ -154,7 +157,7 @@ export class NostrNotificationEventHandler {
       }
     }
 
-    this.processedEvents.clear();
+    this.deduplicator.clear();
     this.isActive = false;
 
     console.log('✅ Competition event monitoring stopped');
@@ -168,10 +171,9 @@ export class NostrNotificationEventHandler {
     relayUrl: string
   ): Promise<void> {
     // Prevent duplicate processing
-    if (this.processedEvents.has(event.id)) {
+    if (this.deduplicator.isDuplicate(event.id)) {
       return;
     }
-    this.processedEvents.add(event.id);
 
     console.log(
       `📥 Competition event received: kind ${event.kind} from ${relayUrl}`
@@ -672,7 +674,7 @@ export class NostrNotificationEventHandler {
     return {
       isActive: this.isActive,
       subscriptionCount: this.subscription ? 1 : 0,
-      processedEventCount: this.processedEvents.size,
+      processedEventCount: this.deduplicator.getStats().size,
     };
   }
 
@@ -681,6 +683,6 @@ export class NostrNotificationEventHandler {
    */
   cleanup(): void {
     this.stopListening();
-    this.processedEvents.clear();
+    this.deduplicator.clear();
   }
 }

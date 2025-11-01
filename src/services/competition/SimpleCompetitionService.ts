@@ -8,6 +8,7 @@ import { GlobalNDKService } from '../nostr/GlobalNDKService';
 import type { NDKFilter, NDKEvent } from '@nostr-dev-kit/ndk';
 import unifiedCache from '../cache/UnifiedNostrCache';
 import { CacheKeys, CacheTTL } from '../../constants/cacheTTL';
+import type { NostrChallengeDefinition } from '../../types/nostrCompetition';
 
 export interface League {
   id: string; // d tag
@@ -487,6 +488,111 @@ export class SimpleCompetitionService {
       return event;
     } catch (error) {
       console.error('Failed to fetch event by ID or d-tag:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get challenges where user is creator or participant
+   * Queries kind 30102 events
+   */
+  async getUserChallenges(userPubkey: string): Promise<NostrChallengeDefinition[]> {
+    console.log(`📋 Fetching challenges for user: ${userPubkey.slice(0, 8)}...`);
+
+    try {
+      const connected = await GlobalNDKService.waitForMinimumConnection(2, 4000);
+      if (!connected) {
+        console.warn('⚠️ Proceeding with minimal relay connectivity for user challenges query');
+      }
+
+      const ndk = await GlobalNDKService.getInstance();
+
+      // Query kind 30102 where user is tagged as participant
+      const filter: NDKFilter = {
+        kinds: [30102],
+        '#p': [userPubkey], // User is tagged as participant (creator or opponent)
+        limit: 100,
+      };
+
+      const events = await Promise.race([
+        ndk.fetchEvents(filter),
+        new Promise<Set<NDKEvent>>(
+          (resolve) => setTimeout(() => resolve(new Set()), 2000) // 2s timeout
+        ),
+      ]);
+
+      const challenges: NostrChallengeDefinition[] = [];
+
+      events.forEach((event) => {
+        try {
+          const challenge = this.parseChallenge(event);
+          if (challenge) {
+            challenges.push(challenge);
+          }
+        } catch (error) {
+          console.error('Failed to parse challenge event:', error);
+        }
+      });
+
+      // Sort by creation date (newest first)
+      challenges.sort((a, b) => b.createdAt - a.createdAt);
+
+      console.log(`✅ Fetched ${challenges.length} challenges for user`);
+      return challenges;
+    } catch (error) {
+      console.error('Failed to fetch user challenges:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Parse a kind 30102 Nostr event into a NostrChallengeDefinition
+   */
+  private parseChallenge(event: NDKEvent): NostrChallengeDefinition | null {
+    try {
+      const getTag = (name: string) =>
+        event.tags.find((t) => t[0] === name)?.[1];
+
+      const id = getTag('d');
+      const name = getTag('name');
+      const distance = parseFloat(getTag('distance') || '0');
+      const duration = parseInt(getTag('duration') || '0');
+      const wager = parseInt(getTag('wager') || '0');
+      const status = getTag('status') as 'open' | 'active' | 'completed' | 'cancelled';
+      const startDate = getTag('start_date');
+      const endDate = getTag('end_date');
+
+      if (!id || !name) {
+        console.warn('Challenge missing required tags:', { id, name });
+        return null;
+      }
+
+      // Extract all participant pubkeys from 'p' tags
+      const participants = event.tags
+        .filter(t => t[0] === 'p')
+        .map(t => t[1]);
+
+      return {
+        id,
+        name,
+        description: getTag('description'),
+        activityType: 'running',
+        distance,
+        metric: 'fastest_time',
+        startDate: startDate || new Date().toISOString(),
+        endDate: endDate || new Date().toISOString(),
+        duration,
+        participants,
+        maxParticipants: parseInt(getTag('max_participants') || '2'),
+        wager,
+        status: status || 'open',
+        createdAt: event.created_at || Date.now() / 1000,
+        updatedAt: event.created_at,
+        rawEvent: event,
+        creatorPubkey: event.pubkey,
+      };
+    } catch (error) {
+      console.error('Failed to parse challenge event:', error);
       return null;
     }
   }

@@ -563,6 +563,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('🔓 AuthContext: Starting sign out process...');
 
+      // Clean up all notification handlers before signing out
+      try {
+        const { notificationCleanupService } = await import(
+          '../services/notifications/NotificationCleanupService'
+        );
+        await notificationCleanupService.cleanupAllHandlers();
+        console.log('✅ AuthContext: Notification handlers cleaned up');
+      } catch (cleanupError) {
+        console.error('⚠️ AuthContext: Failed to cleanup notifications:', cleanupError);
+        // Don't fail logout if notification cleanup fails
+      }
+
       await AuthService.signOut();
 
       // Clear all state (like iOS app)

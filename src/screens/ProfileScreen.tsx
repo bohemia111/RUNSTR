@@ -41,7 +41,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { npubEncode } from '../utils/nostrEncoding';
 import { unifiedNotificationStore } from '../services/notifications/UnifiedNotificationStore';
 import { challengeNotificationHandler } from '../services/notifications/ChallengeNotificationHandler';
+import { challengeResponseHandler } from '../services/notifications/ChallengeResponseHandler';
 import { eventJoinNotificationHandler } from '../services/notifications/EventJoinNotificationHandler';
+import { teamJoinNotificationHandler } from '../services/notifications/TeamJoinNotificationHandler';
 // TEMPORARILY REMOVED TO DEBUG THEME ERROR
 // import { NotificationService } from '../services/notifications/NotificationService';
 import { getUserNostrIdentifiers } from '../utils/nostr';
@@ -137,12 +139,42 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             );
           });
 
+          // Start challenge response monitoring (kinds 1106, 1107)
+          challengeResponseHandler.startListening().catch((err) => {
+            console.warn(
+              '[ProfileScreen] Challenge response handler failed:',
+              err
+            );
+          });
+
           eventJoinNotificationHandler.startListening().catch((err) => {
             console.warn(
               '[ProfileScreen] Event join notification handler failed:',
               err
             );
           });
+
+          // Start team join request monitoring (kind 1104) for captains
+          teamJoinNotificationHandler.startListening().catch((err) => {
+            console.warn(
+              '[ProfileScreen] Team join notification handler failed:',
+              err
+            );
+          });
+
+          // Start competition event monitoring (kinds 1101, 1102, 1103)
+          // This enables competition announcements, results, and reminders
+          const { startCompetitionEventMonitoring } = await import(
+            '../services/notifications/NotificationService'
+          );
+          startCompetitionEventMonitoring(userIdentifiers.hexPubkey).catch(
+            (err) => {
+              console.warn(
+                '[ProfileScreen] Competition event monitoring failed:',
+                err
+              );
+            }
+          );
 
           console.log(
             '[ProfileScreen] ✅ Notification system initialization started (background)'
@@ -160,7 +192,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     return () => {
       clearTimeout(timer);
       challengeNotificationHandler.stopListening();
+      challengeResponseHandler.stopListening();
       eventJoinNotificationHandler.stopListening();
+      teamJoinNotificationHandler.stopListening();
     };
   }, []);
 

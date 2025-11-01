@@ -177,6 +177,7 @@ export class NostrPrefetchService {
    * Prefetch user's teams
    * ✅ OPTIMIZED: Now fetches user teams since we prefetch all teams anyway
    * This gives instant display on My Teams screen
+   * ✅ FIX: Enriches team data with discovered teams to match NavigationDataContext format
    */
   private async prefetchUserTeams(hexPubkey: string): Promise<void> {
     try {
@@ -184,18 +185,95 @@ export class NostrPrefetchService {
         CacheKeys.USER_TEAMS(hexPubkey),
         async () => {
           const membershipService = TeamMembershipService.getInstance();
+          const teamService = getNostrTeamService();
+
           // Get local memberships (teams the user belongs to)
           const memberships = await membershipService.getLocalMemberships(
             hexPubkey
           );
-          // Extract just the team info
-          return memberships.map((m) => ({
-            id: m.teamId,
-            name: m.teamName,
-            captainPubkey: m.captainPubkey,
-            joinedAt: m.joinedAt,
-            status: m.status,
-          }));
+
+          // Get discovered teams for enrichment
+          let discoveredTeams = teamService.getDiscoveredTeams();
+
+          // Ensure discovered teams exist
+          if (discoveredTeams.size === 0) {
+            await teamService.discoverFitnessTeams();
+            discoveredTeams = teamService.getDiscoveredTeams();
+          }
+
+          // Get user identifiers for captain detection
+          const identifiers = await getUserNostrIdentifiers();
+          const userNpub = identifiers?.npub || '';
+
+          // Initialize user teams array
+          const userTeams: any[] = [];
+
+          // 1. Get teams where user is captain
+          const captainTeams = await CaptainCache.getCaptainTeams();
+          console.log(`[Prefetch] Found ${captainTeams.length} captain teams in cache`);
+
+          for (const teamId of captainTeams) {
+            const team = discoveredTeams.get(teamId);
+            if (team) {
+              console.log(`[Prefetch] ✅ Found captain's team: ${team.name}`);
+              userTeams.push({
+                id: team.id,
+                name: team.name,
+                description: team.description || '',
+                prizePool: 0,
+                memberCount: team.memberCount || 0,
+                isActive: true,
+                role: 'captain',
+                bannerImage: team.bannerImage,
+                captainId: team.captainId,
+                charityId: team.charityId,
+              });
+            }
+          }
+
+          // 2. Get all local memberships and enrich with discovered team data
+          console.log(`[Prefetch] Found ${memberships.length} local memberships`);
+
+          for (const membership of memberships) {
+            // Skip if already added as captain
+            if (userTeams.some((t) => t.id === membership.teamId)) {
+              continue;
+            }
+
+            const team = discoveredTeams.get(membership.teamId);
+
+            if (team) {
+              // Enrich with discovered team data
+              const isCaptain = team.captainId === hexPubkey || team.captainId === userNpub;
+              userTeams.push({
+                id: team.id,
+                name: team.name,
+                description: team.description || '',
+                prizePool: 0,
+                memberCount: team.memberCount || 0,
+                isActive: true,
+                role: isCaptain ? 'captain' : 'member',
+                bannerImage: team.bannerImage,
+                captainId: team.captainId,
+                charityId: team.charityId,
+              });
+            } else {
+              // Team not in discovered teams, use membership data
+              userTeams.push({
+                id: membership.teamId,
+                name: membership.teamName,
+                description: '',
+                prizePool: 0,
+                memberCount: 0,
+                isActive: true,
+                role: membership.status === 'official' ? 'member' : 'pending',
+                captainId: membership.captainPubkey,
+              });
+            }
+          }
+
+          console.log(`[Prefetch] ✅ Built ${userTeams.length} enriched teams for user`);
+          return userTeams;
         },
         { ttl: CacheTTL.USER_TEAMS }
       );

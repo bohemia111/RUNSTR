@@ -1,6 +1,8 @@
-// MUST BE FIRST - Polyfills for React Native
-import 'react-native-get-random-values'; // Crypto polyfill
-import 'react-native-url-polyfill/auto'; // URL polyfill (required for NDK WebSocket URLs)
+// MUST BE FIRST - Apply all global polyfills for React Native
+import './src/utils/applyGlobalPolyfills';
+
+// Additional polyfill for WebView crypto (needed for NWC)
+import 'react-native-webview-crypto';
 
 import { registerRootComponent } from 'expo';
 import App from './src/App';

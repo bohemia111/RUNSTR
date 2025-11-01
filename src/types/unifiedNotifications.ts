@@ -108,6 +108,18 @@ export interface TeamNotificationMetadata {
 }
 
 /**
+ * Team join request notification metadata
+ */
+export interface TeamJoinNotificationMetadata {
+  teamId: string;
+  teamName: string;
+  requesterPubkey: string;
+  requesterName?: string;
+  requesterPicture?: string;
+  message?: string;
+}
+
+/**
  * Event join request notification metadata
  */
 export interface EventJoinNotificationMetadata {
@@ -142,6 +154,7 @@ export type NotificationMetadata =
   | CompetitionNotificationMetadata
   | ZapNotificationMetadata
   | TeamNotificationMetadata
+  | TeamJoinNotificationMetadata
   | EventJoinNotificationMetadata
   | WorkoutNotificationMetadata;
 
