@@ -32,6 +32,7 @@ import { QuickActionsSection } from '../components/team/QuickActionsSection';
 import { ActivityFeedSection } from '../components/team/ActivityFeedSection';
 import { JoinRequestsSection } from '../components/team/JoinRequestsSection'; // RESTORED: For team join requests with kind 30000 approval
 import { EventJoinRequestsSection } from '../components/captain/EventJoinRequestsSection';
+import { TeamMembersSection } from '../components/captain/TeamMembersSection';
 import { EventCreationWizard } from '../components/wizards/EventCreationWizard';
 import { LeagueCreationWizard } from '../components/wizards/LeagueCreationWizard';
 import { CompetitionParticipantsSection } from '../components/captain/CompetitionParticipantsSection';
@@ -1408,6 +1409,18 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
             loadTeamMembers();
           }}
         />
+
+        {/* Team Members List - Display and manage current members */}
+        {hasKind30000List && (
+          <TeamMembersSection
+            teamId={teamId}
+            captainPubkey={captainId}
+            members={teamMembers}
+            isLoading={isLoadingMembers}
+            onRemoveMember={handleRemoveMember}
+            onRefresh={loadTeamMembers}
+          />
+        )}
 
         {/* Event Join Requests */}
         <EventJoinRequestsSection
