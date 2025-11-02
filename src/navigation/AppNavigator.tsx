@@ -37,6 +37,7 @@ import { WorkoutHistoryScreen } from '../screens/WorkoutHistoryScreen';
 import { QRChallengeScanner } from '../screens/QRChallengeScanner';
 import { MyTeamsScreen } from '../screens/MyTeamsScreen';
 import { HealthProfileScreen } from '../screens/HealthProfileScreen';
+import { FitnessTestResultsScreen } from '../screens/FitnessTestResultsScreen';
 import type { DiscoveredNostrUser } from '../services/user/UserDiscoveryService';
 
 // Navigation Configuration
@@ -84,6 +85,7 @@ export type RootStackParamList = {
   WorkoutHistory: { userId: string; pubkey: string };
   MyTeams: undefined;
   HealthProfile: undefined;
+  FitnessTestResults: { testId: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -585,6 +587,16 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
       <Stack.Screen
         name="HealthProfile"
         component={HealthProfileScreen}
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      />
+
+      {/* Fitness Test Results Screen */}
+      <Stack.Screen
+        name="FitnessTestResults"
+        component={FitnessTestResultsScreen}
         options={{
           ...defaultScreenOptions,
           headerShown: false,

@@ -64,13 +64,14 @@ export interface GarminActivitiesResponse {
 }
 
 /**
- * Garmin OAuth Token Response
+ * Garmin OAuth Token Response (OAuth 2.0 PKCE)
  * Returned after successful OAuth code exchange
  */
 export interface GarminAuthTokens {
   access_token: string;
   refresh_token: string;
-  expires_in: number; // Seconds until access token expires
+  expires_in: number; // Seconds until access token expires (typically 3 months)
+  refresh_token_expires_in?: number; // Seconds until refresh token expires (optional)
   token_type: 'Bearer';
 }
 
@@ -213,11 +214,14 @@ export const GARMIN_ACTIVITY_TYPE_MAP: Record<string, string> = {
 };
 
 /**
- * Garmin API Endpoints
+ * Garmin API Endpoints (OAuth 2.0 PKCE + Health API)
+ * Reference: OAuth2PKCE_1.pdf specification from Garmin Developer Portal
  */
 export const GARMIN_ENDPOINTS = {
-  OAUTH_AUTHORIZE: 'https://connect.garmin.com/oauthConfirm',
-  OAUTH_TOKEN: 'https://connectapi.garmin.com/oauth-service/oauth/access_token',
+  // OAuth 2.0 PKCE endpoints (correct as of 2024)
+  OAUTH_AUTHORIZE: 'https://apis.garmin.com/tools/oauth2/authorizeUser',
+  OAUTH_TOKEN: 'https://diauth.garmin.com/di-oauth2-service/oauth/token',
+  // Health API endpoints
   ACTIVITIES: 'https://apis.garmin.com/wellness-api/rest/activities',
   ACTIVITY_DETAILS: 'https://apis.garmin.com/wellness-api/rest/activityDetails',
 } as const;

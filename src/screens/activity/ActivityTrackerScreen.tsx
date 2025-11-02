@@ -3,7 +3,7 @@
  * Provides tabs for running, walking, cycling, and more activities
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../../styles/theme';
 import { RunningTrackerScreen } from './RunningTrackerScreen';
 import { WalkingTrackerScreen } from './WalkingTrackerScreen';
@@ -33,6 +34,9 @@ type ActivityTab =
   | 'meditation'
   | 'manual';
 type MoreOption = 'strength' | 'diet' | 'meditation';
+
+// AsyncStorage key for persisting active tab
+const ACTIVITY_TAB_KEY = '@runstr:activity_tab';
 
 interface TabButtonProps {
   label: string;
@@ -169,8 +173,35 @@ export const ActivityTrackerScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActivityTab>('run');
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
+  // Load saved tab from AsyncStorage on mount
+  useEffect(() => {
+    const loadSavedTab = async () => {
+      try {
+        const savedTab = await AsyncStorage.getItem(ACTIVITY_TAB_KEY);
+        if (savedTab && (savedTab as ActivityTab)) {
+          setActiveTab(savedTab as ActivityTab);
+          console.log('[ActivityTracker] Restored saved tab:', savedTab);
+        }
+      } catch (error) {
+        console.warn('[ActivityTracker] Failed to load saved tab:', error);
+      }
+    };
+    loadSavedTab();
+  }, []);
+
+  // Save tab to AsyncStorage whenever it changes
+  const handleTabChange = async (tab: ActivityTab) => {
+    setActiveTab(tab);
+    try {
+      await AsyncStorage.setItem(ACTIVITY_TAB_KEY, tab);
+      console.log('[ActivityTracker] Saved tab:', tab);
+    } catch (error) {
+      console.warn('[ActivityTracker] Failed to save tab:', error);
+    }
+  };
+
   const handleMoreOptionSelect = (option: MoreOption) => {
-    setActiveTab(option);
+    handleTabChange(option);
     setShowMoreMenu(false);
   };
 
@@ -203,19 +234,19 @@ export const ActivityTrackerScreen: React.FC = () => {
         <TabButton
           label="Run"
           isActive={activeTab === 'run'}
-          onPress={() => setActiveTab('run')}
+          onPress={() => handleTabChange('run')}
           icon="body"
         />
         <TabButton
           label="Walk"
           isActive={activeTab === 'walk'}
-          onPress={() => setActiveTab('walk')}
+          onPress={() => handleTabChange('walk')}
           icon="walk"
         />
         <TabButton
           label="Cycle"
           isActive={activeTab === 'cycle'}
-          onPress={() => setActiveTab('cycle')}
+          onPress={() => handleTabChange('cycle')}
           icon="bicycle"
         />
         <TabButton

@@ -22,9 +22,11 @@ import LocalWorkoutStorageService from '../../services/fitness/LocalWorkoutStora
 import { WorkoutPublishingService } from '../../services/nostr/workoutPublishingService';
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import CalorieEstimationService from '../../services/fitness/CalorieEstimationService';
+import { EnhancedSocialShareModal } from '../../components/profile/shared/EnhancedSocialShareModal';
 import type { HealthProfile } from '../HealthProfileScreen';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import type { LocalWorkout } from '../../services/fitness/LocalWorkoutStorageService';
+import type { Workout } from '../../types/workout';
 
 type ExerciseType =
   | 'pushups'
@@ -63,6 +65,7 @@ export const StrengthTrackerScreen: React.FC = () => {
   const [totalSets, setTotalSets] = useState(3);
   const [targetReps, setTargetReps] = useState(20);
   const [restDuration, setRestDuration] = useState(60);
+  const [exerciseWeight, setExerciseWeight] = useState(0); // Weight being lifted (e.g., for bench press)
 
   // Workout state
   const [phase, setPhase] = useState<WorkoutPhase>('setup');
@@ -72,11 +75,13 @@ export const StrengthTrackerScreen: React.FC = () => {
   const [workoutStartTime, setWorkoutStartTime] = useState(0);
   const [workoutDuration, setWorkoutDuration] = useState(0);
   const [savedWorkoutId, setSavedWorkoutId] = useState<string | null>(null);
+  const [savedWorkout, setSavedWorkout] = useState<Workout | null>(null);
   const [estimatedCalories, setEstimatedCalories] = useState<number>(0);
 
   // Modal state
   const [showRepsModal, setShowRepsModal] = useState(false);
   const [currentRepsInput, setCurrentRepsInput] = useState('');
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Timer refs
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -205,12 +210,13 @@ export const StrengthTrackerScreen: React.FC = () => {
         duration: duration, // Duration in seconds (LocalWorkout interface expects seconds)
         reps: totalReps,
         sets: totalSets,
-        notes: `${exerciseLabel} - ${repsBreakdown}`,
+        notes: `${exerciseLabel} - ${repsBreakdown}${exerciseWeight > 0 ? ` @ ${exerciseWeight} lbs` : ''}`,
         calories, // Add calorie estimation
         // Exercise-specific fields for better display and Nostr publishing
         exerciseType: selectedExercise,
         repsBreakdown: completedReps,
         restTime: restDuration,
+        weight: exerciseWeight > 0 ? exerciseWeight : undefined, // Only include if weight was set
       });
 
       console.log(
@@ -218,6 +224,14 @@ export const StrengthTrackerScreen: React.FC = () => {
       );
 
       setSavedWorkoutId(workoutId);
+
+      // Retrieve the saved workout for modal display
+      const allWorkouts = await LocalWorkoutStorageService.getAllWorkouts();
+      const workout = allWorkouts.find((w) => w.id === workoutId);
+      if (workout) {
+        setSavedWorkout(workout as any);
+      }
+
       return workoutId;
     } catch (error) {
       console.error('❌ Failed to save strength workout:', error);
@@ -292,18 +306,13 @@ export const StrengthTrackerScreen: React.FC = () => {
    * Post workout to Nostr as Kind 1 (social post with card)
    */
   const handlePostSocial = () => {
-    if (!savedWorkoutId) {
+    if (!savedWorkout) {
       Alert.alert('Error', 'No workout to post. Please complete a workout first.');
       return;
     }
 
-    // Navigate to WorkoutHistoryScreen with saved workout ID
-    // The Private tab will show the workout with Post button
-    navigation.navigate('WorkoutHistory' as any, {
-      userId: userId,
-      pubkey: userId,
-      initialTab: 'private',
-    });
+    // Open social share modal with enhanced UI (beautiful cards)
+    setShowShareModal(true);
   };
 
   const formatTime = (seconds: number): string => {
@@ -397,6 +406,29 @@ export const StrengthTrackerScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.numberButton}
               onPress={() => setTargetReps(targetReps + 5)}
+            >
+              <Ionicons name="add" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Exercise Weight Input (optional) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Weight (Optional)</Text>
+          <View style={styles.numberInput}>
+            <TouchableOpacity
+              style={styles.numberButton}
+              onPress={() => setExerciseWeight(Math.max(0, exerciseWeight - 5))}
+            >
+              <Ionicons name="remove" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={styles.numberValue}>{exerciseWeight}</Text>
+              <Text style={styles.weightUnit}>lbs</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.numberButton}
+              onPress={() => setExerciseWeight(exerciseWeight + 5)}
             >
               <Ionicons name="add" size={24} color={theme.colors.text} />
             </TouchableOpacity>
@@ -641,6 +673,28 @@ export const StrengthTrackerScreen: React.FC = () => {
         >
           <Text style={styles.discardButtonText}>Discard</Text>
         </TouchableOpacity>
+
+        {/* Social Share Modal */}
+        {savedWorkout && (
+          <EnhancedSocialShareModal
+            visible={showShareModal}
+            workout={savedWorkout}
+            userId={userId}
+            onClose={() => setShowShareModal(false)}
+            onSuccess={() => {
+              Alert.alert('Success', 'Your workout has been shared to Nostr with a beautiful card!', [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    setShowShareModal(false);
+                    // Navigate back to profile after posting
+                    navigation.navigate('Profile' as any);
+                  },
+                },
+              ]);
+            }}
+          />
+        )}
       </ScrollView>
     );
   }
@@ -736,6 +790,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     minWidth: 60,
     textAlign: 'center',
+  },
+  weightUnit: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    marginTop: 4,
   },
   restOptions: {
     flexDirection: 'row',

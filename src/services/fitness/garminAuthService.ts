@@ -30,9 +30,10 @@ const STORAGE_KEYS = {
   STATE: '@garmin:state', // For CSRF protection
 };
 
-// Garmin OAuth 2.0 PKCE endpoints (correct URLs from documentation)
+// Garmin OAuth 2.0 PKCE endpoints (per official OAuth2PKCE_1.pdf specification)
+// CRITICAL: Use /tools/oauth2/authorizeUser for initial authorization (NOT oauth2Confirm)
 const OAUTH_ENDPOINTS = {
-  AUTHORIZE: 'https://connect.garmin.com/oauth2Confirm',
+  AUTHORIZE: 'https://apis.garmin.com/tools/oauth2/authorizeUser',
   TOKEN: 'https://diauth.garmin.com/di-oauth2-service/oauth/token',
 };
 
@@ -233,9 +234,13 @@ export class GarminAuthService {
       code_challenge_method: 'S256',
       redirect_uri: this.config.redirectUri,
       state: state,
+      scope: 'wellness-api', // Required for Health API access to activities
     });
 
-    return `${OAUTH_ENDPOINTS.AUTHORIZE}?${params.toString()}`;
+    const authUrl = `${OAUTH_ENDPOINTS.AUTHORIZE}?${params.toString()}`;
+    console.log('🔐 Garmin Auth URL:', authUrl.replace(this.config.clientId, 'CLIENT_ID_HIDDEN'));
+
+    return authUrl;
   }
 
   /**
@@ -252,12 +257,25 @@ export class GarminAuthService {
 
     try {
       console.log('🔄 Handling OAuth callback...');
+      console.log('   Received code:', code.substring(0, 20) + '...');
+      console.log('   Received state:', returnedState?.substring(0, 20) + '...');
 
-      // Verify state parameter (CSRF protection)
+      // Verify state parameter (CSRF protection) - MANDATORY
       const storedState = await AsyncStorage.getItem(STORAGE_KEYS.STATE);
-      if (returnedState && storedState && returnedState !== storedState) {
-        throw new Error('State mismatch - possible CSRF attack');
+
+      if (!returnedState) {
+        throw new Error('State parameter missing from callback - security check failed');
       }
+
+      if (!storedState) {
+        throw new Error('Stored state not found - please restart the authorization flow');
+      }
+
+      if (returnedState !== storedState) {
+        throw new Error('State mismatch - possible CSRF attack detected');
+      }
+
+      console.log('✅ State verification passed');
 
       // Retrieve code_verifier from storage
       const codeVerifier = await AsyncStorage.getItem(STORAGE_KEYS.CODE_VERIFIER);
@@ -306,32 +324,49 @@ export class GarminAuthService {
 
     try {
       console.log('📤 Sending token exchange request to Garmin...');
+      console.log('   Endpoint:', OAUTH_ENDPOINTS.TOKEN);
+      console.log('   Grant type: authorization_code');
+      console.log('   Code verifier length:', codeVerifier.length);
+      console.log('   Redirect URI:', this.config.redirectUri);
+
+      const requestBody = new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code,
+        code_verifier: codeVerifier, // CRITICAL: Required for PKCE
+        client_id: this.config.clientId,
+        client_secret: this.config.clientSecret,
+        redirect_uri: this.config.redirectUri,
+      });
+
+      console.log('   Request body keys:', Array.from(requestBody.keys()).join(', '));
 
       const response = await fetch(OAUTH_ENDPOINTS.TOKEN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: code,
-          code_verifier: codeVerifier, // CRITICAL: Required for PKCE
-          client_id: this.config.clientId,
-          client_secret: this.config.clientSecret,
-          redirect_uri: this.config.redirectUri,
-        }).toString(),
+        body: requestBody.toString(),
       });
+
+      console.log('📥 Token exchange response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Token exchange failed:', response.status, errorText);
+        console.error('❌ Token exchange failed:');
+        console.error('   Status:', response.status, response.statusText);
+        console.error('   Response body:', errorText);
+        console.error('   Possible causes:');
+        console.error('     - Invalid client credentials');
+        console.error('     - Authorization code expired (codes expire quickly)');
+        console.error('     - Code verifier mismatch');
+        console.error('     - Redirect URI mismatch');
         throw new Error(`Token exchange failed: ${response.status} ${errorText}`);
       }
 
       const tokens: GarminAuthTokens = await response.json();
       console.log('✅ Received tokens from Garmin');
       console.log('   Access token expires in:', tokens.expires_in, 'seconds');
-      console.log('   Refresh token expires in:', tokens.refresh_token_expires_in, 'seconds');
+      console.log('   Refresh token type:', tokens.refresh_token ? 'present' : 'missing');
 
       return tokens;
     } catch (error) {
@@ -404,6 +439,7 @@ export class GarminAuthService {
 
     try {
       console.log('🔄 Refreshing access token...');
+      console.log('   Using refresh token (first 20 chars):', refreshToken.substring(0, 20) + '...');
 
       const response = await fetch(OAUTH_ENDPOINTS.TOKEN, {
         method: 'POST',
@@ -418,9 +454,14 @@ export class GarminAuthService {
         }).toString(),
       });
 
+      console.log('📥 Refresh response status:', response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Token refresh failed:', response.status, errorText);
+        console.error('❌ Token refresh failed:');
+        console.error('   Status:', response.status, response.statusText);
+        console.error('   Response:', errorText);
+        console.error('   This usually means the refresh token expired or was revoked');
         throw new Error(`Token refresh failed: ${response.status} ${errorText}`);
       }
 
@@ -428,6 +469,7 @@ export class GarminAuthService {
       await this.storeTokens(tokens);
 
       console.log('✅ Access token refreshed successfully');
+      console.log('   New access token expires in:', tokens.expires_in, 'seconds');
     } catch (error) {
       console.error('❌ Failed to refresh access token:', error);
       // Clear tokens on refresh failure

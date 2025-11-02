@@ -6,6 +6,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] - 2025-11-02
+
+### Added
+- **RUNSTR Fitness Test** - Complete fitness assessment system with 60-minute timer
+  - `FitnessTestInstructionsModal.tsx`: Instructions modal with exercise demonstrations
+  - `FitnessTestResultsScreen.tsx`: Detailed results screen with scoring breakdown (300-point max)
+  - `FitnessTestService.ts`: Service layer for managing fitness test state and scoring
+  - `fitnessTest.ts`: TypeScript types for fitness test data structures
+  - `AdvancedAnalyticsScreen.tsx`: +286 lines with fitness test integration
+  - Three-exercise format: pushups, situps, and 5K run with individual scoring
+  - Auto-save functionality and resume support for interrupted tests
+  - Timer with 60-minute max duration and automatic completion
+
+- **Captain Dashboard Member Management** - Enhanced team member controls
+  - TeamMembersSection component for displaying and managing team rosters
+  - Member removal functionality for captains
+  - Improved team member list UI with action controls
+  - Real-time member count and status updates
+
+### Fixed
+- **Analytics Page** - Resolved display and calculation bugs
+  - Fixed data rendering issues in analytics charts
+  - Corrected metric calculations for workout statistics
+  - Improved error handling for missing data
+
+- **Strength Training Tracker** - Major improvements and bug fixes
+  - `StrengthTrackerScreen.tsx`: +77 lines with enhanced functionality
+  - Fixed exercise logging and set tracking
+  - Improved rep counter and weight input
+  - Better workout session management
+
+- **Diet Tracking** - Fixed data entry and display issues
+  - `DietTrackerScreen.tsx`: Corrected calorie calculation bugs
+  - Fixed meal entry form validation
+  - Improved nutrition data display
+
+- **Garmin Integration** - Enhanced authentication and sync reliability
+  - `garminAuthService.ts`: +76 lines with improved OAuth flow
+  - `garmin.ts`: Enhanced type definitions for Garmin API
+  - Fixed token refresh issues
+  - Better error handling for failed syncs
+  - Improved connection stability
+
+### Improved
+- **Activity Tracker Performance** - Continued optimization
+  - `ActivityTrackerScreen.tsx`: +41 lines with performance enhancements
+  - Better GPS accuracy during workouts
+  - Improved battery management
+  - Enhanced data collection reliability
+
+### Technical Changes
+- **New Components & Services**
+  - Added fitness test infrastructure (modal, screen, service, types)
+  - Enhanced captain dashboard with member management components
+
+- **Navigation Updates**
+  - `AppNavigator.tsx`: +12 lines with FitnessTestResults screen route
+
+- **Statistics**
+  - 8 files modified (7 updated, 4 new files created)
+  - 471 insertions, 37 deletions (net +434 lines)
+  - Major code additions: Fitness Test (+286 lines), Strength Training (+77 lines), Garmin (+76 lines), Activity Tracker (+41 lines)
+
 ## [0.5.6] - 2025-01-31
 
 ### Added

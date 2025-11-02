@@ -625,7 +625,7 @@ export const DietTrackerScreen: React.FC = () => {
                       color={theme.colors.background}
                       style={styles.buttonIcon}
                     />
-                    <Text style={styles.competeButtonText}>Save to Nostr</Text>
+                    <Text style={styles.competeButtonText}>Enter Competition</Text>
                   </>
                 )}
               </TouchableOpacity>

@@ -37,9 +37,12 @@ import Nostr1301ImportService from '../services/fitness/Nostr1301ImportService';
 import { HealthSnapshotCard } from '../components/analytics/HealthSnapshotCard';
 import { CalorieBalanceCard } from '../components/analytics/CalorieBalanceCard';
 import { ActivityStreaksCard } from '../components/analytics/ActivityStreaksCard';
+import { FitnessTestInstructionsModal } from '../components/fitness/FitnessTestInstructionsModal';
+import FitnessTestService from '../services/fitness/FitnessTestService';
 
 const PRIVACY_NOTICE_KEY = '@runstr:analytics_privacy_accepted';
 const HEALTH_PROFILE_KEY = '@runstr:health_profile';
+const MAX_TEST_DURATION = 3600; // 60 minutes in seconds
 
 export const AdvancedAnalyticsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -57,9 +60,33 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
   const [activityStreaks, setActivityStreaks] = useState<any[]>([]);
   const [caloricMetrics, setCaloricMetrics] = useState<any>(null);
 
+  // Fitness Test state
+  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
+  const [isTestActive, setIsTestActive] = useState(false);
+  const [testStartTime, setTestStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
   useEffect(() => {
     initializeAnalytics();
+    checkActiveTest();
   }, []);
+
+  // Timer effect for fitness test
+  useEffect(() => {
+    if (!isTestActive || !testStartTime) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - testStartTime) / 1000);
+      setElapsedSeconds(elapsed);
+
+      // Auto-finish if max duration reached
+      if (elapsed >= MAX_TEST_DURATION) {
+        handleFinishTest();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isTestActive, testStartTime]);
 
   const initializeAnalytics = async () => {
     try {
@@ -231,6 +258,72 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
     }
   };
 
+  // Check if there's an active fitness test on mount
+  const checkActiveTest = async () => {
+    try {
+      const activeTest = await FitnessTestService.getActiveTest();
+      if (activeTest) {
+        setIsTestActive(true);
+        setTestStartTime(activeTest.startTime);
+        const elapsed = Math.floor((Date.now() - activeTest.startTime) / 1000);
+        setElapsedSeconds(elapsed);
+        console.log('[FitnessTest] Resumed active test:', activeTest.id);
+      }
+    } catch (error) {
+      console.error('[FitnessTest] Failed to check active test:', error);
+    }
+  };
+
+  const handleStartFitnessTest = () => {
+    setShowInstructionsModal(true);
+  };
+
+  const handleInstructionsStart = async () => {
+    try {
+      setShowInstructionsModal(false);
+      const testId = await FitnessTestService.startTest();
+      setIsTestActive(true);
+      setTestStartTime(Date.now());
+      setElapsedSeconds(0);
+      console.log('[FitnessTest] Test started:', testId);
+    } catch (error) {
+      console.error('[FitnessTest] Failed to start test:', error);
+    }
+  };
+
+  const handleCancelTest = async () => {
+    try {
+      await FitnessTestService.cancelTest();
+      setIsTestActive(false);
+      setTestStartTime(null);
+      setElapsedSeconds(0);
+      console.log('[FitnessTest] Test canceled');
+    } catch (error) {
+      console.error('[FitnessTest] Failed to cancel test:', error);
+    }
+  };
+
+  const handleFinishTest = async () => {
+    try {
+      const result = await FitnessTestService.finishTest();
+      setIsTestActive(false);
+      setTestStartTime(null);
+      setElapsedSeconds(0);
+      console.log('[FitnessTest] Test finished:', result);
+
+      // Navigate to results screen
+      (navigation as any).navigate('FitnessTestResults', { testId: result.id });
+    } catch (error) {
+      console.error('[FitnessTest] Failed to finish test:', error);
+    }
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -299,6 +392,69 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
           </Text>
         )}
 
+        {/* RUNSTR Fitness Test Card */}
+        <View style={styles.fitnessTestCard}>
+          <View style={styles.fitnessTestHeader}>
+            <Ionicons name="fitness" size={24} color="#FF9D42" />
+            <Text style={styles.fitnessTestTitle}>RUNSTR Fitness Test</Text>
+          </View>
+
+          {!isTestActive ? (
+            <>
+              <Text style={styles.fitnessTestDesc}>
+                Complete 3 exercises in 60 minutes: pushups, situps, and 5K run.
+                Get a score out of 300.
+              </Text>
+              <TouchableOpacity
+                style={styles.startTestButton}
+                onPress={handleStartFitnessTest}
+              >
+                <Ionicons name="play-circle" size={20} color="#000" />
+                <Text style={styles.startTestButtonText}>Start RUNSTR Test</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.timerContainer}>
+                <Text style={styles.timerLabel}>Time Elapsed</Text>
+                <Text style={styles.timerDisplay}>
+                  {formatTime(elapsedSeconds)} / 60:00
+                </Text>
+                <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      { width: `${(elapsedSeconds / MAX_TEST_DURATION) * 100}%` },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.testInstructions}>
+                Use the workout tracker to complete pushups, situps, and 5K run.
+                Return here when done.
+              </Text>
+
+              <View style={styles.testButtons}>
+                <TouchableOpacity
+                  style={styles.cancelTestButton}
+                  onPress={handleCancelTest}
+                >
+                  <Text style={styles.cancelTestButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.finishTestButton}
+                  onPress={handleFinishTest}
+                >
+                  <Ionicons name="checkmark-circle" size={20} color="#000" />
+                  <Text style={styles.finishTestButtonText}>Finish Test</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+
         {/* Section 1: Health Snapshot (BMI | VO2 Max | Fitness Age) */}
         <Text style={styles.sectionTitle}>Health Metrics</Text>
         <HealthSnapshotCard
@@ -338,6 +494,13 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
         visible={showPrivacyModal}
         onClose={handlePrivacyClose}
         onAccept={handlePrivacyAccept}
+      />
+
+      {/* Fitness Test Instructions Modal */}
+      <FitnessTestInstructionsModal
+        visible={showInstructionsModal}
+        onStart={handleInstructionsStart}
+        onCancel={() => setShowInstructionsModal(false)}
       />
     </SafeAreaView>
   );
@@ -684,5 +847,128 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 16,
     lineHeight: 20,
+  },
+
+  // Fitness Test styles
+  fitnessTestCard: {
+    backgroundColor: '#0a0a0a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1a1a1a',
+    padding: 20,
+    marginBottom: 24,
+  },
+
+  fitnessTestHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+
+  fitnessTestTitle: {
+    fontSize: 18,
+    fontWeight: theme.typography.weights.semiBold,
+    color: '#FFB366',
+  },
+
+  fitnessTestDesc: {
+    fontSize: 14,
+    color: '#CC7A33',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+
+  startTestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF9D42',
+    borderRadius: 12,
+    padding: 16,
+    gap: 8,
+  },
+
+  startTestButtonText: {
+    fontSize: 15,
+    fontWeight: theme.typography.weights.semiBold,
+    color: '#000',
+  },
+
+  timerContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+
+  timerLabel: {
+    fontSize: 14,
+    color: '#CC7A33',
+    marginBottom: 8,
+  },
+
+  timerDisplay: {
+    fontSize: 32,
+    fontWeight: theme.typography.weights.bold,
+    color: '#FF9D42',
+    marginBottom: 16,
+  },
+
+  progressBarContainer: {
+    width: '100%',
+    height: 8,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#FF9D42',
+    borderRadius: 4,
+  },
+
+  testInstructions: {
+    fontSize: 14,
+    color: '#CC7A33',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+
+  testButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  cancelTestButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1a1a1a',
+    alignItems: 'center',
+  },
+
+  cancelTestButtonText: {
+    fontSize: 15,
+    fontWeight: theme.typography.weights.medium,
+    color: '#CC7A33',
+  },
+
+  finishTestButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FF9D42',
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+
+  finishTestButtonText: {
+    fontSize: 15,
+    fontWeight: theme.typography.weights.semiBold,
+    color: '#000',
   },
 });
