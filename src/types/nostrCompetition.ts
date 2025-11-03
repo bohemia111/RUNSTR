@@ -158,6 +158,9 @@ export interface NostrEventDefinition {
   paymentDestination?: 'captain' | 'charity';
   paymentRecipientName?: string;
 
+  // Location (NEW)
+  location?: string; // Optional: Event location (e.g., "Central Park, NYC")
+
   // Status
   status: 'upcoming' | 'active' | 'completed' | 'cancelled';
   createdAt: number; // Unix timestamp
@@ -165,6 +168,7 @@ export interface NostrEventDefinition {
 }
 
 // Challenge Definition (Kind 30102)
+// SIMPLIFIED: 1-day running challenges only (5K/10K/Half/Full Marathon)
 export interface NostrChallengeDefinition {
   // Core identification
   id: string; // d tag - unique identifier
@@ -174,22 +178,23 @@ export interface NostrChallengeDefinition {
   name: string;
   description?: string;
 
-  // Challenge config (Running only for v1)
+  // Challenge config (Running only, fastest time only)
   activityType: 'running';
-  distance: number; // 5, 10, or 21.1 km
+  distance: number; // 5, 10, 21.1, or 42.2 km (5K/10K/Half/Full Marathon)
   metric: 'fastest_time'; // Always fastest time for running challenges
 
-  // Timing
+  // Timing (SIMPLIFIED: Always 24 hours / 1 day)
   startDate: string; // ISO timestamp
   endDate: string; // ISO timestamp
-  duration: number; // hours (24, 48, or 168)
+  duration: 24; // Always 24 hours (1 day)
+  challengeTime?: string; // Optional: Specific time for the run (e.g., "08:00")
 
-  // Participants
+  // Participants (stored directly in challenge tags, no kind 30000 list)
   participants: string[]; // All participating pubkeys (creator + opponents)
-  maxParticipants: number; // Default 2 for 1v1
+  maxParticipants: 2; // Always 2 for 1v1
 
-  // Bitcoin
-  wager: number; // sats per participant
+  // Bitcoin (social agreement only, not enforced)
+  wager: number; // sats per participant (text field only, no payment enforcement)
 
   // Status
   status: 'open' | 'active' | 'completed' | 'cancelled';

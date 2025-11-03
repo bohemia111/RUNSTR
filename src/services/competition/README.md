@@ -29,8 +29,7 @@ src/services/competition/
 ├── competitionService.ts         # Enhanced with auto-entry integration (~100 lines modified)
 ├── leagueRankingService.ts       # Phase 3: Live league rankings
 ├── NostrCompetitionDiscoveryService.ts # Discovers user competitions via kind 30000 lists (~250 lines)
-├── ChallengeService.ts           # 1v1 challenge management (~400 lines)
-├── ChallengeRequestService.ts    # Challenge request/accept/decline flow with Nostr event signing (~500 lines)
+├── ChallengeService.ts           # 1v1 challenge management with tag-based queries (~400 lines)
 ├── Competition1301QueryService.ts # Query workout events for competitions
 └── README.md                     # This file
 

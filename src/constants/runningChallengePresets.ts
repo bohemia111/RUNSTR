@@ -1,10 +1,10 @@
 /**
  * Running Challenge Presets
- * 3 challenge types for 1v1 running competitions (5K/10K/Half Marathon)
- * Always running activity, always fastest_time scoring
+ * 4 challenge types for 1v1 running competitions (5K/10K/Half/Full Marathon)
+ * Always running activity, always fastest_time scoring, always 1-day duration
  */
 
-export type RunningChallengeDistance = '5k' | '10k' | 'half-marathon';
+export type RunningChallengeDistance = '5k' | '10k' | 'half-marathon' | 'marathon';
 
 export interface RunningChallengePreset {
   id: RunningChallengeDistance;
@@ -14,6 +14,7 @@ export interface RunningChallengePreset {
   description: string;
   activityType: 'running'; // Always running
   metric: 'fastest_time'; // Always fastest time
+  durationHours: 24; // Always 24 hours (1 day)
 }
 
 export const RUNNING_CHALLENGE_PRESETS: RunningChallengePreset[] = [
@@ -25,6 +26,7 @@ export const RUNNING_CHALLENGE_PRESETS: RunningChallengePreset[] = [
     description: '5 kilometers - fastest time wins',
     activityType: 'running',
     metric: 'fastest_time',
+    durationHours: 24,
   },
   {
     id: '10k',
@@ -34,6 +36,7 @@ export const RUNNING_CHALLENGE_PRESETS: RunningChallengePreset[] = [
     description: '10 kilometers - fastest time wins',
     activityType: 'running',
     metric: 'fastest_time',
+    durationHours: 24,
   },
   {
     id: 'half-marathon',
@@ -43,19 +46,29 @@ export const RUNNING_CHALLENGE_PRESETS: RunningChallengePreset[] = [
     description: '21.1 kilometers - fastest time wins',
     activityType: 'running',
     metric: 'fastest_time',
+    durationHours: 24,
+  },
+  {
+    id: 'marathon',
+    name: 'Full Marathon',
+    distance: 42.2,
+    unit: 'km',
+    description: '42.2 kilometers - fastest time wins',
+    activityType: 'running',
+    metric: 'fastest_time',
+    durationHours: 24,
   },
 ];
 
+// DEPRECATED: Duration options removed - challenges are now fixed to 1 day (24 hours)
 export interface ChallengeDurationOption {
-  value: '24h' | '48h' | '1week';
+  value: '24h';
   label: string;
   hours: number;
 }
 
 export const CHALLENGE_DURATION_OPTIONS: ChallengeDurationOption[] = [
   { value: '24h', label: '24 Hours', hours: 24 },
-  { value: '48h', label: '48 Hours', hours: 48 },
-  { value: '1week', label: '1 Week', hours: 168 },
 ];
 
 /**

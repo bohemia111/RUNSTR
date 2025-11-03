@@ -1,7 +1,7 @@
 /**
- * GlobalChallengeWizard - Global 1v1 challenge creation flow
- * Guides users through creating challenges with any Nostr user
- * Replaces team-only ChallengeCreationWizard for global challenges
+ * GlobalChallengeWizard - Simplified 1-day running challenge creation
+ * Flow: User Search → Distance → Wager/Time → Instant Creation
+ * Creates kind 30102 challenges with both participants instantly (no acceptance needed)
  */
 
 import React, { useState, useCallback } from 'react';
@@ -14,47 +14,38 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import { theme } from '../../styles/theme';
-import { challengeRequestService } from '../../services/challenge/ChallengeRequestService';
 import {
   userDiscoveryService,
   type DiscoveredNostrUser,
 } from '../../services/user/UserDiscoveryService';
 import { getUserNostrIdentifiers } from '../../utils/nostr';
-import type { ActivityConfiguration } from '../../types/challenge';
-import QRCodeService, {
-  type ChallengeQRData,
-} from '../../services/qr/QRCodeService';
+import { challengeService } from '../../services/competition/ChallengeService';
+import {
+  RUNNING_CHALLENGE_PRESETS,
+  type RunningChallengeDistance,
+} from '../../constants/runningChallengePresets';
 
 // Step components
 import { UserSearchStep } from './steps/UserSearchStep';
-import { ActivityConfigurationStep } from './steps/ActivityConfigurationStep';
-import { ChallengeReviewStep } from './steps/ChallengeReviewStep';
-import { SuccessScreen } from './steps/SuccessScreen';
 
-type GlobalChallengeStep =
-  | 'user_search'
-  | 'activity_config'
-  | 'review'
-  | 'success';
+type ChallengeStep = 'user_search' | 'distance' | 'wager_time' | 'success';
 
 interface GlobalChallengeWizardProps {
   onComplete?: () => void;
   onCancel: () => void;
-  preselectedOpponent?: DiscoveredNostrUser; // For in-app challenge buttons
+  preselectedOpponent?: DiscoveredNostrUser;
 }
 
 interface WizardProgressProps {
-  currentStep: GlobalChallengeStep;
+  currentStep: ChallengeStep;
 }
 
 const WizardProgress: React.FC<WizardProgressProps> = ({ currentStep }) => {
-  const steps: GlobalChallengeStep[] = [
-    'user_search',
-    'activity_config',
-    'review',
-  ];
+  const steps: ChallengeStep[] = ['user_search', 'distance', 'wager_time'];
   const currentIndex = steps.indexOf(currentStep);
 
   return (
@@ -78,38 +69,32 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
   onCancel,
   preselectedOpponent,
 }) => {
-  // Skip user search if opponent is preselected
-  const [currentStep, setCurrentStep] = useState<GlobalChallengeStep>(
-    preselectedOpponent ? 'activity_config' : 'user_search'
+  const [currentStep, setCurrentStep] = useState<ChallengeStep>(
+    preselectedOpponent ? 'distance' : 'user_search'
   );
-  const [selectedUser, setSelectedUser] = useState<
-    DiscoveredNostrUser | undefined
-  >(preselectedOpponent);
-  const [configuration, setConfiguration] = useState<
-    Partial<ActivityConfiguration>
-  >({});
+  const [selectedUser, setSelectedUser] = useState<DiscoveredNostrUser | undefined>(
+    preselectedOpponent
+  );
+  const [selectedDistance, setSelectedDistance] = useState<RunningChallengeDistance | null>(
+    null
+  );
+  const [wager, setWager] = useState('');
+  const [challengeTime, setChallengeTime] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [challengeQRData, setChallengeQRData] =
-    useState<ChallengeQRData | null>(null);
 
   // Step validation
   const validateCurrentStep = useCallback((): boolean => {
     switch (currentStep) {
       case 'user_search':
         return !!selectedUser;
-      case 'activity_config':
-        return !!(
-          configuration.activityType &&
-          configuration.metric &&
-          configuration.duration &&
-          configuration.wagerAmount
-        );
-      case 'review':
-        return true;
+      case 'distance':
+        return !!selectedDistance;
+      case 'wager_time':
+        return true; // Wager and time are optional
       default:
         return false;
     }
-  }, [currentStep, selectedUser, configuration]);
+  }, [currentStep, selectedUser, selectedDistance]);
 
   // Navigation handlers
   const handleNext = useCallback(async () => {
@@ -119,12 +104,12 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
 
     switch (currentStep) {
       case 'user_search':
-        setCurrentStep('activity_config');
+        setCurrentStep('distance');
         break;
-      case 'activity_config':
-        setCurrentStep('review');
+      case 'distance':
+        setCurrentStep('wager_time');
         break;
-      case 'review':
+      case 'wager_time':
         await handleCreateChallenge();
         break;
     }
@@ -132,27 +117,20 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
 
   const handleBack = useCallback(() => {
     switch (currentStep) {
-      case 'activity_config':
-        // Only go back to user search if no preselected opponent
+      case 'distance':
         if (!preselectedOpponent) {
           setCurrentStep('user_search');
         }
         break;
-      case 'review':
-        setCurrentStep('activity_config');
+      case 'wager_time':
+        setCurrentStep('distance');
         break;
     }
   }, [currentStep, preselectedOpponent]);
 
   const handleCreateChallenge = useCallback(async () => {
-    if (
-      !selectedUser ||
-      !configuration.activityType ||
-      !configuration.metric ||
-      !configuration.duration ||
-      configuration.wagerAmount === undefined
-    ) {
-      Alert.alert('Error', 'Please complete all required fields');
+    if (!selectedUser || !selectedDistance) {
+      Alert.alert('Error', 'Please select an opponent and distance');
       return;
     }
 
@@ -161,46 +139,40 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
 
       // Get user identifiers
       const userIdentifiers = await getUserNostrIdentifiers();
-      if (!userIdentifiers?.hexPubkey) {
+      if (!userIdentifiers?.hexPubkey || !userIdentifiers?.nsec) {
         throw new Error('User not authenticated');
       }
 
-      // Create challenge request
-      const result = await challengeRequestService.createChallengeRequest(
+      // Get challenge preset
+      const preset = RUNNING_CHALLENGE_PRESETS.find((p) => p.id === selectedDistance);
+      if (!preset) {
+        throw new Error('Invalid distance selection');
+      }
+
+      // Get signer from nsec
+      const { NDKPrivateKeySigner } = await import('@nostr-dev-kit/ndk');
+      const signer = new NDKPrivateKeySigner(userIdentifiers.nsec);
+
+      // Create challenge via ChallengeService
+      const result = await challengeService.publishChallengeDefinition(
         {
-          challengedPubkey: selectedUser.pubkey,
-          activityType: configuration.activityType,
-          metric: configuration.metric,
-          duration: configuration.duration,
-          wagerAmount: configuration.wagerAmount,
+          name: `${preset.name} Challenge`,
+          distance: preset.distance,
+          duration: 24, // Always 24 hours (1 day)
+          wager: parseInt(wager) || 0,
+          opponentPubkey: selectedUser.pubkey,
         },
-        '' // TODO: Pass nsec from user auth
+        signer
       );
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to create challenge');
+        throw new Error('Failed to create challenge');
       }
 
       // Add to recent challengers
       await userDiscoveryService.addRecentChallenger(selectedUser.pubkey);
 
-      // Generate QR code data
-      const now = Math.floor(Date.now() / 1000);
-      const qrData: ChallengeQRData = {
-        type: 'challenge',
-        id: result.challengeId || '',
-        creator_npub: userIdentifiers.hexPubkey,
-        name: `${configuration.activityType} Challenge`,
-        activity: configuration.activityType,
-        metric: configuration.metric,
-        duration: configuration.duration,
-        wager: configuration.wagerAmount,
-        startsAt: now,
-        expiresAt: now + configuration.duration * 24 * 60 * 60,
-      };
-      setChallengeQRData(qrData);
-
-      // Move to success screen
+      // Show success
       setCurrentStep('success');
 
       console.log(`Challenge created: ${result.challengeId}`);
@@ -227,28 +199,12 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedUser, configuration, onCancel]);
+  }, [selectedUser, selectedDistance, wager, challengeTime, onCancel]);
 
-  const handleEditOpponent = () => {
-    setCurrentStep('user_search');
-  };
-
-  const handleEditConfiguration = () => {
-    setCurrentStep('activity_config');
-  };
-
-  const handleSuccessDone = () => {
-    if (onComplete) {
-      onComplete();
-    }
-    onCancel();
-  };
-
-  // Can't go back from user search, success, or activity_config if opponent was preselected
   const canGoBack =
     currentStep !== 'user_search' &&
     currentStep !== 'success' &&
-    !(currentStep === 'activity_config' && preselectedOpponent);
+    !(currentStep === 'distance' && preselectedOpponent);
   const isValid = validateCurrentStep();
   const showActionButton = currentStep !== 'success';
 
@@ -259,10 +215,7 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
-              style={[
-                styles.headerButton,
-                !canGoBack && styles.headerButtonDisabled,
-              ]}
+              style={[styles.headerButton, !canGoBack && styles.headerButtonDisabled]}
               onPress={handleBack}
               disabled={!canGoBack}
             >
@@ -289,13 +242,11 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
       )}
 
       {/* Step Content */}
-      <View style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {currentStep === 'user_search' && (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Find Opponent</Text>
-            <Text style={styles.stepSubtitle}>
-              Search any Nostr user globally
-            </Text>
+            <Text style={styles.stepSubtitle}>Search any Nostr user globally</Text>
             <UserSearchStep
               selectedUser={selectedUser}
               onSelectUser={setSelectedUser}
@@ -303,57 +254,121 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
           </View>
         )}
 
-        {currentStep === 'activity_config' && (
+        {currentStep === 'distance' && (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Configure Challenge</Text>
+            <Text style={styles.stepTitle}>Choose Distance</Text>
             <Text style={styles.stepSubtitle}>
-              Set activity type, metric, duration, and wager
+              1-day challenge, fastest time wins
             </Text>
-            <ActivityConfigurationStep
-              configuration={configuration as ActivityConfiguration}
-              onUpdateConfiguration={(updates) =>
-                setConfiguration((prev) => ({ ...prev, ...updates }))
-              }
-            />
+
+            <View style={styles.distanceGrid}>
+              {RUNNING_CHALLENGE_PRESETS.map((preset) => (
+                <TouchableOpacity
+                  key={preset.id}
+                  style={[
+                    styles.distanceCard,
+                    selectedDistance === preset.id && styles.distanceCardSelected,
+                  ]}
+                  onPress={() => setSelectedDistance(preset.id)}
+                >
+                  <Text style={styles.distanceName}>{preset.name}</Text>
+                  <Text style={styles.distanceValue}>
+                    {preset.distance} {preset.unit}
+                  </Text>
+                  <Text style={styles.distanceDescription}>
+                    {preset.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
 
-        {currentStep === 'review' &&
-          selectedUser &&
-          configuration.activityType && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>Review Challenge</Text>
-              <Text style={styles.stepSubtitle}>
-                Confirm details before sending
-              </Text>
-              <ChallengeReviewStep
-                opponent={selectedUser}
-                configuration={configuration as ActivityConfiguration}
-                onEditOpponent={handleEditOpponent}
-                onEditConfiguration={handleEditConfiguration}
-              />
-            </View>
-          )}
+        {currentStep === 'wager_time' && (
+          <View style={styles.stepContainer}>
+            <Text style={styles.stepTitle}>Wager & Time</Text>
+            <Text style={styles.stepSubtitle}>
+              Optional: Set wager amount and challenge time
+            </Text>
 
-        {currentStep === 'success' && selectedUser && (
-          <SuccessScreen
-            challengeData={{
-              opponentInfo: {
-                id: selectedUser.pubkey,
-                name:
-                  selectedUser.displayName || selectedUser.name || 'Unknown',
-                avatar: selectedUser.picture || '',
-                stats: { challengesCount: 0, winsCount: 0 },
-              },
-              duration: configuration.duration || 7,
-              wagerAmount: configuration.wagerAmount || 0,
-            }}
-            qrData={challengeQRData}
-            onDone={handleSuccessDone}
-            isInAppChallenge={!!preselectedOpponent}
-          />
+            {selectedUser && (
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>Challenging</Text>
+                <Text style={styles.summaryValue}>
+                  {selectedUser.displayName || selectedUser.name || 'Unknown'}
+                </Text>
+
+                <Text style={[styles.summaryLabel, { marginTop: 12 }]}>
+                  Distance
+                </Text>
+                <Text style={styles.summaryValue}>
+                  {
+                    RUNNING_CHALLENGE_PRESETS.find((p) => p.id === selectedDistance)
+                      ?.name
+                  }
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.inputSection}>
+              <Text style={styles.inputLabel}>
+                Wager Amount (sats) <Text style={styles.optional}>Optional</Text>
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., 2100"
+                placeholderTextColor={theme.colors.textMuted}
+                value={wager}
+                onChangeText={setWager}
+                keyboardType="numeric"
+              />
+              <Text style={styles.inputHint}>
+                Social agreement only - not enforced by app
+              </Text>
+            </View>
+
+            <View style={styles.inputSection}>
+              <Text style={styles.inputLabel}>
+                Challenge Time <Text style={styles.optional}>Optional</Text>
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., 08:00"
+                placeholderTextColor={theme.colors.textMuted}
+                value={challengeTime}
+                onChangeText={setChallengeTime}
+              />
+              <Text style={styles.inputHint}>
+                Suggested time for the run (24-hour format)
+              </Text>
+            </View>
+          </View>
         )}
-      </View>
+
+        {currentStep === 'success' && (
+          <View style={styles.successContainer}>
+            <Text style={styles.successTitle}>Challenge Created! ⚡</Text>
+            <Text style={styles.successMessage}>
+              Your challenge has been sent to{' '}
+              {selectedUser?.displayName || selectedUser?.name || 'your opponent'}.
+            </Text>
+            <Text style={styles.successMessage}>
+              They've been added to the challenge automatically. Both of you have 24
+              hours to complete the run!
+            </Text>
+
+            <TouchableOpacity
+              style={styles.doneButton}
+              onPress={() => {
+                onComplete?.();
+                onCancel();
+              }}
+            >
+              <Text style={styles.doneButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
 
       {/* Action Button */}
       {showActionButton && (
@@ -375,7 +390,7 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
                   (!isValid || isSubmitting) && styles.nextButtonTextDisabled,
                 ]}
               >
-                {currentStep === 'review' ? 'Send Challenge' : 'Next'}
+                {currentStep === 'wager_time' ? 'Create Challenge' : 'Next'}
               </Text>
             )}
           </TouchableOpacity>
@@ -461,6 +476,116 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginBottom: 24,
     lineHeight: 20,
+  },
+  distanceGrid: {
+    gap: 12,
+  },
+  distanceCard: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: theme.colors.card,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  distanceCardSelected: {
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.cardPressed,
+  },
+  distanceName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.text,
+    marginBottom: 4,
+  },
+  distanceValue: {
+    fontSize: 14,
+    color: theme.colors.accent,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  distanceDescription: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  summaryCard: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: 24,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 16,
+    color: theme.colors.text,
+    fontWeight: '600',
+  },
+  inputSection: {
+    marginBottom: 24,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  optional: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    fontWeight: '400',
+  },
+  input: {
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: theme.colors.text,
+  },
+  inputHint: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    marginTop: 8,
+  },
+  successContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: theme.colors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  doneButton: {
+    backgroundColor: theme.colors.accent,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 12,
+    marginTop: 32,
+  },
+  doneButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.accentText,
   },
   actionSection: {
     paddingHorizontal: 20,

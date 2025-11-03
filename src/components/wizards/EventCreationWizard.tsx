@@ -97,6 +97,7 @@ interface EventData {
   entryFeesSats: number;
   eventName: string;
   description: string;
+  location?: string; // NEW: Event location (e.g., "Central Park, NYC")
   targetValue?: number;
   targetUnit?: string;
   prizePoolSats: number | undefined;
@@ -142,6 +143,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
     entryFeesSats: 0,
     eventName: '',
     description: '',
+    location: '', // NEW: Event location
     prizePoolSats: undefined,
     lightningAddress: '',
     paymentDestination: 'captain',
@@ -181,6 +183,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
         entryFeesSats: 0,
         eventName: '',
         description: '',
+        location: '',
         prizePoolSats: undefined,
         lightningAddress: '',
         paymentDestination: 'captain',
@@ -310,6 +313,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
         teamId,
         name: eventData.eventName,
         description: eventData.description,
+        location: eventData.location, // NEW: Event location
         activityType: eventData.activityType, // Auto-set to 'Running'
         scoringType: eventData.scoringType, // Auto-set to 'fastest_time'
         competitionType: eventData.competitionType!, // From preset
@@ -565,6 +569,21 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
                 multiline
                 numberOfLines={3}
               />
+            </View>
+
+            {/* Location (optional) - NEW */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Location (Optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={eventData.location}
+                onChangeText={(text) => updateSettings('location', text)}
+                placeholder="e.g., Central Park, NYC"
+                placeholderTextColor={theme.colors.textMuted}
+              />
+              <Text style={styles.formHelper}>
+                Where will the event take place?
+              </Text>
             </View>
 
             {/* Date Selection */}

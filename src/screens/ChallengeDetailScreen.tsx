@@ -80,97 +80,97 @@ export const ChallengeDetailScreen: React.FC<ChallengeDetailScreenProps> = ({
     setError(null);
 
     try {
-      // For now, create a demo challenge scenario
-      // In full implementation, challenges would be stored as Nostr events
-      const mockChallengeParams = {
-        activityType: 'Running',
-        goalType: 'distance' as const,
-        startTime: Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000), // Started 1 day ago
-        endTime: Math.floor((Date.now() + 6 * 24 * 60 * 60 * 1000) / 1000), // Ends in 6 days
-        goalValue: 10, // 10km challenge
-        goalUnit: 'km',
-      };
+      // Fetch kind 30102 challenge event from Nostr
+      const challengeService = ChallengeService.getInstance();
+      const challengeEvent = await challengeService.getChallengeEvent(challengeId);
 
-      // Mock participant pubkeys (in real implementation, these would come from challenge event)
-      const participant1 = 'npub1participant1example12345678901234567890';
-      const participant2 = 'npub1participant2example12345678901234567890';
+      if (!challengeEvent) {
+        throw new Error('Challenge not found');
+      }
 
-      // Load real leaderboard data for the challenge
+      // Parse challenge event tags
+      const tags = new Map(challengeEvent.tags.map((t) => [t[0], t[1]]));
+      const participants = challengeEvent.tags
+        .filter((tag) => tag[0] === 'p')
+        .map((tag) => tag[1])
+        .filter(Boolean);
+
+      if (participants.length === 0) {
+        throw new Error('No participants found in challenge');
+      }
+
+      // Extract challenge metadata
+      const challengeName = tags.get('name') || 'Running Challenge';
+      const distance = parseFloat(tags.get('distance') || '5');
+      const wager = parseInt(tags.get('wager') || '0');
+      const startDate = tags.get('start_date') || new Date().toISOString();
+      const endDate = tags.get('end_date') || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      const startTime = Math.floor(new Date(startDate).getTime() / 1000);
+      const endTime = Math.floor(new Date(endDate).getTime() / 1000);
+
+      // Get challenge leaderboard with real workout data
       setIsLoadingLeaderboard(true);
-      const leaderboardService =
-        NostrCompetitionLeaderboardService.getInstance();
+      const challengeLeaderboard = await challengeService.getChallengeLeaderboard(challengeId);
+
+      if (!challengeLeaderboard) {
+        throw new Error('Failed to load challenge leaderboard');
+      }
 
       try {
-        const challengeLeaderboard =
-          await leaderboardService.computeChallengeLeaderboard(
-            challengeId,
-            participant1,
-            participant2,
-            mockChallengeParams,
-            'current_user_id' // TODO: Get actual current user ID from auth
-          );
 
         setLeaderboard(challengeLeaderboard);
 
         // Convert leaderboard participants to competitor format
         const competitors = challengeLeaderboard.participants.map(
-          (participant: CompetitionParticipant, index: number) => ({
-            id: participant.pubkey,
-            name: participant.name || `Participant ${index + 1}`,
-            avatar:
-              participant.name?.charAt(0).toUpperCase() || `P${index + 1}`,
-            score: participant.score,
-            position: participant.position || index + 1,
-            distance: participant.totalDistance
-              ? `${Math.round(participant.totalDistance / 1000)} km`
-              : '0 km',
-            time: participant.totalDuration
-              ? formatDuration(participant.totalDuration)
-              : '0 min',
-            workouts: participant.workoutCount || 0,
-            isWinner:
-              participant.position === 1 &&
-              challengeLeaderboard.participants.length > 1,
-            status: 'completed' as const,
-            progress: {
-              value: participant.totalDistance || 0,
-              percentage: Math.min(
-                100,
-                ((participant.totalDistance || 0) /
-                  (mockChallengeParams.goalValue || 1) /
-                  1000) *
-                  100
-              ),
-              unit: 'km',
-            },
-          })
+          (participant, index: number) => {
+            // For fastest_time, currentProgress is the time in seconds (lower = better)
+            const hasCompleted = participant.currentProgress > 0;
+            const timeSeconds = participant.currentProgress;
+
+            return {
+              id: participant.pubkey,
+              name: participant.name || `Runner ${index + 1}`,
+              avatar: participant.name?.charAt(0).toUpperCase() || `R${index + 1}`,
+              score: hasCompleted ? timeSeconds : 0,
+              position: index + 1,
+              distance: `${distance} km`,
+              time: hasCompleted ? formatDuration(timeSeconds) : 'Not completed',
+              workouts: participant.workoutCount || 0,
+              isWinner: index === 0 && hasCompleted && challengeLeaderboard.participants.length > 1,
+              status: hasCompleted ? 'completed' : 'pending' as const,
+              progress: {
+                value: hasCompleted ? distance : 0,
+                percentage: hasCompleted ? 100 : 0,
+                unit: 'km',
+              },
+            };
+          }
         );
 
         // Calculate time remaining
-        const timeRemainingSeconds =
-          mockChallengeParams.endTime - Math.floor(Date.now() / 1000);
-        const formattedTimeRemaining =
-          formatTimeRemaining(timeRemainingSeconds);
+        const timeRemainingSeconds = endTime - Math.floor(Date.now() / 1000);
+        const formattedTimeRemaining = formatTimeRemaining(timeRemainingSeconds);
         const isExpired = timeRemainingSeconds <= 0;
-        const isCompleted = isExpired; // For demo purposes
+        const hasWinner = competitors.some((c) => c.isWinner);
+        const isCompleted = isExpired || hasWinner;
+
+        // Get current user pubkey to check participation
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        const userHexPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+        const isParticipating = userHexPubkey ? participants.includes(userHexPubkey) : false;
 
         // Create challenge detail data with real leaderboard
         const challengeDetailData: ChallengeDetailData = {
           id: challengeId,
-          name: `${mockChallengeParams.goalValue}${mockChallengeParams.goalUnit} ${mockChallengeParams.activityType} Challenge`,
-          description: `Complete ${mockChallengeParams.goalValue} ${
-            mockChallengeParams.goalUnit
-          } of ${mockChallengeParams.activityType.toLowerCase()} before the deadline`,
-          prizePool: 1000, // Mock prize pool in sats
+          name: challengeName,
+          description: `1v1 ${distance}km running challenge. Fastest time wins!${wager > 0 ? ` Wager: ${wager} sats (social agreement)` : ''}`,
+          prizePool: wager,
           competitors,
           progress: {
-            isParticipating: false, // TODO: Check if current user is participating
-            isWatching: true,
-            status: isCompleted
-              ? 'completed'
-              : isExpired
-              ? 'completed'
-              : 'active',
+            isParticipating,
+            isWatching: !isParticipating,
+            status: isCompleted ? 'completed' : isExpired ? 'expired' : 'active',
             isCompleted,
             winner: competitors.find((c) => c.isWinner),
           },
@@ -181,65 +181,74 @@ export const ChallengeDetailScreen: React.FC<ChallengeDetailScreenProps> = ({
           rules: [
             {
               id: '1',
-              text: `Complete ${mockChallengeParams.goalValue} ${
-                mockChallengeParams.goalUnit
-              } of ${mockChallengeParams.activityType.toLowerCase()} before deadline`,
+              text: `Complete a ${distance}km run within 24 hours`,
             },
             {
               id: '2',
-              text: 'Activities must be tracked and published to Nostr (kind 1301 events)',
+              text: 'Track your run using the Activity Tracker (publishes kind 1301 to Nostr)',
             },
-            { id: '3', text: 'Winner determined by total distance covered' },
+            {
+              id: '3',
+              text: 'Fastest time wins - lower time is better',
+            },
             {
               id: '4',
-              text: 'Challenge results updated in real-time from Nostr workout events',
+              text: wager > 0
+                ? `Wager: ${wager} sats (social agreement - not enforced)`
+                : 'No wager - run for glory!',
             },
           ],
           status: isCompleted ? 'completed' : isExpired ? 'expired' : 'active',
-          formattedPrize: '1000 sats',
-          formattedDeadline: new Date(
-            mockChallengeParams.endTime * 1000
-          ).toLocaleDateString(),
+          formattedPrize: wager > 0 ? `${wager} sats` : 'No wager',
+          formattedDeadline: new Date(endTime * 1000).toLocaleDateString(),
         };
 
         setChallengeData(challengeDetailData);
         setTimeRemaining(challengeDetailData.timer.timeRemaining);
       } catch (leaderboardError) {
-        console.error(
-          'Failed to load challenge leaderboard:',
-          leaderboardError
-        );
+        console.error('Failed to load challenge leaderboard:', leaderboardError);
 
         // Fall back to basic challenge data without leaderboard
+        const timeRemainingSeconds = endTime - Math.floor(Date.now() / 1000);
+        const formattedTimeRemaining = formatTimeRemaining(timeRemainingSeconds);
+        const isExpired = timeRemainingSeconds <= 0;
+
         const challengeDetailData: ChallengeDetailData = {
           id: challengeId,
-          name: 'Challenge',
-          description: 'Head-to-head fitness challenge',
-          prizePool: 0,
+          name: challengeName,
+          description: `1v1 ${distance}km running challenge. Fastest time wins!`,
+          prizePool: wager,
           competitors: [],
           progress: {
             isParticipating: false,
-            isWatching: true,
-            status: 'active',
-            isCompleted: false,
+            isWatching: false,
+            status: isExpired ? 'expired' : 'active',
+            isCompleted: isExpired,
           },
           timer: {
-            timeRemaining: '0d 0h 0m',
-            isExpired: false,
+            timeRemaining: formattedTimeRemaining,
+            isExpired,
           },
           rules: [
             {
               id: '1',
-              text: 'Complete the challenge requirements before deadline',
+              text: `Complete a ${distance}km run within 24 hours`,
             },
-            { id: '2', text: 'Activities must be tracked through RUNSTR app' },
-            { id: '3', text: 'Winner takes the full prize pool' },
+            {
+              id: '2',
+              text: 'Track your run using the Activity Tracker',
+            },
+            {
+              id: '3',
+              text: 'Fastest time wins',
+            },
           ],
-          status: 'active',
-          formattedPrize: '0 sats',
-          formattedDeadline: 'TBD',
+          status: isExpired ? 'expired' : 'active',
+          formattedPrize: wager > 0 ? `${wager} sats` : 'No wager',
+          formattedDeadline: new Date(endTime * 1000).toLocaleDateString(),
         };
         setChallengeData(challengeDetailData);
+        setTimeRemaining(formattedTimeRemaining);
       } finally {
         setIsLoadingLeaderboard(false);
       }
@@ -315,74 +324,28 @@ export const ChallengeDetailScreen: React.FC<ChallengeDetailScreenProps> = ({
     }
   };
 
-  // Handle watch/participate toggle
-  const handleWatchToggle = async () => {
-    if (isLoading) return;
-
-    setIsLoading(true);
-
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Toggle watch status
-      const newWatchStatus =
-        watchStatus === 'watching' ? 'not_watching' : 'watching';
-
-      setWatchStatus(newWatchStatus);
-
-      const message =
-        newWatchStatus === 'watching'
-          ? 'You are now watching this challenge!'
-          : 'Stopped watching this challenge';
-
-      Alert.alert('Success', message);
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-      console.error('Error toggling challenge watch:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle participate action (for open challenges)
-  const handleParticipate = async () => {
-    if (isLoading || !challengeData || challengeData.status !== 'pending')
-      return;
+  // Handle "Start Run" action - navigates to Activity Tracker
+  const handleStartRun = () => {
+    if (!challengeData || challengeData.timer.isExpired) return;
 
     Alert.alert(
-      'Join Challenge',
-      'Are you sure you want to participate in this challenge?',
+      'Start Your Run',
+      `Open the Activity Tracker to record your ${challengeData.name.includes('km') ? challengeData.name.split(' ')[0] : 'distance'} run. Your time will be automatically recorded when you publish the workout.`,
       [
         {
           text: 'Cancel',
           style: 'cancel',
         },
         {
-          text: 'Join',
-          onPress: async () => {
-            setIsLoading(true);
-            try {
-              // Simulate API call
-              await new Promise((resolve) => setTimeout(resolve, 1500));
-
-              Alert.alert('Success', 'You have joined the challenge!');
-              setWatchStatus('participating');
-              setChallengeData((prevData) => {
-                if (!prevData) return null;
-                return {
-                  ...prevData,
-                  status: 'active',
-                };
-              });
-            } catch (error) {
-              Alert.alert(
-                'Error',
-                'Failed to join challenge. Please try again.'
-              );
-            } finally {
-              setIsLoading(false);
-            }
+          text: 'Open Activity Tracker',
+          onPress: () => {
+            // Navigate to Activity tab
+            // TODO: Add navigation to Activity tab when navigation ref is available
+            console.log('Navigate to Activity Tracker');
+            Alert.alert(
+              'Activity Tracker',
+              'The Activity tab will open when this feature is fully integrated. For now, manually navigate to the Activity tab to start your run.'
+            );
           },
         },
       ]
@@ -391,84 +354,106 @@ export const ChallengeDetailScreen: React.FC<ChallengeDetailScreenProps> = ({
 
   const getActionButtonTitle = () => {
     if (!challengeData) return '';
+
     if (challengeData.progress?.isCompleted) {
       return 'Challenge Completed';
     }
 
-    if (challengeData.status === 'pending') {
-      return 'Join Challenge';
+    if (challengeData.timer?.isExpired) {
+      return 'Challenge Expired';
     }
 
-    if (watchStatus === 'watching') {
-      return 'Watching Challenge';
+    if (challengeData.progress?.isParticipating) {
+      // Check if user has completed their run
+      const userHasCompleted = challengeData.competitors.some(
+        (c) => c.status === 'completed' && challengeData.progress?.isParticipating
+      );
+      return userHasCompleted ? 'Run Completed ✓' : 'Start Your Run';
     }
 
-    if (watchStatus === 'participating') {
-      return 'Participating ✓';
-    }
-
-    return 'Watch Challenge';
+    return 'View Challenge';
   };
 
   const getActionButtonVariant = () => {
     if (!challengeData) return 'secondary';
-    if (
-      challengeData.progress?.isCompleted ||
-      watchStatus === 'watching' ||
-      watchStatus === 'participating'
-    ) {
+
+    if (challengeData.progress?.isCompleted || challengeData.timer?.isExpired) {
       return 'secondary';
     }
-    return 'primary';
+
+    if (challengeData.progress?.isParticipating) {
+      return 'primary';
+    }
+
+    return 'secondary';
   };
 
   const getActionButtonAction = () => {
-    if (!challengeData) return handleWatchToggle;
-    if (challengeData.status === 'pending') {
-      return handleParticipate;
+    if (!challengeData) return () => {};
+
+    if (challengeData.progress?.isParticipating && !challengeData.progress?.isCompleted && !challengeData.timer?.isExpired) {
+      return handleStartRun;
     }
-    return handleWatchToggle;
+
+    // For non-participants or completed challenges, button is informational only
+    return () => {};
   };
 
   const isActionButtonDisabled = () => {
     if (!challengeData) return true;
-    return (
-      challengeData.progress?.isCompleted || challengeData.timer?.isExpired
+
+    // Disable if completed or expired
+    if (challengeData.progress?.isCompleted || challengeData.timer?.isExpired) {
+      return true;
+    }
+
+    // Disable if not participating (instant challenges - can't join after creation)
+    if (!challengeData.progress?.isParticipating) {
+      return true;
+    }
+
+    // Check if user already completed their run
+    const userHasCompleted = challengeData.competitors.some(
+      (c) => c.status === 'completed' && challengeData.progress?.isParticipating
     );
+
+    return userHasCompleted;
   };
 
   const getAccessibilityLabel = () => {
     if (!challengeData) return 'Challenge';
+
     if (challengeData.progress?.isCompleted) {
       return 'Challenge completed';
     }
-    if (challengeData.status === 'pending') {
-      return 'Join challenge';
+
+    if (challengeData.timer?.isExpired) {
+      return 'Challenge expired';
     }
-    if (watchStatus === 'watching') {
-      return 'Stop watching challenge';
+
+    if (challengeData.progress?.isParticipating) {
+      return 'Start your run for this challenge';
     }
-    if (watchStatus === 'participating') {
-      return 'Currently participating in challenge';
-    }
-    return 'Start watching challenge';
+
+    return 'View challenge details';
   };
 
   const getAccessibilityHint = () => {
     if (!challengeData) return 'Loading challenge';
+
     if (challengeData.progress?.isCompleted) {
       return 'This challenge has been completed';
     }
+
     if (challengeData.timer?.isExpired) {
       return 'This challenge has expired';
     }
-    if (challengeData.status === 'pending') {
-      return 'Tap to join this challenge';
+
+    if (challengeData.progress?.isParticipating) {
+      return 'Tap to open Activity Tracker and start your run';
     }
-    if (watchStatus === 'watching') {
-      return 'Tap to stop watching this challenge';
-    }
-    return 'Tap to start watching this challenge';
+
+    return 'Instant challenges cannot be joined after creation';
   };
 
   // Loading state

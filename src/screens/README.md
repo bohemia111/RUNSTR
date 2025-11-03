@@ -10,11 +10,12 @@ Main application screens for the RUNSTR mobile app's user interface.
 ## Files
 
 - **CaptainDashboardScreen.tsx** - Captain management interface for team oversight and competition creation
-- **ChallengeDetailScreen.tsx** - Detailed view of individual challenges with leaderboards
+- **ChallengeDetailScreen.tsx** - Instant 1v1 running challenges (4 distances, fastest-time only, tag-based)
+- **ChallengeLeaderboardScreen.tsx** - Challenge leaderboard with fastest-time comparison
 - **CompetitionsListScreen.tsx** - List all user competitions with tabbed view (teams/leagues/events/challenges) (~500 lines)
 - **EnhancedTeamScreen.tsx** - Enhanced team view with leagues, events, challenges tabs
 - **EnhancedWorkoutHistoryScreen.tsx** - Enhanced workout history with advanced filtering
-- **EventDetailScreen.tsx** - Detailed view of team events with participation controls
+- **EventDetailScreen.tsx** - Team event details with location, charity support, and entry controls
 - **LoginScreen.tsx** - Nostr authentication screen with nsec input
 - **OnboardingScreen.tsx** - Initial app onboarding and setup flow
 - **ProfileEditScreen.tsx** - Edit profile information and settings

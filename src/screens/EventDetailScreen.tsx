@@ -664,6 +664,16 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
             </View>
           )}
 
+          {eventData.location && (
+            <View style={styles.eventInfoRow}>
+              <View style={styles.locationHeader}>
+                <Ionicons name="location" size={16} color={theme.colors.accent} />
+                <Text style={styles.eventLabel}>Location</Text>
+              </View>
+              <Text style={styles.eventValue}>{eventData.location}</Text>
+            </View>
+          )}
+
           <View style={styles.eventInfoRow}>
             <Text style={styles.eventLabel}>Activity</Text>
             <Text style={styles.eventValue}>
@@ -694,6 +704,15 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
                   {eventData.entryFeesSats} sats
                 </Text>
               </View>
+            </View>
+          )}
+
+          {eventData.paymentDestination === 'charity' && eventData.paymentRecipientName && (
+            <View style={styles.charityCard}>
+              <Ionicons name="heart" size={20} color={theme.colors.accent} />
+              <Text style={styles.charityText}>
+                100% of entry fees support {eventData.paymentRecipientName}
+              </Text>
             </View>
           )}
 
@@ -920,6 +939,30 @@ const styles = StyleSheet.create({
   entryFeeValue: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  charityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.accent + '15',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.accent + '30',
+  },
+  charityText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: '500',
+    flex: 1,
   },
   participantsCard: {
     backgroundColor: theme.colors.cardBackground,

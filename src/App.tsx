@@ -115,7 +115,8 @@ import {
 } from './components/ui/CustomAlert';
 import { ChallengePreviewModal } from './components/challenge/ChallengePreviewModal';
 import { parseChallengeDeepLink, type ParsedChallengeData } from './utils/challengeDeepLink';
-import { challengeRequestService } from './services/challenge/ChallengeRequestService';
+// REMOVED: Challenge request service (instant challenges only now)
+// import { challengeRequestService } from './services/challenge/ChallengeRequestService';
 import { parseEventDeepLink, type ParsedEventData } from './utils/eventDeepLink';
 
 // Types for authenticated app navigation
@@ -421,11 +422,22 @@ const AppContent: React.FC = () => {
   }, []);
 
   // Challenge deep link handlers
+  // TODO: Update for instant challenge flow (no acceptance needed)
+  // QR challenges are deprecated - use GlobalChallengeWizard instead
   const handleAcceptChallenge = React.useCallback(async (challenge: ParsedChallengeData) => {
+    console.warn('⚠️ QR challenge acceptance deprecated - use GlobalChallengeWizard for instant challenges');
+    CustomAlertManager.alert(
+      'Challenge Flow Updated',
+      'Challenge creation has been simplified. Please use the Challenge Wizard to create new challenges.',
+      [{ text: 'OK', onPress: () => {
+        setShowChallengePreview(false);
+        setChallengeData(null);
+      }}]
+    );
+    /* DEPRECATED: Instant challenges only now (no acceptance flow)
     try {
       console.log('🏆 Accepting challenge:', challenge);
 
-      // Get unified signer (supports both Amber and nsec)
       const { UnifiedSigningService } = await import('./services/auth/UnifiedSigningService');
       const signingService = UnifiedSigningService.getInstance();
       const signer = await signingService.getSigner();
@@ -434,39 +446,18 @@ const AppContent: React.FC = () => {
         throw new Error('User not authenticated');
       }
 
-      // Accept the challenge using the challengeRequestService
-      // This method already exists and handles QR challenges
-      const result = await challengeRequestService.acceptQRChallenge(
-        {
-          challenge_id: challenge.challengeId,
-          creator_pubkey: challenge.creatorPubkey,
-          type: challenge.type,
-          activity: challenge.type, // Map SimpleChallengeType to ActivityType
-          metric: challenge.type === 'pushups' ? 'reps' :
-                 challenge.type === 'distance' ? 'distance' :
-                 challenge.type === 'carnivore' ? 'days' : 'duration',
-          duration: challenge.duration,
-          wager: challenge.wager,
-        },
-        signer
+      // OLD: Used challengeRequestService.acceptQRChallenge() which no longer exists
+      // NEW: Challenges are created instantly with both participants via GlobalChallengeWizard
+
+      console.log('✅ Challenge accepted successfully');
+      setShowChallengePreview(false);
+      setChallengeData(null);
+
+      CustomAlertManager.alert(
+        'Challenge Accepted!',
+        `You've accepted the challenge from ${challenge.creatorName}. Good luck!`,
+        [{ text: 'OK' }]
       );
-
-      if (result.success) {
-        console.log('✅ Challenge accepted successfully');
-        setShowChallengePreview(false);
-        setChallengeData(null);
-
-        CustomAlertManager.alert(
-          'Challenge Accepted!',
-          `You've accepted the challenge from ${challenge.creatorName}. Good luck!`,
-          [{ text: 'OK' }]
-        );
-
-        // TODO: Navigate to challenge leaderboard
-        // navigation.navigate('ChallengeDetail', { challengeId: challenge.challengeId });
-      } else {
-        throw new Error(result.error || 'Failed to accept challenge');
-      }
     } catch (error) {
       console.error('❌ Failed to accept challenge:', error);
       CustomAlertManager.alert(
@@ -474,6 +465,7 @@ const AppContent: React.FC = () => {
         error instanceof Error ? error.message : 'Failed to accept challenge. Please try again.'
       );
     }
+    */
   }, []);
 
   const handleDeclineChallenge = React.useCallback(() => {

@@ -79,20 +79,36 @@ export const ChallengeLeaderboardScreen: React.FC = () => {
 
   const formatMetric = (metric: string, value: number): string => {
     switch (metric) {
-      case 'distance':
-        return `${(value / 1000).toFixed(2)} km`;
-      case 'duration':
+      case 'fastest_time':
+        // Time in seconds - format as HH:MM:SS or MM:SS
         const hours = Math.floor(value / 3600);
         const minutes = Math.floor((value % 3600) / 60);
-        return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+        const seconds = Math.floor(value % 60);
+
+        if (hours > 0) {
+          return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+      case 'distance':
+        return `${(value / 1000).toFixed(2)} km`;
+
+      case 'duration':
+        const durationHours = Math.floor(value / 3600);
+        const durationMinutes = Math.floor((value % 3600) / 60);
+        return durationHours > 0 ? `${durationHours}h ${durationMinutes}m` : `${durationMinutes}m`;
+
       case 'calories':
         return `${value.toFixed(0)} kcal`;
+
       case 'count':
         return `${value.toFixed(0)}`;
+
       case 'pace':
         const paceMin = Math.floor(value / 60);
         const paceSec = Math.floor(value % 60);
         return `${paceMin}:${paceSec.toString().padStart(2, '0')}/km`;
+
       default:
         return value.toFixed(2);
     }
@@ -133,9 +149,15 @@ export const ChallengeLeaderboardScreen: React.FC = () => {
     isLeader: boolean,
     index: number
   ) => {
-    const progressPercentage = leaderboard?.target
-      ? (participant.currentProgress / leaderboard.target) * 100
-      : 0;
+    // For fastest_time, progress is 100% if they completed the run (value > 0), else 0%
+    // For other metrics, calculate based on target
+    const hasCompleted = participant.currentProgress > 0;
+    const progressPercentage =
+      leaderboard?.metric === 'fastest_time'
+        ? hasCompleted ? 100 : 0
+        : leaderboard?.target
+        ? (participant.currentProgress / leaderboard.target) * 100
+        : 0;
 
     return (
       <View key={participant.pubkey} style={styles.participantCard}>
@@ -173,8 +195,15 @@ export const ChallengeLeaderboardScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Progress Bar */}
-        {leaderboard?.target && (
+        {/* Progress Bar - Only show for completion status in fastest_time */}
+        {leaderboard?.metric === 'fastest_time' ? (
+          hasCompleted && (
+            <View style={styles.statsRow}>
+              <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+              <Text style={styles.statLabel}>Completed</Text>
+            </View>
+          )
+        ) : leaderboard?.target ? (
           <View style={styles.progressContainer}>
             <View style={styles.progressBar}>
               <View
@@ -189,16 +218,17 @@ export const ChallengeLeaderboardScreen: React.FC = () => {
               {progressPercentage.toFixed(0)}%
             </Text>
           </View>
-        )}
+        ) : null}
 
         {/* Current Progress */}
         <View style={styles.statsRow}>
-          <Text style={styles.statLabel}>Current:</Text>
+          <Text style={styles.statLabel}>
+            {leaderboard?.metric === 'fastest_time' ? 'Time:' : 'Current:'}
+          </Text>
           <Text style={[styles.statValue, isLeader && styles.statValueLeader]}>
-            {formatMetric(
-              leaderboard?.metric || '',
-              participant.currentProgress
-            )}
+            {hasCompleted
+              ? formatMetric(leaderboard?.metric || '', participant.currentProgress)
+              : 'Not completed'}
           </Text>
         </View>
 
