@@ -18,6 +18,8 @@ import {
 import type { QREventData } from './QREventService';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { CustomAlertManager } from '../../components/ui/CustomAlert';
+import { CacheKeys } from '../../constants/cacheTTL';
+import unifiedCache from '../cache/UnifiedNostrCache';
 
 export interface EventJoinResult {
   success: boolean;
@@ -84,6 +86,11 @@ export class EventJoinService {
       console.log(
         `✅ Free event join request sent for: ${eventData.event_name}`
       );
+
+      // ✅ CRITICAL: Invalidate event join requests cache
+      await unifiedCache.invalidate(`event_join_requests_${eventData.event_id}`).catch((err) => {
+        console.warn('[EventJoinService] Cache invalidation failed (non-blocking):', err);
+      });
 
       alertVisible = true;
       CustomAlertManager.alert(
@@ -254,6 +261,11 @@ export class EventJoinService {
       await ndkEvent.publish();
 
       console.log(`✅ Paid join request sent for: ${eventData.event_name}`);
+
+      // ✅ CRITICAL: Invalidate event join requests cache
+      await unifiedCache.invalidate(`event_join_requests_${eventData.event_id}`).catch((err) => {
+        console.warn('[EventJoinService] Cache invalidation failed (non-blocking):', err);
+      });
 
       alertVisible = true;
       CustomAlertManager.alert(

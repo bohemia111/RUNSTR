@@ -7,6 +7,9 @@
 import NDK, { NDKEvent, NDKFilter, NDKSubscription } from '@nostr-dev-kit/ndk';
 import { NostrInitializationService } from '../nostr/NostrInitializationService';
 import { NostrListService } from '../nostr/NostrListService';
+import { CacheInvalidationService } from '../cache/CacheInvalidationService';
+import { CacheKeys } from '../../constants/cacheTTL';
+import unifiedCache from '../cache/UnifiedNostrCache';
 import type { JoinRequest } from '../../components/competition/JoinRequestCard';
 
 // Kind 1106: Challenge acceptance requests
@@ -166,6 +169,14 @@ export class JoinRequestService {
     console.log(
       `[JoinRequestService] Approved request from ${request.requesterPubkey}`
     );
+
+    // ✅ CRITICAL: Invalidate caches so approved member appears immediately
+    await CacheInvalidationService.invalidateTeamMembership(
+      request.requesterPubkey,
+      request.competitionId
+    ).catch((err) => {
+      console.warn('[JoinRequestService] Cache invalidation failed (non-blocking):', err);
+    });
   }
 
   /**
@@ -192,6 +203,11 @@ export class JoinRequestService {
     console.log(
       `[JoinRequestService] Rejected request from ${request.requesterPubkey}`
     );
+
+    // ✅ CRITICAL: Invalidate join requests cache so rejected request disappears
+    await unifiedCache.invalidate(CacheKeys.JOIN_REQUESTS(request.competitionId)).catch((err) => {
+      console.warn('[JoinRequestService] Cache invalidation failed (non-blocking):', err);
+    });
   }
 
   /**
