@@ -22,6 +22,7 @@ import { WorkoutPublishingService } from '../../services/nostr/workoutPublishing
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CalorieEstimationService from '../../services/fitness/CalorieEstimationService';
+import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { HealthProfile } from '../HealthProfileScreen';
 import type { Workout } from '../../types/workout';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
@@ -63,6 +64,8 @@ export const MeditationTrackerScreen: React.FC = () => {
   const [savedWorkout, setSavedWorkout] = useState<Workout | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [signer, setSigner] = useState<NDKSigner | null>(null);
+  const [userAvatar, setUserAvatar] = useState<string | undefined>(undefined);
+  const [userName, setUserName] = useState<string | undefined>(undefined);
 
   // Alert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -92,7 +95,17 @@ export const MeditationTrackerScreen: React.FC = () => {
     const loadUserAndSigner = async () => {
       try {
         const npub = await AsyncStorage.getItem('@runstr:npub');
-        if (npub) setUserId(npub);
+        if (npub) {
+          setUserId(npub);
+
+          // Load user's Nostr profile (avatar and name)
+          const nostrProfile = await nostrProfileService.getProfile(npub);
+          if (nostrProfile) {
+            setUserAvatar(nostrProfile.picture);
+            setUserName(nostrProfile.display_name || nostrProfile.name);
+            console.log('[MeditationTracker] ✅ User profile loaded for social cards');
+          }
+        }
 
         const userSigner = await UnifiedSigningService.getInstance().getSigner();
         if (userSigner) setSigner(userSigner);
@@ -180,8 +193,7 @@ export const MeditationTrackerScreen: React.FC = () => {
         'Meditation';
 
       // Estimate calories using CalorieEstimationService
-      const calorieService = CalorieEstimationService.getInstance();
-      const calories = calorieService.estimateMeditationCalories(
+      const calories = CalorieEstimationService.estimateMeditationCalories(
         elapsedSeconds,
         userWeight
       );
@@ -208,16 +220,22 @@ export const MeditationTrackerScreen: React.FC = () => {
         )}, ${calories} cal`
       );
 
-      // Retrieve the saved workout from storage
-      const allWorkouts = await LocalWorkoutStorageService.getAllWorkouts();
-      const workout = allWorkouts.find((w) => w.id === workoutId);
+      // Create workout object directly from data we already have (like Running does)
+      // This avoids AsyncStorage timing issues when retrieving immediately after save
+      const workout: Workout = {
+        id: workoutId,
+        userId: userId || 'unknown',
+        type: 'meditation',
+        source: 'manual_entry' as const,
+        startTime: new Date(Date.now() - elapsedSeconds * 1000).toISOString(),
+        endTime: new Date().toISOString(),
+        duration: elapsedSeconds,
+        calories,
+        syncedAt: new Date().toISOString(),
+      };
 
-      if (workout) {
-        setSavedWorkout(workout as any);
-        return workout as any;
-      }
-
-      throw new Error('Failed to retrieve saved workout');
+      setSavedWorkout(workout);
+      return workout;
     } catch (error) {
       console.error('❌ Failed to save meditation session:', error);
       throw error;
@@ -255,7 +273,7 @@ export const MeditationTrackerScreen: React.FC = () => {
         setAlertConfig({
           title: 'Success!',
           message: 'Your meditation session has been saved to Nostr!',
-          buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
+          buttons: [{ text: 'OK', style: 'default' }],
         });
         setAlertVisible(true);
       } else {
@@ -492,6 +510,8 @@ export const MeditationTrackerScreen: React.FC = () => {
           visible={showShareModal}
           workout={savedWorkout}
           userId={userId}
+          userAvatar={userAvatar}
+          userName={userName}
           onClose={() => setShowShareModal(false)}
           onSuccess={() => {
             setAlertConfig({

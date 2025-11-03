@@ -18,6 +18,7 @@ import { locationPermissionService } from '../services/activity/LocationPermissi
 import unifiedCache from '../services/cache/UnifiedNostrCache';
 import { CacheKeys } from '../constants/cacheTTL';
 import type { User } from '../types';
+import { PerformanceLogger } from '../utils/PerformanceLogger';
 
 // Authentication state interface
 interface AuthState {
@@ -88,7 +89,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { hexPubkey } = identifiers;
 
         // ✅ ANDROID FIX: Initialize cache (now non-blocking with lazy loading)
+        PerformanceLogger.start('AuthContext: unifiedCache.initialize()');
         await unifiedCache.initialize();
+        PerformanceLogger.end('AuthContext: unifiedCache.initialize()');
 
         // ✅ PROFILE CACHE FIX: Try memory cache first (instant)
         let cachedUser = unifiedCache.getCached<User>(
@@ -99,10 +102,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (!cachedUser) {
           console.log('⚡ AuthContext: Memory cache miss, checking AsyncStorage...');
           try {
+            PerformanceLogger.start('AuthContext: getCachedAsync (AsyncStorage read)', 1);
             cachedUser = await Promise.race([
               unifiedCache.getCachedAsync<User>(CacheKeys.USER_PROFILE(hexPubkey)),
               new Promise<null>((resolve) => setTimeout(() => resolve(null), 300))
             ]);
+            PerformanceLogger.end('AuthContext: getCachedAsync (AsyncStorage read)');
             if (cachedUser) {
               console.log('✅ AuthContext: Loaded user from AsyncStorage');
             }

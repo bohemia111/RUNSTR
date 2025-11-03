@@ -51,6 +51,7 @@ export interface PublishableWorkout extends Workout {
   // Diet/Fasting-specific fields
   mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   mealTime?: string;
+  mealSize?: 'small' | 'medium' | 'large' | 'xl';
   fastingDuration?: number;
   // Strength training-specific fields
   exerciseType?: string;
@@ -424,6 +425,11 @@ export class WorkoutPublishingService {
       tags.push(['reps', workout.reps.toString()]);
     }
 
+    // Add weight for strength training workouts (non-breaking - optional field)
+    if (workout.weight && workout.weight > 0) {
+      tags.push(['weight', workout.weight.toString(), 'lbs']);
+    }
+
     // Add meditation subtype for meditation workouts
     if (workout.meditationType) {
       tags.push(['meditation_type', workout.meditationType]);
@@ -432,6 +438,11 @@ export class WorkoutPublishingService {
     // Add meal type for diet/nutrition workouts
     if (workout.mealType) {
       tags.push(['meal_type', workout.mealType]);
+    }
+
+    // Add meal size for diet/nutrition workouts (non-breaking - optional field)
+    if (workout.mealSize) {
+      tags.push(['meal_size', workout.mealSize]);
     }
 
     // Add exercise type for strength training workouts

@@ -145,6 +145,11 @@ export class Nuclear1301Service {
           let duration = 0;
           let distance = 0;
           let calories = 0;
+          let sets = 0;
+          let reps = 0;
+          let weight = 0;
+          let mealType: string | undefined;
+          let mealSize: string | undefined;
 
           // Parse tags with support for both runstr and other formats
           for (const tag of tags) {
@@ -193,6 +198,28 @@ export class Nuclear1301Service {
             if (tag[0] === 'calories' && tag[1])
               calories = parseInt(tag[1]) || 0;
 
+            // Sets (for strength training)
+            if (tag[0] === 'sets' && tag[1]) sets = parseInt(tag[1]) || 0;
+
+            // Reps (for strength training)
+            if (tag[0] === 'reps' && tag[1]) reps = parseInt(tag[1]) || 0;
+
+            // Weight (for strength training, optional unit tag[2])
+            if (tag[0] === 'weight' && tag[1]) {
+              weight = parseFloat(tag[1]) || 0;
+              // Note: Unit is in tag[2] but we'll default to lbs
+            }
+
+            // Meal type (for diet workouts)
+            if (tag[0] === 'meal_type' && tag[1]) {
+              mealType = tag[1];
+            }
+
+            // Meal size (for diet workouts)
+            if (tag[0] === 'meal_size' && tag[1]) {
+              mealSize = tag[1];
+            }
+
             // Source identification (to identify RUNSTR posts)
             if (tag[0] === 'source' && tag[1] === 'RUNSTR') {
               // This is a RUNSTR-generated workout
@@ -212,6 +239,11 @@ export class Nuclear1301Service {
             duration: duration, // Duration in seconds
             distance: distance, // Distance in meters
             calories: calories,
+            sets: sets > 0 ? sets : undefined, // Strength training
+            reps: reps > 0 ? reps : undefined, // Strength training
+            weight: weight > 0 ? weight : undefined, // Strength training
+            mealType: mealType as any, // Diet tracking
+            mealSize: mealSize as any, // Diet tracking
             source: 'nostr',
             nostrEventId: event.id,
             nostrPubkey: event.pubkey,
@@ -348,6 +380,11 @@ export class Nuclear1301Service {
           const durationTag = tags.find((tag: any[]) => tag[0] === 'duration');
           const caloriesTag = tags.find((tag: any[]) => tag[0] === 'calories');
           const titleTag = tags.find((tag: any[]) => tag[0] === 'title');
+          const setsTag = tags.find((tag: any[]) => tag[0] === 'sets');
+          const repsTag = tags.find((tag: any[]) => tag[0] === 'reps');
+          const weightTag = tags.find((tag: any[]) => tag[0] === 'weight');
+          const mealTypeTag = tags.find((tag: any[]) => tag[0] === 'meal_type');
+          const mealSizeTag = tags.find((tag: any[]) => tag[0] === 'meal_size');
 
           const workout: NostrWorkout = {
             id: event.id,
@@ -358,6 +395,11 @@ export class Nuclear1301Service {
             duration: durationTag ? parseInt(durationTag[1]) : 0,
             distance: distanceTag ? parseFloat(distanceTag[1]) : 0,
             calories: caloriesTag ? parseInt(caloriesTag[1]) : 0,
+            sets: setsTag ? parseInt(setsTag[1]) : undefined, // Strength training
+            reps: repsTag ? parseInt(repsTag[1]) : undefined, // Strength training
+            weight: weightTag ? parseFloat(weightTag[1]) : undefined, // Strength training
+            mealType: mealTypeTag?.[1] as any, // Diet tracking
+            mealSize: mealSizeTag?.[1] as any, // Diet tracking
             source: 'nostr',
             nostrEventId: event.id,
             nostrPubkey: event.pubkey,

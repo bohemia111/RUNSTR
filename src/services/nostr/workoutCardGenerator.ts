@@ -996,19 +996,51 @@ export class WorkoutCardGenerator {
       });
     }
 
-    // Strength training: Show sets and reps
+    // Strength training: Show per-set breakdown or summary
     if (['strength_training', 'gym'].includes(workout.type)) {
-      if (workout.sets) {
-        stats.push({
-          value: workout.sets.toString(),
-          label: 'Sets',
-        });
-      }
-      if (workout.reps) {
-        stats.push({
-          value: workout.reps.toString(),
-          label: 'Reps',
-        });
+      // If we have per-set weight data, show detailed breakdown
+      if (workout.weightsPerSet && workout.weightsPerSet.length > 0) {
+        // Get reps breakdown from metadata if available
+        const repsBreakdown = (workout.metadata as any)?.repsBreakdown as number[] | undefined;
+
+        // Show first 3 sets (to avoid overcrowding the card)
+        const setsToShow = Math.min(3, workout.weightsPerSet.length);
+        for (let i = 0; i < setsToShow; i++) {
+          const reps = repsBreakdown?.[i] || 0;
+          const weight = workout.weightsPerSet[i];
+          stats.push({
+            value: `${reps} @ ${weight} lbs`,
+            label: `Set ${i + 1}`,
+          });
+        }
+
+        // If more than 3 sets, show "..." indicator
+        if (workout.weightsPerSet.length > 3) {
+          stats.push({
+            value: `+${workout.weightsPerSet.length - 3} more`,
+            label: 'Sets',
+          });
+        }
+      } else {
+        // Fallback: Show summary stats (sets, reps, weight)
+        if (workout.sets) {
+          stats.push({
+            value: workout.sets.toString(),
+            label: 'Sets',
+          });
+        }
+        if (workout.reps) {
+          stats.push({
+            value: workout.reps.toString(),
+            label: 'Reps',
+          });
+        }
+        if (workout.weight && workout.weight > 0) {
+          stats.push({
+            value: `${workout.weight} lbs`,
+            label: 'Avg Weight',
+          });
+        }
       }
     }
 
@@ -1019,6 +1051,41 @@ export class WorkoutCardGenerator {
         value: steps.toLocaleString(),
         label: 'Steps',
       });
+    }
+
+    // Diet: Show meal type and meal size
+    if (workout.type === 'diet') {
+      if (workout.mealType) {
+        // Capitalize first letter
+        const mealTypeFormatted = workout.mealType.charAt(0).toUpperCase() + workout.mealType.slice(1);
+        stats.push({
+          value: mealTypeFormatted,
+          label: 'Meal',
+        });
+      }
+      if (workout.mealSize) {
+        // Capitalize first letter
+        const mealSizeFormatted = workout.mealSize.charAt(0).toUpperCase() + workout.mealSize.slice(1);
+        stats.push({
+          value: mealSizeFormatted,
+          label: 'Portion',
+        });
+      }
+    }
+
+    // Meditation: Show meditation type
+    if (workout.type === 'meditation') {
+      if (workout.meditationType) {
+        // Format meditation type nicely (e.g., "body_scan" → "Body Scan")
+        const typeFormatted = workout.meditationType
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        stats.push({
+          value: typeFormatted,
+          label: 'Type',
+        });
+      }
     }
 
     return stats;

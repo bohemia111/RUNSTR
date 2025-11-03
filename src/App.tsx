@@ -104,6 +104,7 @@ import { appInitializationService } from './services/initialization/AppInitializ
 import { theme } from './styles/theme';
 import unifiedCache from './services/cache/UnifiedNostrCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PerformanceLogger } from './utils/PerformanceLogger';
 import { challengeCompletionService } from './services/challenge/ChallengeCompletionService';
 import { appPermissionService } from './services/initialization/AppPermissionService';
 import { PermissionRequestModal } from './components/permissions/PermissionRequestModal';
@@ -191,7 +192,10 @@ const AppContent: React.FC = () => {
       if (isAuthenticated) {
         // ✅ FIX: Check AsyncStorage synchronously for cached keys instead of waiting for hydration
         // This prevents race conditions where cache hydration hasn't finished yet
+        PerformanceLogger.start('App.tsx: AsyncStorage.getAllKeys()');
         const keys = await AsyncStorage.getAllKeys();
+        PerformanceLogger.end('App.tsx: AsyncStorage.getAllKeys()');
+
         const hasCachedData = keys.some((key) =>
           key.startsWith('@runstr:unified_cache:')
         );

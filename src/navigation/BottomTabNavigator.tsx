@@ -16,6 +16,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
+import { PerformanceLogger } from '../utils/PerformanceLogger';
 
 // ✅ PERFORMANCE: Lazy load all tab screens (runstr-github pattern)
 const ProfileScreen = React.lazy(() =>
@@ -90,6 +91,15 @@ export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
 
   // Create navigation handlers
   const handlers = createNavigationHandlers();
+
+  // ✅ PERFORMANCE: Log total blocking time when app is interactive
+  React.useEffect(() => {
+    if (!isLoading && profileData) {
+      console.log('\n🎯 APP IS INTERACTIVE - Performance Summary:');
+      PerformanceLogger.summary();
+      console.log('\n');
+    }
+  }, [isLoading, profileData]);
 
   return (
     <Tab.Navigator

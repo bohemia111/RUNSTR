@@ -11,6 +11,7 @@ import React, {
   useCallback,
   ReactNode,
 } from 'react';
+import { InteractionManager } from 'react-native';
 import { AuthService } from '../services/auth/authService';
 import { getNostrTeamService } from '../services/nostr/NostrTeamService';
 import { DirectNostrProfileService } from '../services/user/directNostrProfileService';
@@ -21,6 +22,7 @@ import { getUserNostrIdentifiers } from '../utils/nostr';
 import { useAuth } from './AuthContext';
 import unifiedCache from '../services/cache/UnifiedNostrCache';
 import { CacheKeys, CacheTTL } from '../constants/cacheTTL';
+import { PerformanceLogger } from '../utils/PerformanceLogger';
 import type {
   TeamScreenData,
   ProfileScreenData,
@@ -215,12 +217,14 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
    * OPTIMIZED: Uses stale-while-revalidate for instant returns
    */
   const getAllUserTeams = async (user: UserWithWallet): Promise<any[]> => {
+    PerformanceLogger.start('NavigationDataContext: getAllUserTeams()');
     setIsLoadingTeam(true);
     try {
       const userIdentifiers = await getUserNostrIdentifiers();
       if (!userIdentifiers) {
         console.log('No user identifiers found for team detection');
         setIsLoadingTeam(false);
+        PerformanceLogger.end('NavigationDataContext: getAllUserTeams()');
         return [];
       }
 
@@ -231,16 +235,27 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
         async () => {
           // Fetcher - builds user teams from memberships + discovered teams
           const membershipService = TeamMembershipService.getInstance();
+
+          PerformanceLogger.start('  └─ getLocalMemberships()', 1);
           const localMemberships = await membershipService.getLocalMemberships(
             hexPubkey
           );
+          PerformanceLogger.end('  └─ getLocalMemberships()');
 
           const teamService = getNostrTeamService();
           let discoveredTeams = teamService.getDiscoveredTeams();
 
           // Ensure discovered teams exist
           if (discoveredTeams.size === 0) {
-            await teamService.discoverFitnessTeams();
+            PerformanceLogger.start('  └─ discoverFitnessTeams() [NOSTR QUERY]', 1);
+            // ✅ PERFORMANCE FIX: Move blocking Nostr query off main thread
+            await new Promise<void>((resolve) => {
+              InteractionManager.runAfterInteractions(async () => {
+                await teamService.discoverFitnessTeams();
+                PerformanceLogger.end('  └─ discoverFitnessTeams() [NOSTR QUERY]');
+                resolve();
+              });
+            });
             discoveredTeams = teamService.getDiscoveredTeams();
           }
 
@@ -248,7 +263,9 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
           const userTeams: any[] = [];
 
           // 1. Get teams where user is captain
+          PerformanceLogger.start('  └─ getCaptainTeams()', 1);
           const captainTeams = await CaptainCache.getCaptainTeams();
+          PerformanceLogger.end('  └─ getCaptainTeams()');
           console.log(`Found ${captainTeams.length} captain teams in cache`);
 
           for (const teamId of captainTeams) {
@@ -326,10 +343,12 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
         } teams (with background refresh)`
       );
       setIsLoadingTeam(false);
+      PerformanceLogger.end('NavigationDataContext: getAllUserTeams()');
       return teams || [];
     } catch (error) {
       console.error('Error getting all user teams:', error);
       setIsLoadingTeam(false);
+      PerformanceLogger.end('NavigationDataContext: getAllUserTeams()');
       return [];
     } finally {
       setIsLoadingTeam(false);
@@ -352,6 +371,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
   };
 
   const fetchProfileData = async (user: UserWithWallet): Promise<void> => {
+    PerformanceLogger.start('NavigationDataContext: fetchProfileData()');
     try {
       let realWalletBalance = user.walletBalance || 0;
       let currentTeam = undefined;
@@ -451,8 +471,10 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
       };
 
       setProfileData(profileData);
+      PerformanceLogger.end('NavigationDataContext: fetchProfileData()');
     } catch (error) {
       console.error('Error creating profile data:', error);
+      PerformanceLogger.end('NavigationDataContext: fetchProfileData()');
     }
   };
 

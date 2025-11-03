@@ -6,6 +6,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9] - 2025-11-03
+
+### Added
+- **Per-Set Weight Tracking** - Strength training now tracks weight for each individual set
+  - `StrengthTrackerScreen.tsx`: +260 lines with per-set weight tracking
+  - Weight input modal allows entering weight for each set
+  - Pre-fills with previous set's weight or setup weight for convenience
+  - Stores per-set weights in workout metadata
+
+- **Enhanced Workout Card Stats** - Smarter stat display based on workout type
+  - `workoutCardGenerator.ts`: +91 lines with improved stat generation
+  - **Strength workouts**: Per-set breakdown showing "X reps @ Y lbs" for first 3 sets
+  - **Diet workouts**: Meal type and portion size display
+  - **Meditation workouts**: Meditation type display (e.g., "Guided", "Breathwork")
+  - Shows "+N more sets" indicator when more than 3 sets
+
+- **PerformanceLogger Utility** - New performance monitoring tool
+  - `PerformanceLogger.ts`: Track and log performance metrics
+  - Helps identify bottlenecks and optimization opportunities
+
+### Improved
+- **Social Sharing Enhancements** - Better user profile integration
+  - All activity trackers now load user avatar and name for social cards
+  - StrengthTrackerScreen, MeditationTrackerScreen, DietTrackerScreen updated
+  - Richer social cards with user identity
+
+- **Nuclear1301Service** - Enhanced workout publishing
+  - `Nuclear1301Service.ts`: +42 lines of improvements
+  - Better workout data processing and validation
+  - Improved error handling
+
+- **Workout Publishing Service** - Better publishing flow
+  - `workoutPublishingService.ts`: +11 lines of enhancements
+  - More reliable workout posting to Nostr
+
+- **Navigation & Context** - Performance and data flow improvements
+  - `NavigationDataContext.tsx`: +24 lines with better data management
+  - `BottomTabNavigator.tsx`: +10 lines of optimizations
+  - `AuthContext.tsx`: +5 lines with auth flow improvements
+  - `App.tsx`: +4 lines of initialization improvements
+
+### Fixed
+- **Replaced React Native Alert** - Better UX across activity trackers
+  - Replaced native Alert with CustomAlert component
+  - Consistent alert styling and behavior
+  - Better integration with app theme
+
+- **Weight Tracking Workflow** - Improved strength training UX
+  - Weight defaults to previous set's weight for faster entry
+  - Better validation and error handling
+  - Clearer labels ("Avg Weight" vs per-set weights)
+
+### Technical Changes
+- **Workout Type Support** - Enhanced type system
+  - `workout.ts`: +2 lines with new workout type fields
+  - Support for per-set weights, meal types, meditation types
+
+- **Statistics**
+  - 12 files modified (11 updated, 1 new file)
+  - 435 insertions, 80 deletions (net +355 lines)
+  - Major additions: StrengthTracker (+260 lines), workoutCardGenerator (+91 lines), Nuclear1301Service (+42 lines)
+
 ## [0.5.8] - 2025-11-02
 
 ### Added

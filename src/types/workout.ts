@@ -48,6 +48,8 @@ export interface Workout {
   // Strength training fields
   sets?: number;
   reps?: number;
+  weight?: number; // Average weight in lbs (for single-weight workouts or average of per-set weights)
+  weightsPerSet?: number[]; // Weight per set in lbs (for varying weights across sets)
   // Weather context
   weather?: {
     temp: number; // Temperature in Celsius

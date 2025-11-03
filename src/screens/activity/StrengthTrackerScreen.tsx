@@ -12,17 +12,18 @@ import {
   TextInput,
   ScrollView,
   Modal,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../../styles/theme';
+import { CustomAlert } from '../../components/ui/CustomAlert';
 import LocalWorkoutStorageService from '../../services/fitness/LocalWorkoutStorageService';
 import { WorkoutPublishingService } from '../../services/nostr/workoutPublishingService';
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import CalorieEstimationService from '../../services/fitness/CalorieEstimationService';
 import { EnhancedSocialShareModal } from '../../components/profile/shared/EnhancedSocialShareModal';
+import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { HealthProfile } from '../HealthProfileScreen';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import type { LocalWorkout } from '../../services/fitness/LocalWorkoutStorageService';
@@ -58,6 +59,8 @@ export const StrengthTrackerScreen: React.FC = () => {
   const [signer, setSigner] = useState<NDKSigner | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [userWeight, setUserWeight] = useState<number | undefined>(undefined);
+  const [userAvatar, setUserAvatar] = useState<string | undefined>(undefined);
+  const [userName, setUserName] = useState<string | undefined>(undefined);
 
   // Setup state
   const [selectedExercise, setSelectedExercise] =
@@ -71,6 +74,7 @@ export const StrengthTrackerScreen: React.FC = () => {
   const [phase, setPhase] = useState<WorkoutPhase>('setup');
   const [currentSet, setCurrentSet] = useState(1);
   const [repsCompleted, setRepsCompleted] = useState<number[]>([]);
+  const [weightsCompleted, setWeightsCompleted] = useState<number[]>([]); // Track weight per set
   const [restTimeRemaining, setRestTimeRemaining] = useState(0);
   const [workoutStartTime, setWorkoutStartTime] = useState(0);
   const [workoutDuration, setWorkoutDuration] = useState(0);
@@ -81,7 +85,24 @@ export const StrengthTrackerScreen: React.FC = () => {
   // Modal state
   const [showRepsModal, setShowRepsModal] = useState(false);
   const [currentRepsInput, setCurrentRepsInput] = useState('');
+  const [currentWeightInput, setCurrentWeightInput] = useState(''); // Weight input for current set
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Alert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    message: string;
+    buttons: Array<{
+      text: string;
+      onPress?: () => void;
+      style?: 'default' | 'cancel' | 'destructive';
+    }>;
+  }>({
+    title: '',
+    message: '',
+    buttons: [],
+  });
 
   // Timer refs
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -90,13 +111,14 @@ export const StrengthTrackerScreen: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Load signer
-        const userSigner = await UnifiedSigningService.getInstance().getSigner();
-        const userPubkey = await UnifiedSigningService.getHexPubkey();
+        // Load signer and user ID
+        const signingService = UnifiedSigningService.getInstance();
+        const userSigner = await signingService.getSigner();
+        const userPubkey = await signingService.getUserPubkey();
         if (userSigner && userPubkey) {
           setSigner(userSigner);
           setUserId(userPubkey);
-          console.log('[StrengthTracker] ✅ User signer loaded for posting');
+          console.log('[StrengthTracker] ✅ User signer and pubkey loaded for posting');
         }
 
         // Load health profile for calorie estimation
@@ -106,6 +128,16 @@ export const StrengthTrackerScreen: React.FC = () => {
           if (profile.weight) {
             setUserWeight(profile.weight);
             console.log('[StrengthTracker] ✅ User weight loaded:', profile.weight);
+          }
+        }
+
+        // Load user's Nostr profile (avatar and name)
+        if (userPubkey) {
+          const nostrProfile = await nostrProfileService.getProfile(userPubkey);
+          if (nostrProfile) {
+            setUserAvatar(nostrProfile.picture);
+            setUserName(nostrProfile.display_name || nostrProfile.name);
+            console.log('[StrengthTracker] ✅ User profile loaded for social cards');
           }
         }
       } catch (error) {
@@ -145,20 +177,30 @@ export const StrengthTrackerScreen: React.FC = () => {
     setPhase('active');
     setCurrentSet(1);
     setRepsCompleted([]);
+    setWeightsCompleted([]); // Reset weights
     setWorkoutStartTime(Date.now());
   };
 
   const handleSetComplete = () => {
     setCurrentRepsInput(targetReps.toString());
+    // Pre-fill weight with either exerciseWeight (setup value) or last set's weight
+    const defaultWeight = weightsCompleted.length > 0
+      ? weightsCompleted[weightsCompleted.length - 1].toString()
+      : exerciseWeight > 0 ? exerciseWeight.toString() : '0';
+    setCurrentWeightInput(defaultWeight);
     setShowRepsModal(true);
   };
 
   const confirmReps = async () => {
     const reps = parseInt(currentRepsInput) || 0;
+    const weight = parseInt(currentWeightInput) || 0;
     const newReps = [...repsCompleted, reps];
+    const newWeights = [...weightsCompleted, weight];
     setRepsCompleted(newReps);
+    setWeightsCompleted(newWeights);
     setShowRepsModal(false);
     setCurrentRepsInput('');
+    setCurrentWeightInput('');
 
     // Check if workout is complete
     if (currentSet >= totalSets) {
@@ -166,7 +208,7 @@ export const StrengthTrackerScreen: React.FC = () => {
       setWorkoutDuration(duration);
 
       // AUTO-SAVE: Save workout to local storage immediately
-      await saveWorkoutToLocal(newReps, duration);
+      await saveWorkoutToLocal(newReps, newWeights, duration);
 
       setPhase('summary');
     } else {
@@ -182,6 +224,7 @@ export const StrengthTrackerScreen: React.FC = () => {
    */
   const saveWorkoutToLocal = async (
     completedReps: number[],
+    completedWeights: number[],
     duration: number
   ): Promise<string | null> => {
     try {
@@ -190,13 +233,21 @@ export const StrengthTrackerScreen: React.FC = () => {
         EXERCISE_OPTIONS.find((e) => e.value === selectedExercise)?.label ||
         'Strength Training';
 
+      // Build per-set breakdown with reps AND weights
       const repsBreakdown = completedReps
-        .map((r, i) => `Set ${i + 1}: ${r}`)
+        .map((r, i) => {
+          const weight = completedWeights[i] || 0;
+          return weight > 0 ? `Set ${i + 1}: ${r} @ ${weight} lbs` : `Set ${i + 1}: ${r}`;
+        })
         .join(', ');
 
+      // Calculate average weight if weights were tracked
+      const averageWeight = completedWeights.length > 0
+        ? Math.round(completedWeights.reduce((a, b) => a + b, 0) / completedWeights.length)
+        : undefined;
+
       // Estimate calories using CalorieEstimationService
-      const calorieService = CalorieEstimationService.getInstance();
-      const calories = calorieService.estimateStrengthCalories(
+      const calories = CalorieEstimationService.estimateStrengthCalories(
         totalReps,
         totalSets,
         duration,
@@ -210,13 +261,14 @@ export const StrengthTrackerScreen: React.FC = () => {
         duration: duration, // Duration in seconds (LocalWorkout interface expects seconds)
         reps: totalReps,
         sets: totalSets,
-        notes: `${exerciseLabel} - ${repsBreakdown}${exerciseWeight > 0 ? ` @ ${exerciseWeight} lbs` : ''}`,
+        notes: `${exerciseLabel} - ${repsBreakdown}`,
         calories, // Add calorie estimation
         // Exercise-specific fields for better display and Nostr publishing
         exerciseType: selectedExercise,
         repsBreakdown: completedReps,
         restTime: restDuration,
-        weight: exerciseWeight > 0 ? exerciseWeight : undefined, // Only include if weight was set
+        weight: averageWeight, // Average weight across all sets
+        weightsPerSet: completedWeights, // Individual weights per set
       });
 
       console.log(
@@ -225,12 +277,25 @@ export const StrengthTrackerScreen: React.FC = () => {
 
       setSavedWorkoutId(workoutId);
 
-      // Retrieve the saved workout for modal display
-      const allWorkouts = await LocalWorkoutStorageService.getAllWorkouts();
-      const workout = allWorkouts.find((w) => w.id === workoutId);
-      if (workout) {
-        setSavedWorkout(workout as any);
-      }
+      // Create workout object directly from data we already have (like Running does)
+      // This avoids AsyncStorage timing issues when retrieving immediately after save
+      const workout: Workout = {
+        id: workoutId,
+        userId: userId || 'unknown',
+        type: 'strength_training',
+        source: 'manual_entry' as const,
+        startTime: new Date(Date.now() - duration * 1000).toISOString(),
+        endTime: new Date().toISOString(),
+        duration,
+        calories,
+        reps: totalReps,
+        sets: totalSets,
+        weight: averageWeight, // Average weight across all sets
+        weightsPerSet: completedWeights, // Individual weights per set
+        syncedAt: new Date().toISOString(),
+      };
+
+      setSavedWorkout(workout);
 
       return workoutId;
     } catch (error) {
@@ -244,12 +309,22 @@ export const StrengthTrackerScreen: React.FC = () => {
    */
   const handlePostNostr = async () => {
     if (!savedWorkoutId) {
-      Alert.alert('Error', 'No workout to post. Please complete a workout first.');
+      setAlertConfig({
+        title: 'Error',
+        message: 'No workout to post. Please complete a workout first.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
       return;
     }
 
     if (!signer || !userId) {
-      Alert.alert('Error', 'Authentication required. Please log in again.');
+      setAlertConfig({
+        title: 'Error',
+        message: 'Authentication required. Please log in again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
       return;
     }
 
@@ -259,7 +334,12 @@ export const StrengthTrackerScreen: React.FC = () => {
       const workout = workouts.find((w) => w.id === savedWorkoutId);
 
       if (!workout) {
-        Alert.alert('Error', 'Workout not found.');
+        setAlertConfig({
+          title: 'Error',
+          message: 'Workout not found.',
+          buttons: [{ text: 'OK', style: 'default' }],
+        });
+        setAlertVisible(true);
         return;
       }
 
@@ -284,21 +364,23 @@ export const StrengthTrackerScreen: React.FC = () => {
         // Mark workout as synced
         await LocalWorkoutStorageService.markAsSynced(workout.id, result.eventId);
 
-        Alert.alert('Success', 'Workout saved to Nostr!', [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate back to profile after posting
-              navigation.navigate('Profile' as any);
-            },
-          },
-        ]);
+        setAlertConfig({
+          title: 'Success',
+          message: 'Workout saved to Nostr!',
+          buttons: [{ text: 'OK', style: 'default' }],
+        });
+        setAlertVisible(true);
       } else {
         throw new Error(result.error || 'Failed to publish workout');
       }
     } catch (error) {
       console.error('[StrengthTracker] ❌ Post to Nostr (1301) failed:', error);
-      Alert.alert('Error', 'Failed to post workout. Please try again.');
+      setAlertConfig({
+        title: 'Error',
+        message: 'Failed to post workout. Please try again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
     }
   };
 
@@ -307,7 +389,12 @@ export const StrengthTrackerScreen: React.FC = () => {
    */
   const handlePostSocial = () => {
     if (!savedWorkout) {
-      Alert.alert('Error', 'No workout to post. Please complete a workout first.');
+      setAlertConfig({
+        title: 'Error',
+        message: 'No workout to post. Please complete a workout first.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
       return;
     }
 
@@ -464,6 +551,15 @@ export const StrengthTrackerScreen: React.FC = () => {
         <TouchableOpacity style={styles.startButton} onPress={startWorkout}>
           <Text style={styles.startButtonText}>Start Workout</Text>
         </TouchableOpacity>
+
+        {/* Custom Alert */}
+        <CustomAlert
+          visible={alertVisible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          buttons={alertConfig.buttons}
+          onClose={() => setAlertVisible(false)}
+        />
       </ScrollView>
     );
   }
@@ -506,11 +602,13 @@ export const StrengthTrackerScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Reps Input Modal */}
+        {/* Reps & Weight Input Modal */}
         <Modal visible={showRepsModal} animationType="fade" transparent>
           <View style={styles.modalOverlay}>
             <View style={styles.repsModalContainer}>
-              <Text style={styles.repsModalTitle}>How many reps?</Text>
+              <Text style={styles.repsModalTitle}>Set {currentSet} Complete</Text>
+
+              <Text style={styles.inputLabel}>Reps</Text>
               <TextInput
                 style={styles.repsInput}
                 value={currentRepsInput}
@@ -518,16 +616,39 @@ export const StrengthTrackerScreen: React.FC = () => {
                 keyboardType="number-pad"
                 autoFocus
                 selectTextOnFocus
+                placeholder="Enter reps"
+                placeholderTextColor={theme.colors.textMuted}
               />
+
+              <Text style={styles.inputLabel}>Weight (lbs)</Text>
+              <TextInput
+                style={styles.repsInput}
+                value={currentWeightInput}
+                onChangeText={setCurrentWeightInput}
+                keyboardType="number-pad"
+                selectTextOnFocus
+                placeholder="Enter weight"
+                placeholderTextColor={theme.colors.textMuted}
+              />
+
               <TouchableOpacity
                 style={styles.confirmButton}
                 onPress={confirmReps}
               >
-                <Text style={styles.confirmButtonText}>Confirm</Text>
+                <Text style={styles.confirmButtonText}>Save Set</Text>
               </TouchableOpacity>
             </View>
           </View>
         </Modal>
+
+        {/* Custom Alert */}
+        <CustomAlert
+          visible={alertVisible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          buttons={alertConfig.buttons}
+          onClose={() => setAlertVisible(false)}
+        />
       </View>
     );
   }
@@ -560,6 +681,15 @@ export const StrengthTrackerScreen: React.FC = () => {
             <Text style={styles.skipButtonText}>Skip Rest</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Custom Alert */}
+        <CustomAlert
+          visible={alertVisible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          buttons={alertConfig.buttons}
+          onClose={() => setAlertVisible(false)}
+        />
       </View>
     );
   }
@@ -622,12 +752,17 @@ export const StrengthTrackerScreen: React.FC = () => {
 
           <View style={styles.breakdownSection}>
             <Text style={styles.breakdownTitle}>Breakdown</Text>
-            {repsCompleted.map((reps, index) => (
-              <View key={index} style={styles.breakdownRow}>
-                <Text style={styles.breakdownSet}>Set {index + 1}</Text>
-                <Text style={styles.breakdownReps}>{reps} reps</Text>
-              </View>
-            ))}
+            {repsCompleted.map((reps, index) => {
+              const weight = weightsCompleted[index];
+              return (
+                <View key={index} style={styles.breakdownRow}>
+                  <Text style={styles.breakdownSet}>Set {index + 1}</Text>
+                  <Text style={styles.breakdownReps}>
+                    {reps} reps{weight > 0 ? ` @ ${weight} lbs` : ''}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -680,21 +815,38 @@ export const StrengthTrackerScreen: React.FC = () => {
             visible={showShareModal}
             workout={savedWorkout}
             userId={userId}
+            userAvatar={userAvatar}
+            userName={userName}
             onClose={() => setShowShareModal(false)}
             onSuccess={() => {
-              Alert.alert('Success', 'Your workout has been shared to Nostr with a beautiful card!', [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    setShowShareModal(false);
-                    // Navigate back to profile after posting
-                    navigation.navigate('Profile' as any);
+              setAlertConfig({
+                title: 'Success',
+                message: 'Your workout has been shared to Nostr with a beautiful card!',
+                buttons: [
+                  {
+                    text: 'OK',
+                    style: 'default',
+                    onPress: () => {
+                      setShowShareModal(false);
+                      // Navigate back to profile after posting
+                      navigation.navigate('Profile' as any);
+                    },
                   },
-                },
-              ]);
+                ],
+              });
+              setAlertVisible(true);
             }}
           />
         )}
+
+        {/* Custom Alert */}
+        <CustomAlert
+          visible={alertVisible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          buttons={alertConfig.buttons}
+          onClose={() => setAlertVisible(false)}
+        />
       </ScrollView>
     );
   }
@@ -929,6 +1081,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
   repsInput: {
     backgroundColor: theme.colors.background,
     borderRadius: 12,
@@ -939,7 +1097,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     borderWidth: 1,
     borderColor: theme.colors.border,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   confirmButton: {
     backgroundColor: theme.colors.text,
@@ -1104,7 +1262,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   postButton: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.text,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',

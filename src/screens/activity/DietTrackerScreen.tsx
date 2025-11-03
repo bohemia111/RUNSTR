@@ -25,6 +25,7 @@ import { WorkoutPublishingService } from '../../services/nostr/workoutPublishing
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import { CustomAlert } from '../../components/ui/CustomAlert';
 import CalorieEstimationService, { type MealSize } from '../../services/fitness/CalorieEstimationService';
+import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import type { Workout } from '../../types/workout';
 
@@ -63,6 +64,8 @@ export const DietTrackerScreen: React.FC = () => {
   const [userId, setUserId] = useState<string>('');
   const [signer, setSigner] = useState<NDKSigner | null>(null);
   const [isCompeting, setIsCompeting] = useState(false);
+  const [userAvatar, setUserAvatar] = useState<string | undefined>(undefined);
+  const [userName, setUserName] = useState<string | undefined>(undefined);
 
   // Alert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -87,7 +90,17 @@ export const DietTrackerScreen: React.FC = () => {
         await loadLastMealTime();
 
         const npub = await AsyncStorage.getItem('@runstr:npub');
-        if (npub) setUserId(npub);
+        if (npub) {
+          setUserId(npub);
+
+          // Load user's Nostr profile (avatar and name)
+          const nostrProfile = await nostrProfileService.getProfile(npub);
+          if (nostrProfile) {
+            setUserAvatar(nostrProfile.picture);
+            setUserName(nostrProfile.display_name || nostrProfile.name);
+            console.log('[DietTracker] ✅ User profile loaded for social cards');
+          }
+        }
 
         const userSigner = await UnifiedSigningService.getInstance().getSigner();
         if (userSigner) setSigner(userSigner);
@@ -149,8 +162,7 @@ export const DietTrackerScreen: React.FC = () => {
       });
 
       // Estimate calories using CalorieEstimationService
-      const calorieService = CalorieEstimationService.getInstance();
-      const estimatedCalories = calorieService.estimateMealCalories(
+      const estimatedCalories = CalorieEstimationService.estimateMealCalories(
         selectedMealSize,
         selectedMealType
       );
@@ -644,6 +656,8 @@ export const DietTrackerScreen: React.FC = () => {
           visible={showShareModal}
           workout={savedWorkout}
           userId={userId}
+          userAvatar={userAvatar}
+          userName={userName}
           onClose={() => setShowShareModal(false)}
           onSuccess={() => {
             setAlertConfig({
