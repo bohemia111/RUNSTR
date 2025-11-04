@@ -626,6 +626,21 @@ export class WorkoutCardGenerator {
       return workout.exerciseType.charAt(0).toUpperCase() + workout.exerciseType.slice(1);
     }
 
+    // For diet, show specific meal type if available
+    if (workout.type === 'diet' && workout.mealType) {
+      // Capitalize meal type: "breakfast" → "Breakfast", "lunch" → "Lunch"
+      return workout.mealType.charAt(0).toUpperCase() + workout.mealType.slice(1);
+    }
+
+    // For meditation, show specific meditation type if available
+    if (workout.type === 'meditation' && workout.meditationType) {
+      // Format meditation type: "body_scan" → "Body Scan", "guided" → "Guided"
+      return workout.meditationType
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+
     // Fall back to generic type mapping
     const typeMap: Record<string, string> = {
       running: 'Running',
@@ -636,6 +651,8 @@ export class WorkoutCardGenerator {
       strength_training: 'Strength Training',
       yoga: 'Yoga',
       meditation: 'Meditation',
+      diet: 'Meal',
+      fasting: 'Fasting',
       other: 'Workout',
     };
     return typeMap[workout.type] || 'Workout';
