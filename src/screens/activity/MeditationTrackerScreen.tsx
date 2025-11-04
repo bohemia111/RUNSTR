@@ -231,6 +231,7 @@ export const MeditationTrackerScreen: React.FC = () => {
         endTime: new Date().toISOString(),
         duration: elapsedSeconds,
         calories,
+        meditationType: selectedType, // Specific meditation type (guided, unguided, etc.) for social cards
         syncedAt: new Date().toISOString(),
       };
 

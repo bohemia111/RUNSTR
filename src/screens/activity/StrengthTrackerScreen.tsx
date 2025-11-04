@@ -292,6 +292,8 @@ export const StrengthTrackerScreen: React.FC = () => {
         sets: totalSets,
         weight: averageWeight, // Average weight across all sets
         weightsPerSet: completedWeights, // Individual weights per set
+        exerciseType: selectedExercise, // Specific exercise (pushups, bench, etc.) for social cards
+        repsBreakdown: completedReps, // Per-set reps for detailed social cards
         syncedAt: new Date().toISOString(),
       };
 
@@ -499,28 +501,30 @@ export const StrengthTrackerScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Exercise Weight Input (optional) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Weight (Optional)</Text>
-          <View style={styles.numberInput}>
-            <TouchableOpacity
-              style={styles.numberButton}
-              onPress={() => setExerciseWeight(Math.max(0, exerciseWeight - 5))}
-            >
-              <Ionicons name="remove" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={styles.numberValue}>{exerciseWeight}</Text>
-              <Text style={styles.weightUnit}>lbs</Text>
+        {/* Exercise Weight Input (only for weighted exercises: bench, curls) */}
+        {['bench', 'curls'].includes(selectedExercise) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Weight (lbs)</Text>
+            <View style={styles.numberInput}>
+              <TouchableOpacity
+                style={styles.numberButton}
+                onPress={() => setExerciseWeight(Math.max(0, exerciseWeight - 5))}
+              >
+                <Ionicons name="remove" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={styles.numberValue}>{exerciseWeight}</Text>
+                <Text style={styles.weightUnit}>lbs</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.numberButton}
+                onPress={() => setExerciseWeight(exerciseWeight + 5)}
+              >
+                <Ionicons name="add" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.numberButton}
-              onPress={() => setExerciseWeight(exerciseWeight + 5)}
-            >
-              <Ionicons name="add" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
           </View>
-        </View>
+        )}
 
         {/* Rest Duration */}
         <View style={styles.section}>
