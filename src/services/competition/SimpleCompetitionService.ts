@@ -9,6 +9,7 @@ import type { NDKFilter, NDKEvent } from '@nostr-dev-kit/ndk';
 import unifiedCache from '../cache/UnifiedNostrCache';
 import { CacheKeys, CacheTTL } from '../../constants/cacheTTL';
 import type { NostrChallengeDefinition } from '../../types/nostrCompetition';
+import NdkTeamService from '../team/NdkTeamService';
 
 export interface League {
   id: string; // d tag
@@ -254,11 +255,24 @@ export class SimpleCompetitionService {
 
       const ndk = await GlobalNDKService.getInstance();
 
-      // ✅ PERFORMANCE FIX: Filter by team at Nostr query level (not client-side)
+      // ✅ CRITICAL FIX: Get team captain to query by author (relays reject #team queries)
+      const team = await this.getTeamCaptainId(teamId);
+      if (!team?.captainId) {
+        console.warn(`⚠️ Cannot query events - team ${teamId} has no captain`);
+        return [];
+      }
+
+      console.log(`📡 Querying events by captain author (relays don't support #team tag):`, {
+        captainId: team.captainId.substring(0, 16) + '...',
+        teamId: teamId.substring(0, 16) + '...',
+      });
+
+      // ✅ FIX: Query by AUTHORS (indexed) instead of #team (not indexed by most relays)
       const filter: NDKFilter = {
         kinds: [30101],
-        '#team': [teamId], // Only fetch events for THIS team
-        limit: 100, // Reduced from 500 (most teams have <20 events)
+        authors: [team.captainId], // ✅ Relays support author queries
+        limit: 200, // Higher limit since we filter client-side
+        since: Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60, // Last 90 days
       };
 
       // Check if aborted before fetch
@@ -269,9 +283,12 @@ export class SimpleCompetitionService {
       const events = await Promise.race([
         ndk.fetchEvents(filter),
         new Promise<Set<NDKEvent>>(
-          (resolve) => setTimeout(() => resolve(new Set()), 2000) // 2s timeout
+          (resolve) => setTimeout(() => resolve(new Set()), 3000) // 3s timeout
         ),
       ]);
+
+      // Simple logging - no crashes
+      console.log(`✅ Received ${events.size} events from Nostr for team ${teamId.substring(0, 8)}...`);
 
       // Check if aborted after fetch
       if (signal?.aborted) {
@@ -280,31 +297,50 @@ export class SimpleCompetitionService {
 
       const competitionEvents: CompetitionEvent[] = [];
       const now = new Date();
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      // ✅ FIX: Filter based on event END date, not start date (7 days for more permissive filtering)
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // Keep events that ended within 7 days
       const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+      console.log(`📅 Date filtering window: ${sevenDaysAgo.toISOString()} to ${ninetyDaysFromNow.toISOString()}`);
+      console.log(`📅 Current time: ${now.toISOString()}`);
 
       events.forEach((event) => {
         try {
           const competitionEvent = this.parseEventEvent(event);
           if (!competitionEvent) return;
 
+          // ✅ CRITICAL: Filter client-side for THIS team (since we query by author)
+          if (competitionEvent.teamId && competitionEvent.teamId !== teamId) {
+            console.log(`⏩ Skipping event for different team: ${competitionEvent.name} (team: ${competitionEvent.teamId.substring(0, 8)}...)`);
+            return;
+          }
+
           // Ensure teamId is set (from filter context if missing in event)
           if (!competitionEvent.teamId) {
             competitionEvent.teamId = teamId;
           }
 
-          // Filter out old/distant events
-          const eventDate = new Date(competitionEvent.eventDate);
+          // Calculate event end date (start + duration)
+          const eventStartDate = new Date(competitionEvent.eventDate);
+          const durationMinutes = competitionEvent.durationMinutes || 1440; // Default 24 hours
+          const eventEndDate = new Date(eventStartDate.getTime() + durationMinutes * 60 * 1000);
 
-          if (eventDate < sevenDaysAgo) {
-            console.log(`⏩ Filtering out old event: ${competitionEvent.name} (${competitionEvent.eventDate})`);
+          console.log(`📅 Event "${competitionEvent.name}": start=${eventStartDate.toISOString()}, end=${eventEndDate.toISOString()}, duration=${durationMinutes}min`);
+
+          // ✅ FIX: Filter out events that ended more than 7 days ago (changed from 48 hours)
+          if (eventEndDate < sevenDaysAgo) {
+            const hoursAgo = Math.floor((now.getTime() - eventEndDate.getTime()) / (1000 * 60 * 60));
+            console.log(`❌ FILTERED OUT: Event ended ${hoursAgo} hours ago (> 7 days): ${competitionEvent.name}`);
             return;
           }
 
-          if (eventDate > ninetyDaysFromNow) {
-            console.log(`⏩ Filtering out distant event: ${competitionEvent.name} (${competitionEvent.eventDate})`);
+          // Filter out events starting more than 90 days in the future
+          if (eventStartDate > ninetyDaysFromNow) {
+            console.log(`❌ FILTERED OUT: Distant future event: ${competitionEvent.name} (${competitionEvent.eventDate})`);
             return;
           }
+
+          console.log(`✅ KEPT: Event "${competitionEvent.name}" passed date filtering`);
 
           competitionEvents.push(competitionEvent);
         } catch (error) {
@@ -332,7 +368,7 @@ export class SimpleCompetitionService {
         return dateA >= nowTime ? -1 : 1;
       });
 
-      console.log(`✅ Fetched ${competitionEvents.length} events from Nostr for team ${teamId}`);
+      console.log(`✅ Found ${competitionEvents.length} events for team ${teamId} after filtering (from ${events.size} total captain events)`);
       return competitionEvents;
     } catch (error: any) {
       // ✅ FIX: Handle abort errors gracefully
@@ -342,6 +378,38 @@ export class SimpleCompetitionService {
       }
       console.error(`Failed to fetch team events from Nostr: ${teamId}`, error);
       return [];
+    }
+  }
+
+  /**
+   * ✅ FIXED: Helper method to get team captain ID from team data
+   * Checks cache first, then fetches from Nostr if needed
+   * Uses static imports to prevent Metro bundler crashes
+   */
+  private async getTeamCaptainId(teamId: string): Promise<{ captainId: string } | null> {
+    try {
+      // Try UnifiedCache first (fastest) - using static import
+      const cached = unifiedCache.getCached(`team_${teamId}`);
+      if (cached?.captainId) {
+        console.log(`📦 Found team captain in cache: ${cached.captainId.substring(0, 16)}...`);
+        return { captainId: cached.captainId };
+      }
+
+      // Try discovering teams from Nostr - using static import
+      console.log(`🔍 Fetching team ${teamId} from Nostr to get captain...`);
+      const teams = await NdkTeamService.getInstance().discoverAllTeams();
+      const team = teams.find(t => t.id === teamId);
+
+      if (team?.captainId) {
+        console.log(`✅ Found team captain from Nostr: ${team.captainId.substring(0, 16)}...`);
+        return { captainId: team.captainId };
+      }
+
+      console.warn(`⚠️ Team ${teamId} not found or has no captain`);
+      return null;
+    } catch (error) {
+      console.error(`❌ Error getting team captain for ${teamId}:`, error);
+      return null;
     }
   }
 
@@ -371,11 +439,11 @@ export class SimpleCompetitionService {
         limit: 1,
       };
 
-      // Add 2s timeout to prevent infinite loading
+      // ✅ FIX: Increased timeout from 2s to 5s for better reliability
       const events = await Promise.race([
         ndk.fetchEvents(filter),
         new Promise<Set<NDKEvent>>(
-          (resolve) => setTimeout(() => resolve(new Set()), 2000) // 2s timeout
+          (resolve) => setTimeout(() => resolve(new Set()), 5000) // 5s timeout
         ),
       ]);
 
@@ -419,11 +487,11 @@ export class SimpleCompetitionService {
         limit: 1,
       };
 
-      // Add 2s timeout to prevent infinite loading
+      // ✅ FIX: Increased timeout from 2s to 5s for better reliability
       const events = await Promise.race([
         ndk.fetchEvents(filter),
         new Promise<Set<NDKEvent>>(
-          (resolve) => setTimeout(() => resolve(new Set()), 2000) // 2s timeout
+          (resolve) => setTimeout(() => resolve(new Set()), 5000) // 5s timeout
         ),
       ]);
 
@@ -641,14 +709,29 @@ export class SimpleCompetitionService {
       const id = getTag('d');
       const teamId = getTag('team') || getTag('team_id'); // Support both 'team' and 'team_id' tags
 
+      // ✅ FIX: Debug logging - show what tags were found
+      console.log('🔍 Parsing event from Nostr:', {
+        eventId: id,
+        teamTag: getTag('team'),
+        eventPubkey: event.pubkey,
+        activityTypeTag: getTag('activity_type'),
+        nameTag: getTag('name'),
+        allTags: event.tags?.map(t => `[${t[0]}, ${t[1]}]`).slice(0, 10) || [], // First 10 tags (safe null check)
+      });
+
       if (!id) {
-        console.warn('Event missing required id tag');
+        console.warn('❌ Event missing required id tag - rejecting');
         return null;
       }
 
-      // Log warning but don't reject if teamId is missing
-      if (!teamId) {
-        console.warn(`Event ${id} missing teamId tag - will attempt to infer from context`);
+      // ✅ FIX: Warn about missing teamId but don't reject - let context inject it
+      if (!teamId || teamId.trim() === '') {
+        console.warn(`⚠️ Event ${id} missing teamId tag - will use context teamId`, {
+          teamTag: getTag('team'),
+          teamIdTag: getTag('team_id'),
+          eventPubkey: event.pubkey,
+        });
+        // Don't return null - SimpleTeamScreen will inject teamId from context
       }
 
       const targetValue = getTag('target_value');
@@ -685,6 +768,7 @@ export class SimpleCompetitionService {
         paymentRecipientName: getTag('payment_recipient_name'),
         scoringMode: scoringModeTag as 'individual' | 'team-total' | undefined, // ✅ NEW
         teamGoal: teamGoalTag ? parseFloat(teamGoalTag) : undefined, // ✅ NEW
+        location: getTag('location'), // ✅ NEW: Parse location tag
       };
     } catch (error) {
       console.error('Failed to parse event:', error);

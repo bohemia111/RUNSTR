@@ -12,6 +12,7 @@ import {
   ScrollView,
   TextInput,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { theme } from '../../styles/theme';
 import { WizardStepContainer, WizardStep } from './WizardStepContainer';
 import { CustomAlert } from '../ui/CustomAlert';
@@ -130,6 +131,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
   const user = useUserStore((state) => state.user);
+  const navigation = useNavigation<any>(); // ✅ Add navigation for event detail screen redirect
   const [teamCharityId, setTeamCharityId] = useState<string | undefined>();
   const [captainLightningAddress, setCaptainLightningAddress] =
     useState<string>('');
@@ -340,6 +342,68 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
 
       console.log('🎯 Creating event with participant list:', eventCreationData);
 
+      // ✅ FIX: Validate critical fields before proceeding
+      if (!teamId || teamId.trim() === '') {
+        console.error('❌ CRITICAL: teamId is empty in wizard!', {
+          teamIdFromProps: teamId,
+          captainPubkey,
+          eventDataSnapshot: eventData,
+        });
+        setAlertTitle('Configuration Error');
+        setAlertMessage(
+          'Cannot create event: Team ID is missing.\n\n' +
+          'This usually means:\n' +
+          '• Wizard was opened without team context\n' +
+          '• Team data failed to load\n\n' +
+          'Please close the wizard and try again from the team page.'
+        );
+        setAlertButtons([{ text: 'OK' }]);
+        setAlertVisible(true);
+        setIsCreating(false);
+        return;
+      }
+
+      if (!captainPubkey || captainPubkey.trim() === '') {
+        console.error('❌ CRITICAL: captainPubkey is empty in wizard!', {
+          captainPubkey,
+          teamId,
+        });
+        setAlertTitle('Authentication Error');
+        setAlertMessage(
+          'Cannot create event: Captain identity is missing.\n\n' +
+          'Please ensure you are logged in and try again.'
+        );
+        setAlertButtons([{ text: 'OK' }]);
+        setAlertVisible(true);
+        setIsCreating(false);
+        return;
+      }
+
+      // ✅ FIX: Check for invalid activity types (defensive check for potential bugs)
+      const validActivityTypes = ['Running', 'Walking', 'Cycling', 'Hiking', 'Swimming', 'Rowing', 'Strength Training', 'Yoga', 'Meditation'];
+      if (!eventData.activityType || !validActivityTypes.includes(eventData.activityType)) {
+        console.error('❌ CRITICAL: activityType is invalid!', {
+          activityType: eventData.activityType,
+          preset: eventData.selectedPreset,
+        });
+        setAlertTitle('Preset Error');
+        setAlertMessage(
+          'Cannot create event: Activity type is invalid.\n\n' +
+          'Please select an event preset from the first step.'
+        );
+        setAlertButtons([{ text: 'OK' }]);
+        setAlertVisible(true);
+        setIsCreating(false);
+        return;
+      }
+
+      console.log('✅ Wizard validation passed:', {
+        teamId,
+        captainPubkey,
+        activityType: eventData.activityType,
+        eventName: eventData.eventName,
+      });
+
       // STEP 1: Generate event ID first (needed for participant list d-tag)
       const timestamp = Math.floor(Date.now() / 1000).toString(36);
       const random = Math.random().toString(36).substring(2, 8);
@@ -407,7 +471,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
           eventName: eventData.eventName,
           teamId,
           teamName: team?.name || 'Your Team',
-          activityType: eventData.activityType!,
+          activityType: eventData.activityType || 'Running', // ✅ FIX: Provide fallback
           eventDate: eventData.eventDate!.toISOString(),
           entryFee: eventData.entryFeesSats,
           prizePool: eventData.prizePoolSats,
@@ -415,25 +479,35 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
           durationMinutes: eventData.durationMinutes,
         };
 
-        // Show success alert (participant list already created successfully)
+        // ✅ FIX: Debug log announcement data to verify all fields
+        console.log('📢 Announcement data prepared:', {
+          eventId: announcementData.eventId,
+          eventName: announcementData.eventName,
+          activityType: announcementData.activityType,
+          teamName: announcementData.teamName,
+          eventDate: announcementData.eventDate,
+        });
+
+        // ✅ FIX: Show simple success alert, then close wizard and call callback
         setAlertTitle('Success!');
         setAlertMessage(
           `Event "${eventData.eventName}" has been created and published to Nostr relays.\n\nParticipant list created successfully.`
         );
         setAlertButtons([
           {
-            text: 'Continue',
+            text: 'OK',
             onPress: () => {
+              console.log('✅ Success alert dismissed, closing wizard and calling onEventCreated');
               setAlertVisible(false);
-              // Show announcement preview modal
-              setCreatedEventData(announcementData);
-              setShowAnnouncementPreview(true);
+              // Call onEventCreated callback to trigger parent component's success modal
               onEventCreated(eventData);
-              onClose(); // Close wizard to show preview modal
+              // Close wizard explicitly
+              onClose();
             },
           },
         ]);
         setAlertVisible(true);
+        console.log('📢 Success alert displayed for event:', eventData.eventName);
       } else {
         throw new Error(result.message || 'Failed to create event');
       }
@@ -918,7 +992,13 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({
           eventData={createdEventData}
           onClose={() => {
             setShowAnnouncementPreview(false);
+            const eventIdForNavigation = createdEventData.eventId;
             setCreatedEventData(null);
+            // ✅ FIX: Close wizard after user dismisses announcement preview
+            onClose();
+            // ✅ FIX: Navigate to EventDetailScreen after wizard closes
+            console.log('🚀 Navigating to EventDetail screen:', eventIdForNavigation);
+            navigation.navigate('EventDetail', { eventId: eventIdForNavigation });
           }}
           onPublished={() => {
             console.log('✅ Event announcement published successfully');
