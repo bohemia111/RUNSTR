@@ -112,6 +112,11 @@ export class WorkoutCardGenerator {
       // Generate SVG content
       const svgContent = this.createSVGCard(workout, config, options);
 
+      // Validate SVG content is not empty
+      if (!svgContent || svgContent.trim().length === 0) {
+        throw new Error('Generated SVG content is empty');
+      }
+
       return {
         svgContent,
         dimensions,
@@ -123,7 +128,20 @@ export class WorkoutCardGenerator {
       };
     } catch (error) {
       console.error('❌ Error generating workout card:', error);
-      throw new Error('Failed to generate workout card');
+
+      // Return fallback minimal card instead of throwing
+      const fallbackDimensions = { width: 800, height: 600 };
+      const fallbackSvg = this.getFallbackSVG(workout, fallbackDimensions.width, fallbackDimensions.height);
+
+      return {
+        svgContent: fallbackSvg,
+        dimensions: fallbackDimensions,
+        metadata: {
+          workoutId: workout.id,
+          template: 'fallback',
+          generatedAt: new Date().toISOString(),
+        },
+      };
     }
   }
 
@@ -337,8 +355,13 @@ export class WorkoutCardGenerator {
       year: 'numeric'
     });
 
-    // Key stats with null safety
+    // Key stats with null safety and validation
     const stats = this.getWorkoutStats(workout);
+
+    // Validate stats array to prevent SVG rendering errors
+    if (!Array.isArray(stats) || stats.length === 0) {
+      console.warn('No stats available for workout card');
+    }
 
     // For strength training, show all sets; for other workouts, show primary + secondary stat
     const isStrengthTraining = ['strength_training', 'gym'].includes(workout.type);
@@ -401,31 +424,33 @@ export class WorkoutCardGenerator {
 
       ${isStrengthTraining ? `
         <!-- Strength training: Show all sets -->
-        ${stats.map((stat, index) => {
-          const yOffset = options.userName ? 160 : 140;
-          const statY = yOffset + (index * 70); // 70px spacing between sets
-          return `
-            <text
-              x="${padding}"
-              y="${statY}"
-              font-family="${serifFont}"
-              font-size="36"
-              font-weight="300"
-              fill="#FFFFFF"
-            >${stat.value}</text>
+        ${stats
+          .filter((stat) => stat && stat.value && stat.label) // Filter out invalid stats
+          .map((stat, index) => {
+            const yOffset = options.userName ? 160 : 140;
+            const statY = yOffset + (index * 70); // 70px spacing between sets
+            return `
+              <text
+                x="${padding}"
+                y="${statY}"
+                font-family="${serifFont}"
+                font-size="36"
+                font-weight="300"
+                fill="#FFFFFF"
+              >${this.escapeXml(String(stat.value))}</text>
 
-            <text
-              x="${padding}"
-              y="${statY + 25}"
-              font-family="${sansFont}"
-              font-size="12"
-              font-weight="500"
-              fill="#FFFFFF"
-              opacity="0.5"
-              letter-spacing="1"
-            >${stat.label.toUpperCase()}</text>
-          `;
-        }).join('')}
+              <text
+                x="${padding}"
+                y="${statY + 25}"
+                font-family="${sansFont}"
+                font-size="12"
+                font-weight="500"
+                fill="#FFFFFF"
+                opacity="0.5"
+                letter-spacing="1"
+              >${this.escapeXml(String(stat.label).toUpperCase())}</text>
+            `;
+          }).join('')}
       ` : `
         <!-- Primary stat (duration) -->
         <text
@@ -1154,24 +1179,9 @@ export class WorkoutCardGenerator {
       });
     }
 
-    // Diet: Show meal type, meal description, and calories (skip meal size and duration)
+    // Diet: Show meal description, portion size, and calories
+    // NOTE: Don't show meal type here - it's already the card title
     if (workout.type === 'diet') {
-      if (workout.mealType) {
-        // Capitalize first letter
-        const mealTypeFormatted = workout.mealType.charAt(0).toUpperCase() + workout.mealType.slice(1);
-        stats.push({
-          value: mealTypeFormatted,
-          label: 'Meal',
-        });
-      }
-      if (workout.mealSize) {
-        // Capitalize first letter
-        const mealSizeFormatted = workout.mealSize.charAt(0).toUpperCase() + workout.mealSize.slice(1);
-        stats.push({
-          value: mealSizeFormatted,
-          label: 'Portion',
-        });
-      }
       // Show meal description from notes (if available and not auto-generated)
       if (workout.notes && !workout.notes.includes('at ')) {
         // Skip auto-generated notes like "Breakfast at 8:30 AM"
@@ -1182,6 +1192,14 @@ export class WorkoutCardGenerator {
         stats.push({
           value: description,
           label: 'Food',
+        });
+      }
+      if (workout.mealSize) {
+        // Capitalize first letter
+        const mealSizeFormatted = workout.mealSize.charAt(0).toUpperCase() + workout.mealSize.slice(1);
+        stats.push({
+          value: mealSizeFormatted,
+          label: 'Portion',
         });
       }
       // Re-add calories for diet workouts (it was removed earlier, but is useful here)
@@ -1483,6 +1501,70 @@ export class WorkoutCardGenerator {
         description: 'Full stats with motivational messages',
       },
     ];
+  }
+
+  /**
+   * Generate a simple fallback SVG when card generation fails
+   * Prevents app crashes by providing a minimal valid SVG
+   */
+  private getFallbackSVG(
+    workout: PublishableWorkout,
+    width: number,
+    height: number
+  ): string {
+    const workoutType = this.getWorkoutTypeName(workout);
+    const duration = this.formatDurationDetailed(workout.duration);
+    const icon = this.getWorkoutIcon(workout.type);
+
+    return `
+      <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+        <!-- Background -->
+        <rect width="${width}" height="${height}" fill="#000000"/>
+
+        <!-- Activity Icon -->
+        <text
+          x="${width / 2}"
+          y="${height / 2 - 80}"
+          font-size="80"
+          text-anchor="middle"
+          fill="#FF6B35"
+        >${icon}</text>
+
+        <!-- Workout Type -->
+        <text
+          x="${width / 2}"
+          y="${height / 2}"
+          font-family="system-ui, -apple-system, sans-serif"
+          font-size="36"
+          font-weight="600"
+          text-anchor="middle"
+          fill="#FFFFFF"
+        >${this.escapeXml(workoutType)}</text>
+
+        <!-- Duration -->
+        <text
+          x="${width / 2}"
+          y="${height / 2 + 50}"
+          font-family="system-ui, -apple-system, sans-serif"
+          font-size="24"
+          text-anchor="middle"
+          fill="#FFFFFF"
+          opacity="0.7"
+        >${duration}</text>
+
+        <!-- RUNSTR Branding -->
+        <text
+          x="${width / 2}"
+          y="${height - 40}"
+          font-family="system-ui, -apple-system, sans-serif"
+          font-size="14"
+          font-weight="600"
+          text-anchor="middle"
+          fill="#FF6B35"
+          letter-spacing="2"
+        >RUNSTR</text>
+      </svg>
+    `;
   }
 }
 

@@ -6,6 +6,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2025-11-09
+
+### Fixed
+- **Android Crash Stability** - Resolved critical white screen crashes on Android
+  - Fixed `ChallengeNotificationHandler` constructor async call crash during app resume from background
+  - Added screen-level `ErrorBoundary` component wrapping lazy-loaded screens
+  - Fixed `WalletStore` references to deleted `nutzapService` (removed in v0.6.2)
+  - Added defensive error handling in `ChallengeDetailScreen` leaderboard loading
+  - Added SVG validation fallbacks in `workoutCardGenerator` to prevent rendering crashes
+  - Wrapped `SimpleTeamScreen` lazy loading in error boundary to prevent navigation crashes
+  - All async operations now have proper error handling to prevent unhandled promise rejections
+
+- **Event Data Completeness** - Resolved "Event Data Incomplete" errors
+  - Added `captainPubkey` fallback injection in `SimpleTeamScreen` (line 163)
+  - Events now auto-heal stale cached data by injecting captain info from team context
+  - Enhanced `SimpleCompetitionService` with defensive captain pubkey extraction (lines 749-753)
+  - Added redundant captain tag to event publishing in `NostrCompetitionService` (line 280)
+  - New events publish with both `event.pubkey` and `['captain', captainPubkey]` tag for reliability
+  - Added `clearEventCaches()` method to `UnifiedNostrCache` for manual cache clearing
+
+### Improved
+- **Error Recovery** - Enhanced app stability and user experience
+  - Screen errors now show friendly error message with "Go Back" button instead of blank screen
+  - Background/foreground transitions now handle errors gracefully
+  - SVG generation failures fall back to minimal workout cards
+  - Challenge leaderboard failures degrade gracefully to basic challenge info
+
+### Technical
+- Bumped version code from 54 to 55 (Android)
+- All deprecated NutZap wallet methods now return graceful errors instead of crashing
+
 ## [0.6.2] - 2025-11-08
 
 ### Added

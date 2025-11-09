@@ -43,7 +43,13 @@ export class ChallengeNotificationHandler {
   private deduplicator = new TTLDeduplicator(3600000, 1000); // 1hr TTL, 1000 max entries
 
   private constructor() {
-    this.loadNotifications();
+    // Load notifications asynchronously without blocking constructor
+    this.loadNotifications().catch((error) => {
+      console.error(
+        '[ChallengeNotificationHandler] Failed to load notifications in constructor:',
+        error
+      );
+    });
   }
 
   static getInstance(): ChallengeNotificationHandler {

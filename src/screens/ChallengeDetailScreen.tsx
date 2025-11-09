@@ -114,7 +114,59 @@ export const ChallengeDetailScreen: React.FC<ChallengeDetailScreenProps> = ({
       const challengeLeaderboard = await challengeService.getChallengeLeaderboard(challengeId);
 
       if (!challengeLeaderboard) {
-        throw new Error('Failed to load challenge leaderboard');
+        console.warn('Challenge leaderboard not available, showing basic challenge info');
+        // Don't throw - fall through to basic challenge data rendering
+        setIsLoadingLeaderboard(false);
+
+        // Create basic challenge data without leaderboard
+        const timeRemainingSeconds = endTime - Math.floor(Date.now() / 1000);
+        const formattedTimeRemaining = formatTimeRemaining(timeRemainingSeconds);
+        const isExpired = timeRemainingSeconds <= 0;
+
+        const basicChallengeData: ChallengeDetailData = {
+          id: challengeId,
+          name: challengeName,
+          description: `1v1 ${distance}km running challenge. Fastest time wins!${wager > 0 ? ` Wager: ${wager} sats` : ''}`,
+          prizePool: wager,
+          competitors: [],
+          progress: {
+            isParticipating: false,
+            isWatching: false,
+            status: isExpired ? 'expired' : 'active',
+            isCompleted: isExpired,
+          },
+          timer: {
+            timeRemaining: formattedTimeRemaining,
+            isExpired,
+          },
+          rules: [
+            {
+              id: '1',
+              text: `Complete a ${distance}km run within 24 hours`,
+            },
+            {
+              id: '2',
+              text: 'Track your run using the Activity Tracker',
+            },
+            {
+              id: '3',
+              text: 'Fastest time wins - lower time is better',
+            },
+            {
+              id: '4',
+              text: wager > 0
+                ? `Wager: ${wager} sats (social agreement)`
+                : 'No wager - run for glory!',
+            },
+          ],
+          status: isExpired ? 'expired' : 'active',
+          formattedPrize: wager > 0 ? `${wager} sats` : 'No wager',
+          formattedDeadline: new Date(endTime * 1000).toLocaleDateString(),
+        };
+
+        setChallengeData(basicChallengeData);
+        setTimeRemaining(basicChallengeData.timer.timeRemaining);
+        return; // Exit early
       }
 
       try {

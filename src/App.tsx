@@ -68,6 +68,58 @@ class AppErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
+
+/**
+ * Screen-level error boundary for catching errors in individual screens
+ * Prevents white screen crashes by showing error UI and allowing navigation back
+ */
+class ScreenErrorBoundary extends React.Component<
+  { children: React.ReactNode; navigation: any },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode; navigation: any }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('🔴 ScreenErrorBoundary caught error:', error);
+    console.error('🔴 Error info:', errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={errorStyles.container}>
+          <Text style={errorStyles.title}>Screen Error</Text>
+          <Text style={errorStyles.error}>
+            {this.state.error?.message || 'Failed to load screen'}
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              this.setState({ hasError: false, error: undefined });
+              this.props.navigation.goBack();
+            }}
+            style={{
+              marginTop: 20,
+              padding: 12,
+              backgroundColor: '#1a1a1a',
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: '#FFFFFF' }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 import { NavigationContainer } from '@react-navigation/native';
 import { ActivityIndicator } from 'react-native';
 
@@ -425,15 +477,21 @@ const AppContent: React.FC = () => {
   // TODO: Update for instant challenge flow (no acceptance needed)
   // QR challenges are deprecated - use GlobalChallengeWizard instead
   const handleAcceptChallenge = React.useCallback(async (challenge: ParsedChallengeData) => {
-    console.warn('⚠️ QR challenge acceptance deprecated - use GlobalChallengeWizard for instant challenges');
-    CustomAlertManager.alert(
-      'Challenge Flow Updated',
-      'Challenge creation has been simplified. Please use the Challenge Wizard to create new challenges.',
-      [{ text: 'OK', onPress: () => {
-        setShowChallengePreview(false);
-        setChallengeData(null);
-      }}]
-    );
+    try {
+      console.warn('⚠️ QR challenge acceptance deprecated - use GlobalChallengeWizard for instant challenges');
+      CustomAlertManager.alert(
+        'Challenge Flow Updated',
+        'Challenge creation has been simplified. Please use the Challenge Wizard to create new challenges.',
+        [{ text: 'OK', onPress: () => {
+          setShowChallengePreview(false);
+          setChallengeData(null);
+        }}]
+      );
+    } catch (error) {
+      console.error('Error in handleAcceptChallenge:', error);
+      setShowChallengePreview(false);
+      setChallengeData(null);
+    }
     /* DEPRECATED: Instant challenges only now (no acceptance flow)
     try {
       console.log('🏆 Accepting challenge:', challenge);
@@ -748,21 +806,22 @@ const AppContent: React.FC = () => {
               '[App.tsx] ⏳ SUSPENSE FALLBACK RENDERING - Waiting for lazy component'
             );
             return (
-              <React.Suspense
-                fallback={
-                  <View
-                    style={{
-                      flex: 1,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      backgroundColor: theme.colors.background,
-                    }}
-                  >
-                    <ActivityIndicator size="large" color={theme.colors.text} />
-                  </View>
-                }
-              >
-                <SimpleTeamScreen
+              <ScreenErrorBoundary navigation={navigation}>
+                <React.Suspense
+                  fallback={
+                    <View
+                      style={{
+                        flex: 1,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: theme.colors.background,
+                      }}
+                    >
+                      <ActivityIndicator size="large" color={theme.colors.text} />
+                    </View>
+                  }
+                >
+                  <SimpleTeamScreen
                   data={{
                     team: team,
                     leaderboard: [],
@@ -842,6 +901,7 @@ const AppContent: React.FC = () => {
                   userIsCaptain={userIsCaptain}
                 />
               </React.Suspense>
+              </ScreenErrorBoundary>
             );
           }}
         </AuthenticatedStack.Screen>

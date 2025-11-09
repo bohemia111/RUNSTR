@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import nutzapService from '../services/nutzap/nutzapService';
+// import nutzapService from '../services/nutzap/nutzapService';
 
 interface Transaction {
   id: string;
@@ -55,6 +55,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   // Initialize wallet (called once at app startup)
   // PERFORMANCE: Uses quick resume for instant load when returning to app
+  // NOTE: Wallet functionality disabled - NutZap service removed in v0.6.2
   initialize: async (nsec?: string, quickResume: boolean = false) => {
     const state = get();
 
@@ -66,102 +67,40 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       return;
     }
 
-    set({ isInitializing: true, error: null });
+    console.warn(
+      '[WalletStore] Wallet initialization disabled - NutZap service removed in v0.6.2. Use NWC wallet instead.'
+    );
 
-    try {
-      console.log(
-        `[WalletStore] Initializing global wallet... (quick resume: ${quickResume})`
-      );
-
-      // Get user's nsec from storage if not provided
-      let userNsec = nsec;
-      if (!userNsec) {
-        const storedNsec = await AsyncStorage.getItem('@runstr:user_nsec');
-        userNsec = storedNsec || undefined;
-      }
-
-      // Initialize service with quick resume flag
-      // Quick resume skips Nostr queries if cache is fresh (<2 minutes)
-      const walletState = await nutzapService.initialize(
-        userNsec || undefined,
-        quickResume
-      );
-
-      // Check if wallet exists (has balance or was just created)
-      const hasWallet = walletState.balance > 0 || walletState.created;
-
-      set({
-        isInitialized: true,
-        isInitializing: false,
-        walletExists: hasWallet,
-        balance: walletState.balance,
-        userPubkey: walletState.pubkey,
-        error: null,
-        lastSync: Date.now(),
-      });
-
-      if (walletState.created) {
-        console.log('[WalletStore] New wallet created for user');
-      } else if (hasWallet) {
-        console.log('[WalletStore] Existing wallet loaded successfully');
-      } else {
-        console.log('[WalletStore] No wallet found - user needs to create one');
-      }
-
-      // Note: Auto-claim is now handled by WalletSync background service
-    } catch (error) {
-      console.error('[WalletStore] Initialization error:', error);
-      set({
-        isInitializing: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Failed to initialize wallet',
-      });
-    }
+    // Set as "initialized" but with wallet disabled state
+    set({
+      isInitialized: true,
+      isInitializing: false,
+      walletExists: false,
+      balance: 0,
+      userPubkey: '',
+      error: 'Wallet functionality disabled - use NWC wallet',
+      lastSync: Date.now(),
+    });
   },
 
   // Create wallet (user-initiated)
+  // NOTE: Wallet functionality disabled - NutZap service removed in v0.6.2
   createWallet: async () => {
-    try {
-      console.log('[WalletStore] Creating RUNSTR wallet...');
-      const WalletCore = (await import('../services/nutzap/WalletCore'))
-        .default;
-
-      const result = await WalletCore.createRunstrWallet();
-
-      if (result.success) {
-        console.log('[WalletStore] Wallet created successfully');
-        // Refresh state from service
-        const balance = await nutzapService.getBalance();
-        set({
-          walletExists: true,
-          balance,
-          lastSync: Date.now(),
-          error: null,
-        });
-      } else {
-        console.error('[WalletStore] Wallet creation failed:', result.error);
-        set({ error: result.error || 'Failed to create wallet' });
-      }
-    } catch (error) {
-      console.error('[WalletStore] Error creating wallet:', error);
-      set({
-        error:
-          error instanceof Error ? error.message : 'Failed to create wallet',
-      });
-    }
+    console.warn(
+      '[WalletStore] Wallet creation disabled - NutZap service removed in v0.6.2. Use NWC wallet instead.'
+    );
+    set({
+      error: 'Wallet functionality disabled - use NWC wallet',
+    });
   },
 
   // Refresh balance from service
+  // NOTE: Wallet functionality disabled - NutZap service removed in v0.6.2
   refreshBalance: async () => {
-    try {
-      const balance = await nutzapService.getBalance();
-      set({ balance, lastSync: Date.now() });
-      console.log(`[WalletStore] Balance refreshed: ${balance} sats`);
-    } catch (error) {
-      console.error('[WalletStore] Failed to refresh balance:', error);
-    }
+    console.warn(
+      '[WalletStore] Balance refresh disabled - NutZap service removed in v0.6.2. Use NWC wallet instead.'
+    );
+    set({ balance: 0, lastSync: Date.now() });
   },
 
   // Update balance (called after successful transactions)
