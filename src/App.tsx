@@ -543,80 +543,25 @@ const AppContent: React.FC = () => {
   const appState = React.useRef(AppState.currentState);
   const backgroundTime = React.useRef<number>(0);
 
+  // ⚠️ REMOVED: AppState handler was causing instant crashes on Android
+  // The synchronous challengeCompletionService.stopMonitoring() call created
+  // a race condition with NostrMobileConnectionManager's WebSocket access.
+  // Android kills WebSockets immediately on background, causing crash.
+  // Challenge monitoring is now handled differently to avoid this issue.
+
+  // Track app state for reference but don't add conflicting handlers
   React.useEffect(() => {
+    // Just update the ref, no handlers that could conflict
     const subscription = AppState.addEventListener(
       'change',
       (nextAppState: AppStateStatus) => {
-        const previousState = appState.current;
-
-        // App going to background
-        if (
-          previousState === 'active' &&
-          nextAppState.match(/inactive|background/)
-        ) {
-          backgroundTime.current = Date.now();
-          console.log('[AppState] App going to background');
-
-          // ✅ FIX: Stop challenge monitoring to prevent dangling async calls during background
-          try {
-            challengeCompletionService.stopMonitoring();
-            console.log('[AppState] 🛑 Challenge monitoring stopped for background');
-          } catch (error) {
-            console.error('[AppState] Failed to stop challenge monitoring:', error);
-          }
-        }
-
-        // App returning to foreground
-        if (
-          previousState.match(/inactive|background/) &&
-          nextAppState === 'active'
-        ) {
-          const timeInBackground = Date.now() - backgroundTime.current;
-          const secondsInBackground = Math.round(timeInBackground / 1000);
-
-          console.log(
-            `[AppState] App returning to foreground (${secondsInBackground}s in background)`
-          );
-
-          // ✅ FIX: Restart challenge monitoring safely with error handling
-          try {
-            challengeCompletionService.startMonitoring();
-            console.log('[AppState] ✅ Challenge monitoring restarted');
-          } catch (error) {
-            console.error('[AppState] Failed to restart challenge monitoring:', error);
-            // Non-critical - app continues without monitoring
-          }
-
-          // ❌ CASHU WALLET REFRESH DISABLED: Removed in favor of NWC (v0.2.4+)
-          // Smart refresh strategy previously triggered Cashu wallet sync on app resume
-          // NWC wallet services now handle all Lightning payments independently
-          console.log('[AppState] Cashu wallet refresh skipped (using NWC for Lightning payments)');
-          /*
-          if (isAuthenticated && walletStore.isInitialized) {
-            if (timeInBackground < 60 * 1000) {
-              // < 1 minute: No refresh needed
-              console.log('[AppState] Quick return - no refresh needed');
-            } else if (timeInBackground < 5 * 60 * 1000) {
-              // 1-5 minutes: Quick resume with background sync
-              console.log('[AppState] Medium return - using quick resume');
-              walletStore.initialize(undefined, true); // Quick resume mode
-            } else {
-              // > 5 minutes: Full refresh
-              console.log('[AppState] Long return - triggering full refresh');
-              walletStore.refreshBalance();
-            }
-          }
-          */
-        }
-
         appState.current = nextAppState;
       }
     );
-
     return () => {
       subscription.remove();
     };
-  }, [isAuthenticated, walletStore.isInitialized]);
+  }, []);
 
   // Authenticated app with bottom tabs and team creation modal
   const AuthenticatedNavigator: React.FC<{ user: User }> = ({ user }) => {

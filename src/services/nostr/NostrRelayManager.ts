@@ -166,16 +166,40 @@ export class NostrRelayManager {
     disconnected: number;
     error: number;
   } {
-    const connections = this.getAllConnections();
+    try {
+      const connections = this.getAllConnections();
 
-    return {
-      total: connections.length,
-      connected: connections.filter((c) => c.status === 'connected').length,
-      connecting: connections.filter((c) => c.status === 'connecting').length,
-      disconnected: connections.filter((c) => c.status === 'disconnected')
-        .length,
-      error: connections.filter((c) => c.status === 'error').length,
-    };
+      // ⚠️ FIX: Guard against dead WebSocket references on Android
+      // Filter out any connections that might have invalid WebSocket state
+      const safeConnections = connections.filter(conn => {
+        try {
+          // Just check if we can access the status property
+          return conn && conn.status !== undefined;
+        } catch (e) {
+          console.warn('Invalid connection object detected:', e);
+          return false;
+        }
+      });
+
+      return {
+        total: safeConnections.length,
+        connected: safeConnections.filter((c) => c.status === 'connected').length,
+        connecting: safeConnections.filter((c) => c.status === 'connecting').length,
+        disconnected: safeConnections.filter((c) => c.status === 'disconnected')
+          .length,
+        error: safeConnections.filter((c) => c.status === 'error').length,
+      };
+    } catch (error) {
+      console.error('❌ Error getting connection status:', error);
+      // Return safe defaults if anything goes wrong
+      return {
+        total: 0,
+        connected: 0,
+        connecting: 0,
+        disconnected: 0,
+        error: 0,
+      };
+    }
   }
 
   /**

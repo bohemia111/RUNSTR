@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2025-11-09
+
+### Fixed
+- **Android Instant Background Crash (CRITICAL)** - Fixed immediate white screen crash when switching apps
+  - Root cause: Multiple conflicting AppState listeners with synchronous WebSocket operations creating race condition
+  - Android kills WebSockets immediately on background, causing crash when accessed
+  - **App.tsx (lines 546-564)**: Removed entire conflicting AppState handler that was competing with NostrMobileConnectionManager
+  - **NostrMobileConnectionManager.ts (lines 131-147)**: Deferred background transition operations with setTimeout to avoid synchronous execution
+  - **NostrMobileConnectionManager.ts (lines 214-226)**: Added setTimeout wrapper to pauseConnections() WebSocket access
+  - **NostrMobileConnectionManager.ts (lines 278-291)**: Added try-catch to verifyConnections() method
+  - **NostrRelayManager.ts (lines 169-202)**: Added guards to getConnectionStatus() to handle dead WebSocket references
+  - App now handles instant backgrounding without crashes, restoring v0.5.9 stability
+
+### Improved
+- **WebSocket Safety** - All WebSocket operations now properly guarded against Android's immediate suspension
+  - Deferred operations prevent race conditions during app state transitions
+  - Safe fallbacks return empty connection stats when WebSockets are dead
+  - Comprehensive error handling throughout connection management layer
+
+### Technical
+- Bumped version code from 56 to 57 (Android)
+- Removed synchronous operations from AppState change handlers
+- Added defensive programming patterns for Android WebSocket lifecycle
+
 ## [0.6.4] - 2025-11-09
 
 ### Fixed

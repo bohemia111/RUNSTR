@@ -128,19 +128,23 @@ export class NostrMobileConnectionManager {
       return;
     }
 
-    // Set immediate state change
-    this.updateState({ isActive: false });
+    // ⚠️ FIX: Defer state update to avoid synchronous operations during Android suspension
+    // Android kills the app immediately, so we need to be careful
+    setTimeout(() => {
+      // Set immediate state change
+      this.updateState({ isActive: false });
 
-    // Set timer for potential disconnection
-    if (this.config.backgroundTimeout > 0) {
-      this.backgroundTimer = setTimeout(() => {
-        this.handleBackgroundTimeout();
-      }, this.config.backgroundTimeout) as any;
+      // Set timer for potential disconnection
+      if (this.config.backgroundTimeout > 0) {
+        this.backgroundTimer = setTimeout(() => {
+          this.handleBackgroundTimeout();
+        }, this.config.backgroundTimeout) as any;
 
-      console.log(
-        `⏰ Background timeout set for ${this.config.backgroundTimeout}ms`
-      );
-    }
+        console.log(
+          `⏰ Background timeout set for ${this.config.backgroundTimeout}ms`
+        );
+      }
+    }, 0);
   }
 
   /**
@@ -211,15 +215,21 @@ export class NostrMobileConnectionManager {
     console.log('🔋 Pausing relay connections for battery optimization...');
 
     try {
-      // Get connection stats before pausing
-      const stats = nostrRelayManager.getConnectionStatus();
-      console.log(`📊 Pausing ${stats.connected} connected relays`);
-
-      // Note: We don't fully disconnect, just reduce activity
-      // The WebSocket connections will handle their own keepalive management
-      this.emit('connectionsPaused', stats);
+      // ⚠️ FIX: Defer WebSocket access to avoid Android instant crash
+      // Android kills WebSockets immediately on background
+      setTimeout(() => {
+        try {
+          const stats = nostrRelayManager.getConnectionStatus();
+          console.log(`📊 Pausing ${stats.connected} connected relays`);
+          this.emit('connectionsPaused', stats);
+        } catch (error) {
+          console.error('❌ Error getting connection status during pause:', error);
+          // Return safe defaults if WebSockets are dead
+          this.emit('connectionsPaused', { total: 0, connected: 0, connecting: 0, disconnected: 0, error: 0 });
+        }
+      }, 0);
     } catch (error) {
-      console.error('❌ Error pausing connections:', error);
+      console.error('❌ Error in pauseConnections:', error);
     }
   }
 
@@ -269,13 +279,19 @@ export class NostrMobileConnectionManager {
   private verifyConnections(): void {
     console.log('🔍 Verifying connection health...');
 
-    const stats = nostrRelayManager.getConnectionStatus();
+    try {
+      const stats = nostrRelayManager.getConnectionStatus();
 
-    if (stats.connected === 0) {
-      console.warn('⚠️ No connected relays, attempting reconnection...');
-      this.resumeConnections();
-    } else {
-      console.log(`✅ ${stats.connected} relays still connected`);
+      if (stats.connected === 0) {
+        console.warn('⚠️ No connected relays, attempting reconnection...');
+        this.resumeConnections();
+      } else {
+        console.log(`✅ ${stats.connected} relays still connected`);
+      }
+    } catch (error) {
+      console.error('❌ Error verifying connections:', error);
+      // Assume disconnected if we can't verify
+      console.warn('⚠️ Cannot verify connections, assuming disconnected');
     }
   }
 
