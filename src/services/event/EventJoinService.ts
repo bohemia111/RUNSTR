@@ -46,7 +46,10 @@ export class EventJoinService {
   /**
    * Join a free event (send join request only)
    */
-  public async joinFreeEvent(eventData: QREventData): Promise<EventJoinResult> {
+  public async joinFreeEvent(
+    eventData: QREventData,
+    participationType?: 'in-person' | 'virtual'
+  ): Promise<EventJoinResult> {
     let alertVisible = false;
     try {
       console.log(`📝 Joining free event: ${eventData.event_name}`);
@@ -76,6 +79,11 @@ export class EventJoinService {
         requestData,
         userHexPubkey
       );
+
+      // ✅ NEW: Add participation type tag if provided
+      if (participationType && eventTemplate.tags) {
+        eventTemplate.tags.push(['participation_type', participationType]);
+      }
 
       // Sign and publish event
       const ndk = await GlobalNDKService.getInstance();
@@ -184,7 +192,8 @@ export class EventJoinService {
    */
   public async submitPaidJoinRequest(
     eventData: QREventData,
-    paymentInvoice: string
+    paymentInvoice: string,
+    participationType?: 'in-person' | 'virtual'
   ): Promise<EventJoinResult> {
     let alertVisible = false;
     try {
@@ -252,6 +261,11 @@ export class EventJoinService {
           eventData.entry_fee.toString(),
         ]);
         eventTemplate.tags.push(['payment_timestamp', Date.now().toString()]);
+
+        // ✅ NEW: Add participation type tag if provided
+        if (participationType) {
+          eventTemplate.tags.push(['participation_type', participationType]);
+        }
       }
 
       // Sign and publish event

@@ -1,6 +1,7 @@
 /**
  * WorkoutLevelRing Component
- * Circular progress ring displaying user's workout level and XP
+ * Circular progress ring displaying user's charity level and XP
+ * MVP: Level now based on charity donations, shows "Level X: Charity Champion"
  * Matches RUNSTR orange/gold theme with dark background
  */
 
@@ -11,6 +12,8 @@ import { theme } from '../../styles/theme';
 import type { LevelStats } from '../../types/workoutLevel';
 import WorkoutLevelService from '../../services/fitness/WorkoutLevelService';
 import type { NostrWorkout } from '../../types/nostrWorkout';
+import { CharitySelectionService } from '../../services/charity/CharitySelectionService';
+import type { Charity } from '../../constants/charities';
 
 interface WorkoutLevelRingProps {
   workouts: NostrWorkout[];
@@ -23,11 +26,13 @@ export const WorkoutLevelRing: React.FC<WorkoutLevelRingProps> = ({
 }) => {
   const [stats, setStats] = useState<LevelStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedCharity, setSelectedCharity] = useState<Charity | null>(null);
 
   const levelService = WorkoutLevelService;
 
   useEffect(() => {
     loadLevelStats();
+    loadCharity();
   }, [workouts, pubkey]);
 
   const loadLevelStats = async () => {
@@ -39,6 +44,15 @@ export const WorkoutLevelRing: React.FC<WorkoutLevelRingProps> = ({
       console.error('[WorkoutLevelRing] Failed to load level stats:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadCharity = async () => {
+    try {
+      const charity = await CharitySelectionService.getSelectedCharity();
+      setSelectedCharity(charity);
+    } catch (error) {
+      console.error('[WorkoutLevelRing] Failed to load charity:', error);
     }
   };
 
@@ -114,10 +128,12 @@ export const WorkoutLevelRing: React.FC<WorkoutLevelRingProps> = ({
           />
         </Svg>
 
-        {/* Level number in center */}
+        {/* Level number and charity in center */}
         <View style={styles.centerContent}>
           <Text style={styles.levelNumber}>{stats.level.level}</Text>
-          <Text style={styles.levelLabel}>LEVEL</Text>
+          <Text style={styles.levelLabel}>
+            {selectedCharity ? `${selectedCharity.name}` : 'LEVEL'}
+          </Text>
         </View>
       </View>
 
@@ -142,7 +158,8 @@ export const WorkoutLevelRing: React.FC<WorkoutLevelRingProps> = ({
         {nextMilestone && (
           <View style={styles.milestoneContainer}>
             <Text style={styles.milestoneText}>
-              Next: {nextMilestone.title} at Level {nextMilestone.level}
+              Next: {nextMilestone.title} at Level {nextMilestone.level} (
+              {nextMilestone.level * 100} sats for charity)
             </Text>
           </View>
         )}

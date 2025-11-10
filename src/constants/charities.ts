@@ -25,7 +25,7 @@ export const CHARITIES: Charity[] = [
     id: 'hrf',
     name: 'Human Rights Foundation',
     displayName: 'The HRF',
-    lightningAddress: 'nostr@btcpay.hrf.org',
+    lightningAddress: 'hrf@btcpay.hrf.org',
     description: 'Promoting freedom and human rights worldwide',
     website: 'https://hrf.org',
   },

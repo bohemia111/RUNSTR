@@ -144,11 +144,11 @@ export class TeamJoinNotificationHandler {
       );
 
       // Parse event tags to get team info
-      const teamIdTag = ndkEvent.tags.find(t => t[0] === 'team_id');
-      const teamNameTag = ndkEvent.tags.find(t => t[0] === 'team_name');
+      const teamIdTag = ndkEvent.tags.find(t => t[0] === 'team-id');
+      const teamNameTag = ndkEvent.tags.find(t => t[0] === 'team-name');
 
       if (!teamIdTag || !teamIdTag[1]) {
-        console.warn('[TeamJoinHandler] Missing team_id tag');
+        console.warn('[TeamJoinHandler] Missing team-id tag');
         return;
       }
 

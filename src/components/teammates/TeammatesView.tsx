@@ -3,7 +3,7 @@
  * Groups teammates by team name and allows viewing profiles
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,10 @@ import { useNavigation } from '@react-navigation/native';
 import { theme } from '../../styles/theme';
 import { MemberAvatar } from '../ui/MemberAvatar';
 import { TeamMemberCache } from '../../services/team/TeamMemberCache';
-import { ProfileCache } from '../../cache/ProfileCache';
+import { useNostrProfiles } from '../../hooks/useCachedData';
+import { NWCLightningButton } from '../lightning/NWCLightningButton';
+import { ChallengeIconButton } from '../ui/ChallengeIconButton';
+import { SimpleChallengeWizardV2 } from '../wizards/SimpleChallengeWizardV2';
 import type { Team } from '../../types';
 
 interface TeammateData {
@@ -32,27 +35,45 @@ interface TeammatesViewProps {
   teams: Team[];
   userNpub: string;
   onRefresh?: () => Promise<void>;
+  isLoadingTeams?: boolean;
 }
 
 export const TeammatesView: React.FC<TeammatesViewProps> = ({
   teams,
   userNpub,
   onRefresh,
+  isLoadingTeams = false,
 }) => {
   const navigation = useNavigation<any>();
   const [teammates, setTeammates] = useState<TeammateData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [groupedTeammates, setGroupedTeammates] = useState<Record<string, TeammateData[]>>({});
+  const [activeWizard, setActiveWizard] = useState<string | null>(null);
+  const [allMemberPubkeys, setAllMemberPubkeys] = useState<string[]>([]);
 
-  // Load teammates from all teams
-  const loadTeammates = async () => {
+  // Fetch profiles for all members using hook
+  const { profiles, loading: profilesLoading } = useNostrProfiles(allMemberPubkeys);
+
+  // Load teammate pubkeys from all teams (profiles fetched by hook)
+  const loadTeammates = useCallback(async () => {
     try {
       setIsLoading(true);
-      const allTeammates: TeammateData[] = [];
+      const allPubkeys: string[] = [];
+      const rawTeammates: TeammateData[] = [];
+
+      // Handle empty teams case gracefully
+      if (teams.length === 0) {
+        setTeammates([]);
+        setGroupedTeammates({});
+        setAllMemberPubkeys([]);
+        setIsLoading(false);
+        return;
+      }
+
       const memberCache = TeamMemberCache.getInstance();
 
-      // For each team, fetch members
+      // For each team, fetch member pubkeys
       for (const team of teams) {
         if (!team.id || !team.captainId) {
           console.warn(`Skipping team ${team.name} - missing ID or captain`);
@@ -68,55 +89,65 @@ export const TeammatesView: React.FC<TeammatesViewProps> = ({
 
           console.log(`Found ${memberPubkeys.length} members in team ${team.name}`);
 
-          // Batch fetch profiles
-          if (memberPubkeys.length > 0) {
-            const profiles = await ProfileCache.fetchProfiles(memberPubkeys);
+          // Collect teammate data WITHOUT profiles (profiles will be fetched by hook)
+          for (const pubkey of memberPubkeys) {
+            // Skip self
+            if (pubkey === userNpub) continue;
 
-            // Transform to teammate data
-            for (const pubkey of memberPubkeys) {
-              // Skip self
-              if (pubkey === userNpub) continue;
-
-              const profile = profiles.get(pubkey);
-              allTeammates.push({
-                pubkey,
-                name: profile?.name || `${pubkey.slice(0, 8)}...`,
-                picture: profile?.picture,
-                teamName: team.name,
-                teamId: team.id,
-              });
-            }
+            allPubkeys.push(pubkey);
+            rawTeammates.push({
+              pubkey,
+              name: `${pubkey.slice(0, 8)}...${pubkey.slice(-8)}`, // Placeholder
+              picture: undefined,
+              teamName: team.name,
+              teamId: team.id,
+            });
           }
         } catch (error) {
           console.error(`Error loading members for team ${team.name}:`, error);
         }
       }
 
-      setTeammates(allTeammates);
-
-      // Group by team name
-      const grouped = allTeammates.reduce((acc, teammate) => {
-        if (!acc[teammate.teamName]) {
-          acc[teammate.teamName] = [];
-        }
-        acc[teammate.teamName].push(teammate);
-        return acc;
-      }, {} as Record<string, TeammateData[]>);
-
-      setGroupedTeammates(grouped);
+      // Store raw teammate data and pubkeys (hook will fetch profiles)
+      setTeammates(rawTeammates);
+      setAllMemberPubkeys([...new Set(allPubkeys)]); // Deduplicate pubkeys
     } catch (error) {
       console.error('Failed to load teammates:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [teams, userNpub]);
 
   // Load teammates when teams change
   useEffect(() => {
-    if (teams.length > 0) {
-      loadTeammates();
+    loadTeammates();
+  }, [loadTeammates]);
+
+  // Enrich teammates with profile data when profiles arrive
+  useEffect(() => {
+    if (teammates.length === 0) {
+      setGroupedTeammates({});
+      return;
     }
-  }, [teams]);
+
+    // Enrich each teammate with profile data
+    const enriched = teammates.map(teammate => ({
+      ...teammate,
+      name: profiles.get(teammate.pubkey)?.name || teammate.name,
+      picture: profiles.get(teammate.pubkey)?.picture,
+    }));
+
+    // Group by team name
+    const grouped = enriched.reduce((acc, teammate) => {
+      if (!acc[teammate.teamName]) {
+        acc[teammate.teamName] = [];
+      }
+      acc[teammate.teamName].push(teammate);
+      return acc;
+    }, {} as Record<string, TeammateData[]>);
+
+    setGroupedTeammates(grouped);
+  }, [teammates, profiles]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -135,11 +166,14 @@ export const TeammatesView: React.FC<TeammatesViewProps> = ({
     });
   };
 
-  if (isLoading && teammates.length === 0) {
+  // Show loading if actively fetching teammates or if parent is loading teams
+  if ((isLoading && teammates.length === 0) || (isLoadingTeams && teams.length === 0)) {
     return (
       <View style={styles.loadingState}>
         <ActivityIndicator size="large" color={theme.colors.text} />
-        <Text style={styles.loadingText}>Loading teammates...</Text>
+        <Text style={styles.loadingText}>
+          {isLoadingTeams ? 'Loading teams...' : 'Loading teammates...'}
+        </Text>
       </View>
     );
   }
@@ -178,38 +212,59 @@ export const TeammatesView: React.FC<TeammatesViewProps> = ({
           </View>
 
           {members.map((teammate) => (
-            <TouchableOpacity
+            <View
               key={`${teammate.teamId}-${teammate.pubkey}`}
               style={styles.teammateCard}
-              onPress={() => handleTeammatePress(teammate)}
-              activeOpacity={0.7}
             >
-              <MemberAvatar
-                name={teammate.name}
-                imageUrl={teammate.picture}
-                size={40}
-              />
-              <View style={styles.teammateInfo}>
-                <Text style={styles.teammateName} numberOfLines={1}>
-                  {teammate.name}
-                </Text>
-                <Text style={styles.teammatePubkey} numberOfLines={1}>
-                  {teammate.pubkey.slice(0, 16)}...
-                </Text>
-              </View>
               <TouchableOpacity
-                style={styles.zapButton}
-                onPress={() => {
-                  // TODO: Implement zap functionality
-                  console.log('Zap teammate:', teammate.pubkey);
-                }}
+                style={styles.teammateContent}
+                onPress={() => handleTeammatePress(teammate)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.zapIcon}>⚡</Text>
+                <MemberAvatar
+                  name={teammate.name}
+                  imageUrl={teammate.picture}
+                  size={40}
+                />
+                <View style={styles.teammateInfo}>
+                  <Text style={styles.teammateName} numberOfLines={1}>
+                    {teammate.name}
+                  </Text>
+                </View>
               </TouchableOpacity>
-            </TouchableOpacity>
+
+              {/* Action buttons - hide for current user */}
+              {teammate.pubkey !== userNpub && (
+                <View style={styles.actionButtons}>
+                  <NWCLightningButton
+                    recipientNpub={teammate.pubkey}
+                    recipientName={teammate.name}
+                    size="small"
+                    onZapSuccess={() => console.log('Zapped teammate:', teammate.name)}
+                  />
+                  <ChallengeIconButton
+                    userPubkey={teammate.pubkey}
+                    userName={teammate.name}
+                    onPress={() => setActiveWizard(teammate.pubkey)}
+                  />
+                </View>
+              )}
+            </View>
           ))}
         </View>
+      ))}
+
+      {/* Challenge Wizard Modal - render for all teammates */}
+      {teammates.map((teammate) => (
+        <SimpleChallengeWizardV2
+          key={`wizard-${teammate.pubkey}`}
+          visible={activeWizard === teammate.pubkey}
+          onClose={() => setActiveWizard(null)}
+          preSelectedOpponent={{
+            pubkey: teammate.pubkey,
+            name: teammate.name,
+          }}
+        />
       ))}
     </ScrollView>
   );
@@ -284,6 +339,7 @@ const styles = StyleSheet.create({
   teammateCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 12,
     paddingHorizontal: 16,
     backgroundColor: theme.colors.background,
@@ -291,8 +347,21 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
 
+  teammateContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+
   teammateInfo: {
     flex: 1,
+    marginLeft: 12,
+  },
+
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
     marginLeft: 12,
   },
 
@@ -300,24 +369,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.text,
-    marginBottom: 2,
-  },
-
-  teammatePubkey: {
-    fontSize: 12,
-    color: theme.colors.textMuted,
-  },
-
-  zapButton: {
-    backgroundColor: theme.colors.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-
-  zapIcon: {
-    fontSize: 16,
   },
 });

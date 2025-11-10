@@ -16,6 +16,7 @@
 
 import NDK, { NDKNip07Signer } from '@nostr-dev-kit/ndk';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppStateManager } from '../core/AppStateManager';
 
 export class GlobalNDKService {
   private static instance: NDK | null = null;
@@ -54,8 +55,9 @@ export class GlobalNDKService {
         `♻️ GlobalNDK: Reusing cached instance (${status.connectedRelays}/${status.relayCount} relays connected)`
       );
 
+      // ✅ FIX: Don't reconnect if app is backgrounded (prevents Android crash)
       // If below target threshold (2 relays), trigger background reconnection
-      if (status.connectedRelays < 2 && !this.initPromise) {
+      if (status.connectedRelays < 2 && !this.initPromise && AppStateManager.canDoNetworkOps()) {
         console.log(
           `🔄 GlobalNDK: Only ${status.connectedRelays}/3 relays connected, starting background reconnection...`
         );
@@ -91,6 +93,12 @@ export class GlobalNDKService {
    */
   private static async connectInBackground(): Promise<void> {
     console.log('🔄 GlobalNDK: Starting background connection to relays...');
+
+    // ✅ FIX: Don't connect if app is backgrounded (prevents Android crash)
+    if (!AppStateManager.canDoNetworkOps()) {
+      console.log('🔴 App is backgrounded, skipping NDK connection');
+      return;
+    }
 
     try {
       if (!this.instance) {
@@ -186,6 +194,12 @@ export class GlobalNDKService {
     );
 
     this.keepaliveTimer = setInterval(() => {
+      // CRITICAL FIX v0.6.8: Check if app is active before ANY WebSocket operations
+      if (!AppStateManager.canDoNetworkOps()) {
+        console.log('🔴 GlobalNDK: App is backgrounded, skipping keepalive check');
+        return;
+      }
+
       if (!this.instance) {
         return;
       }
@@ -212,6 +226,12 @@ export class GlobalNDKService {
    * Only allows one reconnection attempt per 10 seconds
    */
   private static debouncedReconnect(): void {
+    // CRITICAL FIX v0.6.8: Don't reconnect if app is backgrounded
+    if (!AppStateManager.canDoNetworkOps()) {
+      console.log('🔴 GlobalNDK: App is backgrounded, skipping reconnection attempt');
+      return;
+    }
+
     const now = Date.now();
     const minInterval = 10000; // 10 seconds minimum between reconnections
 

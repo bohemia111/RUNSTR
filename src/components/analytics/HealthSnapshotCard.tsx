@@ -1,10 +1,13 @@
 /**
  * HealthSnapshotCard - 3-column display of BMI, VO2 Max, and Fitness Age
  * Privacy-preserving health metrics calculated locally
+ * Tap card to navigate to HealthProfileScreen for input
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import type { BodyCompositionMetrics, VO2MaxData } from '../../types/analytics';
 
@@ -17,19 +20,28 @@ export const HealthSnapshotCard: React.FC<HealthSnapshotCardProps> = ({
   bodyComposition,
   vo2MaxData,
 }) => {
+  const navigation = useNavigation();
+
+  const handlePress = () => {
+    // @ts-ignore - Navigation type not defined for HealthProfile
+    navigation.navigate('HealthProfile');
+  };
+
   // If no data, show prompt
   if (!bodyComposition && !vo2MaxData) {
     return (
-      <View style={styles.emptyCard}>
+      <TouchableOpacity style={styles.emptyCard} onPress={handlePress} activeOpacity={0.7}>
+        <Ionicons name="person-outline" size={32} color={theme.colors.orangeBright} style={{ marginBottom: 8 }} />
         <Text style={styles.emptyText}>
-          Add weight & height in Health Profile for BMI and fitness age estimates
+          Tap to add weight & height for BMI and fitness age estimates
         </Text>
-      </View>
+        <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} style={{ marginTop: 4 }} />
+      </TouchableOpacity>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity style={styles.container} onPress={handlePress} activeOpacity={0.7}>
       {/* BMI Column */}
       <View style={styles.column}>
         <Text style={styles.label}>BMI</Text>
@@ -80,7 +92,12 @@ export const HealthSnapshotCard: React.FC<HealthSnapshotCardProps> = ({
           <Text style={styles.noData}>-</Text>
         )}
       </View>
-    </View>
+
+      {/* Edit Indicator */}
+      <View style={styles.editIndicator}>
+        <Ionicons name="create-outline" size={16} color={theme.colors.textMuted} />
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -150,5 +167,12 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
     lineHeight: 20,
+  },
+
+  editIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
   },
 });

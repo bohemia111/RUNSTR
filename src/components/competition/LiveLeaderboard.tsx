@@ -17,7 +17,7 @@ import { MemberAvatar } from '../ui/MemberAvatar';
 import { TimeRemaining } from '../ui/TimeRemaining';
 import { LeaderboardService } from '../../services/competition/leaderboardService';
 import { CompetitionDistributionPanel } from './CompetitionDistributionPanel';
-import { NutzapLightningButton } from '../nutzap/NutzapLightningButton';
+// import { NutzapLightningButton } from '../nutzap/NutzapLightningButton';
 import type { NDKSubscription } from '@nostr-dev-kit/ndk';
 import type {
   Competition,

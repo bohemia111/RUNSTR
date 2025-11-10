@@ -746,10 +746,16 @@ export class SimpleCompetitionService {
       const scoringModeTag = getTag('scoring_mode');
       const teamGoalTag = getTag('team_goal');
 
+      // ✅ FIX: Defensive captain pubkey extraction with fallback
+      const captainPubkey = event.pubkey || getTag('captain') || '';
+      if (!captainPubkey) {
+        console.warn(`⚠️ Event ${id} missing captain pubkey - event.pubkey and captain tag both empty`);
+      }
+
       return {
         id,
         teamId,
-        captainPubkey: event.pubkey,
+        captainPubkey,
         name: getTag('name') || 'Unnamed Event',
         description: getTag('description'),
         activityType, // ✅ FIX: Properly read from tags

@@ -13,7 +13,6 @@ Main application screens for the RUNSTR mobile app's user interface.
 - **ChallengeDetailScreen.tsx** - Instant 1v1 running challenges (4 distances, fastest-time only, tag-based)
 - **ChallengeLeaderboardScreen.tsx** - Challenge leaderboard with fastest-time comparison
 - **CompetitionsListScreen.tsx** - List all user competitions with tabbed view (teams/leagues/events/challenges) (~500 lines)
-- **EnhancedTeamScreen.tsx** - Enhanced team view with leagues, events, challenges tabs
 - **EnhancedWorkoutHistoryScreen.tsx** - Enhanced workout history with advanced filtering
 - **EventDetailScreen.tsx** - Team event details with location, charity support, and entry controls
 - **LoginScreen.tsx** - Nostr authentication screen with nsec input

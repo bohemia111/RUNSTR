@@ -72,7 +72,7 @@ const HK_WORKOUT_TYPE_MAP: Record<string, WorkoutType> = {
   52: 'walking', // HKWorkoutActivityTypeWalking
   13: 'cycling', // HKWorkoutActivityTypeCycling
   24: 'hiking', // HKWorkoutActivityTypeHiking
-  46: 'yoga', // HKWorkoutActivityTypeYoga
+  46: 'other', // HKWorkoutActivityTypeYoga (not supported - mapped to other)
   35: 'strength_training', // HKWorkoutActivityTypeStrengthTraining
   3: 'gym', // HKWorkoutActivityTypeTraditionalStrengthTraining
 };

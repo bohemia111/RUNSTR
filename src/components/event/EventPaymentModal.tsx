@@ -26,6 +26,7 @@ interface EventPaymentModalProps {
   invoice: string;
   paymentDestination?: 'captain' | 'charity';
   paymentRecipientName?: string;
+  participationType?: 'in-person' | 'virtual'; // ✅ NEW: Show participation type in payment summary
   onPaid: () => void;
   onCancel: () => void;
 }
@@ -39,6 +40,7 @@ export const EventPaymentModal: React.FC<EventPaymentModalProps> = ({
   invoice,
   paymentDestination,
   paymentRecipientName,
+  participationType,
   onPaid,
   onCancel,
 }) => {
@@ -105,7 +107,7 @@ export const EventPaymentModal: React.FC<EventPaymentModalProps> = ({
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Pay Entry Fee</Text>
+          <Text style={styles.headerTitle}>Pay Entry Donation</Text>
           <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
             <Ionicons name="close" size={24} color={theme.colors.text} />
           </TouchableOpacity>
@@ -140,6 +142,20 @@ export const EventPaymentModal: React.FC<EventPaymentModalProps> = ({
                     ? 'Charity - '
                     : 'Captain - '}
                   {paymentRecipientName}
+                </Text>
+              </View>
+            )}
+            {/* ✅ NEW: Show participation type */}
+            {participationType && (
+              <View style={styles.participationTypeDisplay}>
+                <Ionicons
+                  name={participationType === 'in-person' ? 'location' : 'home'}
+                  size={16}
+                  color={theme.colors.textMuted}
+                />
+                <Text style={styles.participationTypeText}>
+                  {participationType === 'in-person' ? 'In-Person' : 'Virtual'}{' '}
+                  Participation
                 </Text>
               </View>
             )}
@@ -333,6 +349,24 @@ const styles = StyleSheet.create({
   },
 
   paymentDestinationText: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    fontWeight: theme.typography.weights.medium,
+  },
+
+  // ✅ NEW: Participation Type Display
+  participationTypeDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.small,
+  },
+
+  participationTypeText: {
     fontSize: 13,
     color: theme.colors.textMuted,
     fontWeight: theme.typography.weights.medium,

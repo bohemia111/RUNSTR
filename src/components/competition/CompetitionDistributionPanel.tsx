@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { theme } from '../../styles/theme';
 import { useNutzap } from '../../hooks/useNutzap';
-import rewardService from '../../services/nutzap/rewardService';
+// import rewardService from '../../services/nutzap/rewardService';
 import type { CompetitionParticipant } from '../../services/competition/competitionService';
 import type { Competition } from '../../services/competition/competitionService';
 import AsyncStorage from '@react-native-async-storage/async-storage';

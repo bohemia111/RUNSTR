@@ -15,6 +15,7 @@ import leagueRankingService, {
   LeagueParameters,
 } from '../services/competition/leagueRankingService';
 import { Competition1301QueryService } from '../services/competition/Competition1301QueryService';
+import { ProfileCache, CachedProfile } from '../cache/ProfileCache';
 import type { NostrWorkout } from '../types/nostrWorkout';
 
 /**
@@ -509,4 +510,45 @@ export function useCachedData<T>(
     error,
     refetch: () => fetchData(true),
   };
+}
+
+/**
+ * Hook for batch fetching Nostr profiles with React integration
+ * Wraps ProfileCache.fetchProfiles() with proper state management
+ * @param pubkeys Array of pubkeys (npub or hex format)
+ * @returns {profiles, loading} Profile map that triggers re-renders
+ */
+export function useNostrProfiles(pubkeys: string[]) {
+  const [profiles, setProfiles] = useState<Map<string, CachedProfile>>(
+    new Map()
+  );
+  const [loading, setLoading] = useState(true);
+
+  // Use stable dependency by joining pubkeys
+  const pubkeysKey = pubkeys.join(',');
+
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      if (pubkeys.length === 0) {
+        setProfiles(new Map());
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const profilesMap = await ProfileCache.fetchProfiles(pubkeys);
+        setProfiles(profilesMap);
+      } catch (error) {
+        console.error('[useNostrProfiles] Failed to fetch profiles:', error);
+        setProfiles(new Map());
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfiles();
+  }, [pubkeysKey]);
+
+  return { profiles, loading };
 }

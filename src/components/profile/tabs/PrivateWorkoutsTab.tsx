@@ -246,7 +246,7 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
                   <Ionicons
                     name="chatbubble-outline"
                     size={16}
-                    color={theme.colors.accentText}
+                    color="#000"
                   />
                   <Text style={styles.postButtonText}>Post</Text>
                 </>
@@ -265,7 +265,7 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
                   <Ionicons
                     name="cloud-upload-outline"
                     size={16}
-                    color={theme.colors.accentText}
+                    color="#000"
                   />
                   <Text style={styles.publicButtonText}>Public</Text>
                 </>
@@ -293,7 +293,7 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
     <MonthlyWorkoutGroup
       group={item}
       renderWorkout={renderWorkout}
-      defaultExpanded={item === monthlyGroups[0]}
+      defaultExpanded={false}
     />
   );
 
@@ -416,20 +416,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   postButton: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: '#FF9D42',
     flex: 1.5,
   },
   postButtonText: {
-    color: theme.colors.accentText,
+    color: '#000',
     fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
   },
   publicButton: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: '#FF9D42',
     flex: 1.5,
   },
   publicButtonText: {
-    color: theme.colors.accentText,
+    color: '#000',
     fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
   },

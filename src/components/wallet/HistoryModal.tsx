@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { theme } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
-import nutzapService from '../../services/nutzap/nutzapService';
+// import nutzapService from '../../services/nutzap/nutzapService';
 
 interface Transaction {
   id: string;

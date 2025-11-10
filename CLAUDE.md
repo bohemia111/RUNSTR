@@ -3,6 +3,8 @@
 ## Project Overview
 RUNSTR REWARDS is a React Native mobile application that transforms fitness routines into Bitcoin-powered team competitions through Nostr's decentralized protocol. The app focuses on three core pillars: **Teams** (community-driven fitness groups with charity integration), **Competitions** (Bitcoin-incentivized events with ticket sales), and **Workouts** (local-first data with selective publishing). Teams receive payments via Nostr Wallet Connect (NWC), enabling instant Bitcoin transactions without platform custody. Members can pay event entry fees with any Lightning wallet (Cash App, Strike, Alby, self-custodial), and captains can challenge each other to 1v1 competitions with Bitcoin wagers.
 
+📖 **For comprehensive feature documentation, see**: [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md)
+🎯 **For Phase 1 MVP strategy and implementation plan, see**: [PHASE_1_MVP.md](./PHASE_1_MVP.md)
 📖 **For detailed overview, see**: [RUNSTR_REWARDS_OVERVIEW.md](./RUNSTR_REWARDS_OVERVIEW.md)
 📖 **For user flow documentation, see**: [APP_USER_FLOW_AND_CAPTAIN_EXPERIENCE.md](./docs/APP_USER_FLOW_AND_CAPTAIN_EXPERIENCE.md)
 🔐 **For environment setup (NWC, secrets), see**: [ENVIRONMENT_SETUP.md](./docs/ENVIRONMENT_SETUP.md)
@@ -138,7 +140,7 @@ RUNSTR is refocusing on three essential components that make fitness competition
 - Distance: separate array elements `['distance', '5.2', 'km']`
 - Duration: HH:MM:SS format (`00:30:45`)
 
-**Supported Activities**: running, walking, cycling, hiking, swimming, rowing, strength, yoga, meditation, other
+**Supported Activities**: running, walking, cycling, hiking, strength, meditation, diet, other
 
 📖 **For complete event specification, tag requirements, and examples, see**: [docs/KIND_1301_SPEC.md](./docs/KIND_1301_SPEC.md)
 
@@ -528,7 +530,7 @@ git add . && git status && git commit -m "Fix: description" && git push origin m
 ✅ **Competition Wizard System** - Complete Event & League creation wizards
 ✅ **Captain Dashboard** - Team management with join request approvals and member removal
 ✅ **Dynamic Scoring System** - Automatic leaderboards based on wizard parameters
-✅ **Bitcoin Integration** - NIP-60/61 Lightning P2P payments, direct prize distribution
+✅ **Bitcoin Integration** - NWC Lightning payments, direct P2P zaps and prize distribution
 ✅ **NEW: Event Payment Verification** - NWC auto-verify + manual override for paid event join requests
 ✅ **NEW: Transaction History Dashboard** - Captain view of incoming payments matching entry fees
 ✅ **NEW: Multi-Path Payment Support** - NWC wallets, Lightning addresses, cash/Venmo manual approval
@@ -560,10 +562,10 @@ git add . && git status && git commit -m "Fix: description" && git push origin m
 
 **Key Architecture Principles:**
 - **No Competition Events**: Competitions are NOT published to Nostr (may change in future)
-- **No Team Wallets**: Direct P2P Bitcoin payments via NIP-60/61 (no pooled funds)
+- **No Team Wallets**: Direct P2P Bitcoin payments via NWC and Lightning addresses (no pooled funds)
 - **No Backend Database**: Pure Nostr events + AsyncStorage caching only
 - **Ephemeral Competitions**: Competitions exist as app-side views over permanent Nostr workout data
-- **Working Backend**: Uses NIP-60/61 protocol with mint.coinos.io infrastructure
+- **Payment System**: Uses NWC (Nostr Wallet Connect) for team payments and Lightning invoices for event tickets
 
 **Why This Architecture:**
 - **Simplicity**: No complex Nostr event types needed for competitions

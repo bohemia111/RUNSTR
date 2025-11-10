@@ -92,6 +92,7 @@ export interface UserCompetition {
   endsAt?: number;
   wager?: number; // For challenges
   prizePool?: number; // For leagues/events
+  eventData?: any; // ✅ Store complete event data (for events type only)
 }
 
 // Global User Discovery Types

@@ -11,10 +11,7 @@ Team discovery, management, and display components for RUNSTR team functionality
 - **CaptainHeader.tsx** - Header component for captain dashboard and management
 - **CaptainWalletManager.tsx** - Wallet management component for team captains
 - **ChallengesCard.tsx** - Challenge display card for team dashboard (deprecated)
-- **ChatHeader.tsx** - Chat channel header with public message warning
-- **ChatInput.tsx** - Message input field with auto-resize and send button
-- **ChatMessage.tsx** - Individual message bubble with avatar and action buttons
-- **CompetitionTabs.tsx** - Tab navigation for League, Events, and Chat sections
+- **CompetitionTabs.tsx** - Tab navigation for League and Events sections
 - **CompetitionWinnersCard.tsx** - Display card showing competition winners with Zap button for P2P payments
 - **DifficultyIndicator.tsx** - Difficulty level indicator for team activities
 - **EventsCard.tsx** - Event display card for team dashboard
@@ -28,7 +25,6 @@ Team discovery, management, and display components for RUNSTR team functionality
 - **TeamActivityFeed.tsx** - Main team activity feed component
 - **TeamCard.tsx** - Team card component for discovery and display
 - **TeamCardHeader.tsx** - Header section for team cards
-- **TeamChatSection.tsx** - Main team chat interface with auto-creation and real-time messaging
 - **TeamDiscoveryManager.tsx** - Team discovery and search management component
 - **TeamHeader.tsx** - Main team header with basic information
 - **TeamJoinModal.tsx** - Modal for joining teams with confirmation

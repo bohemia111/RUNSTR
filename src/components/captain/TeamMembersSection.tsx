@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { MemberAvatar } from '../ui/MemberAvatar';
 import { TeamMemberCache } from '../../services/team/TeamMemberCache';
+import { useNostrProfiles } from '../../hooks/useCachedData';
 
 interface TeamMembersSectionProps {
   teamId: string;
@@ -26,6 +27,12 @@ interface TeamMembersSectionProps {
   onRemoveMember: (memberPubkey: string) => void;
   onRefresh?: () => void;
   style?: any;
+}
+
+interface EnrichedMember {
+  pubkey: string;
+  name: string;
+  picture?: string;
 }
 
 export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
@@ -38,6 +45,10 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
   style,
 }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [enrichedMembers, setEnrichedMembers] = useState<EnrichedMember[]>([]);
+
+  // Fetch profiles using hook (triggers re-renders when profiles arrive)
+  const { profiles, loading: profilesLoading } = useNostrProfiles(members);
 
   const handleRefresh = async () => {
     if (onRefresh) {
@@ -47,25 +58,21 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
     }
   };
 
-  /**
-   * Format pubkey for display:
-   * - If starts with 'npub': show as "npub...last8"
-   * - If hex (64 chars): show as "User ...last8"
-   */
-  const formatMemberDisplay = (pubkey: string): { name: string; subtitle: string } => {
-    if (pubkey.startsWith('npub')) {
-      return {
-        name: `${pubkey.slice(0, 12)}...${pubkey.slice(-8)}`,
-        subtitle: 'Team Member',
-      };
+  // Enrich members with profile data whenever members or profiles change
+  useEffect(() => {
+    if (members.length === 0) {
+      setEnrichedMembers([]);
+      return;
     }
 
-    // Hex pubkey format
-    return {
-      name: `User ${pubkey.slice(0, 8)}...${pubkey.slice(-8)}`,
-      subtitle: 'Team Member',
-    };
-  };
+    const enriched: EnrichedMember[] = members.map(pubkey => ({
+      pubkey,
+      name: profiles.get(pubkey)?.name || `${pubkey.slice(0, 8)}...${pubkey.slice(-8)}`,
+      picture: profiles.get(pubkey)?.picture,
+    }));
+
+    setEnrichedMembers(enriched);
+  }, [members, profiles]);
 
   /**
    * Check if member is the captain (prevent self-removal)
@@ -96,37 +103,39 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
             />
           }
         >
-          {members.map((memberPubkey, index) => {
-            const { name, subtitle } = formatMemberDisplay(memberPubkey);
-            const isTeamCaptain = isCaptain(memberPubkey);
+          {enrichedMembers.map((member, index) => {
+            const isTeamCaptain = isCaptain(member.pubkey);
 
             return (
               <View
-                key={`${memberPubkey}-${index}`}
+                key={`${member.pubkey}-${index}`}
                 style={[
                   styles.memberCard,
-                  index === members.length - 1 && styles.lastMemberCard,
+                  index === enrichedMembers.length - 1 && styles.lastMemberCard,
                 ]}
               >
                 <View style={styles.memberInfo}>
-                  <MemberAvatar name={name} size={36} />
+                  <MemberAvatar
+                    name={member.name}
+                    imageUrl={member.picture}
+                    size={36}
+                  />
                   <View style={styles.memberDetails}>
                     <View style={styles.nameRow}>
-                      <Text style={styles.memberName}>{name}</Text>
+                      <Text style={styles.memberName}>{member.name}</Text>
                       {isTeamCaptain && (
                         <View style={styles.captainBadge}>
                           <Text style={styles.captainBadgeText}>CAPTAIN</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={styles.memberSubtitle}>{subtitle}</Text>
                   </View>
                 </View>
 
                 {!isTeamCaptain && (
                   <TouchableOpacity
                     style={styles.removeButton}
-                    onPress={() => onRemoveMember(memberPubkey)}
+                    onPress={() => onRemoveMember(member.pubkey)}
                     activeOpacity={0.7}
                   >
                     <Ionicons
@@ -234,11 +243,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.text,
-  },
-
-  memberSubtitle: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
   },
 
   // Captain badge

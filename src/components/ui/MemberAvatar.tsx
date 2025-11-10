@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { theme } from '../../styles/theme';
 
 interface MemberAvatarProps {
@@ -41,7 +41,18 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
     textAlign: 'center' as const,
   };
 
-  // For now, we'll use initials. Image support can be added later
+  // Show image if available, otherwise show initials
+  if (imageUrl) {
+    return (
+      <Image
+        source={{ uri: imageUrl }}
+        style={[avatarStyle, style]}
+        resizeMode="cover"
+      />
+    );
+  }
+
+  // Fallback to initials
   return (
     <View style={[avatarStyle, style]}>
       <Text style={textStyle}>{getInitial(name)}</Text>

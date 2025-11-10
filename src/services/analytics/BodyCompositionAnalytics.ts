@@ -2,6 +2,22 @@
  * Body Composition Analytics Service
  * Calculates BMI, VO2 Max, Fitness Age, and healthy weight ranges
  * All calculations happen locally using health profile data
+ *
+ * LOCAL WORKOUT DATA EXTRACTION (Paragraph 1 of 5):
+ * This service extracts workout data from the device's local storage using LocalWorkoutStorageService.
+ * Data sources include GPS-tracked workouts, manually entered workouts, Apple HealthKit imports,
+ * and optionally imported Nostr kind 1301 events from the user's public workout history.
+ * All processing happens on-device without any data transmission to external servers.
+ * The service filters for running/walking workouts with valid distance and duration data,
+ * prioritizing 10K times over 5K times for more accurate VO2 max estimation.
+ *
+ * ACCURACY LIMITATIONS AND BEST PRACTICES (Paragraph 5 of 5):
+ * VO2 max estimates are most accurate when based on recent race-effort workouts (5K or 10K).
+ * BMI does not account for muscle mass, so athletes may show "overweight" despite being fit.
+ * Fitness age is a simplified metric combining two factors - it should be used as a trend indicator
+ * rather than absolute medical assessment. For best results: 1) Complete at least one 5K or 10K
+ * at race effort, 2) Keep weight/height updated in health profile, 3) Track metrics over time
+ * to see improvement trends, 4) Consult medical professionals for health decisions.
  */
 
 import type { LocalWorkout } from '../fitness/LocalWorkoutStorageService';
@@ -49,6 +65,12 @@ export class BodyCompositionAnalytics {
   /**
    * Calculate BMI (Body Mass Index)
    * Formula: weight (kg) / height (m)²
+   *
+   * BMI CALCULATION METHODOLOGY (Paragraph 2 of 5):
+   * BMI is calculated by dividing weight in kilograms by height in meters squared.
+   * This provides a simple measure of body composition that correlates with health outcomes.
+   * Healthy BMI range is 18.5-24.9, overweight is 25-29.9, and obese is 30+.
+   * All calculations happen locally on-device using stored health profile data.
    */
   static calculateBMI(
     weightKg: number,
@@ -70,6 +92,26 @@ export class BodyCompositionAnalytics {
       value: Math.round(bmi * 10) / 10,
       category,
     };
+  }
+
+  /**
+   * Calculate BMI Age - converts BMI to an age metric for fitness age calculation
+   * Healthy BMI = chronological age, deviations add years
+   */
+  static calculateBMIAge(bmi: number, chronologicalAge: number): number {
+    if (bmi >= 18.5 && bmi <= 24.9) {
+      // Healthy BMI - no adjustment
+      return chronologicalAge;
+    } else if (bmi >= 25 && bmi < 30) {
+      // Overweight - add 5 years
+      return chronologicalAge + 5;
+    } else if (bmi >= 30) {
+      // Obese - add 10 years
+      return chronologicalAge + 10;
+    } else {
+      // Underweight - add 3 years
+      return chronologicalAge + 3;
+    }
   }
 
   /**
@@ -142,16 +184,25 @@ export class BodyCompositionAnalytics {
       vo2Max = vo2Max * Math.max(0.8, Math.min(1.2, ageFactor)); // Cap adjustment
     }
 
-    // Calculate percentile and fitness age
+    // Calculate percentile and fitness age with BMI
     const percentile = this.calculateVO2MaxPercentile(
       vo2Max,
       healthProfile.age || 30,
       healthProfile.biologicalSex
     );
+
+    // Calculate BMI for 2-metric fitness age
+    let bmi: number | undefined;
+    if (healthProfile.weight && healthProfile.height) {
+      const heightM = healthProfile.height / 100;
+      bmi = healthProfile.weight / (heightM * heightM);
+    }
+
     const fitnessAge = this.calculateFitnessAge(
       vo2Max,
       healthProfile.age || 30,
-      healthProfile.biologicalSex
+      healthProfile.biologicalSex,
+      bmi
     );
     const category = this.categorizeVO2Max(
       vo2Max,
@@ -205,10 +256,19 @@ export class BodyCompositionAnalytics {
       healthProfile.age || 30,
       healthProfile.biologicalSex
     );
+
+    // Calculate BMI for 2-metric fitness age
+    let bmi: number | undefined;
+    if (healthProfile.weight && healthProfile.height) {
+      const heightM = healthProfile.height / 100;
+      bmi = healthProfile.weight / (heightM * heightM);
+    }
+
     const fitnessAge = this.calculateFitnessAge(
       vo2Max,
       healthProfile.age || 30,
-      healthProfile.biologicalSex
+      healthProfile.biologicalSex,
+      bmi
     );
     const category = this.categorizeVO2Max(
       vo2Max,
@@ -249,28 +309,69 @@ export class BodyCompositionAnalytics {
   }
 
   /**
-   * Calculate fitness age from VO2 Max
-   * Higher VO2 Max = younger fitness age
+   * Calculate fitness age from VO2 Max and BMI using weighted average
+   * 75% VO2 Max Age + 25% BMI Age
+   *
+   * 2-METRIC FITNESS AGE CALCULATION (Paragraph 4 of 5):
+   * Fitness age combines cardiovascular fitness (VO2 max) and body composition (BMI).
+   * First, VO2 max is converted to a "VO2 age" using age-specific norms (e.g., VO2 40 = 35 years old).
+   * Second, BMI is converted to a "BMI age" (+5 years if overweight, +10 if obese).
+   * Final fitness age = (VO2 age × 0.75) + (BMI age × 0.25), weighted toward cardio fitness.
+   * Example: VO2 age 35, BMI age 34 → Fitness age = (35×0.75) + (34×0.25) = 34.75 years
    */
   static calculateFitnessAge(
     vo2Max: number,
     chronologicalAge: number,
-    sex?: 'male' | 'female'
+    sex?: 'male' | 'female',
+    bmi?: number
   ): number {
-    // Average VO2 Max at age 25 (peak fitness)
-    const avgVO2MaxAt25 = sex === 'female' ? 40 : 48;
+    // Calculate VO2 Max Age using age-specific norms (general population, not elite athletes)
+    // Based on ACSM standards for "fair to good" fitness levels
+    const menNorms: Record<number, number> = {
+      20: 42, 25: 41, 30: 40, 35: 38, 40: 37, 45: 36, 50: 35,
+      55: 34, 60: 33, 65: 32, 70: 31
+    };
 
-    // Average decline per year
-    const declinePerYear = sex === 'female' ? 0.4 : 0.5;
+    const womenNorms: Record<number, number> = {
+      20: 38, 25: 37, 30: 36, 35: 35, 40: 34, 45: 33, 50: 32,
+      55: 31, 60: 30, 65: 29, 70: 28
+    };
 
-    // Calculate years difference from age 25 based on VO2 Max
-    const yearsDiff = (avgVO2MaxAt25 - vo2Max) / declinePerYear;
+    const norms = sex === 'female' ? womenNorms : menNorms;
 
-    // Fitness age = 25 + years difference
-    const fitnessAge = 25 + yearsDiff;
+    // Find the age where VO2 max matches the user's current VO2 max
+    let vo2Age = chronologicalAge;
+    let smallestDiff = Infinity;
 
-    // Cap fitness age to reasonable range (18-80)
-    return Math.max(18, Math.min(80, fitnessAge));
+    for (const [ageStr, normVO2] of Object.entries(norms)) {
+      const age = parseInt(ageStr);
+      const diff = Math.abs(normVO2 - vo2Max);
+
+      if (diff < smallestDiff) {
+        smallestDiff = diff;
+        vo2Age = age;
+      }
+    }
+
+    // If VO2 max is higher than 20-year-old norm, cap at 20
+    if (vo2Max > norms[20]) {
+      vo2Age = 20;
+    }
+
+    // If VO2 max is lower than 70-year-old norm, cap at 70
+    if (vo2Max < norms[70]) {
+      vo2Age = 70;
+    }
+
+    // If BMI provided, calculate 2-metric fitness age (75% VO2 + 25% BMI)
+    if (bmi !== undefined) {
+      const bmiAge = this.calculateBMIAge(bmi, chronologicalAge);
+      const weightedFitnessAge = (vo2Age * 0.75) + (bmiAge * 0.25);
+      return Math.round(weightedFitnessAge);
+    }
+
+    // Fallback: Return VO2 age only if no BMI provided
+    return vo2Age;
   }
 
   /**

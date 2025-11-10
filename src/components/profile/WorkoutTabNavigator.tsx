@@ -33,7 +33,7 @@ interface WorkoutTabNavigatorProps {
 export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
   userId,
   pubkey,
-  initialTab = 'public',
+  initialTab = 'private',
   onRefresh,
   onPostToNostr,
   onPostToSocial,
@@ -50,22 +50,6 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
       {/* Tab Switcher */}
       <View style={styles.tabBar}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'public' && styles.tabActive]}
-          onPress={() => setActiveTab('public')}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'public' && styles.tabTextActive,
-            ]}
-          >
-            Public
-          </Text>
-          {activeTab === 'public' && <View style={styles.tabIndicator} />}
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={[styles.tab, activeTab === 'private' && styles.tabActive]}
           onPress={() => setActiveTab('private')}
           activeOpacity={0.7}
@@ -79,6 +63,22 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
             Local
           </Text>
           {activeTab === 'private' && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'public' && styles.tabActive]}
+          onPress={() => setActiveTab('public')}
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'public' && styles.tabTextActive,
+            ]}
+          >
+            Public
+          </Text>
+          {activeTab === 'public' && <View style={styles.tabIndicator} />}
         </TouchableOpacity>
 
         {Platform.OS === 'ios' && (

@@ -245,7 +245,9 @@ export class EventEligibilityService {
       hiking: ['Walking', 'Running'], // Hiking can match both
       gym: ['Strength Training'],
       strength_training: ['Strength Training'],
-      yoga: ['Yoga'],
+      meditation: [],
+      diet: [],
+      fasting: [],
       other: [], // Other requires manual matching
     };
 

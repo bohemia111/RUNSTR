@@ -31,9 +31,6 @@ import { YourCompetitionsBox } from '../components/profile/YourCompetitionsBox';
 import { YourWorkoutsBox } from '../components/profile/YourWorkoutsBox';
 import { NotificationBadge } from '../components/profile/NotificationBadge';
 import { NotificationModal } from '../components/profile/NotificationModal';
-import { QRScannerModal } from '../components/qr/QRScannerModal';
-import { JoinPreviewModal } from '../components/qr/JoinPreviewModal';
-import { NWCQRConfirmationModal } from '../components/wallet/NWCQRConfirmationModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 // Wallet imports removed - moved to Settings
@@ -48,6 +45,7 @@ import { teamJoinNotificationHandler } from '../services/notifications/TeamJoinN
 // import { NotificationService } from '../services/notifications/NotificationService';
 import { getUserNostrIdentifiers } from '../utils/nostr';
 import type { QRData } from '../services/qr/QRCodeService';
+import { AppStateManager } from '../services/core/AppStateManager';
 import JoinRequestService from '../services/competition/JoinRequestService';
 import { EventJoinRequestService } from '../services/events/EventJoinRequestService';
 import { UnifiedSigningService } from '../services/auth/UnifiedSigningService';
@@ -101,11 +99,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const navigation = useNavigation<any>();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
-  const [showQRScanner, setShowQRScanner] = useState(false);
-  const [showJoinPreview, setShowJoinPreview] = useState(false);
-  const [showNWCConfirmation, setShowNWCConfirmation] = useState(false);
-  const [scannedQRData, setScannedQRData] = useState<QRData | null>(null);
-  const [scannedNWCString, setScannedNWCString] = useState<string>('');
   const [userNpub, setUserNpub] = useState<string>('');
 
   // Wallet features moved to Settings screen
@@ -195,6 +188,45 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       challengeResponseHandler.stopListening();
       eventJoinNotificationHandler.stopListening();
       teamJoinNotificationHandler.stopListening();
+    };
+  }, []);
+
+  // v0.6.8: Handle app background/foreground to stop/restart notification handlers
+  useEffect(() => {
+    console.log('[ProfileScreen] 🎯 Setting up AppState lifecycle management');
+
+    const unsubscribe = AppStateManager.onStateChange((isActive) => {
+      if (!isActive) {
+        // App going to background - stop all notification handlers
+        console.log('[ProfileScreen] 📱 App backgrounded - stopping notification handlers');
+        challengeNotificationHandler.stopListening();
+        challengeResponseHandler.stopListening();
+        eventJoinNotificationHandler.stopListening();
+        teamJoinNotificationHandler.stopListening();
+      } else {
+        // App coming to foreground - restart notification handlers
+        console.log('[ProfileScreen] 📱 App foregrounded - restarting notification handlers');
+
+        // Small delay to ensure app is fully active
+        setTimeout(() => {
+          challengeNotificationHandler.startListening().catch((err) => {
+            console.warn('[ProfileScreen] Failed to restart challenge handler:', err);
+          });
+          challengeResponseHandler.startListening().catch((err) => {
+            console.warn('[ProfileScreen] Failed to restart response handler:', err);
+          });
+          eventJoinNotificationHandler.startListening().catch((err) => {
+            console.warn('[ProfileScreen] Failed to restart event handler:', err);
+          });
+          teamJoinNotificationHandler.startListening().catch((err) => {
+            console.warn('[ProfileScreen] Failed to restart team handler:', err);
+          });
+        }, 500);
+      }
+    });
+
+    return () => {
+      unsubscribe();
     };
   }, []);
 
@@ -331,110 +363,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onSignOut,
   ]);
 
-  const handleQRScanned = useCallback((qrData: QRData) => {
-    try {
-      // Route to appropriate modal based on QR type
-      if (qrData.type === 'nwc') {
-        // Validate NWC data before setting state
-        if (!qrData.connectionString || typeof qrData.connectionString !== 'string') {
-          throw new Error('Invalid NWC connection string');
-        }
-        setScannedNWCString(qrData.connectionString);
-        setShowNWCConfirmation(true);
-      } else {
-        // Validate challenge/event data
-        if (!qrData) {
-          throw new Error('Invalid QR data');
-        }
-        setScannedQRData(qrData);
-        setShowJoinPreview(true);
-      }
-    } catch (error) {
-      console.error('[ProfileScreen] QR scan error:', error);
-      Alert.alert(
-        'Error',
-        'Failed to process QR code. Please try scanning again.',
-        [{ text: 'OK' }]
-      );
-    }
-  }, []);
-
-  const handleNWCConnected = useCallback(() => {
-    console.log('[ProfileScreen] NWC wallet connected successfully');
-    // Modal will close automatically, no additional action needed
-  }, []);
-
-  const handleJoinCompetition = useCallback(async (qrData: QRData) => {
-    try {
-      if (qrData.type === 'challenge') {
-        await JoinRequestService.publishChallengeAcceptance(
-          qrData.id,
-          qrData.creator_npub
-        );
-        Alert.alert('Success', 'Challenge acceptance request sent!');
-      } else if (qrData.type === 'event') {
-        // Handle event join using EventJoinRequestService (kind 1105)
-        const signer = await UnifiedSigningService.getSigner();
-        if (!signer) {
-          Alert.alert('Error', 'Authentication required to join events');
-          return;
-        }
-
-        const userHexPubkey = await UnifiedSigningService.getHexPubkey();
-        if (!userHexPubkey) {
-          Alert.alert('Error', 'Could not determine user public key');
-          return;
-        }
-
-        const eventJoinService = EventJoinRequestService.getInstance();
-
-        // Prepare event join request
-        const requestData = {
-          eventId: qrData.id,
-          eventName: qrData.name,
-          teamId: qrData.team_id,
-          captainPubkey: qrData.captain_npub,
-          message: `Requesting to join ${qrData.name} via QR code`,
-        };
-
-        const eventTemplate = eventJoinService.prepareEventJoinRequest(
-          requestData,
-          userHexPubkey
-        );
-
-        // Sign and publish the event join request using UnifiedSigningService
-        const ndk = await GlobalNDKService.getInstance();
-        const ndkEvent = new NDKEvent(ndk, eventTemplate);
-        await ndkEvent.sign(signer);
-        await ndkEvent.publish();
-
-        Alert.alert(
-          'Request Sent',
-          'Your join request has been sent to the captain for approval!'
-        );
-      }
-      // NWC type is handled by separate modal, not here
-    } catch (error) {
-      console.error('Failed to join competition:', error);
-      Alert.alert('Error', 'Failed to send join request. Please try again.');
-    }
-  }, []);
+  // QR scanner and related functions moved to Settings screen
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header with QR Scanner and Settings Button */}
+      {/* Header with Settings Button */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.qrButton}
-          onPress={() => setShowQRScanner(true)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons
-            name="qr-code-outline"
-            size={24}
-            color={theme.colors.text}
-          />
-        </TouchableOpacity>
         <View style={styles.headerSpacer} />
 
         <TouchableOpacity
@@ -497,34 +431,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       </ScrollView>
 
       {/* Wallet modals moved to Settings screen */}
+      {/* QR scanner and related modals moved to Settings screen */}
 
       {/* Notification Modal */}
       <NotificationModal
         visible={showNotificationModal}
         onClose={() => setShowNotificationModal(false)}
-      />
-
-      {/* QR Scanner Modal */}
-      <QRScannerModal
-        visible={showQRScanner}
-        onClose={() => setShowQRScanner(false)}
-        onScanned={handleQRScanned}
-      />
-
-      {/* Join Preview Modal */}
-      <JoinPreviewModal
-        visible={showJoinPreview}
-        onClose={() => setShowJoinPreview(false)}
-        data={scannedQRData}
-        onJoin={handleJoinCompetition}
-      />
-
-      {/* NWC Wallet Connection Modal */}
-      <NWCQRConfirmationModal
-        visible={showNWCConfirmation}
-        onClose={() => setShowNWCConfirmation(false)}
-        connectionString={scannedNWCString}
-        onSuccess={handleNWCConnected}
       />
     </SafeAreaView>
   );

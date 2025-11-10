@@ -22,6 +22,7 @@ interface LeaderboardEntry {
   score: number;
   formattedScore: string;
   workoutCount: number;
+  participationType?: 'in-person' | 'virtual'; // ✅ NEW: How user is participating
 }
 
 interface SimpleLeagueDisplayProps {
@@ -113,6 +114,30 @@ export const SimpleLeagueDisplay: React.FC<SimpleLeagueDisplayProps> = ({
 
             {/* Row 2: Stats below */}
             <View style={styles.statsRow}>
+              {/* ✅ NEW: Participation type badge */}
+              {entry.participationType && (
+                <View
+                  style={[
+                    styles.participationBadge,
+                    entry.participationType === 'in-person'
+                      ? styles.participationBadgeInPerson
+                      : styles.participationBadgeVirtual,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.participationBadgeText,
+                      entry.participationType === 'in-person'
+                        ? styles.participationBadgeTextInPerson
+                        : styles.participationBadgeTextVirtual,
+                    ]}
+                  >
+                    {entry.participationType === 'in-person'
+                      ? 'IN-PERSON'
+                      : 'VIRTUAL'}
+                  </Text>
+                </View>
+              )}
               <Text style={styles.workoutCount}>{entry.workoutCount} runs</Text>
               <Text
                 style={[
@@ -261,5 +286,39 @@ const styles = StyleSheet.create({
   topThreeScore: {
     fontSize: 15,
     color: theme.colors.accent,
+  },
+
+  // ✅ NEW: Participation type badge styles
+  participationBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+
+  participationBadgeInPerson: {
+    backgroundColor: '#000',
+    borderWidth: 2,
+    borderColor: theme.colors.accent, // Orange
+  },
+
+  participationBadgeVirtual: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+
+  participationBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+
+  participationBadgeTextInPerson: {
+    color: theme.colors.accent, // Orange text
+  },
+
+  participationBadgeTextVirtual: {
+    color: '#999', // Medium gray text
   },
 });

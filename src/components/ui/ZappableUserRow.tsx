@@ -16,7 +16,7 @@ import { theme } from '../../styles/theme';
 import { Avatar } from './Avatar';
 import { NWCLightningButton } from '../lightning/NWCLightningButton';
 import { ChallengeIconButton } from './ChallengeIconButton';
-import { QuickChallengeWizard } from '../wizards/QuickChallengeWizard';
+import { SimpleChallengeWizardV2 } from '../wizards/SimpleChallengeWizardV2';
 import { useNostrProfile } from '../../hooks/useCachedData';
 
 interface ZappableUserRowProps {
@@ -113,21 +113,14 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
       </View>
 
       {/* Challenge Wizard Modal */}
-      <Modal
+      <SimpleChallengeWizardV2
         visible={challengeWizardVisible}
-        animationType="slide"
-        presentationStyle="fullScreen"
-      >
-        <QuickChallengeWizard
-          opponent={{
-            pubkey: npub,
-            name: displayName,
-            picture: avatarUrl,
-          }}
-          onComplete={() => setChallengeWizardVisible(false)}
-          onCancel={() => setChallengeWizardVisible(false)}
-        />
-      </Modal>
+        onClose={() => setChallengeWizardVisible(false)}
+        preSelectedOpponent={{
+          pubkey: npub,
+          name: displayName,
+        }}
+      />
     </>
   );
 };

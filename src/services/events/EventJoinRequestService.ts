@@ -26,6 +26,8 @@ export interface EventJoinRequest {
   paymentHash?: string; // Extracted payment hash for NWC verification
   amountPaid?: number; // Amount in sats from amount_paid tag
   paymentTimestamp?: number; // When payment was made (from payment_timestamp tag)
+  // ✅ NEW: Participation type tracking
+  participationType?: 'in-person' | 'virtual'; // How user will participate
 }
 
 export interface EventJoinRequestData {
@@ -296,6 +298,9 @@ export class EventJoinRequestService {
         (t) => t[0] === 'payment_timestamp'
       );
 
+      // ✅ NEW: Extract participation type tag
+      const participationTypeTag = event.tags.find((t) => t[0] === 'participation_type');
+
       // Extract payment hash from invoice if present
       let paymentHash: string | undefined;
       if (paymentProofTag?.[1]) {
@@ -322,6 +327,8 @@ export class EventJoinRequestService {
         paymentTimestamp: paymentTimestampTag?.[1]
           ? parseInt(paymentTimestampTag[1], 10)
           : undefined,
+        // ✅ NEW: Participation type field
+        participationType: participationTypeTag?.[1] as 'in-person' | 'virtual' | undefined,
       };
     } catch (error) {
       console.error('❌ Failed to parse event join request:', error);

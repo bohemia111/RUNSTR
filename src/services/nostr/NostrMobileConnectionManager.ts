@@ -6,6 +6,7 @@
 
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import { nostrRelayManager } from './NostrRelayManager';
+import { AppStateManager } from '../core/AppStateManager';
 
 export interface MobileConnectionConfig {
   pauseInBackground: boolean;
@@ -71,11 +72,23 @@ export class NostrMobileConnectionManager {
   private initialize(): void {
     console.log('🔄 Initializing mobile connection management...');
 
-    // Set up app state change listener
-    this.appStateSubscription = AppState.addEventListener(
-      'change',
-      this.handleAppStateChange.bind(this)
-    );
+    // ✅ FIX: Use AppStateManager instead of direct AppState listener
+    // This prevents multiple conflicting listeners causing Android crashes
+    this.appStateSubscription = AppStateManager.onStateChange((isActive) => {
+      const nextAppState = isActive ? 'active' : 'background';
+      const previousAppState = this.state.appState;
+
+      // Update state
+      this.state.appState = nextAppState;
+
+      if (!isActive) {
+        // App going to background
+        this.handleBackgroundTransition();
+      } else {
+        // App coming to foreground
+        this.handleForegroundTransition();
+      }
+    });
 
     // Set up network state listeners if available
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -85,37 +98,9 @@ export class NostrMobileConnectionManager {
     console.log('✅ Mobile connection management initialized');
   }
 
-  /**
-   * Handle app state changes (background/foreground)
-   */
-  private handleAppStateChange(nextAppState: AppStateStatus): void {
-    const previousAppState = this.state.appState;
-    console.log(`📱 App state changing: ${previousAppState} → ${nextAppState}`);
-
-    // Clear any existing timers
-    this.clearTimers();
-
-    if (
-      previousAppState.match(/inactive|background/) &&
-      nextAppState === 'active'
-    ) {
-      // App coming to foreground
-      this.handleForegroundTransition();
-    } else if (
-      previousAppState === 'active' &&
-      nextAppState.match(/inactive|background/)
-    ) {
-      // App going to background
-      this.handleBackgroundTransition();
-    }
-
-    this.updateState({
-      appState: nextAppState,
-      backgroundSince: nextAppState.match(/inactive|background/)
-        ? new Date()
-        : undefined,
-    });
-  }
+  // ✅ REMOVED: handleAppStateChange method no longer needed
+  // AppStateManager now handles state changes centrally
+  // This prevents multiple conflicting listeners
 
   /**
    * Handle app going to background
@@ -425,8 +410,9 @@ export class NostrMobileConnectionManager {
 
     this.clearTimers();
 
+    // ✅ FIX: Call the unsubscribe function returned by AppStateManager
     if (this.appStateSubscription) {
-      this.appStateSubscription.remove();
+      this.appStateSubscription(); // This is now a function, not an object with .remove()
       this.appStateSubscription = null;
     }
 

@@ -119,17 +119,20 @@ export class CaloricAnalyticsService {
     let caloriesOut = 0;
 
     for (const workout of dayWorkouts) {
-      if (!workout.calories) continue;
+      // Validate calorie data exists and is a positive number
+      if (!workout.calories || workout.calories < 0 || isNaN(workout.calories)) {
+        continue;
+      }
 
       if (workout.type === 'diet') {
         // Meals add calories
-        caloriesIn += workout.calories;
+        caloriesIn += Math.abs(workout.calories);
       } else if (workout.type === 'fasting') {
         // Fasting doesn't add intake (already 0)
         continue;
       } else {
         // All other activities burn calories
-        caloriesOut += workout.calories;
+        caloriesOut += Math.abs(workout.calories);
       }
     }
 
@@ -299,34 +302,37 @@ export class CaloricAnalyticsService {
 
   /**
    * Calculate weekly average (for simple display)
+   * Uses same date-based logic as calculateDailyBalance for timezone consistency
    */
   static calculateWeeklyAverage(
     workouts: LocalWorkout[]
-  ): { in: number; out: number; net: number } {
+  ): { in: number; out: number; net: number; daysWithData: number } {
     const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const last7Days: DailyCalorieBalance[] = [];
 
-    const weekWorkouts = workouts.filter(
-      (w) => new Date(w.startTime) >= weekAgo
-    );
-
-    let totalIn = 0;
-    let totalOut = 0;
-
-    for (const workout of weekWorkouts) {
-      if (!workout.calories) continue;
-
-      if (workout.type === 'diet') {
-        totalIn += workout.calories;
-      } else if (workout.type !== 'fasting') {
-        totalOut += workout.calories;
-      }
+    // Calculate balance for each of the last 7 days (including today)
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toLocaleDateString('en-CA');
+      const dayBalance = this.calculateDailyBalance(workouts, dateStr);
+      last7Days.push(dayBalance);
     }
+
+    // Count days with any calorie data
+    const daysWithData = last7Days.filter(
+      (day) => day.caloriesIn > 0 || day.caloriesOut > 0
+    ).length;
+
+    // Sum totals across all 7 days
+    const totalIn = last7Days.reduce((sum, day) => sum + day.caloriesIn, 0);
+    const totalOut = last7Days.reduce((sum, day) => sum + day.caloriesOut, 0);
 
     return {
       in: Math.round(totalIn / 7),
       out: Math.round(totalOut / 7),
       net: Math.round((totalIn - totalOut) / 7),
+      daysWithData,
     };
   }
 }

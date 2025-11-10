@@ -5,7 +5,6 @@
 
 export const FEATURES = {
   // Wallet Systems
-  ENABLE_CASHU_WALLET: false, // NIP-60/61 Cashu wallet (preserved for future, currently disabled)
   ENABLE_NWC_WALLET: true, // Nostr Wallet Connect (current implementation)
 
   // Bitcoin Features

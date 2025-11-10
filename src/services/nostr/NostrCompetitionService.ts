@@ -201,6 +201,43 @@ export class NostrCompetitionService {
     try {
       console.log('🎯 Creating event:', eventData.name);
 
+      // ✅ FIX: Validate required fields before publishing
+      if (!eventData.teamId || eventData.teamId.trim() === '') {
+        console.error('❌ Event creation failed: teamId is required but was empty');
+        return {
+          eventId: '',
+          competitionId: '',
+          success: false,
+          message: 'Team ID is required to create an event. Please ensure you are creating the event from a team page.',
+        };
+      }
+
+      if (!eventData.name || eventData.name.trim() === '') {
+        console.error('❌ Event creation failed: name is required but was empty');
+        return {
+          eventId: '',
+          competitionId: '',
+          success: false,
+          message: 'Event name is required.',
+        };
+      }
+
+      if (!eventData.activityType) {
+        console.error('❌ Event creation failed: activityType is required but was missing');
+        return {
+          eventId: '',
+          competitionId: '',
+          success: false,
+          message: 'Activity type is required. Please select an event preset.',
+        };
+      }
+
+      console.log('✅ Event validation passed:', {
+        teamId: eventData.teamId,
+        name: eventData.name,
+        activityType: eventData.activityType,
+      });
+
       const isSigner = typeof captainPrivateKeyOrSigner !== 'string';
 
       // ✅ FIX: Use provided ID if available (from wizard), otherwise generate new one
@@ -240,6 +277,7 @@ export class NostrCompetitionService {
       const tags: Array<[string, string]> = [
         ['d', competitionId],
         ['team', eventData.teamId],
+        ['captain', captainPubkey], // ✅ FIX: Explicit captain tag for redundancy
         ['activity_type', eventData.activityType],
         ['competition_type', eventData.competitionType], // Deprecated: backward compat
         ['event_date', eventData.eventDate],
@@ -312,6 +350,11 @@ export class NostrCompetitionService {
         tags.push(['payment_recipient_name', eventData.paymentRecipientName]);
       }
 
+      // ✅ NEW: Add location tag if provided
+      if (eventData.location) {
+        tags.push(['location', eventData.location]);
+      }
+
       const eventTemplate: EventTemplate = {
         kind: 30101,
         content: JSON.stringify(eventDefinition),
@@ -338,6 +381,17 @@ export class NostrCompetitionService {
         await ndkEvent.sign(signer);
       }
 
+      // ✅ FIX: Debug logging - verify event structure before publishing
+      console.log('✍️ Signed event ready to publish:', {
+        id: ndkEvent.id,
+        pubkey: ndkEvent.pubkey,
+        kind: ndkEvent.kind,
+        created_at: ndkEvent.created_at,
+        tags: ndkEvent.tags,
+        content_preview: ndkEvent.content.substring(0, 200) + '...',
+      });
+      console.log('🔍 Event definition in content:', JSON.parse(ndkEvent.content));
+
       // Publish to relays with timeout
       const publishPromise = ndkEvent.publish();
       const timeoutPromise = new Promise<Set<any>>((resolve) =>
@@ -349,6 +403,15 @@ export class NostrCompetitionService {
 
       if (publishedRelayCount > 0) {
         console.log(`✅ Event published successfully to ${publishedRelayCount} relays:`, competitionId);
+
+        // ✅ DEBUG: Verify tags persisted after publish
+        console.log('🔍 Verifying published event has team tag:', {
+          eventId: ndkEvent.id,
+          teamTag: ndkEvent.tags.find(t => t[0] === 'team'),
+          captainTag: ndkEvent.tags.find(t => t[0] === 'captain'),
+          nameTag: ndkEvent.tags.find(t => t[0] === 'name'),
+          allTags: ndkEvent.tags.slice(0, 15).map(t => `[${t[0]}, ${t[1]}]`),
+        });
 
         // ✅ NEW: Save event locally for captain dashboard re-announcement
         try {

@@ -17,7 +17,7 @@ import {
   DirectNostrProfileService,
   type DirectNostrUser,
 } from '../../user/directNostrProfileService';
-import nutzapService from '../../nutzap/nutzapService';
+// import nutzapService from '../../nutzap/nutzapService';
 import { NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
 
 export class NostrAuthProvider {

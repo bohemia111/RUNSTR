@@ -157,6 +157,7 @@ import { theme } from './styles/theme';
 import unifiedCache from './services/cache/UnifiedNostrCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PerformanceLogger } from './utils/PerformanceLogger';
+import { AppStateManager } from './services/core/AppStateManager';
 import { challengeCompletionService } from './services/challenge/ChallengeCompletionService';
 import { appPermissionService } from './services/initialization/AppPermissionService';
 import { PermissionRequestModal } from './components/permissions/PermissionRequestModal';
@@ -224,6 +225,12 @@ const AppContent: React.FC = () => {
     initError,
     signOut,
   } = useAuth();
+
+  // Initialize AppStateManager as early as possible
+  React.useEffect(() => {
+    console.log('[App] 🎯 Initializing AppStateManager - Single source of truth');
+    AppStateManager.initialize();
+  }, []);
 
   const [onboardingCompleted, setOnboardingCompleted] = React.useState<
     boolean | null
@@ -543,25 +550,10 @@ const AppContent: React.FC = () => {
   const appState = React.useRef(AppState.currentState);
   const backgroundTime = React.useRef<number>(0);
 
-  // ⚠️ REMOVED: AppState handler was causing instant crashes on Android
-  // The synchronous challengeCompletionService.stopMonitoring() call created
-  // a race condition with NostrMobileConnectionManager's WebSocket access.
-  // Android kills WebSockets immediately on background, causing crash.
-  // Challenge monitoring is now handled differently to avoid this issue.
-
-  // Track app state for reference but don't add conflicting handlers
-  React.useEffect(() => {
-    // Just update the ref, no handlers that could conflict
-    const subscription = AppState.addEventListener(
-      'change',
-      (nextAppState: AppStateStatus) => {
-        appState.current = nextAppState;
-      }
-    );
-    return () => {
-      subscription.remove();
-    };
-  }, []);
+  // ⚠️ AppState management is now handled by AppStateManager
+  // This prevents multiple conflicting listeners and race conditions
+  // that were causing instant crashes on Android in v0.6.2-v0.6.5
+  // AppStateManager is the SINGLE source of truth for app state
 
   // Authenticated app with bottom tabs and team creation modal
   const AuthenticatedNavigator: React.FC<{ user: User }> = ({ user }) => {
@@ -634,13 +626,32 @@ const AppContent: React.FC = () => {
           }
           */
 
-          // ✅ CHALLENGE COMPLETION: Defer monitoring start to prevent startup crashes
-          console.log('[App] 🏁 Challenge monitoring will start in 5 seconds (deferred start)...');
+          // ✅ CHALLENGE COMPLETION: Use AppStateManager to control monitoring
+          console.log('[App] 🏁 Setting up challenge monitoring with AppStateManager...');
+
+          // Register callback to stop/start monitoring based on app state
+          AppStateManager.onStateChange((isActive) => {
+            if (isActive) {
+              // Resume monitoring when app becomes active
+              setTimeout(() => {
+                if (AppStateManager.canDoNetworkOps()) {
+                  challengeCompletionService.startMonitoring();
+                  console.log('[App] ✅ Challenge monitoring resumed (app active)');
+                }
+              }, 1000);
+            } else {
+              // Stop monitoring when app goes to background
+              challengeCompletionService.stopMonitoring();
+              console.log('[App] ⏸️ Challenge monitoring paused (app background)');
+            }
+          });
+
+          // Initial start if app is active
           setTimeout(() => {
             try {
-              if (appState.current === 'active') {
+              if (AppStateManager.isActive()) {
                 challengeCompletionService.startMonitoring();
-                console.log('[App] ✅ Challenge completion monitoring active (deferred start)');
+                console.log('[App] ✅ Challenge completion monitoring active (initial start)');
               } else {
                 console.log('[App] ⏸️  App not active, skipping challenge monitoring start');
               }

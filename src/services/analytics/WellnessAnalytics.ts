@@ -46,7 +46,7 @@ export class WellnessAnalytics {
     return workouts
       .filter(
         (w) =>
-          w.type === 'meditation' || w.type === 'yoga' || w.type === 'wellness'
+          w.type === 'meditation' || w.type === 'wellness'
       )
       .sort(
         (a, b) =>

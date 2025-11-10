@@ -21,7 +21,6 @@ import { theme } from '../../styles/theme';
 import { getCharityById } from '../../constants/charities';
 import { CharityZapService } from '../../services/charity/CharityZapService';
 import { CharityPaymentModal } from '../charity/CharityPaymentModal';
-import { EnhancedZapModal } from '../nutzap/EnhancedZapModal';
 import { ExternalZapModal } from '../nutzap/ExternalZapModal';
 import { NWCWalletService } from '../../services/wallet/NWCWalletService';
 import { useNWCZap } from '../../hooks/useNWCZap';
@@ -37,7 +36,6 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
   charityId,
 }) => {
   // State for modals
-  const [showEnhancedModal, setShowEnhancedModal] = useState(false);
   const [showExternalModal, setShowExternalModal] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState(DEFAULT_ZAP_AMOUNT);
   const [selectedMemo, setSelectedMemo] = useState('');
@@ -133,15 +131,25 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
     ]).start();
   };
 
-  // SINGLE TAP: Quick zap with NWC (21 sats default)
-  const handleZapPress = async () => {
+  // SINGLE TAP: Open ExternalZapModal with QR code (universal, works for everyone)
+  const handleZapPress = () => {
+    animatePress();
+    console.log('[CharitySection] Tap detected - opening external wallet modal');
+
+    setSelectedAmount(DEFAULT_ZAP_AMOUNT);
+    setSelectedMemo(`Donation to ${charity.name}`);
+    setShowExternalModal(true);
+  };
+
+  // LONG PRESS: Quick NWC zap (21 sats default, power user feature)
+  const handleZapLongPress = async () => {
     animatePress();
 
     // Check for NWC wallet
     if (!hasWallet) {
       Alert.alert(
-        'Wallet Not Configured',
-        'Long press to donate using an external wallet like Cash App or Strike.',
+        'NWC Wallet Not Configured',
+        'Tap to donate using external wallets like Cash App or Strike.',
         [{ text: 'OK' }]
       );
       return;
@@ -151,7 +159,7 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
     if (walletBalance < DEFAULT_ZAP_AMOUNT) {
       Alert.alert(
         'Insufficient Balance',
-        `You need ${DEFAULT_ZAP_AMOUNT} sats but only have ${walletBalance}. Long press to use an external wallet.`,
+        `You need ${DEFAULT_ZAP_AMOUNT} sats but only have ${walletBalance}. Tap to use an external wallet.`,
         [{ text: 'OK' }]
       );
       return;
@@ -160,7 +168,7 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
     // Quick zap with default amount
     setIsZapping(true);
     try {
-      console.log(`[CharitySection] Quick zapping ${charity.name} with ${DEFAULT_ZAP_AMOUNT} sats`);
+      console.log(`[CharitySection] Long press NWC zap to ${charity.name} with ${DEFAULT_ZAP_AMOUNT} sats`);
 
       // Get invoice from charity's Lightning address
       const { invoice } = await getInvoiceFromLightningAddress(
@@ -186,20 +194,11 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
         Alert.alert('Error', paymentResult.error || 'Failed to process donation. Please try again.');
       }
     } catch (error) {
-      console.error('[CharitySection] Quick zap error:', error);
-      Alert.alert('Error', 'Failed to process donation. Long press to use an external wallet.');
+      console.error('[CharitySection] Long press NWC zap error:', error);
+      Alert.alert('Error', 'Failed to process donation. Tap to use an external wallet.');
     } finally {
       setIsZapping(false);
     }
-  };
-
-  // LONG PRESS: Open modal for custom amount
-  const handleZapLongPress = () => {
-    animatePress();
-    console.log('[CharitySection] Long press detected - opening amount modal');
-
-    // Just open the modal, Lightning address will be passed directly
-    setShowEnhancedModal(true);
   };
 
   const handleLearnMore = () => {
@@ -252,7 +251,7 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
           )}
         </View>
 
-        {/* Zap Button - Single tap for quick 21 sats, long press for custom amount */}
+        {/* Zap Button - Tap for QR code, long press for quick NWC zap */}
         <Animated.View style={{ transform: [{ scale: scaleAnimation }] }}>
           <TouchableOpacity
             onPress={handleZapPress}
@@ -281,44 +280,16 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
         </Animated.View>
       </View>
 
-      {/* Enhanced Zap Modal for amount selection */}
-      {showEnhancedModal && (
-        <EnhancedZapModal
-          visible={showEnhancedModal}
-          onClose={() => setShowEnhancedModal(false)}
-          recipientNpub={charity.lightningAddress}  // Pass Lightning address directly
-          recipientName={charity.name}
-          balance={walletBalance}
-          defaultAmount={DEFAULT_ZAP_AMOUNT}
-          onSuccess={async () => {
-            await markAsZapped();
-            setShowEnhancedModal(false);
-          }}
-          onShowExternalWallet={(amount, memo) => {
-            console.log('[CharitySection] Switching to external wallet:', { amount, memo });
-            setSelectedAmount(amount);
-            setSelectedMemo(memo || `Donation to ${charity.name}`);
-            setShowEnhancedModal(false);
-            setTimeout(() => {
-              // Small delay to ensure modal transition is smooth
-              setShowExternalModal(true);
-            }, 100);
-          }}
-        />
-      )}
-
       {/* External Wallet Modal for QR code payment */}
-      {showExternalModal && (
-        <ExternalZapModal
-          visible={showExternalModal}
-          onClose={() => setShowExternalModal(false)}
-          recipientNpub={charity.lightningAddress}  // Pass Lightning address directly
-          recipientName={charity.name}
-          amount={selectedAmount}
-          memo={selectedMemo}
-          onSuccess={handleExternalPaymentConfirmed}
-        />
-      )}
+      <ExternalZapModal
+        visible={showExternalModal}
+        onClose={() => setShowExternalModal(false)}
+        recipientNpub={charity.lightningAddress}  // Pass Lightning address directly
+        recipientName={charity.name}
+        amount={selectedAmount}
+        memo={selectedMemo}
+        onSuccess={handleExternalPaymentConfirmed}
+      />
     </View>
   );
 };

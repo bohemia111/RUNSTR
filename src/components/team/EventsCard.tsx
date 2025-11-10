@@ -35,7 +35,29 @@ interface EventStatus {
   isCompleted: boolean;
   hasRequestedJoin: boolean;
   participantCount: number;
+  // ✅ NEW: Time-based event status
+  timingStatus: 'upcoming' | 'active' | 'ended';
 }
+
+// ✅ NEW: Helper function to calculate event timing status
+const getEventTimingStatus = (
+  event: FormattedEvent
+): 'upcoming' | 'active' | 'ended' => {
+  const now = new Date();
+  const eventStartDate = new Date(event.startDate || event.date);
+  const durationMinutes = event.durationMinutes || 1440; // Default 24 hours
+  const eventEndDate = new Date(
+    eventStartDate.getTime() + durationMinutes * 60 * 1000
+  );
+
+  if (now < eventStartDate) {
+    return 'upcoming';
+  } else if (now >= eventStartDate && now <= eventEndDate) {
+    return 'active';
+  } else {
+    return 'ended';
+  }
+};
 
 export const EventsCard: React.FC<EventsCardProps> = ({
   events,
@@ -113,6 +135,7 @@ export const EventsCard: React.FC<EventsCardProps> = ({
             isCompleted,
             hasRequestedJoin,
             participantCount: participants.length,
+            timingStatus: getEventTimingStatus(event), // ✅ NEW: Calculate timing status
           };
         } catch (error) {
           console.log(`Could not check status for event ${event.id}`);
@@ -122,6 +145,7 @@ export const EventsCard: React.FC<EventsCardProps> = ({
             isCompleted: false,
             hasRequestedJoin: false,
             participantCount: 0,
+            timingStatus: getEventTimingStatus(event), // ✅ NEW: Calculate timing status even on error
           };
         }
       }
@@ -232,22 +256,29 @@ export const EventsCard: React.FC<EventsCardProps> = ({
                   <Text style={styles.eventName}>{event.name}</Text>
                   {eventStatuses[event.id] && (
                     <View style={styles.statusBadges}>
-                      {eventStatuses[event.id].isJoined && (
-                        <View style={styles.statusBadge}>
-                          <Text style={styles.statusText}>Joined</Text>
+                      {/* ✅ NEW: Timing status badge (always shown) */}
+                      {eventStatuses[event.id].timingStatus === 'upcoming' && (
+                        <View style={styles.upcomingBadge}>
+                          <Text style={styles.statusText}>Upcoming</Text>
                         </View>
                       )}
-                      {eventStatuses[event.id].isActive && (
-                        <View style={styles.activeBadge}>
+                      {eventStatuses[event.id].timingStatus === 'active' && (
+                        <View style={styles.activeTimingBadge}>
                           <Text style={styles.statusText}>Active</Text>
                         </View>
                       )}
-                      {eventStatuses[event.id].isCompleted &&
-                        !eventStatuses[event.id].isJoined && (
-                          <View style={styles.completedBadge}>
-                            <Text style={styles.statusText}>Past</Text>
-                          </View>
-                        )}
+                      {eventStatuses[event.id].timingStatus === 'ended' && (
+                        <View style={styles.endedBadge}>
+                          <Text style={styles.statusText}>Ended</Text>
+                        </View>
+                      )}
+
+                      {/* Existing participation badges */}
+                      {eventStatuses[event.id].isJoined && (
+                        <View style={styles.joinedBadge}>
+                          <Text style={styles.statusText}>Joined</Text>
+                        </View>
+                      )}
                     </View>
                   )}
                 </View>
@@ -473,6 +504,43 @@ const styles = StyleSheet.create({
   completedBadge: {
     borderWidth: 1,
     borderColor: theme.colors.textMuted + '60',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+
+  // ✅ Timing status badge styles (theme-compliant)
+  upcomingBadge: {
+    backgroundColor: theme.colors.orangeBright + '20', // Orange with opacity
+    borderWidth: 1,
+    borderColor: theme.colors.orangeBright,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+
+  activeTimingBadge: {
+    backgroundColor: theme.colors.orangeBright + '30', // Slightly more opaque for active
+    borderWidth: 1,
+    borderColor: theme.colors.orangeBright,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+
+  endedBadge: {
+    backgroundColor: theme.colors.textMuted + '20', // Muted gray with opacity
+    borderWidth: 1,
+    borderColor: theme.colors.textMuted,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+
+  joinedBadge: {
+    borderWidth: 1,
+    borderColor: theme.colors.orangeBright,
+    backgroundColor: theme.colors.orangeBright + '20',
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,

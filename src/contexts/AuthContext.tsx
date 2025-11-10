@@ -98,15 +98,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           CacheKeys.USER_PROFILE(hexPubkey)
         );
 
-        // ✅ PROFILE CACHE FIX: If memory cache empty, try AsyncStorage (with timeout)
+        // ✅ PERFORMANCE FIX: If memory cache empty, try AsyncStorage (no artificial timeout)
         if (!cachedUser) {
           console.log('⚡ AuthContext: Memory cache miss, checking AsyncStorage...');
           try {
             PerformanceLogger.start('AuthContext: getCachedAsync (AsyncStorage read)', 1);
-            cachedUser = await Promise.race([
-              unifiedCache.getCachedAsync<User>(CacheKeys.USER_PROFILE(hexPubkey)),
-              new Promise<null>((resolve) => setTimeout(() => resolve(null), 300))
-            ]);
+            cachedUser = await unifiedCache.getCachedAsync<User>(CacheKeys.USER_PROFILE(hexPubkey));
             PerformanceLogger.end('AuthContext: getCachedAsync (AsyncStorage read)');
             if (cachedUser) {
               console.log('✅ AuthContext: Loaded user from AsyncStorage');

@@ -6,6 +6,7 @@
  * NEW: Uses Lightning addresses for direct payment flow (no escrow)
  */
 
+import { AppStateManager } from '../core/AppStateManager';
 import challengeService from '../competition/ChallengeService';
 import { challengePaymentService } from './ChallengePaymentService';
 import { challengeArbitrationService } from './ChallengeArbitrationService';
@@ -81,6 +82,12 @@ export class ChallengeCompletionService {
       // ✅ FIX: Early exit if monitoring is stopped (prevents background execution)
       if (!this.monitoringInterval) {
         console.log('⏸️  Monitoring stopped, skipping challenge check');
+        return;
+      }
+
+      // ✅ FIX: Check if app can do network operations (prevents Android crash)
+      if (!AppStateManager.canDoNetworkOps()) {
+        console.log('🔴 App is backgrounded, skipping challenge check');
         return;
       }
 

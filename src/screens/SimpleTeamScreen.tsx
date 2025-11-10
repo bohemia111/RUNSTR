@@ -22,6 +22,10 @@ import SimpleCompetitionService from '../services/competition/SimpleCompetitionS
 import unifiedCache from '../services/cache/UnifiedNostrCache';
 import { CacheKeys } from '../constants/cacheTTL';
 import { CharitySection } from '../components/team/CharitySection';
+import { TeamMembershipService } from '../services/team/teamMembershipService';
+import { publishJoinRequest } from '../utils/joinRequestPublisher';
+import { useNavigationData } from '../contexts/NavigationDataContext';
+import { CustomAlertManager } from '../components/ui/CustomAlert';
 
 interface SimpleTeamScreenProps {
   data: {
@@ -59,6 +63,14 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
   const [events, setEvents] = useState<any[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [isMember, setIsMember] = useState(userIsMemberProp);
+
+  // Navigation data context for optimistic updates
+  const navigationData = useNavigationData();
+
+  // Team membership service
+  const membershipService = TeamMembershipService.getInstance();
 
   // ✅ PERFORMANCE: Debounce timer to prevent rapid navigation fetches
   const debounceTimerRef = useRef<NodeJS.Timeout>();
@@ -144,10 +156,11 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
             'events'
           );
 
-          // Ensure all events have teamId (use team context if missing)
+          // Ensure all events have teamId and captainPubkey (use team context if missing)
           const eventsWithTeamId = freshEvents.map(event => ({
             ...event,
-            teamId: event.teamId || team.id
+            teamId: event.teamId || team.id,
+            captainPubkey: event.captainPubkey || team.captainId
           }));
 
           setEvents(eventsWithTeamId);
@@ -186,6 +199,103 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
       };
     }, [team?.id, data, team])
   );
+
+  // ✅ Join Team Handler - Following working pattern from TeamCard.tsx
+  const handleJoinTeam = useCallback(async () => {
+    if (!currentUserNpub || !team?.id || isJoining) return;
+
+    try {
+      setIsJoining(true);
+
+      // 1. Join locally - instant bookmark, no captain approval needed
+      await membershipService.joinTeamLocally(
+        team.id,
+        team.name,
+        team.captainId,
+        currentUserNpub
+      );
+
+      console.log(`✅ Team joined locally: ${team.name}`);
+
+      // 2. Update button state to show member status
+      setIsMember(true);
+
+      // 3. ✅ Optimistic ProfileData Update - Instantly add to My Teams
+      if (navigationData.profileData?.teams && !navigationData.profileData.teams.some(t => t.id === team.id)) {
+        const optimisticTeam = {
+          id: team.id,
+          name: team.name,
+          description: team.description || team.about || '',
+          bannerImage: team.bannerImage,
+          captainId: team.captainId,
+          charityId: team.charityId,
+          memberCount: team.memberCount || 0,
+          prizePool: 0,
+          isActive: true,
+          role: 'member' as const,
+        };
+
+        // Direct state update for instant UI refresh
+        const profileDataRef = navigationData.profileData;
+        const currentTeams = profileDataRef.teams || [];
+        profileDataRef.teams = [...currentTeams, optimisticTeam];
+
+        console.log(`⚡ Optimistically added ${team.name} to profileData (instant My Teams update)`);
+      }
+
+      // 4. ✅ Success Alert - Inform user with navigation hint
+      CustomAlertManager.alert(
+        'Success!',
+        `You've joined ${team.name}. View it in My Teams.`
+      );
+
+      // 5. ✅ Background: Publish join request to Nostr (fire-and-forget)
+      const publishRequest = async () => {
+        try {
+          const result = await publishJoinRequest(
+            team.id,
+            team.name,
+            team.captainId,
+            currentUserNpub,
+            `I'd like to join ${team.name}!`
+          );
+
+          if (result.success) {
+            console.log(`📤 Join request published for ${team.name} (event: ${result.eventId})`);
+          } else {
+            console.warn(`⚠️ Failed to publish join request: ${result.error}`);
+            // Don't show error to user - they're already "joined" locally
+          }
+        } catch (error) {
+          console.warn('Failed to publish join request:', error);
+          // Silent fail - user is already joined locally
+        }
+      };
+      publishRequest(); // Fire and forget - don't await
+
+      // 6. ✅ Background: Refresh teams cache (fire-and-forget)
+      const refreshCache = async () => {
+        try {
+          const nostrPrefetchService = (
+            await import('../services/nostr/NostrPrefetchService')
+          ).default;
+          await nostrPrefetchService.refreshUserTeamsCache();
+          console.log('✅ Teams cache refreshed after join (background)');
+        } catch (cacheError) {
+          console.warn('⚠️ Background cache refresh failed:', cacheError);
+          // Silently fail - optimistic update already happened
+        }
+      };
+      refreshCache(); // Don't await - let it run in background
+
+    } catch (error) {
+      console.error('Failed to join team:', error);
+      CustomAlertManager.alert('Error', 'Failed to join team. Please try again.');
+      setIsMember(false);
+    } finally {
+      setIsJoining(false);
+    }
+  }, [currentUserNpub, team, isJoining, membershipService, navigationData]);
 
   // Pull-to-refresh handler
   const onRefresh = useCallback(async () => {
@@ -301,14 +411,23 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
             )}
 
             {/* Join Team Button */}
-            {showJoinButton && !userIsMemberProp && (
-              <TouchableOpacity style={styles.joinButton} activeOpacity={0.8}>
-                <Text style={styles.joinButtonText}>Join Team</Text>
+            {showJoinButton && !isMember && (
+              <TouchableOpacity
+                style={[styles.joinButton, isJoining && styles.joinButtonDisabled]}
+                activeOpacity={0.8}
+                onPress={handleJoinTeam}
+                disabled={isJoining}
+              >
+                {isJoining ? (
+                  <ActivityIndicator color={theme.colors.background} size="small" />
+                ) : (
+                  <Text style={styles.joinButtonText}>Join Team</Text>
+                )}
               </TouchableOpacity>
             )}
 
             {/* Member Badge */}
-            {userIsMemberProp && !userIsCaptain && (
+            {isMember && !userIsCaptain && (
               <View style={styles.memberBadge}>
                 <Ionicons
                   name="checkmark-circle"
@@ -578,6 +697,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  joinButtonDisabled: {
+    opacity: 0.5,
   },
   joinButtonText: {
     color: theme.colors.background,

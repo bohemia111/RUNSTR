@@ -12,10 +12,13 @@ export interface EventAnnouncementData {
   eventName: string;
   teamId: string;
   teamName: string;
-  activityType: string;
   eventDate: string; // ISO string
-  entryFee?: number; // sats
-  prizePool?: number; // sats
+  eventTime?: string; // Time in "HH:MM" format (e.g., "09:00", "14:30")
+  isRecurring?: boolean; // Whether event repeats weekly
+  recurrenceDay?: string; // Day of week (e.g., "monday", "tuesday")
+  description?: string; // Event description (optional)
+  targetValue: number; // Distance value (5, 10, 21.1)
+  targetUnit: string; // Distance unit (km)
   captainName?: string;
   durationMinutes?: number;
 }
@@ -54,6 +57,20 @@ export class EventAnnouncementCardGenerator {
         `🎨 Generating announcement card for event: ${event.eventName}`
       );
 
+      // ✅ FIX: Validate required fields before generating
+      if (!event.eventId) {
+        throw new Error('Event ID is required');
+      }
+      if (!event.teamId) {
+        throw new Error('Team ID is required');
+      }
+      if (!event.eventName) {
+        throw new Error('Event name is required');
+      }
+      if (!event.targetValue || !event.targetUnit) {
+        console.warn('⚠️ Distance info missing, using defaults');
+      }
+
       const dimensions = { width: 800, height: 600 };
 
       // Generate deep link
@@ -79,6 +96,10 @@ export class EventAnnouncementCardGenerator {
       };
     } catch (error) {
       console.error('❌ Error generating announcement card:', error);
+      // ✅ FIX: Preserve original error message
+      if (error instanceof Error) {
+        throw error;
+      }
       throw new Error('Failed to generate announcement card');
     }
   }
@@ -104,13 +125,50 @@ export class EventAnnouncementCardGenerator {
       day: 'numeric',
     });
 
-    // Get activity emoji
-    const activityEmoji = this.getActivityEmoji(event.activityType);
-
     // Format duration if available
     const durationText = event.durationMinutes
       ? this.formatDuration(event.durationMinutes)
       : null;
+
+    // Format event time if available
+    const timeText = event.eventTime ? this.formatTime(event.eventTime) : null;
+
+    // Format recurring schedule if applicable
+    const recurringText = event.isRecurring && event.recurrenceDay
+      ? this.formatRecurringSchedule(event.recurrenceDay)
+      : null;
+
+    // Wrap description text (if provided)
+    const descriptionLines = event.description
+      ? this.wrapText(event.description, 60) // Max 60 chars per line
+      : [];
+
+    // Calculate dynamic Y positions based on what's shown
+    let currentY = 240; // Starting Y for event date (moved up from 310)
+    const lineHeight = 35;
+
+    const dateY = currentY;
+    currentY += lineHeight;
+
+    const recurringY = recurringText ? currentY : null;
+    if (recurringText) currentY += lineHeight;
+
+    const durationY = durationText ? currentY : null;
+    if (durationText) currentY += lineHeight;
+
+    // Description section (if present)
+    const descriptionStartY = descriptionLines.length > 0 ? currentY + 10 : null;
+    if (descriptionLines.length > 0) {
+      currentY += 10 + (descriptionLines.length * 25); // 25px per line
+    }
+
+    // Distance box Y position (add padding)
+    const distanceBoxY = currentY + 15;
+
+    // Calculate remaining element positions
+    const teamNameY = distanceBoxY + 85; // Box height (60) + padding (25)
+    const deepLinkY = teamNameY + 50;
+    const brandingY = deepLinkY + 35;
 
     return `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
@@ -162,29 +220,35 @@ export class EventAnnouncementCardGenerator {
           letter-spacing="-0.5"
         >${this.escapeXml(event.eventName)}</text>
 
-        <!-- Activity type with emoji -->
-        <text
-          x="${centerX}"
-          y="260"
-          font-family="${sansFont}"
-          font-size="28"
-          font-weight="500"
-          text-anchor="middle"
-          fill="#FFFFFF"
-          opacity="0.8"
-        >${activityEmoji} ${this.escapeXml(event.activityType)}</text>
-
         <!-- Event date -->
         <text
           x="${centerX}"
-          y="310"
+          y="${dateY}"
           font-family="${sansFont}"
           font-size="20"
           font-weight="400"
           text-anchor="middle"
           fill="#FFFFFF"
           opacity="0.7"
-        >📅 ${formattedDate}</text>
+        >${formattedDate}${timeText ? ' at ' + timeText : ''}</text>
+
+        <!-- Recurring schedule (if applicable) -->
+        ${
+          recurringText
+            ? `
+        <text
+          x="${centerX}"
+          y="${recurringY}"
+          font-family="${sansFont}"
+          font-size="18"
+          font-weight="400"
+          text-anchor="middle"
+          fill="#FFFFFF"
+          opacity="0.6"
+        >${recurringText}</text>
+        `
+            : ''
+        }
 
         <!-- Duration (if available) -->
         ${
@@ -192,77 +256,55 @@ export class EventAnnouncementCardGenerator {
             ? `
         <text
           x="${centerX}"
-          y="345"
+          y="${durationY}"
           font-family="${sansFont}"
           font-size="18"
           font-weight="400"
           text-anchor="middle"
           fill="#FFFFFF"
           opacity="0.6"
-        >⏱️ ${durationText}</text>
+        >${durationText}</text>
         `
             : ''
         }
 
-        <!-- Entry fee and prize pool info -->
-        <g transform="translate(${centerX - 150}, ${durationText ? 380 : 350})">
-          ${
-            event.entryFee && event.entryFee > 0
-              ? `
-          <rect x="0" y="0" width="140" height="60" fill="${accentColor}20" rx="8" stroke="${accentColor}" stroke-width="2"/>
-          <text
-            x="70"
-            y="25"
-            font-family="${sansFont}"
-            font-size="22"
-            font-weight="700"
-            text-anchor="middle"
-            fill="${accentColor}"
-          >${event.entryFee.toLocaleString()} sats</text>
-          <text
-            x="70"
-            y="45"
-            font-family="${sansFont}"
-            font-size="12"
-            font-weight="500"
-            text-anchor="middle"
-            fill="#FFFFFF"
-            opacity="0.7"
-            letter-spacing="0.5"
-          >ENTRY FEE</text>
-          `
-              : `
-          <rect x="0" y="0" width="140" height="60" fill="${accentColor}20" rx="8" stroke="${accentColor}" stroke-width="2"/>
-          <text
-            x="70"
-            y="30"
-            font-family="${sansFont}"
-            font-size="18"
-            font-weight="600"
-            text-anchor="middle"
-            fill="${accentColor}"
-          >FREE EVENT</text>
-          `
-          }
-        </g>
-
+        <!-- Event description (if available) -->
         ${
-          event.prizePool && event.prizePool > 0
-            ? `
-        <g transform="translate(${centerX + 10}, ${durationText ? 380 : 350})">
+          descriptionLines.length > 0
+            ? descriptionLines
+                .map(
+                  (line, index) => `
+        <text
+          x="${centerX}"
+          y="${descriptionStartY! + index * 25}"
+          font-family="${sansFont}"
+          font-size="16"
+          font-weight="400"
+          text-anchor="middle"
+          fill="#FFFFFF"
+          opacity="0.7"
+        >${this.escapeXml(line)}</text>
+        `
+                )
+                .join('')
+            : ''
+        }
+
+        <!-- Distance box (centered) -->
+        <g transform="translate(${centerX - 70}, ${distanceBoxY})">
           <rect x="0" y="0" width="140" height="60" fill="${accentColor}20" rx="8" stroke="${accentColor}" stroke-width="2"/>
           <text
             x="70"
-            y="25"
+            y="28"
             font-family="${sansFont}"
-            font-size="22"
+            font-size="24"
             font-weight="700"
             text-anchor="middle"
             fill="${accentColor}"
-          >${event.prizePool.toLocaleString()} sats</text>
+          >${event.targetValue} ${event.targetUnit}</text>
           <text
             x="70"
-            y="45"
+            y="48"
             font-family="${sansFont}"
             font-size="12"
             font-weight="500"
@@ -270,16 +312,13 @@ export class EventAnnouncementCardGenerator {
             fill="#FFFFFF"
             opacity="0.7"
             letter-spacing="0.5"
-          >PRIZE POOL</text>
+          >DISTANCE</text>
         </g>
-        `
-            : ''
-        }
 
         <!-- Team name -->
         <text
           x="${centerX}"
-          y="${durationText ? 480 : 450}"
+          y="${teamNameY}"
           font-family="${sansFont}"
           font-size="16"
           font-weight="500"
@@ -291,7 +330,7 @@ export class EventAnnouncementCardGenerator {
         <!-- Deep link (bottom) -->
         <text
           x="${centerX}"
-          y="${durationText ? 530 : 500}"
+          y="${deepLinkY}"
           font-family="${sansFont}"
           font-size="14"
           font-weight="400"
@@ -303,7 +342,7 @@ export class EventAnnouncementCardGenerator {
         <!-- RUNSTR branding -->
         <text
           x="${centerX}"
-          y="${durationText ? 565 : 535}"
+          y="${brandingY}"
           font-family="${sansFont}"
           font-size="12"
           font-weight="600"
@@ -317,24 +356,34 @@ export class EventAnnouncementCardGenerator {
   }
 
   /**
-   * Get activity emoji based on type
+   * Wrap text into multiple lines based on max character width
+   * @param text - Text to wrap
+   * @param maxChars - Maximum characters per line
+   * @returns Array of text lines
    */
-  private getActivityEmoji(activityType: string): string {
-    const emojiMap: Record<string, string> = {
-      running: '🏃',
-      cycling: '🚴',
-      walking: '🚶',
-      hiking: '🥾',
-      'strength training': '💪',
-      yoga: '🧘',
-      meditation: '🧘',
-      diet: '🥗',
-      swimming: '🏊',
-      rowing: '🚣',
-    };
+  private wrapText(text: string, maxChars: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
 
-    const lowerType = activityType.toLowerCase();
-    return emojiMap[lowerType] || '⚡';
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+
+      if (testLine.length <= maxChars) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+        currentLine = word;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines;
   }
 
   /**
@@ -353,6 +402,28 @@ export class EventAnnouncementCardGenerator {
     }
 
     return `${hours}h ${remainingMinutes}m`;
+  }
+
+  /**
+   * Format time from 24-hour to 12-hour format
+   * @param time - Time in "HH:MM" format (e.g., "09:00", "14:30")
+   * @returns Formatted time (e.g., "9:00 AM", "2:30 PM")
+   */
+  private formatTime(time: string): string {
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12; // Convert 0 to 12 for midnight
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  }
+
+  /**
+   * Format recurring schedule text
+   * @param day - Day of week (e.g., "monday", "tuesday")
+   * @returns Formatted text (e.g., "Weekly on Monday")
+   */
+  private formatRecurringSchedule(day: string): string {
+    const capitalizedDay = day.charAt(0).toUpperCase() + day.slice(1);
+    return `Weekly on ${capitalizedDay}`;
   }
 
   /**

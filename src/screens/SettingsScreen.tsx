@@ -37,9 +37,15 @@ import { WalletConfigModal } from '../components/wallet/WalletConfigModal';
 import { SendModal } from '../components/wallet/SendModal';
 import { ReceiveModal } from '../components/wallet/ReceiveModal';
 import { HistoryModal } from '../components/wallet/HistoryModal';
+import { QRScannerModal } from '../components/qr/QRScannerModal';
+import { NWCQRConfirmationModal } from '../components/wallet/NWCQRConfirmationModal';
+import type { QRData } from '../services/qr/QRCodeService';
 import { useNutzap } from '../hooks/useNutzap';
 import { useWalletStore } from '../store/walletStore';
 import { dailyStepCounterService } from '../services/activity/DailyStepCounterService';
+import { CharitySelectionService } from '../services/charity/CharitySelectionService';
+import type { Charity } from '../constants/charities';
+import { Alert } from 'react-native';
 
 interface SettingsScreenProps {
   currentTeam?: Team;
@@ -105,6 +111,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   });
   const [backgroundTrackingEnabled, setBackgroundTrackingEnabled] = useState(false);
 
+  // Charity Selection state
+  const [selectedCharity, setSelectedCharity] = useState<Charity | null>(null);
+
   // NWC Wallet state
   const [hasNWC, setHasNWC] = useState(false);
   const [showWalletConfig, setShowWalletConfig] = useState(false);
@@ -116,9 +125,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [userNpub, setUserNpub] = useState<string>('');
 
-  // Wallet hooks for balance and initialization
-  const { balance, refreshBalance } = useNutzap(false); // autoInitialize = false
-  const { initialize: initializeWallet, isInitialized } = useWalletStore();
+  // QR Scanner state (Phase 1: moved from ProfileScreen)
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showNWCConfirmation, setShowNWCConfirmation] = useState(false);
+  const [scannedNWCString, setScannedNWCString] = useState<string>('');
+
+  // Wallet balance state (don't initialize hooks unconditionally to prevent infinite loop)
+  const [walletBalance, setWalletBalance] = useState(0);
 
   // Alert state for CustomAlert
   const [alertVisible, setAlertVisible] = useState(false);
@@ -150,14 +163,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       const nsec = await AsyncStorage.getItem('@runstr:user_nsec');
       setUserNsec(nsec);
 
-      // Check NWC wallet status
+      // Check NWC wallet status (don't initialize to prevent infinite loop)
       const nwcAvailable = await NWCStorageService.hasNWC();
       setHasNWC(nwcAvailable);
-
-      // Initialize wallet if NWC is connected
-      if (nwcAvailable && !isInitialized) {
-        await initializeWallet(undefined, true); // Quick resume mode
-      }
 
       // Load user's npub for receiving
       const npub = await AsyncStorage.getItem('@runstr:npub');
@@ -171,6 +179,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         const permissionStatus = await dailyStepCounterService.checkPermissionStatus();
         setBackgroundTrackingEnabled(permissionStatus === 'granted');
       }
+
+      // Load selected charity
+      const charity = await CharitySelectionService.getSelectedCharity();
+      setSelectedCharity(charity);
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -376,10 +388,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     const nwcAvailable = await NWCStorageService.hasNWC();
     setHasNWC(nwcAvailable);
 
-    // Initialize wallet after successful connection
-    if (nwcAvailable && !isInitialized) {
-      await initializeWallet(undefined, true);
-    }
+    // Wallet initialization removed to prevent infinite loop
+    // Balance will be loaded when user opens wallet features
   };
 
   // Helper function to format balance
@@ -411,6 +421,42 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setAlertVisible(true);
   };
 
+  // QR Scanner handlers (Phase 1: moved from ProfileScreen)
+  const handleQRScanned = (qrData: QRData) => {
+    try {
+      // Only handle NWC QR codes in Settings
+      if (qrData.type === 'nwc') {
+        // Validate NWC data before setting state
+        if (!qrData.connectionString || typeof qrData.connectionString !== 'string') {
+          throw new Error('Invalid NWC connection string');
+        }
+        setScannedNWCString(qrData.connectionString);
+        setShowNWCConfirmation(true);
+      } else {
+        // Other QR types not handled in Settings
+        Alert.alert(
+          'Wrong QR Code Type',
+          'Please scan an NWC wallet connection QR code. Event and challenge QR codes should be scanned from the event pages.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('[SettingsScreen] QR scan error:', error);
+      Alert.alert(
+        'Error',
+        'Failed to process QR code. Please try scanning again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleNWCConnected = async () => {
+    console.log('[SettingsScreen] NWC wallet connected successfully');
+    // Reload settings to update wallet status
+    await loadSettings();
+    setShowNWCConfirmation(false);
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -422,6 +468,55 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const handleChangeCharity = () => {
+    // Get all available charities
+    const charities = CharitySelectionService.getAllCharities();
+
+    // Create buttons for each charity
+    const charityButtons = charities.map((charity) => ({
+      text: charity.name,
+      onPress: async () => {
+        try {
+          const success = await CharitySelectionService.setSelectedCharity(
+            charity.id
+          );
+          if (success) {
+            setSelectedCharity(charity);
+            // Show success message
+            setAlertVisible(false);
+            setTimeout(() => {
+              setAlertTitle('Charity Updated');
+              setAlertMessage(
+                `You are now supporting ${charity.name}. All your competition winnings will go to this charity.`
+              );
+              setAlertButtons([{ text: 'OK' }]);
+              setAlertVisible(true);
+            }, 100);
+          }
+        } catch (error) {
+          console.error('Error setting charity:', error);
+          setAlertVisible(false);
+          setTimeout(() => {
+            setAlertTitle('Error');
+            setAlertMessage('Failed to update charity. Please try again.');
+            setAlertButtons([{ text: 'OK' }]);
+            setAlertVisible(true);
+          }, 100);
+        }
+      },
+    }));
+
+    // Add cancel button
+    charityButtons.push({ text: 'Cancel', style: 'cancel' });
+
+    setAlertTitle('Select Your Charity');
+    setAlertMessage(
+      'Choose which charity will receive your competition winnings'
+    );
+    setAlertButtons(charityButtons as any);
+    setAlertVisible(true);
   };
 
   const handleBackupPassword = () => {
@@ -561,12 +656,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   <View style={styles.settingInfo}>
                     <Text style={styles.settingTitle}>Balance</Text>
                     <Text style={styles.walletBalance}>
-                      {isInitialized ? formatBalance(balance) : 'Loading...'}
+                      {formatBalance(walletBalance)}
                     </Text>
                   </View>
                   <TouchableOpacity
                     style={styles.refreshButton}
-                    onPress={refreshBalance}
+                    onPress={() => {
+                      // Balance refresh removed to prevent infinite loop
+                      console.log('[Settings] Balance refresh disabled');
+                    }}
                   >
                     <Ionicons
                       name="refresh"
@@ -637,15 +735,37 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   Connect Your Wallet
                 </Text>
                 <Text style={styles.connectWalletDescription}>
-                  Connect a Lightning wallet to send and receive Bitcoin
-                  payments directly from the app
+                  Connect a Lightning wallet via Nostr Wallet Connect (NWC) to send and receive Bitcoin payments
                 </Text>
+
+                {/* Two connection options */}
                 <TouchableOpacity
                   style={styles.connectWalletButton}
+                  onPress={() => setShowQRScanner(true)}
+                >
+                  <Ionicons
+                    name="qr-code-outline"
+                    size={20}
+                    color={theme.colors.background}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={styles.connectWalletButtonText}>
+                    Scan QR Code
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.connectWalletButton, styles.connectWalletButtonSecondary]}
                   onPress={() => setShowWalletConfig(true)}
                 >
-                  <Text style={styles.connectWalletButtonText}>
-                    Connect Wallet
+                  <Ionicons
+                    name="create-outline"
+                    size={20}
+                    color={theme.colors.text}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={[styles.connectWalletButtonText, styles.connectWalletButtonTextSecondary]}>
+                    Enter Manually
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -682,6 +802,31 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               title="Health Profile"
               subtitle="Set weight, height, age for better analytics (optional)"
               onPress={() => (navigation as any).navigate('HealthProfile')}
+            />
+          </Card>
+        </View>
+
+        {/* Charity Selection Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>CHARITY SUPPORT</Text>
+          <Card style={styles.card}>
+            <SettingItem
+              title="Selected Charity"
+              subtitle={
+                selectedCharity
+                  ? `${selectedCharity.name} - All competition winnings go here`
+                  : 'Loading...'
+              }
+              onPress={handleChangeCharity}
+              rightElement={
+                <View style={styles.charityIcon}>
+                  <Ionicons
+                    name="heart"
+                    size={20}
+                    color={theme.colors.accent}
+                  />
+                </View>
+              }
             />
           </Card>
         </View>
@@ -928,14 +1073,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <SendModal
         visible={showSendModal}
         onClose={() => setShowSendModal(false)}
-        currentBalance={balance}
+        currentBalance={walletBalance}
       />
 
       {/* Receive Modal */}
       <ReceiveModal
         visible={showReceiveModal}
         onClose={() => setShowReceiveModal(false)}
-        currentBalance={balance}
+        currentBalance={walletBalance}
         userNpub={userNpub}
       />
 
@@ -944,6 +1089,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         visible={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
       />
+
+      {/* QR Scanner Modal (Phase 1: moved from ProfileScreen) */}
+      {showQRScanner && (
+        <QRScannerModal
+          visible={showQRScanner}
+          onClose={() => setShowQRScanner(false)}
+          onScanned={handleQRScanned}
+        />
+      )}
+
+      {/* NWC Wallet Connection Confirmation Modal */}
+      {showNWCConfirmation && (
+        <NWCQRConfirmationModal
+          visible={showNWCConfirmation}
+          onClose={() => setShowNWCConfirmation(false)}
+          connectionString={scannedNWCString}
+          onSuccess={handleNWCConnected}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -1269,11 +1433,30 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.medium,
     paddingVertical: 12,
     paddingHorizontal: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  connectWalletButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginTop: 12,
   },
 
   connectWalletButtonText: {
     fontSize: 16,
     fontWeight: theme.typography.weights.bold,
     color: '#000', // Black text on orange button
+  },
+
+  connectWalletButtonTextSecondary: {
+    color: theme.colors.text,
+  },
+
+  // Charity Selection Styles
+  charityIcon: {
+    marginLeft: 8,
   },
 });

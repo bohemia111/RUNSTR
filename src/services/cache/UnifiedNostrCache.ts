@@ -374,6 +374,52 @@ export class UnifiedNostrCache {
   }
 
   /**
+   * Clear event-specific caches (useful for fixing stale event data)
+   * ✅ FIX: Clears all cached events to force fresh fetch with captain data
+   */
+  async clearEventCaches(): Promise<void> {
+    console.log('[UnifiedCache] Clearing event caches...');
+
+    try {
+      // Get all keys from AsyncStorage
+      const keys = await AsyncStorage.getAllKeys();
+
+      // Filter for event-related cache keys (team_events_*, event_participants_*, event_leaderboard_*)
+      const eventCacheKeys = keys.filter((key) =>
+        key.startsWith(STORAGE_PREFIX) &&
+        (key.includes('team_events_') ||
+         key.includes('event_participants_') ||
+         key.includes('event_leaderboard_'))
+      );
+
+      // Also clear from memory cache
+      const memoryKeysToDelete: string[] = [];
+      this.cache.forEach((_, key) => {
+        if (key.includes('team_events_') ||
+            key.includes('event_participants_') ||
+            key.includes('event_leaderboard_')) {
+          memoryKeysToDelete.push(key);
+        }
+      });
+
+      // Remove from memory
+      memoryKeysToDelete.forEach(key => this.cache.delete(key));
+
+      // Remove from AsyncStorage
+      if (eventCacheKeys.length > 0) {
+        await AsyncStorage.multiRemove(eventCacheKeys);
+        console.log(
+          `[UnifiedCache] ✅ Cleared ${eventCacheKeys.length} event cache entries`
+        );
+      } else {
+        console.log('[UnifiedCache] No event cache entries to clear');
+      }
+    } catch (error) {
+      console.error('[UnifiedCache] Failed to clear event caches:', error);
+    }
+  }
+
+  /**
    * Subscribe to cache updates for a specific key
    */
   subscribe<T>(key: string, callback: SubscriberCallback<T>): () => void {
@@ -456,14 +502,17 @@ export class UnifiedNostrCache {
         if (error?.name === 'AbortError' || error?.message?.includes('abort')) {
           console.log(`[UnifiedCache] Fetch cancelled for: ${key} (user navigated away)`);
         } else {
-          // Real errors should be logged
-          console.error(`[UnifiedCache] Fetch failed for: ${key}`, error);
+          // Use warn instead of error for cache failures (non-critical)
+          // Cache failures should not break the app - components should handle undefined gracefully
+          console.warn(`[UnifiedCache] Fetch failed for: ${key}`, error?.message || error);
         }
 
         // Clean up pending fetch
         this.pendingFetches.delete(key);
 
-        throw error;
+        // Don't throw - return undefined to allow graceful degradation
+        // Components should handle undefined cached data
+        return undefined;
       });
 
     // Track pending fetch

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Card } from '../ui/Card';
 import { Avatar } from '../ui/Avatar';
-import { NutzapLightningButton } from '../nutzap/NutzapLightningButton';
+// import { NutzapLightningButton } from '../nutzap/NutzapLightningButton';
 import { ChallengeIconButton } from '../ui/ChallengeIconButton';
-import { QuickChallengeWizard } from '../wizards/QuickChallengeWizard';
+import { SimpleChallengeWizardV2 } from '../wizards/SimpleChallengeWizardV2';
 import { FormattedLeaderboardEntry } from '../../types';
 import { theme } from '../../styles/theme';
 
@@ -71,12 +71,12 @@ export const LeaderboardCard: React.FC<LeaderboardCardProps> = ({
                   userName={entry.name}
                   onPress={() => handleChallengePress(entry)}
                 />
-                <NutzapLightningButton
+                {/* <NutzapLightningButton
                   recipientNpub={entry.npub}
                   recipientName={entry.name}
                   size="small"
                   style={styles.zapButton}
-                />
+                /> */}
               </View>
             )}
           </View>
@@ -84,25 +84,14 @@ export const LeaderboardCard: React.FC<LeaderboardCardProps> = ({
       </Card>
 
       {/* Challenge Wizard Modal */}
-      {selectedOpponent && (
-        <Modal
-          visible={challengeWizardVisible}
-          animationType="slide"
-          presentationStyle="fullScreen"
-        >
-          <QuickChallengeWizard
-            opponent={selectedOpponent}
-            onComplete={() => {
-              setChallengeWizardVisible(false);
-              setSelectedOpponent(null);
-            }}
-            onCancel={() => {
-              setChallengeWizardVisible(false);
-              setSelectedOpponent(null);
-            }}
-          />
-        </Modal>
-      )}
+      <SimpleChallengeWizardV2
+        visible={challengeWizardVisible}
+        onClose={() => {
+          setChallengeWizardVisible(false);
+          setSelectedOpponent(null);
+        }}
+        preSelectedOpponent={selectedOpponent || undefined}
+      />
     </>
   );
 };

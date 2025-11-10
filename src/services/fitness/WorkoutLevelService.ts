@@ -1,6 +1,7 @@
 /**
  * Workout Level Service
- * Calculates XP, levels, and progression from kind 1301 workout events
+ * Calculates XP, levels, and progression based on charity donations
+ * MVP: Levels determined by sats earned for charity (1 XP per 100 sats)
  * Caches level data in AsyncStorage for performance
  */
 
@@ -13,6 +14,7 @@ import type {
   LevelMilestone,
 } from '../../types/workoutLevel';
 import { XP_CONSTANTS, LEVEL_MILESTONES } from '../../types/workoutLevel';
+import { CharitySelectionService } from '../charity/CharitySelectionService';
 
 const CACHE_KEY_PREFIX = '@runstr:workout_level:';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -36,33 +38,18 @@ export class WorkoutLevelService {
 
   /**
    * Calculate XP earned from a single workout
+   * MVP: Returns 0 (XP now based on charity donations, not workouts)
+   * Kept for backward compatibility
    */
   calculateWorkoutXP(workout: NostrWorkout): XPCalculation {
-    // Base XP: 10 per workout
-    const baseXP = XP_CONSTANTS.BASE_PER_WORKOUT;
-
-    // Distance bonus: +1 XP per km (distance is in meters)
-    const distanceKm = (workout.distance || 0) / 1000;
-    const distanceBonus = Math.floor(distanceKm * XP_CONSTANTS.PER_KM);
-
-    // Duration bonus: +1 XP per 10 minutes (duration is in seconds)
-    const durationMinutes = (workout.duration || 0) / 60;
-    const durationBonus =
-      Math.floor(durationMinutes / 10) * XP_CONSTANTS.PER_10_MINUTES;
-
-    // Calorie bonus: +5 XP per 100 calories
-    const calories = workout.calories || 0;
-    const calorieBonus =
-      Math.floor(calories / 100) * XP_CONSTANTS.PER_100_CALORIES;
-
-    const totalXP = baseXP + distanceBonus + durationBonus + calorieBonus;
-
+    // MVP: XP is now based on charity donations, not workout metrics
+    // Return 0s but keep method signature for backward compatibility
     return {
-      baseXP,
-      distanceBonus,
-      durationBonus,
-      calorieBonus,
-      totalXP,
+      baseXP: 0,
+      distanceBonus: 0,
+      durationBonus: 0,
+      calorieBonus: 0,
+      totalXP: 0,
     };
   }
 
@@ -86,22 +73,27 @@ export class WorkoutLevelService {
 
   /**
    * Calculate complete level stats from workout array
+   * MVP: XP is now based on charity donations (1 XP per 100 sats)
+   * Workouts are still tracked for stats, but don't contribute to XP
    */
-  calculateLevelStats(workouts: NostrWorkout[]): LevelStats {
-    let totalXP = 0;
+  async calculateLevelStats(workouts: NostrWorkout[]): Promise<LevelStats> {
     let totalDistance = 0;
     let totalDuration = 0;
     let totalCalories = 0;
 
-    // Calculate XP and totals from all workouts
+    // Still track workout totals for display
     workouts.forEach((workout) => {
-      const xp = this.calculateWorkoutXP(workout);
-      totalXP += xp.totalXP;
       totalDistance += workout.distance || 0;
       totalDuration += workout.duration || 0;
       totalCalories += workout.calories || 0;
     });
 
+    // Get XP from charity donations instead of workouts
+    const charityStats = await CharitySelectionService.getCharityStats();
+    const totalSats = charityStats.totalSatsEarned;
+
+    // Calculate XP: 1 XP per 100 sats earned for charity
+    const totalXP = Math.floor(totalSats / 100);
     const level = this.calculateLevel(totalXP);
 
     return {
@@ -145,11 +137,11 @@ export class WorkoutLevelService {
       }
     }
 
-    // Calculate fresh stats
+    // Calculate fresh stats (now includes charity XP)
     console.log(
-      `[WorkoutLevel] Calculating stats from ${workouts.length} workouts...`
+      `[WorkoutLevel] Calculating stats from ${workouts.length} workouts + charity donations...`
     );
-    const stats = this.calculateLevelStats(workouts);
+    const stats = await this.calculateLevelStats(workouts);
 
     // Cache the results
     try {

@@ -52,6 +52,8 @@ export class StreakAnalyticsService {
 
   /**
    * Group workouts by activity type
+   * Normalizes type to lowercase to prevent duplicates (e.g., "Strength" vs "strength")
+   * Filters out "other" type workouts from streak tracking
    */
   private static groupByActivityType(
     workouts: LocalWorkout[]
@@ -59,10 +61,18 @@ export class StreakAnalyticsService {
     const grouped: Record<string, LocalWorkout[]> = {};
 
     for (const workout of workouts) {
-      if (!grouped[workout.type]) {
-        grouped[workout.type] = [];
+      // Normalize type to lowercase to prevent duplicates
+      const normalizedType = (workout.type || 'other').toLowerCase().trim();
+
+      // Skip "other" workouts - don't track streaks for miscellaneous activities
+      if (normalizedType === 'other') {
+        continue;
       }
-      grouped[workout.type].push(workout);
+
+      if (!grouped[normalizedType]) {
+        grouped[normalizedType] = [];
+      }
+      grouped[normalizedType].push(workout);
     }
 
     return grouped;

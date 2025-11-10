@@ -29,7 +29,6 @@ const WORKOUT_PRESETS: WorkoutPreset[] = [
   { id: 'pushups', name: 'Pushups', icon: 'fitness', category: 'strength' },
   { id: 'pullups', name: 'Pullups', icon: 'fitness', category: 'strength' },
   { id: 'situps', name: 'Situps', icon: 'fitness', category: 'strength' },
-  { id: 'yoga', name: 'Yoga', icon: 'body', category: 'flexibility' },
   {
     id: 'meditation',
     name: 'Meditation',
@@ -106,7 +105,6 @@ export const ManualWorkoutScreen: React.FC = () => {
       Pushups: 'strength_training',
       Pullups: 'strength_training',
       Situps: 'strength_training',
-      Yoga: 'yoga',
       Meditation: 'other',
       Treadmill: 'running',
       'Weight Training': 'strength_training',

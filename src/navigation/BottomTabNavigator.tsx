@@ -32,9 +32,6 @@ const ActivityTrackerScreen = React.lazy(() =>
     default: m.ActivityTrackerScreen,
   }))
 );
-const EventsScreen = React.lazy(() =>
-  import('../screens/EventsScreen').then((m) => ({ default: m.EventsScreen }))
-);
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -59,7 +56,6 @@ import { createNavigationHandlers } from './navigationHandlers';
 // Types
 export type BottomTabParamList = {
   Teams: undefined;
-  Events: undefined;
   Activity: undefined;
   Profile: undefined;
 };
@@ -114,8 +110,6 @@ export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
 
           if (route.name === 'Teams') {
             iconName = focused ? 'search' : 'search-outline';
-          } else if (route.name === 'Events') {
-            iconName = focused ? 'ticket' : 'ticket-outline';
           } else if (route.name === 'Activity') {
             iconName = focused ? 'fitness' : 'fitness-outline';
           } else if (route.name === 'Profile') {
@@ -186,21 +180,6 @@ export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
                 onCreateTeam={onNavigateToTeamCreation} // Pass team creation handler
               />
             </SafeAreaView>
-          </Suspense>
-        )}
-      </Tab.Screen>
-
-      {/* Season Tab - RUNSTR Season 1 */}
-      <Tab.Screen
-        name="Events"
-        options={{
-          title: 'Season',
-          headerShown: false,
-        }}
-      >
-        {() => (
-          <Suspense fallback={<LoadingFallback />}>
-            <EventsScreen />
           </Suspense>
         )}
       </Tab.Screen>

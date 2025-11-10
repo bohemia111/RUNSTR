@@ -25,7 +25,6 @@ const ACTIVITY_TYPE_MAP: Record<string, WorkoutType> = {
   gym: 'gym',
   strength: 'strength_training',
   weightlifting: 'strength_training',
-  yoga: 'yoga',
   other: 'other',
 };
 

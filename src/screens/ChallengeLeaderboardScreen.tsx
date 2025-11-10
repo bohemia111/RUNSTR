@@ -21,7 +21,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { theme } from '../styles/theme';
 import { challengeService } from '../services/competition/ChallengeService';
 import type { ChallengeLeaderboard } from '../types/challenge';
-import { NutzapLightningButton } from '../components/nutzap/NutzapLightningButton';
+// import { NutzapLightningButton } from '../components/nutzap/NutzapLightningButton';
 
 type RouteParams = {
   ChallengeLeaderboard: {

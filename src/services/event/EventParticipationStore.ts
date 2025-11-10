@@ -5,13 +5,11 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { CompetitionEvent } from '../competition/SimpleCompetitionService';
 
 export interface EventParticipation {
   eventId: string;
-  eventName: string;
-  teamId: string;
-  activityType: string;
-  eventDate: string;
+  eventData: CompetitionEvent; // ✅ Store complete event object
   entryFeePaid: number;
   paymentMethod: 'nutzap' | 'lightning';
   paidAt: number; // Unix timestamp
@@ -54,7 +52,7 @@ export class EventParticipationStore {
       existing.push(participation);
       await AsyncStorage.setItem(key, JSON.stringify(existing));
 
-      console.log('[EventParticipation] Added:', participation.eventName);
+      console.log('[EventParticipation] Added:', participation.eventData.name);
     } catch (error) {
       console.error('[EventParticipation] Failed to add:', error);
       throw error;

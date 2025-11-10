@@ -698,14 +698,8 @@ export class WorkoutPublishingService {
         return 'Completed a bike ride with RUNSTR!';
       case 'hiking':
         return 'Completed a hike with RUNSTR!';
-      case 'swimming':
-        return 'Completed a swim with RUNSTR!';
-      case 'rowing':
-        return 'Completed a rowing session with RUNSTR!';
       case 'strength':
         return 'Completed a strength training workout with RUNSTR!';
-      case 'yoga':
-        return 'Completed a yoga session with RUNSTR!';
       case 'meditation':
         return 'Completed a meditation session with RUNSTR!';
       default:
@@ -816,34 +810,6 @@ export class WorkoutPublishingService {
     }
 
     return null;
-  }
-
-  /**
-   * Get activity emoji for runstr compatibility
-   */
-  private getActivityEmoji(exerciseVerb: string): string {
-    switch (exerciseVerb) {
-      case 'running':
-        return '🏃‍♂️💨';
-      case 'walking':
-        return '🚶‍♀️';
-      case 'cycling':
-        return '🚴';
-      case 'hiking':
-        return '🥾';
-      case 'swimming':
-        return '🏊‍♂️';
-      case 'rowing':
-        return '🚣';
-      case 'yoga':
-        return '🧘';
-      case 'meditation':
-        return '🧘‍♂️';
-      case 'strength':
-        return '💪';
-      default:
-        return '💪';
-    }
   }
 
   /**
@@ -1071,7 +1037,6 @@ export class WorkoutPublishingService {
     } else {
       // Generate clean header with specific exercise details
       const exerciseVerb = this.getExerciseVerb(workout.type);
-      const activityEmoji = this.getActivityEmoji(exerciseVerb);
       const specificExercise = this.getSpecificExerciseName(workout);
 
       // For strength workouts with sets/reps and specific exercise, create detailed header
@@ -1081,21 +1046,21 @@ export class WorkoutPublishingService {
         specificExercise
       ) {
         if (workout.reps && workout.sets) {
-          content = `Completed ${workout.reps} ${specificExercise} in ${workout.sets} sets with RUNSTR! ${activityEmoji}\n\n`;
+          content = `Completed ${workout.reps} ${specificExercise} in ${workout.sets} sets with RUNSTR!\n\n`;
         } else if (workout.reps) {
-          content = `Completed ${workout.reps} ${specificExercise} with RUNSTR! ${activityEmoji}\n\n`;
+          content = `Completed ${workout.reps} ${specificExercise} with RUNSTR!\n\n`;
         } else {
-          content = `Completed ${specificExercise} with RUNSTR! ${activityEmoji}\n\n`;
+          content = `Completed ${specificExercise} with RUNSTR!\n\n`;
         }
       }
       // For any workout with a specific exercise name (yoga, meditation, treadmill, etc.)
       else if (specificExercise) {
-        content = `Completed ${specificExercise} with RUNSTR! ${activityEmoji}\n\n`;
+        content = `Completed ${specificExercise} with RUNSTR!\n\n`;
       }
       // Generic format with readable workout type
       else {
         const workoutType = this.getReadableWorkoutType(workout.type);
-        content = `Just completed ${workoutType} with RUNSTR! ${activityEmoji}\n\n`;
+        content = `Just completed ${workoutType} with RUNSTR!\n\n`;
       }
     }
 

@@ -9,12 +9,15 @@ import { RUNSTR_LOGO_BASE64 } from './runstrLogoBase64';
 export interface ChallengeAnnouncementData {
   challengeId: string;
   challengeName: string;
+  teamId: string;
+  teamName: string;
+  challengeDate: string; // ISO string
+  challengeTime: string; // HH:MM format
   distance: number; // km
-  duration: number; // hours
-  wager: number; // sats
-  opponentName?: string;
-  opponentPubkey?: string;
-  creatorName?: string;
+  opponentName: string;
+  isRecurring?: boolean;
+  recurrenceDay?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+  description?: string;
 }
 
 export interface AnnouncementCardData {
@@ -87,11 +90,27 @@ export class ChallengeAnnouncementCardGenerator {
     const accentColor = '#FF6B35'; // RUNSTR orange
     const sansFont = 'system-ui, -apple-system, sans-serif';
 
-    // Format duration
-    const durationText = this.formatDuration(challenge.duration);
+    // Format date
+    const challengeDate = new Date(challenge.challengeDate);
+    const dateText = challengeDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    // Format time (convert 24h to 12h)
+    const [hours, minutes] = challenge.challengeTime.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const timeText = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+
+    // Recurring text
+    const recurringText = challenge.isRecurring && challenge.recurrenceDay
+      ? `Every ${challenge.recurrenceDay.charAt(0).toUpperCase() + challenge.recurrenceDay.slice(1)}`
+      : '';
 
     // Format opponent info
-    const opponentText = challenge.opponentName || 'Open Challenge';
+    const opponentText = challenge.opponentName;
 
     return `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
@@ -155,7 +174,7 @@ export class ChallengeAnnouncementCardGenerator {
           opacity="0.8"
         >🏃 ${challenge.distance} km</text>
 
-        <!-- Scoring method -->
+        <!-- Date -->
         <text
           x="${centerX}"
           y="300"
@@ -165,9 +184,9 @@ export class ChallengeAnnouncementCardGenerator {
           text-anchor="middle"
           fill="#FFFFFF"
           opacity="0.7"
-        >⚡ Fastest Time Wins</text>
+        >📅 ${dateText}</text>
 
-        <!-- Duration -->
+        <!-- Time -->
         <text
           x="${centerX}"
           y="335"
@@ -177,98 +196,67 @@ export class ChallengeAnnouncementCardGenerator {
           text-anchor="middle"
           fill="#FFFFFF"
           opacity="0.6"
-        >⏱️ ${durationText}</text>
+        >⏰ ${timeText}</text>
 
-        <!-- Wager and opponent info -->
-        <g transform="translate(${centerX - 150}, 360)">
-          ${
-            challenge.wager > 0
-              ? `
-          <rect x="0" y="0" width="140" height="60" fill="${accentColor}20" rx="8" stroke="${accentColor}" stroke-width="2"/>
+        <!-- Recurring (if applicable) -->
+        ${
+          recurringText
+            ? `
+        <text
+          x="${centerX}"
+          y="365"
+          font-family="${sansFont}"
+          font-size="16"
+          font-weight="400"
+          text-anchor="middle"
+          fill="${accentColor}"
+          opacity="0.8"
+        >🔄 ${recurringText}</text>
+        `
+            : ''
+        }
+
+        <!-- Opponent info (centered card) -->
+        <g transform="translate(${centerX - 150}, ${recurringText ? 385 : 360})">
+          <rect x="0" y="0" width="300" height="70" fill="${accentColor}20" rx="12" stroke="${accentColor}" stroke-width="2"/>
           <text
-            x="70"
-            y="25"
-            font-family="${sansFont}"
-            font-size="22"
-            font-weight="700"
-            text-anchor="middle"
-            fill="${accentColor}"
-          >${challenge.wager.toLocaleString()} sats</text>
-          <text
-            x="70"
-            y="45"
-            font-family="${sansFont}"
-            font-size="12"
-            font-weight="500"
-            text-anchor="middle"
-            fill="#FFFFFF"
-            opacity="0.7"
-            letter-spacing="0.5"
-          >WAGER</text>
-          `
-              : `
-          <rect x="0" y="0" width="140" height="60" fill="${accentColor}20" rx="8" stroke="${accentColor}" stroke-width="2"/>
-          <text
-            x="70"
+            x="150"
             y="30"
             font-family="${sansFont}"
             font-size="18"
             font-weight="600"
             text-anchor="middle"
-            fill="${accentColor}"
-          >NO WAGER</text>
-          `
-          }
-        </g>
-
-        <!-- Opponent info -->
-        <g transform="translate(${centerX + 10}, 360)">
-          <rect x="0" y="0" width="140" height="60" fill="${accentColor}20" rx="8" stroke="${accentColor}" stroke-width="2"/>
-          <text
-            x="70"
-            y="25"
-            font-family="${sansFont}"
-            font-size="16"
-            font-weight="600"
-            text-anchor="middle"
-            fill="#FFFFFF"
-            opacity="0.9"
-          >VS</text>
-          <text
-            x="70"
-            y="45"
-            font-family="${sansFont}"
-            font-size="12"
-            font-weight="500"
-            text-anchor="middle"
             fill="#FFFFFF"
             opacity="0.7"
-            letter-spacing="0.5"
-          >${this.escapeXml(opponentText).toUpperCase()}</text>
+            letter-spacing="1"
+          >CHALLENGING</text>
+          <text
+            x="150"
+            y="55"
+            font-family="${sansFont}"
+            font-size="24"
+            font-weight="700"
+            text-anchor="middle"
+            fill="${accentColor}"
+          >@${this.escapeXml(opponentText)}</text>
         </g>
 
-        <!-- Created by -->
-        ${
-          challenge.creatorName
-            ? `
+        <!-- Team name -->
         <text
           x="${centerX}"
-          y="470"
+          y="${recurringText ? 490 : 465}"
           font-family="${sansFont}"
           font-size="16"
           font-weight="500"
           text-anchor="middle"
           fill="#FFFFFF"
           opacity="0.6"
-        >Created by ${this.escapeXml(challenge.creatorName)}</text>
-        `
-            : ''
-        }
+        >Team: ${this.escapeXml(challenge.teamName)}</text>
 
         <!-- Deep link (bottom) -->
         <text
           x="${centerX}"
-          y="520"
+          y="${recurringText ? 540 : 520}"
           font-family="${sansFont}"
           font-size="14"
           font-weight="400"
@@ -280,7 +268,7 @@ export class ChallengeAnnouncementCardGenerator {
         <!-- RUNSTR branding -->
         <text
           x="${centerX}"
-          y="555"
+          y="${recurringText ? 570 : 555}"
           font-family="${sansFont}"
           font-size="12"
           font-weight="600"
@@ -291,24 +279,6 @@ export class ChallengeAnnouncementCardGenerator {
         >POWERED BY RUNSTR</text>
       </svg>
     `.trim();
-  }
-
-  /**
-   * Format duration in human-readable format
-   */
-  private formatDuration(hours: number): string {
-    if (hours < 24) {
-      return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
-    }
-
-    const days = Math.floor(hours / 24);
-    const remainingHours = hours % 24;
-
-    if (remainingHours === 0) {
-      return `${days} ${days === 1 ? 'day' : 'days'}`;
-    }
-
-    return `${days}d ${remainingHours}h`;
   }
 
   /**

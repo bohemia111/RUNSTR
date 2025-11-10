@@ -380,8 +380,19 @@ export class CardioPerformanceAnalytics {
   }
 
   /**
-   * Estimate VO2 Max from race times
-   * Uses time-based formula for 5K races
+   * Estimate VO2 Max from race times using complete Jack Daniels VDOT formula
+   *
+   * COMPLETE VO2 MAX CALCULATION (Paragraph 3 of 5):
+   * Uses the Jack Daniels VDOT formula to convert race performance to VO2 max.
+   * Formula: VO2max = numerator / denominator
+   *
+   * Numerator = -4.60 + 0.182258 × V + 0.000104 × V²
+   * Denominator = 0.8 + 0.1894393 × e^(-0.012778 × T) + 0.2989558 × e^(-0.1932605 × T)
+   *
+   * Where V = velocity in meters per MINUTE, T = time in MINUTES
+   * Example: 56-minute 10K (age 34) → VO2 max ~35 ml/kg/min
+   *
+   * Source: Daniels, Jack. "Daniels' Running Formula." 3rd ed. Human Kinetics, 2013.
    */
   private static estimateVO2Max(
     workouts: LocalWorkout[],
@@ -391,54 +402,83 @@ export class CardioPerformanceAnalytics {
     const fiveKWorkouts = workouts.filter(
       (w) => w.distance && w.distance >= 4900 && w.distance <= 5100
     );
+    const tenKWorkouts = workouts.filter(
+      (w) => w.distance && w.distance >= 9900 && w.distance <= 10100
+    );
 
-    if (fiveKWorkouts.length === 0) {
+    let vo2Max: number;
+    const age = healthProfile.age || 30;
+
+    // Prefer 10K if available (more accurate for VO2 max estimation)
+    if (tenKWorkouts.length > 0) {
+      const fastest10K = tenKWorkouts.reduce((fastest, current) => {
+        return current.duration < fastest.duration ? current : fastest;
+      });
+
+      // Complete Jack Daniels VDOT formula
+      const distanceMeters = fastest10K.distance!;
+      const timeMinutes = fastest10K.duration / 60;
+      const velocityMPM = distanceMeters / timeMinutes; // CRITICAL: meters per MINUTE (not per second!)
+
+      const numerator = -4.60 + 0.182258 * velocityMPM + 0.000104 * (velocityMPM * velocityMPM);
+      const denominator = 0.8 +
+        0.1894393 * Math.exp(-0.012778 * timeMinutes) +
+        0.2989558 * Math.exp(-0.1932605 * timeMinutes);
+
+      vo2Max = numerator / denominator;
+    } else if (fiveKWorkouts.length > 0) {
+      const fastest5K = fiveKWorkouts.reduce((fastest, current) => {
+        return current.duration < fastest.duration ? current : fastest;
+      });
+
+      // Complete Jack Daniels VDOT formula for 5K
+      const distanceMeters = fastest5K.distance!;
+      const timeMinutes = fastest5K.duration / 60;
+      const velocityMPM = distanceMeters / timeMinutes; // CRITICAL: meters per MINUTE (not per second!)
+
+      const numerator = -4.60 + 0.182258 * velocityMPM + 0.000104 * (velocityMPM * velocityMPM);
+      const denominator = 0.8 +
+        0.1894393 * Math.exp(-0.012778 * timeMinutes) +
+        0.2989558 * Math.exp(-0.1932605 * timeMinutes);
+
+      vo2Max = numerator / denominator;
+    } else {
       return undefined;
     }
 
-    // Get fastest 5K time
-    const fastest5K = fiveKWorkouts.reduce((fastest, current) => {
-      const currentPace = current.duration / (current.distance! / 1000);
-      const fastestPace = fastest.duration / (fastest.distance! / 1000);
-      return currentPace < fastestPace ? current : fastest;
-    });
+    // Cap VO2 max to reasonable range (20-80)
+    vo2Max = Math.max(20, Math.min(80, vo2Max));
 
-    // VO2 Max estimation using Cooper 12-minute test method
-    // Convert 5K time to equivalent 12-minute distance
-    const timeInMinutes = fastest5K.duration / 60;
-    const distance12Min = (fastest5K.distance! / timeInMinutes) * 12;
-
-    // Cooper formula: VO2max = (distance in meters - 504.9) / 44.73
-    let vo2Max = (distance12Min - 504.9) / 44.73;
-
-    // Adjust for age (VO2 max declines ~1% per year after 25)
-    const age = healthProfile.age || 30;
-    const ageFactor = age > 25 ? 1 - (age - 25) * 0.01 : 1;
-    const adjustedVO2Max = vo2Max * Math.max(0.8, Math.min(1.2, ageFactor)); // Cap adjustment to prevent extremes
-
-    // Calculate percentile (simplified)
+    // Calculate percentile
     const percentile = this.calculateVO2MaxPercentile(
-      adjustedVO2Max,
+      vo2Max,
       age,
       healthProfile.biologicalSex
     );
 
-    // Calculate fitness age
+    // Calculate fitness age with 2-metric system (75% VO2 + 25% BMI)
+    let bmi: number | undefined;
+    if (healthProfile.weight && healthProfile.height) {
+      const heightM = healthProfile.height / 100;
+      bmi = healthProfile.weight / (heightM * heightM);
+    }
+
     const fitnessAge = this.calculateFitnessAge(
-      adjustedVO2Max,
+      vo2Max,
       age,
-      healthProfile.biologicalSex
+      healthProfile.biologicalSex,
+      bmi
     );
 
     // Categorize
     const category = this.categorizeVO2Max(
-      adjustedVO2Max,
+      vo2Max,
       age,
       healthProfile.biologicalSex
     );
 
     return {
-      estimate: Math.round(adjustedVO2Max * 10) / 10,
+      estimate: Math.round(vo2Max * 10) / 10,
       percentile,
       fitnessAge,
       category,
@@ -461,19 +501,23 @@ export class CardioPerformanceAnalytics {
   }
 
   /**
-   * Calculate fitness age from VO2 Max
+   * Calculate fitness age - delegates to BodyCompositionAnalytics for 2-metric calculation
+   * Uses 75% VO2 Max Age + 25% BMI Age
    */
   private static calculateFitnessAge(
     vo2Max: number,
     chronologicalAge: number,
-    sex?: 'male' | 'female'
+    sex?: 'male' | 'female',
+    bmi?: number
   ): number {
-    // Simplified calculation
-    const avgVO2MaxAt25 = sex === 'female' ? 40 : 48;
-    const declinePerYear = sex === 'female' ? 0.4 : 0.5;
-
-    const yearsDiff = (avgVO2MaxAt25 - vo2Max) / declinePerYear;
-    return Math.round(25 + yearsDiff);
+    // Import at runtime to avoid circular dependency
+    const { BodyCompositionAnalytics } = require('./BodyCompositionAnalytics');
+    return BodyCompositionAnalytics.calculateFitnessAge(
+      vo2Max,
+      chronologicalAge,
+      sex,
+      bmi
+    );
   }
 
   /**

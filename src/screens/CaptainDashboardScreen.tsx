@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
+import { Ionicons } from '@expo/vector-icons';
 import { CHARITIES, getCharityById } from '../constants/charities';
 import {
   validateShopUrl,
@@ -33,7 +34,7 @@ import { ActivityFeedSection } from '../components/team/ActivityFeedSection';
 import { JoinRequestsSection } from '../components/team/JoinRequestsSection'; // RESTORED: For team join requests with kind 30000 approval
 import { EventJoinRequestsSection } from '../components/captain/EventJoinRequestsSection';
 import { TeamMembersSection } from '../components/captain/TeamMembersSection';
-import { EventCreationWizard } from '../components/wizards/EventCreationWizard';
+import { SimpleEventWizardV2 } from '../components/wizards/SimpleEventWizardV2';
 import { LeagueCreationWizard } from '../components/wizards/LeagueCreationWizard';
 import { CompetitionParticipantsSection } from '../components/captain/CompetitionParticipantsSection';
 import { ActiveEventsSection } from '../components/captain/ActiveEventsSection';
@@ -59,7 +60,6 @@ import unifiedCache from '../services/cache/UnifiedNostrCache';
 import { CacheKeys } from '../constants/cacheTTL';
 import { CaptainEventStore } from '../services/event/CaptainEventStore';
 import type { CaptainEventRecord } from '../services/event/CaptainEventStore';
-import { EventAnnouncementPreview } from '../components/events/EventAnnouncementPreview';
 
 // Type definitions for captain dashboard data
 export interface CaptainDashboardData {
@@ -183,9 +183,8 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       await loadTeamData();
       await loadCaptainEvents();
       await checkForKind30000List(); // Check if team has member list
-      if (hasKind30000List) {
-        await loadTeamMembers(); // Load members if list exists
-      }
+      // Always try to load members - checkForKind30000List will set hasKind30000List
+      await loadTeamMembers(); // Load members (uses TeamMemberCache which handles caching)
     };
 
     initializeTeam();
@@ -449,19 +448,6 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
     }
 
     setLeagueWizardVisible(true);
-  };
-
-  const handleEventCreated = async (eventData: any) => {
-    console.log(
-      '[CaptainDashboard] 📅 Event created, refreshing competitions list...'
-    );
-    setEventWizardVisible(false);
-
-    // Reload active competitions and captain events to show the new event
-    await loadActiveCompetitions();
-    await loadCaptainEvents();
-
-    onEventCreated?.(eventData);
   };
 
   const handleLeagueCreated = async (leagueData: any) => {
@@ -844,8 +830,11 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
 
   // REMOVED: handleUpdateTeamFlashUrl() - Flash feature removed
 
-  const handleCloseEventWizard = () => {
+  const handleCloseEventWizard = async () => {
     setEventWizardVisible(false);
+    // ✅ FIX: Refresh competitions when wizard closes (after user sees success UI)
+    await loadActiveCompetitions();
+    await loadCaptainEvents();
   };
 
   const handleCloseLeagueWizard = () => {
@@ -1411,7 +1400,8 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
         />
 
         {/* Team Members List - Display and manage current members */}
-        {hasKind30000List && (
+        {/* Show when loading OR when members exist OR when has kind 30000 list */}
+        {(isLoadingMembers || teamMembers.length > 0 || hasKind30000List) && (
           <TeamMembersSection
             teamId={teamId}
             captainPubkey={captainId}
@@ -1571,12 +1561,17 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
                 }
                 style={styles.picker}
               >
-                <Picker.Item label="No charity selected" value="none" />
+                <Picker.Item
+                  label="No charity selected"
+                  value="none"
+                  color={theme.colors.orangeBright}
+                />
                 {CHARITIES.map((charity) => (
                   <Picker.Item
                     key={charity.id}
                     label={charity.name}
                     value={charity.id}
+                    color={theme.colors.orangeBright}
                   />
                 ))}
               </Picker>
@@ -1629,12 +1624,11 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       {/* REMOVED: Flash Subscription Modal - Flash feature removed */}
 
       {/* Wizard Modals */}
-      <EventCreationWizard
+      <SimpleEventWizardV2
         visible={eventWizardVisible}
         teamId={data.team.id}
         captainPubkey={captainId}
         onClose={handleCloseEventWizard}
-        onEventCreated={handleEventCreated}
       />
 
       <LeagueCreationWizard
@@ -1658,22 +1652,7 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
 
       {/* REMOVED: Add Member Modal - teams no longer require member management */}
 
-      {/* Event Announcement Modal */}
-      {selectedEventForAnnouncement && (
-        <EventAnnouncementPreview
-          visible={showAnnouncementModal}
-          eventData={selectedEventForAnnouncement}
-          onClose={() => {
-            setShowAnnouncementModal(false);
-            setSelectedEventForAnnouncement(null);
-          }}
-          onSuccess={() => {
-            console.log('✅ Event announced successfully');
-            setShowAnnouncementModal(false);
-            setSelectedEventForAnnouncement(null);
-          }}
-        />
-      )}
+      {/* REMOVED: Event Creation Success Modal - Now handled in Step 3 of SimpleEventWizard */}
     </SafeAreaView>
   );
 };
@@ -2175,22 +2154,25 @@ const styles = StyleSheet.create({
 
   // Picker styles for charity modal
   pickerContainer: {
-    backgroundColor: theme.colors.cardBackground, // Better contrast than pure black
+    backgroundColor: '#2a2a2a', // Lighter gray background for better visibility
     borderWidth: 1,
     borderColor: theme.colors.orangeDeep, // Orange border for visibility
     borderRadius: 12,
-    overflow: 'hidden',
+    // Removed overflow: 'hidden' to allow picker dropdown to display
     marginBottom: 16,
+    minHeight: 150,
   },
 
   picker: {
     height: 150,
     color: theme.colors.orangeBright, // Light orange text for visibility
+    backgroundColor: 'transparent',
   },
 
   pickerItem: {
     fontSize: 16,
     color: theme.colors.orangeBright, // Light orange for better contrast
+    backgroundColor: '#2a2a2a',
   },
 
   selectedCharityDescription: {

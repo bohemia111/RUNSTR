@@ -7,7 +7,6 @@ Individual tab components for different workout data sources. Each tab is comple
 - **NostrWorkoutsTab.tsx** - Displays Nostr kind 1301 workout events with "Published to Nostr" badges
 - **AppleHealthTab.tsx** - Shows HealthKit workouts from last 30 days with "Post to Nostr" functionality
 - **GarminTab.tsx** - Placeholder for Garmin Connect integration with "Coming Soon" message
-- **GoogleFitTab.tsx** - Placeholder for Google Fit integration with "Coming Soon" message
 
 ## Architecture Benefits
 

@@ -54,6 +54,7 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState('');
+  const [participationType, setParticipationType] = useState<'in-person' | 'virtual'>('virtual'); // ✅ NEW: Default to virtual (safer assumption)
   const [teamGoalProgress, setTeamGoalProgress] = useState<{
     current: number;
     goal: number;
@@ -134,6 +135,17 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         event = await SimpleCompetitionService.getInstance().getEventByIdOrDTag(
           eventId
         );
+
+        // ✅ FIX: If Nostr fetch failed but we have eventData prop, use it
+        if (!event && eventData) {
+          console.warn('⚠️ Nostr fetch failed, using passed event data as fallback');
+          event = {
+            ...eventData,
+            teamId: eventData.teamId || initialTeamId,
+            captainPubkey: eventData.captainPubkey || currentUser?.pubkey || '',
+          };
+        }
+
         setIsLoading(false);
       } else {
         console.log('✅ Using passed event data (instant load)');
@@ -149,10 +161,19 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       // ✅ CRITICAL: Validate event has captain pubkey before querying participants
       if (!event.captainPubkey || event.captainPubkey.trim() === '') {
         console.error(`❌ Event ${eventId} has no captain pubkey - cannot load participants`);
+        console.error('Event data:', JSON.stringify(event, null, 2));
         setParticipants([]);
         setLoadingMembers(false);
         setLoadingLeaderboard(false);
-        setError('This event has incomplete data. The event captain information is missing. Please contact the event organizer or try refreshing.');
+        setError(
+          `Event Data Incomplete\n\n` +
+          `This event is missing captain information and cannot load participants.\n\n` +
+          `Possible causes:\n` +
+          `• Event was created incorrectly\n` +
+          `• Event data is corrupted on Nostr\n` +
+          `• Event was deleted by captain\n\n` +
+          `Please contact the event organizer for assistance.`
+        );
         return;
       }
 
@@ -160,19 +181,28 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       setLoadingMembers(true);
       console.log('⏳ Fetching event participants...');
 
-      const NostrListService = (
-        await import('../services/nostr/NostrListService')
-      ).NostrListService.getInstance();
-      const eventParticipants = await NostrListService.getListMembers(
-        event.captainPubkey, // Author of the participant list
-        `event-${eventId}-participants` // Event-specific d-tag
-      );
+      let eventParticipants: string[] = [];
+      try {
+        const NostrListService = (
+          await import('../services/nostr/NostrListService')
+        ).NostrListService.getInstance();
+        eventParticipants = await NostrListService.getListMembers(
+          event.captainPubkey, // Author of the participant list
+          `event-${eventId}-participants` // Event-specific d-tag
+        );
 
-      console.log(
-        `✅ Found ${eventParticipants.length} event participants (not team members)`
-      );
-      setParticipants(eventParticipants);
-      setLoadingMembers(false);
+        console.log(
+          `✅ Found ${eventParticipants.length} event participants (not team members)`
+        );
+      } catch (participantError) {
+        console.error('❌ Failed to load event participants:', participantError);
+        // Set empty array and continue - participants list is optional
+        eventParticipants = [];
+      } finally {
+        // Always clear loading state, even if error occurred
+        setParticipants(eventParticipants);
+        setLoadingMembers(false);
+      }
 
       // Check if current user is a participant and/or captain
       const userHexPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
@@ -272,7 +302,34 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       }
     } catch (err) {
       console.error('❌ Failed to load event:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load event');
+
+      // ✅ FIX: Provide specific error messages based on error type
+      let errorMessage = 'Failed to load event';
+      if (err instanceof Error) {
+        if (err.message.includes('not found')) {
+          errorMessage =
+            `Event Not Found\n\n` +
+            `This event may have been:\n` +
+            `• Deleted by the captain\n` +
+            `• Moved to different relays\n` +
+            `• Created with an invalid ID\n\n` +
+            `Event ID: ${eventId}`;
+        } else if (err.message.includes('timeout') || err.message.includes('timed out')) {
+          errorMessage =
+            `Connection Timeout\n\n` +
+            `Unable to reach Nostr relays.\n\n` +
+            `Please check your connection and try again.`;
+        } else if (err.message.includes('No connected relays')) {
+          errorMessage =
+            `No Relay Connection\n\n` +
+            `Cannot connect to Nostr network.\n\n` +
+            `Please check your internet connection.`;
+        } else {
+          errorMessage = `Error: ${err.message}`;
+        }
+      }
+
+      setError(errorMessage);
       setIsLoading(false);
       setLoadingMembers(false);
       setLoadingLeaderboard(false);
@@ -412,7 +469,7 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       }
 
       // Free event or paid event without Lightning address (fallback to NWC)
-      const result = await eventJoinService.joinEvent(qrEventData);
+      const result = await eventJoinService.joinFreeEvent(qrEventData, participationType);
 
       if (result.success) {
         // Store participation locally for instant UX
@@ -421,10 +478,7 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         );
         await EventParticipationStore.addParticipation({
           eventId: eventData.id,
-          eventName: eventData.name,
-          teamId: eventData.teamId,
-          activityType: eventData.activityType,
-          eventDate: eventData.eventDate,
+          eventData: eventData, // ✅ Store complete event object
           entryFeePaid: eventData.entryFeesSats || 0,
           paymentMethod: 'lightning',
           paidAt: Date.now(),
@@ -481,7 +535,8 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       // Submit join request with payment proof
       const result = await eventJoinService.submitPaidJoinRequest(
         qrEventData,
-        paymentInvoice
+        paymentInvoice,
+        participationType
       );
 
       if (result.success) {
@@ -491,10 +546,7 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         );
         await EventParticipationStore.addParticipation({
           eventId: eventData.id,
-          eventName: eventData.name,
-          teamId: eventData.teamId,
-          activityType: eventData.activityType,
-          eventDate: eventData.eventDate,
+          eventData: eventData, // ✅ Store complete event object
           entryFeePaid: eventData.entryFeesSats || 0,
           paymentMethod: 'lightning',
           paidAt: Date.now(),
@@ -759,6 +811,46 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
           )}
         </View>
 
+        {/* Participation Type Selector */}
+        {!isParticipant && (
+          <View style={styles.participationTypeContainer}>
+            {eventData.location && (
+              <View style={styles.locationRow}>
+                <Ionicons name="location" size={16} color={theme.colors.textSecondary} />
+                <Text style={styles.locationText}>{eventData.location}</Text>
+              </View>
+            )}
+            <Text style={styles.participationTypeLabel}>Participation Type:</Text>
+            <View style={styles.radioGroup}>
+              <TouchableOpacity
+                style={styles.radioOption}
+                onPress={() => setParticipationType('in-person')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.radioCircle}>
+                  {participationType === 'in-person' && (
+                    <View style={styles.radioInner} />
+                  )}
+                </View>
+                <Text style={styles.radioLabel}>In-Person</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.radioOption}
+                onPress={() => setParticipationType('virtual')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.radioCircle}>
+                  {participationType === 'virtual' && (
+                    <View style={styles.radioInner} />
+                  )}
+                </View>
+                <Text style={styles.radioLabel}>Virtual</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Join Button */}
         {!isParticipant && (
           <TouchableOpacity
@@ -831,6 +923,7 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         invoice={paymentInvoice}
         paymentDestination={eventData?.paymentDestination}
         paymentRecipientName={eventData?.paymentRecipientName}
+        participationType={participationType}
         onPaid={handlePaymentConfirmed}
         onCancel={() => {
           setShowPaymentModal(false);
@@ -1111,5 +1204,59 @@ const styles = StyleSheet.create({
     color: theme.colors.background,
     fontSize: 15,
     fontWeight: '600',
+  },
+  // ✅ NEW: Participation type selector styles
+  participationTypeContainer: {
+    backgroundColor: theme.colors.cardBackground,
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  locationText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  participationTypeLabel: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  radioGroup: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.accent,
+  },
+  radioLabel: {
+    fontSize: 15,
+    color: theme.colors.text,
   },
 });

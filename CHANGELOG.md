@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.6] - 2025-11-09
+
+### Fixed
+- **Comprehensive Android Background Crash Resolution** - Eliminated all sources of instant white screen crashes
+  - Root cause: 6+ conflicting AppState listeners across multiple services creating race conditions
+  - v0.5.9 worked because it had NO background monitoring services running
+  - v0.6.2 introduced `ChallengeCompletionService` with 5-minute interval that crashed on background
+  - **AppStateManager.ts**: Created centralized single source of truth for app state management
+  - **App.tsx**: Removed ALL AppState listeners, now uses AppStateManager exclusively
+  - **ChallengeCompletionService.ts**: Added `AppStateManager.canDoNetworkOps()` guards before Nostr queries
+  - **GlobalNDKService.ts**: Added background checks to prevent connection attempts when suspended
+  - **NostrMobileConnectionManager.ts**: Replaced AppState listener with AppStateManager callbacks
+  - App now mimics v0.5.9 behavior: NO background operations on Android whatsoever
+
+### Architecture
+- **Centralized State Management** - AppStateManager prevents multiple listeners and race conditions
+  - Single AppState.addEventListener in entire app (AppStateManager only)
+  - All services register callbacks with AppStateManager
+  - Android-specific instant blocking (iOS gets grace period)
+  - Operation queue for resuming work when app returns to foreground
+  - Comprehensive guards before ANY network operation
+
+### Technical
+- Bumped version code from 57 to 58 (Android)
+- Removed 6 conflicting AppState listeners from various services
+- All network operations now gated by `AppStateManager.canDoNetworkOps()`
+- Restored v0.5.9 stability: zero background operations = zero crashes
+
 ## [0.6.5] - 2025-11-09
 
 ### Fixed

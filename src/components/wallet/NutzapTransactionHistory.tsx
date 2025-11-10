@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { theme } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { NutzapTransaction } from '../../types/nutzap';
+// import { NutzapTransaction } from '../../types/nutzap';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface NutzapTransactionHistoryProps {

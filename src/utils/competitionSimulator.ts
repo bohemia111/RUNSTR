@@ -776,7 +776,6 @@ export class CompetitionSimulator {
       'walking',
       'cycling',
       'strength',
-      'yoga',
       'meditation',
       'other',
     ];

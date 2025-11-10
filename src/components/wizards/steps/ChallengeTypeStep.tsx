@@ -60,14 +60,6 @@ const CHALLENGE_TYPES: ChallengeType[] = [
     activityType: 'hiking',
     metric: 'elevation',
   },
-  {
-    id: 'most-swimming-laps',
-    name: 'Most Swimming Laps',
-    description: 'Total laps completed in pool',
-    category: 'cardio',
-    activityType: 'swimming',
-    metric: 'laps',
-  },
   // Strength Challenges
   {
     id: 'most-pushups-single',
@@ -118,22 +110,6 @@ const CHALLENGE_TYPES: ChallengeType[] = [
     activityType: 'meditation',
     metric: 'duration',
   },
-  {
-    id: 'yoga-session-streak',
-    name: 'Yoga Session Streak',
-    description: 'Most consecutive days with yoga sessions',
-    category: 'wellness',
-    activityType: 'yoga',
-    metric: 'sessions',
-  },
-  {
-    id: 'most-poses-completed',
-    name: 'Most Poses Completed',
-    description: 'Total yoga poses completed in week',
-    category: 'wellness',
-    activityType: 'yoga',
-    metric: 'poses',
-  },
   // Endurance Challenges
   {
     id: 'longest-treadmill-session',
@@ -142,14 +118,6 @@ const CHALLENGE_TYPES: ChallengeType[] = [
     category: 'endurance',
     activityType: 'treadmill',
     metric: 'duration',
-  },
-  {
-    id: 'most-rowing-distance',
-    name: 'Most Rowing Distance',
-    description: 'Total rowing distance in week',
-    category: 'endurance',
-    activityType: 'rowing',
-    metric: 'distance',
   },
   {
     id: 'weekly-consistency',

@@ -188,18 +188,18 @@ export class Nostr1301ImportService {
       bike: 'cycling',
       biking: 'cycling',
 
-      swim: 'swimming',
-      swimming: 'swimming',
+      swim: 'other', // Not supported - mapped to other
+      swimming: 'other', // Not supported - mapped to other
 
-      row: 'rowing',
-      rowing: 'rowing',
+      row: 'other', // Not supported - mapped to other
+      rowing: 'other', // Not supported - mapped to other
 
       strength: 'strength',
       'strength training': 'strength',
       weights: 'strength',
       lifting: 'strength',
 
-      yoga: 'yoga',
+      yoga: 'other', // Not supported - mapped to other
       meditation: 'meditation',
       meditate: 'meditation',
 

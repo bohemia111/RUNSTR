@@ -42,7 +42,8 @@ const MEAL_TYPES: {
   { value: 'snack', label: 'Snack', icon: 'nutrition' },
 ];
 
-const LAST_MEAL_KEY = '@runstr:last_meal_timestamp';
+const ACTIVE_FAST_START_KEY = '@runstr:active_fast_start';
+const IS_FASTING_KEY = '@runstr:is_fasting';
 
 export const DietTrackerScreen: React.FC = () => {
   const [selectedMealType, setSelectedMealType] =
@@ -51,7 +52,10 @@ export const DietTrackerScreen: React.FC = () => {
   const [mealNotes, setMealNotes] = useState('');
   const [mealTime, setMealTime] = useState(new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [lastMealTime, setLastMealTime] = useState<Date | null>(null);
+
+  // Intentional fasting state
+  const [isFasting, setIsFasting] = useState<boolean>(false);
+  const [fastStartTime, setFastStartTime] = useState<Date | null>(null);
   const [fastingDuration, setFastingDuration] = useState<number>(0); // seconds
 
   // Summary modal state
@@ -83,11 +87,11 @@ export const DietTrackerScreen: React.FC = () => {
     buttons: [],
   });
 
-  // Load last meal time, userId, and signer on mount
+  // Load fasting state, userId, and signer on mount
   useEffect(() => {
     const initializeData = async () => {
       try {
-        await loadLastMealTime();
+        await loadFastingState();
 
         const npub = await AsyncStorage.getItem('@runstr:npub');
         if (npub) {
@@ -111,37 +115,71 @@ export const DietTrackerScreen: React.FC = () => {
     initializeData();
   }, []);
 
-  // Calculate fasting duration in real-time
+  // Calculate fasting duration in real-time (only when actively fasting)
   useEffect(() => {
-    if (!lastMealTime) return;
+    if (!isFasting || !fastStartTime) return;
 
     const interval = setInterval(() => {
       const duration = Math.floor(
-        (mealTime.getTime() - lastMealTime.getTime()) / 1000
+        (Date.now() - fastStartTime.getTime()) / 1000
       );
       setFastingDuration(Math.max(0, duration));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [lastMealTime, mealTime]);
+  }, [isFasting, fastStartTime]);
 
-  const loadLastMealTime = async () => {
+  const loadFastingState = async () => {
     try {
-      const timestamp = await AsyncStorage.getItem(LAST_MEAL_KEY);
-      if (timestamp) {
-        setLastMealTime(new Date(parseInt(timestamp)));
+      const [fastingFlag, startTimeStr] = await Promise.all([
+        AsyncStorage.getItem(IS_FASTING_KEY),
+        AsyncStorage.getItem(ACTIVE_FAST_START_KEY),
+      ]);
+
+      if (fastingFlag === 'true' && startTimeStr) {
+        setIsFasting(true);
+        setFastStartTime(new Date(parseInt(startTimeStr)));
+        console.log('[DietTracker] ✅ Restored active fast from storage');
       }
     } catch (error) {
-      console.error('Failed to load last meal time:', error);
+      console.error('[DietTracker] Failed to load fasting state:', error);
     }
   };
 
-  const saveLastMealTime = async (time: Date) => {
+  const startFastingMode = async () => {
     try {
-      await AsyncStorage.setItem(LAST_MEAL_KEY, time.getTime().toString());
-      setLastMealTime(time);
+      const startTime = new Date();
+      await Promise.all([
+        AsyncStorage.setItem(IS_FASTING_KEY, 'true'),
+        AsyncStorage.setItem(ACTIVE_FAST_START_KEY, startTime.getTime().toString()),
+      ]);
+      setIsFasting(true);
+      setFastStartTime(startTime);
+      setFastingDuration(0);
+      console.log('[DietTracker] ✅ Started fasting mode');
     } catch (error) {
-      console.error('Failed to save last meal time:', error);
+      console.error('[DietTracker] Failed to start fasting:', error);
+      setAlertConfig({
+        title: 'Error',
+        message: 'Failed to start fasting. Please try again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
+    }
+  };
+
+  const stopFastingMode = async () => {
+    try {
+      await Promise.all([
+        AsyncStorage.removeItem(IS_FASTING_KEY),
+        AsyncStorage.removeItem(ACTIVE_FAST_START_KEY),
+      ]);
+      setIsFasting(false);
+      setFastStartTime(null);
+      setFastingDuration(0);
+      console.log('[DietTracker] ✅ Stopped fasting mode');
+    } catch (error) {
+      console.error('[DietTracker] Failed to stop fasting:', error);
     }
   };
 
@@ -179,9 +217,6 @@ export const DietTrackerScreen: React.FC = () => {
 
       console.log(`✅ Meal logged: ${selectedMealType} at ${timeString}`);
 
-      // Update last meal time
-      await saveLastMealTime(mealTime);
-
       // Retrieve saved workout for summary modal
       const allWorkouts = await LocalWorkoutStorageService.getAllWorkouts();
       const workout = allWorkouts.find((w) => w.id === workoutId);
@@ -206,15 +241,9 @@ export const DietTrackerScreen: React.FC = () => {
     }
   };
 
-  const saveFast = async () => {
-    if (!lastMealTime) {
-      console.warn('No last meal recorded, cannot save fast');
-      setAlertConfig({
-        title: 'No Last Meal',
-        message: 'You need to log a meal first before recording a fast.',
-        buttons: [{ text: 'OK', style: 'default' }],
-      });
-      setAlertVisible(true);
+  const breakFastAndLogMeal = async () => {
+    if (!isFasting || !fastStartTime) {
+      console.warn('[DietTracker] Not currently fasting, cannot break fast');
       return;
     }
 
@@ -222,24 +251,50 @@ export const DietTrackerScreen: React.FC = () => {
       const hours = Math.floor(fastingDuration / 3600);
       const minutes = Math.floor((fastingDuration % 3600) / 60);
 
-      const workoutId = await LocalWorkoutStorageService.saveManualWorkout({
-        type: 'fasting', // Proper type for fasting workouts
-        duration: fastingDuration, // Store in seconds (consistent with other workouts)
-        notes: mealNotes || `Completed ${hours}h ${minutes}m fast`,
+      // First, save the fasting period
+      const fastWorkoutId = await LocalWorkoutStorageService.saveManualWorkout({
+        type: 'fasting',
+        duration: fastingDuration,
+        notes: `Completed ${hours}h ${minutes}m fast`,
         fastingDuration,
       });
 
       console.log(`✅ Fast logged: ${formatDuration(fastingDuration)}`);
 
-      // Update last meal time to now (breaking the fast)
-      await saveLastMealTime(mealTime);
+      // Then, save the meal that breaks the fast
+      const mealTypeLabel =
+        MEAL_TYPES.find((m) => m.value === selectedMealType)?.label || 'Meal';
+      const timeString = mealTime.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 
-      // Retrieve saved workout for summary modal
+      const estimatedCalories = CalorieEstimationService.estimateMealCalories(
+        selectedMealSize,
+        selectedMealType
+      );
+
+      await LocalWorkoutStorageService.saveManualWorkout({
+        type: 'diet',
+        duration: 0,
+        notes: mealNotes || `${mealTypeLabel} at ${timeString} (broke fast)`,
+        mealType: selectedMealType,
+        mealTime: mealTime.toISOString(),
+        mealSize: selectedMealSize,
+        calories: estimatedCalories,
+      });
+
+      console.log(`✅ Meal logged: ${selectedMealType} at ${timeString}`);
+
+      // Stop fasting mode
+      await stopFastingMode();
+
+      // Retrieve the fast workout for summary modal
       const allWorkouts = await LocalWorkoutStorageService.getAllWorkouts();
-      const workout = allWorkouts.find((w) => w.id === workoutId);
+      const fastWorkout = allWorkouts.find((w) => w.id === fastWorkoutId);
 
-      if (workout) {
-        setSavedWorkout(workout as any);
+      if (fastWorkout) {
+        setSavedWorkout(fastWorkout as any);
         setSummaryType('fast');
         setShowSummary(true);
       }
@@ -248,10 +303,10 @@ export const DietTrackerScreen: React.FC = () => {
       setMealNotes('');
       setMealTime(new Date());
     } catch (error) {
-      console.error('❌ Failed to save fast:', error);
+      console.error('❌ Failed to break fast and log meal:', error);
       setAlertConfig({
         title: 'Error',
-        message: 'Failed to save fast. Please try again.',
+        message: 'Failed to break fast. Please try again.',
         buttons: [{ text: 'OK', style: 'default' }],
       });
       setAlertVisible(true);
@@ -259,14 +314,34 @@ export const DietTrackerScreen: React.FC = () => {
   };
 
   const handlePost = async () => {
+    console.log('🔍 [DietTracker] handlePost() CALLED - Entry point reached');
+    console.log('🔍 [DietTracker] savedWorkout exists:', !!savedWorkout);
+
     try {
-      if (!savedWorkout) return;
-      setShowShareModal(true);
+      // If savedWorkout not in state, try retrieving from storage (like MeditationTracker)
+      if (!savedWorkout) {
+        console.log('[DietTracker] Workout not in state, retrieving from storage...');
+        const allWorkouts = await LocalWorkoutStorageService.getAllWorkouts();
+        const latestWorkout = allWorkouts[0]; // Most recent workout
+
+        if (latestWorkout) {
+          console.log('[DietTracker] Retrieved latest workout from storage:', latestWorkout.id);
+          setSavedWorkout(latestWorkout as any);
+          console.log('🔍 [DietTracker] About to set showShareModal = true (from storage)');
+          setShowShareModal(true);
+        } else {
+          throw new Error('No workout found to share');
+        }
+      } else {
+        console.log('[DietTracker] Using savedWorkout from state');
+        console.log('🔍 [DietTracker] About to set showShareModal = true (from state)');
+        setShowShareModal(true);
+      }
     } catch (error) {
       console.error('❌ Failed to prepare workout for sharing:', error);
       setAlertConfig({
         title: 'Error',
-        message: 'Failed to prepare workout. Please try again.',
+        message: 'No workout data available. Please try logging your meal/fast again.',
         buttons: [{ text: 'OK', style: 'default' }],
       });
       setAlertVisible(true);
@@ -275,9 +350,21 @@ export const DietTrackerScreen: React.FC = () => {
 
   const handleCompete = async () => {
     try {
-      if (!savedWorkout) return;
+      console.log('🔍 [DietTracker] handleCompete() started');
+
+      if (!savedWorkout) {
+        console.log('❌ [DietTracker] No savedWorkout found');
+        return;
+      }
+      console.log('✅ [DietTracker] savedWorkout exists:', {
+        id: savedWorkout.id,
+        type: savedWorkout.type,
+        calories: savedWorkout.calories,
+        hasNotes: !!savedWorkout.notes,
+      });
 
       if (!signer || !userId) {
+        console.log('❌ [DietTracker] Authentication missing - signer:', !!signer, 'userId:', !!userId);
         setAlertConfig({
           title: 'Authentication Required',
           message: 'Please log in with your Nostr key to post workouts.',
@@ -286,43 +373,70 @@ export const DietTrackerScreen: React.FC = () => {
         setAlertVisible(true);
         return;
       }
+      console.log('✅ [DietTracker] Authentication OK - userId:', userId);
 
       setIsCompeting(true);
+      console.log('🔄 [DietTracker] Starting kind 1301 publishing...');
 
       // Publish as kind 1301 (competition data)
       const publishingService = WorkoutPublishingService.getInstance();
+      console.log('📤 [DietTracker] Calling saveWorkoutToNostr...');
       const result = await publishingService.saveWorkoutToNostr(
         savedWorkout,
         signer,
         userId
       );
+      console.log('📥 [DietTracker] Publishing result:', result);
 
       if (result.success && result.eventId) {
+        console.log('✅ [DietTracker] Publishing successful! Event ID:', result.eventId);
+
         // Mark as synced in local storage
+        console.log('💾 [DietTracker] Marking workout as synced in local storage...');
         await LocalWorkoutStorageService.markAsSynced(
           savedWorkout.id,
           result.eventId
         );
+        console.log('✅ [DietTracker] Marked as synced');
 
-        setAlertConfig({
-          title: 'Success!',
-          message: `Your ${summaryType === 'meal' ? 'meal' : 'fast'} has been saved to Nostr!`,
-          buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
-        });
-        setAlertVisible(true);
+        // Close summary modal FIRST to prevent alert appearing behind it
+        setShowSummary(false);
+
+        // Show alert after modal closes
+        setTimeout(() => {
+          setAlertConfig({
+            title: 'Success!',
+            message: `Your ${summaryType === 'meal' ? 'meal' : 'fast'} has been saved to Nostr!`,
+            buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
+          });
+          setAlertVisible(true);
+        }, 300);
       } else {
+        console.error('❌ [DietTracker] Publishing failed:', result.error);
         throw new Error(result.error || 'Failed to save to Nostr');
       }
     } catch (error) {
-      console.error('❌ Failed to compete workout:', error);
-      setAlertConfig({
-        title: 'Error',
-        message: 'Failed to enter competition. Please try again.',
-        buttons: [{ text: 'OK', style: 'default' }],
+      console.error('❌ [DietTracker] handleCompete error:', error);
+      console.error('❌ [DietTracker] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      setAlertVisible(true);
+
+      // Close summary modal FIRST to prevent alert appearing behind it
+      setShowSummary(false);
+
+      // Show error alert after modal closes
+      setTimeout(() => {
+        setAlertConfig({
+          title: 'Error',
+          message: 'Failed to publish. Please try again.',
+          buttons: [{ text: 'OK', style: 'default' }],
+        });
+        setAlertVisible(true);
+      }, 300);
     } finally {
       setIsCompeting(false);
+      console.log('🏁 [DietTracker] handleCompete() finished');
     }
   };
 
@@ -387,14 +501,16 @@ export const DietTrackerScreen: React.FC = () => {
       </View>
 
       <Text style={styles.title}>Diet Tracker</Text>
-      <Text style={styles.subtitle}>Log your meals and track fasting</Text>
+      <Text style={styles.subtitle}>
+        {isFasting ? 'Currently Fasting' : 'Log your meals and track fasting'}
+      </Text>
 
-      {/* Fasting Duration Display */}
-      {lastMealTime && (
+      {/* Active Fasting Display */}
+      {isFasting && fastStartTime && (
         <View style={styles.fastingCard}>
           <View style={styles.fastingHeader}>
             <Ionicons name="time" size={24} color={theme.colors.orangeBright} />
-            <Text style={styles.fastingTitle}>Time Since Last Meal</Text>
+            <Text style={styles.fastingTitle}>Fasting in Progress</Text>
           </View>
           <Text style={styles.fastingDuration}>
             {formatDuration(fastingDuration)}
@@ -419,8 +535,8 @@ export const DietTrackerScreen: React.FC = () => {
           })()}
 
           <Text style={styles.fastingSubtitle}>
-            Last meal:{' '}
-            {lastMealTime.toLocaleString('en-US', {
+            Started:{' '}
+            {fastStartTime.toLocaleString('en-US', {
               month: 'short',
               day: 'numeric',
               hour: '2-digit',
@@ -538,19 +654,40 @@ export const DietTrackerScreen: React.FC = () => {
 
       {/* Action Buttons */}
       <View style={styles.buttonGroup}>
-        <TouchableOpacity style={styles.saveMealButton} onPress={saveMeal}>
-          <Ionicons
-            name="restaurant"
-            size={20}
-            color={theme.colors.background}
-          />
-          <Text style={styles.saveMealButtonText}>Log Meal</Text>
-        </TouchableOpacity>
+        {!isFasting ? (
+          <>
+            <TouchableOpacity style={styles.saveMealButton} onPress={saveMeal}>
+              <Ionicons
+                name="restaurant"
+                size={20}
+                color={theme.colors.background}
+              />
+              <Text style={styles.saveMealButtonText}>Log Meal</Text>
+            </TouchableOpacity>
 
-        {lastMealTime && fastingDuration > 0 && (
-          <TouchableOpacity style={styles.saveFastButton} onPress={saveFast}>
-            <Ionicons name="timer" size={20} color={theme.colors.background} />
-            <Text style={styles.saveFastButtonText}>Log as Fast</Text>
+            <TouchableOpacity
+              style={styles.startFastingButton}
+              onPress={startFastingMode}
+            >
+              <Ionicons
+                name="timer-outline"
+                size={20}
+                color={theme.colors.background}
+              />
+              <Text style={styles.startFastingButtonText}>Start Fasting</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={styles.breakFastButton}
+            onPress={breakFastAndLogMeal}
+          >
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={theme.colors.background}
+            />
+            <Text style={styles.breakFastButtonText}>Break Fast + Log Meal</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -562,8 +699,9 @@ export const DietTrackerScreen: React.FC = () => {
           color={theme.colors.textMuted}
         />
         <Text style={styles.hintText}>
-          "Log Meal" records what you ate. "Log as Fast" records the time since
-          your last meal.
+          {isFasting
+            ? 'Click "Break Fast + Log Meal" to end your fast and record what you eat.'
+            : '"Log Meal" saves your food. "Start Fasting" begins tracking a fasting period.'}
         </Text>
       </View>
 
@@ -637,7 +775,7 @@ export const DietTrackerScreen: React.FC = () => {
                       color={theme.colors.background}
                       style={styles.buttonIcon}
                     />
-                    <Text style={styles.competeButtonText}>Enter Competition</Text>
+                    <Text style={styles.competeButtonText}>Public</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -648,27 +786,27 @@ export const DietTrackerScreen: React.FC = () => {
             </View>
           </View>
         </View>
-      </Modal>
 
-      {/* Social Share Modal */}
-      {savedWorkout && (
-        <EnhancedSocialShareModal
-          visible={showShareModal}
-          workout={savedWorkout}
-          userId={userId}
-          userAvatar={userAvatar}
-          userName={userName}
-          onClose={() => setShowShareModal(false)}
-          onSuccess={() => {
-            setAlertConfig({
-              title: 'Success!',
-              message: `Your ${summaryType === 'meal' ? 'meal' : 'fast'} has been shared to Nostr with a beautiful card!`,
-              buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
-            });
-            setAlertVisible(true);
-          }}
-        />
-      )}
+        {/* Social Share Modal - Rendered INSIDE summary Modal for proper z-index */}
+        {savedWorkout && (
+          <EnhancedSocialShareModal
+            visible={showShareModal}
+            workout={savedWorkout}
+            userId={userId}
+            userAvatar={userAvatar}
+            userName={userName}
+            onClose={() => setShowShareModal(false)}
+            onSuccess={() => {
+              setAlertConfig({
+                title: 'Success!',
+                message: `Your ${summaryType === 'meal' ? 'meal' : 'fast'} has been shared to Nostr with a beautiful card!`,
+                buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
+              });
+              setAlertVisible(true);
+            }}
+          />
+        )}
+      </Modal>
 
       {/* Custom Alert */}
       <CustomAlert
@@ -869,16 +1007,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: theme.typography.weights.bold,
   },
-  saveFastButton: {
+  startFastingButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.orangeBright,
+    backgroundColor: theme.colors.text,
     borderRadius: 12,
     paddingVertical: 16,
     gap: 8,
   },
-  saveFastButtonText: {
+  startFastingButtonText: {
+    color: theme.colors.background,
+    fontSize: 16,
+    fontWeight: theme.typography.weights.bold,
+  },
+  breakFastButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.text,
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  breakFastButtonText: {
     color: theme.colors.background,
     fontSize: 16,
     fontWeight: theme.typography.weights.bold,
@@ -967,7 +1119,7 @@ const styles = StyleSheet.create({
   },
   postButton: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.text,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',

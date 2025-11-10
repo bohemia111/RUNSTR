@@ -72,7 +72,7 @@ export const SplashInitScreen: React.FC<SplashInitScreenProps> = ({
   };
 
   const initializeApp = async () => {
-    const MAX_INIT_TIME = 20000; // 20 seconds for ALL data (profile + teams + workouts)
+    const MAX_INIT_TIME = 8000; // ✅ PERFORMANCE FIX: Reduced from 20s to 8s for faster perceived startup
 
     // ✅ COMPLETE LOADING STRATEGY: Load everything BEFORE showing app
     const completeLoadingPromise = (async () => {

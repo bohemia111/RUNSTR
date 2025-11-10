@@ -1,5 +1,5 @@
 /**
- * ChallengePaymentModal - Universal payment modal for challenge wagers
+ * ChallengePaymentModal - Universal payment modal for challenge charity donations
  * Shows Lightning invoice QR code and copyable invoice
  * User manually confirms payment (no automatic polling)
  */
@@ -71,16 +71,16 @@ export const ChallengePaymentModal: React.FC<ChallengePaymentModalProps> = ({
   };
 
   const getRoleText = () => {
-    if (role === 'creator') return 'Challenge Wager';
-    if (role === 'accepter') return 'Challenge Wager';
-    return 'Challenge Payout';
+    if (role === 'creator') return 'Charity Donation';
+    if (role === 'accepter') return 'Charity Donation';
+    return 'Charity Payout';
   };
 
   const getDescription = () => {
     if (role === 'loser') {
-      return `You lost the challenge. Pay ${wagerAmount.toLocaleString()} sats to the winner.`;
+      return `You lost the challenge. Pay ${wagerAmount.toLocaleString()} sats to winner's charity.`;
     }
-    return 'Pay your wager to join this challenge.';
+    return 'Pay your donation to join this challenge.';
   };
 
   return (

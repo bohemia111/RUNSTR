@@ -20,9 +20,9 @@ import type {
 } from '../../types/season';
 import { calculatePrize } from '../../types/season';
 import { ChallengeIconButton } from '../ui/ChallengeIconButton';
-import { QuickChallengeWizard } from '../wizards/QuickChallengeWizard';
+import { SimpleChallengeWizardV2 } from '../wizards/SimpleChallengeWizardV2';
 import { getUserNostrIdentifiers } from '../../utils/nostr';
-import { NutzapLightningButton } from '../nutzap/NutzapLightningButton';
+// import { NutzapLightningButton } from '../nutzap/NutzapLightningButton';
 
 interface Season1LeaderboardProps {
   leaderboard: Season1Leaderboard | null;
@@ -181,7 +181,7 @@ export const Season1LeaderboardComponent: React.FC<Season1LeaderboardProps> = ({
                             )
                           }
                         />
-                        <NutzapLightningButton
+                        {/* <NutzapLightningButton
                           recipientNpub={participant.pubkey}
                           recipientName={formatName(
                             participant.name,
@@ -189,7 +189,7 @@ export const Season1LeaderboardComponent: React.FC<Season1LeaderboardProps> = ({
                           )}
                           size="small"
                           style={styles.zapButton}
-                        />
+                        /> */}
                       </View>
                     )}
                 </View>
@@ -224,25 +224,14 @@ export const Season1LeaderboardComponent: React.FC<Season1LeaderboardProps> = ({
       )}
 
       {/* Challenge Wizard Modal */}
-      {selectedOpponent && (
-        <Modal
-          visible={challengeWizardVisible}
-          animationType="slide"
-          presentationStyle="fullScreen"
-        >
-          <QuickChallengeWizard
-            opponent={selectedOpponent}
-            onComplete={() => {
-              setChallengeWizardVisible(false);
-              setSelectedOpponent(null);
-            }}
-            onCancel={() => {
-              setChallengeWizardVisible(false);
-              setSelectedOpponent(null);
-            }}
-          />
-        </Modal>
-      )}
+      <SimpleChallengeWizardV2
+        visible={challengeWizardVisible}
+        onClose={() => {
+          setChallengeWizardVisible(false);
+          setSelectedOpponent(null);
+        }}
+        preSelectedOpponent={selectedOpponent || undefined}
+      />
     </View>
   );
 };

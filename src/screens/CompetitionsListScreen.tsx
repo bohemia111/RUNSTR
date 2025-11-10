@@ -23,7 +23,7 @@ import { NostrCompetitionDiscoveryService } from '../services/competition/NostrC
 import { getUserNostrIdentifiers } from '../utils/nostr';
 import type { UserCompetition } from '../types/challenge';
 import { theme } from '../styles/theme';
-import { SimplifiedChallengeWizard } from '../components/wizards/SimplifiedChallengeWizard';
+import { GlobalChallengeWizard } from '../components/wizards/GlobalChallengeWizard';
 import { EventParticipationStore } from '../services/event/EventParticipationStore';
 
 type RootStackParamList = {
@@ -81,15 +81,17 @@ export const CompetitionsListScreen: React.FC = () => {
       const localEvents = await EventParticipationStore.getParticipations();
 
       // Convert to UserCompetition format
+      // ✅ Store eventData for later retrieval (avoid defaults in buildEventDataFromCompetition)
       const localCompetitions: UserCompetition[] = localEvents.map((event) => ({
         id: event.eventId,
-        name: event.eventName,
+        name: event.eventData.name,
         type: 'event' as const,
         status: event.status === 'approved' ? ('active' as const) : ('upcoming' as const),
         participantCount: 1, // At least the user
         yourRole: 'member' as const,
-        startsAt: new Date(event.eventDate).getTime() / 1000,
+        startsAt: new Date(event.eventData.eventDate).getTime() / 1000,
         prizePool: event.entryFeePaid,
+        eventData: event.eventData, // ✅ Include full event data
       }));
 
       // Show local events immediately for fast UX
@@ -133,21 +135,27 @@ export const CompetitionsListScreen: React.FC = () => {
 
   /**
    * Build event data from competition for instant display
-   * ✅ FIX: Pass full event data to prevent "Event not found" errors
+   * ✅ FIX: Use stored eventData if available (from local participations)
    */
   const buildEventDataFromCompetition = (comp: UserCompetition) => {
     if (comp.type !== 'event') return null;
 
+    // ✅ If we have full event data stored, use it directly
+    if (comp.eventData) {
+      return comp.eventData;
+    }
+
+    // Fallback to partial data (for events from Nostr without local participation)
     return {
       id: comp.id,
       name: comp.name,
-      activityType: 'Any', // Default - will be fetched from Nostr if needed
+      activityType: 'Any',
       eventDate: comp.startsAt
         ? new Date(comp.startsAt * 1000).toISOString()
         : new Date().toISOString(),
-      metric: 'total_distance', // Default metric
-      teamId: '', // Will be fetched from Nostr if needed
-      captainPubkey: '', // Will be fetched from Nostr if needed
+      metric: 'total_distance',
+      teamId: '',
+      captainPubkey: '',
       description: undefined,
       entryFeesSats: comp.prizePool,
     };
@@ -335,15 +343,17 @@ export const CompetitionsListScreen: React.FC = () => {
         />
       )}
 
-      {/* Simplified Challenge Wizard Modal */}
-      <SimplifiedChallengeWizard
-        visible={showChallengeWizard}
-        onClose={() => setShowChallengeWizard(false)}
-        onChallengeCreated={() => {
-          // Refresh competitions after challenge is created
-          loadCompetitions(true);
-        }}
-      />
+      {/* Challenge Wizard Modal */}
+      {showChallengeWizard && (
+        <GlobalChallengeWizard
+          onCancel={() => setShowChallengeWizard(false)}
+          onComplete={() => {
+            // Refresh competitions after challenge is created
+            setShowChallengeWizard(false);
+            loadCompetitions(true);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 };

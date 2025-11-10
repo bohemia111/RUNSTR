@@ -272,6 +272,7 @@ export const MyTeamsScreen: React.FC = () => {
           teams={teams}
           userNpub={userNpub}
           onRefresh={handleRefresh}
+          isLoadingTeams={isLoadingTeam}
         />
       )}
     </SafeAreaView>

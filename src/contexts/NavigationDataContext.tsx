@@ -9,6 +9,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   ReactNode,
 } from 'react';
 import { InteractionManager } from 'react-native';
@@ -892,7 +893,8 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
     init();
   }, []);
 
-  const value: NavigationData = {
+  // ✅ PERFORMANCE FIX: Memoize context value to prevent unnecessary re-renders
+  const value = useMemo<NavigationData>(() => ({
     user,
     teamData,
     profileData,
@@ -907,7 +909,22 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
     loadWallet,
     loadCaptainDashboard,
     prefetchLeaguesInBackground,
-  };
+  }), [
+    user,
+    teamData,
+    profileData,
+    walletData,
+    captainDashboardData,
+    availableTeams,
+    isLoading,
+    isLoadingTeam,
+    error,
+    refresh,
+    loadTeams,
+    loadWallet,
+    loadCaptainDashboard,
+    prefetchLeaguesInBackground,
+  ]);
 
   return (
     <NavigationDataContext.Provider value={value}>

@@ -201,9 +201,17 @@ export class ChallengeNotificationHandler {
 
       console.log('Subscribing to kind 30102 challenges with filter:', filter);
 
+      // v0.6.8: Re-enabled with proper lifecycle management
       this.subscription = ndk.subscribe(filter, { closeOnEose: false });
 
       this.subscription.on('event', async (event: NDKEvent) => {
+        // Check if app is active before processing events
+        const { AppStateManager } = await import('../core/AppStateManager');
+        if (!AppStateManager.canDoNetworkOps()) {
+          console.log('🔴 App backgrounded, skipping challenge event processing');
+          return;
+        }
+
         const challengeId = event.tags.find((t) => t[0] === 'd')?.[1];
         if (!challengeId) {
           console.warn('kind 30102 event missing d-tag:', event.id);

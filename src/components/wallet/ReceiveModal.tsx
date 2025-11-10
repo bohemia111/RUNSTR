@@ -19,7 +19,7 @@ import { theme } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import nutzapService from '../../services/nutzap/nutzapService';
+// import nutzapService from '../../services/nutzap/nutzapService';
 import { useNutzap } from '../../hooks/useNutzap';
 import { FEATURES } from '../../config/features';
 import { NWCStorageService } from '../../services/wallet/NWCStorageService';

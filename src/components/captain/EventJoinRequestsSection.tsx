@@ -362,6 +362,15 @@ export const EventJoinRequestsSection: React.FC<
         console.warn('⚠️ Failed to invalidate snapshot (non-critical):', error);
       }
 
+      // Clear join request cache to prevent approved requests from reappearing
+      try {
+        const requestService = EventJoinRequestService.getInstance();
+        requestService.clearCache();
+        console.log('🗑️ Join request cache cleared after approval');
+      } catch (error) {
+        console.warn('⚠️ Failed to clear join request cache (non-critical):', error);
+      }
+
       alertVisible = true;
       CustomAlertManager.alert('Success', 'Participant approved and added to event', [
         { text: 'OK', onPress: () => { alertVisible = false; } }

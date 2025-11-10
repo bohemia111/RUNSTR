@@ -165,11 +165,11 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
       return;
     }
 
-    // Always start long press timer - wallet check happens on tap vs hold
+    // Phase 1: Long press = NWC quick zap (power users)
     console.log('[NWCLightningButton] Starting long press timer...');
     longPressTimer.current = setTimeout(() => {
-      console.log('[NWCLightningButton] Long press detected, opening modal');
-      setShowModal(true);
+      console.log('[NWCLightningButton] Long press detected, performing quick zap');
+      performQuickZap();
       longPressTimer.current = null;
     }, LONG_PRESS_DURATION);
   };
@@ -182,12 +182,15 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
 
     if (longPressTimer.current) {
       // Timer still active = quick tap (not long press)
-      console.log('[NWCLightningButton] Quick tap detected, performing zap');
+      // Phase 1: Tap = External wallet (default, most accessible)
+      console.log('[NWCLightningButton] Quick tap detected, opening external wallet modal');
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
 
-      // Quick zap with default amount
-      await performQuickZap();
+      // Open external wallet modal with default amount
+      setExternalZapAmount(defaultAmount);
+      setExternalZapMemo(`⚡ Zap from RUNSTR to ${recipientName}`);
+      setShowExternalModal(true);
     }
   };
 
@@ -198,7 +201,7 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
     if (!isInitialized || !hasWallet) {
       Alert.alert(
         'No Wallet Connected',
-        'Quick zap requires an NWC wallet. Hold the button to pay with an external wallet (Cash App, Strike, etc.)',
+        'NWC quick zap requires a configured wallet. Tap the button to pay with an external wallet (Cash App, Strike, etc.), or configure NWC in Settings.',
         [{ text: 'OK' }]
       );
       return;
@@ -208,7 +211,7 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
     if (balance < defaultAmount) {
       Alert.alert(
         'Insufficient Balance',
-        `You need ${defaultAmount} sats but only have ${balance} sats. Hold the button to pay with an external wallet.`,
+        `You need ${defaultAmount} sats but only have ${balance} sats. Tap the button to pay with an external wallet.`,
         [{ text: 'OK' }]
       );
       return;

@@ -13,7 +13,6 @@ Services for managing live workout tracking, location services, and text-to-spee
 
 ### Location Tracking
 
-**EnhancedLocationTrackingService.ts** - Advanced GPS tracking with filtering and accuracy validation (~400 lines)
 **LocationTrackingService.ts** - Basic location tracking for workout activities
 **LocationValidator.ts** - Validates GPS coordinates and filters out bad data points
 **LocationPermissionService.ts** - Manages location permissions for iOS/Android
@@ -141,7 +140,6 @@ const stats = splitTrackingService.getStatistics();
 All files under 500 lines per project requirements:
 - TTSAnnouncementService.ts: ~350 lines ✅
 - TTSPreferencesService.ts: ~200 lines ✅
-- EnhancedLocationTrackingService.ts: ~400 lines ✅
 
 ### Audio Ducking
 Uses platform-specific audio session configuration:

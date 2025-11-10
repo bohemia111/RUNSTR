@@ -36,7 +36,7 @@ import { StreakAnalyticsService } from '../services/analytics/StreakAnalyticsSer
 import Nostr1301ImportService from '../services/fitness/Nostr1301ImportService';
 import { HealthSnapshotCard } from '../components/analytics/HealthSnapshotCard';
 import { CalorieBalanceCard } from '../components/analytics/CalorieBalanceCard';
-import { ActivityStreaksCard } from '../components/analytics/ActivityStreaksCard';
+import { WeeklySummaryAccordion } from '../components/analytics/WeeklySummaryAccordion';
 import { FitnessTestInstructionsModal } from '../components/fitness/FitnessTestInstructionsModal';
 import FitnessTestService from '../services/fitness/FitnessTestService';
 
@@ -57,7 +57,6 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
     totalImported: number;
     importedAt: string;
   } | null>(null);
-  const [activityStreaks, setActivityStreaks] = useState<any[]>([]);
   const [caloricMetrics, setCaloricMetrics] = useState<any>(null);
 
   // Fitness Test state
@@ -161,11 +160,6 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
         profile || undefined
       );
 
-      // 3. Activity Streaks (for Activity Streaks Card)
-      const activityStreaks = StreakAnalyticsService.calculateActivityStreaks(
-        allWorkouts
-      );
-
       // Store simplified analytics
       const summary: AnalyticsSummary = {
         cardio: cardioMetrics || undefined,
@@ -174,7 +168,6 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
       };
 
       setAnalytics(summary);
-      setActivityStreaks(activityStreaks);
       setCaloricMetrics(caloricMetrics);
       setLoading(false);
       console.log('[AdvancedAnalytics] ✅ Analytics calculation complete');
@@ -370,26 +363,21 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
           <Text style={styles.privacyLink}>Tap to learn more →</Text>
         </TouchableOpacity>
 
-        {/* Import Nostr History Button (always visible) */}
-        <TouchableOpacity
-          style={styles.importButton}
-          onPress={handleImportNostrHistory}
-          disabled={importing}
-        >
-          <Ionicons name="cloud-download-outline" size={20} color="#000" />
-          <Text style={styles.importButtonText}>
-            {importing
-              ? `Importing... (${importStats?.totalImported || 0} workouts)`
-              : importStats
-              ? '✓ Re-import Nostr Workouts'
-              : 'Import Nostr Workouts'}
-          </Text>
-        </TouchableOpacity>
-        {importStats && !importing && (
-          <Text style={styles.importStats}>
-            Last imported: {importStats.totalImported} workouts on{' '}
-            {new Date(importStats.importedAt).toLocaleDateString()}
-          </Text>
+        {/* Section 1: Health Metrics (BMI | VO2 Max | Fitness Age) */}
+        <Text style={styles.sectionTitle}>Health Metrics</Text>
+        <HealthSnapshotCard
+          bodyComposition={analytics?.bodyComposition}
+          vo2MaxData={analytics?.cardio?.vo2MaxEstimate}
+        />
+
+        {/* Section 2: Weekly Summary Breakdown */}
+        <WeeklySummaryAccordion workouts={workouts} />
+
+        {/* Today's Caloric Balance */}
+        {caloricMetrics && (
+          <CalorieBalanceCard
+            dailyBalance={caloricMetrics.today}
+          />
         )}
 
         {/* RUNSTR Fitness Test Card */}
@@ -455,31 +443,31 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Section 1: Health Snapshot (BMI | VO2 Max | Fitness Age) */}
-        <Text style={styles.sectionTitle}>Health Metrics</Text>
-        <HealthSnapshotCard
-          bodyComposition={analytics?.bodyComposition}
-          vo2MaxData={analytics?.cardio?.vo2MaxEstimate}
-        />
-
-        {/* Section 2: Weekly Caloric Balance */}
-        {caloricMetrics && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Weekly Caloric Balance</Text>
-            <CalorieBalanceCard
-              dailyBalance={caloricMetrics.today}
-              weeklyAverage={CaloricAnalyticsService.calculateWeeklyAverage(
-                workouts
-              )}
-            />
-          </View>
+        {/* Import Nostr History Button (moved to bottom) */}
+        <Text style={styles.fitnessTestDesc}>
+          Sync your published workout history from Nostr relays to keep your
+          local records up to date.
+        </Text>
+        <TouchableOpacity
+          style={styles.importButton}
+          onPress={handleImportNostrHistory}
+          disabled={importing}
+        >
+          <Ionicons name="cloud-download-outline" size={20} color="#000" />
+          <Text style={styles.importButtonText}>
+            {importing
+              ? `Importing... (${importStats?.totalImported || 0} workouts)`
+              : importStats
+              ? '✓ Re-import Public Workouts'
+              : 'Import Public Workouts'}
+          </Text>
+        </TouchableOpacity>
+        {importStats && !importing && (
+          <Text style={styles.importStats}>
+            Last imported: {importStats.totalImported} workouts on{' '}
+            {new Date(importStats.importedAt).toLocaleDateString()}
+          </Text>
         )}
-
-        {/* Section 3: Activity Streaks */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Activity Streaks</Text>
-          <ActivityStreaksCard streaks={activityStreaks} />
-        </View>
 
         {/* Last Updated */}
         {analytics && (
@@ -555,8 +543,8 @@ const styles = StyleSheet.create({
   },
 
   contentContainer: {
-    padding: 16,
-    paddingBottom: 100,
+    padding: 12,
+    paddingBottom: 80,
   },
 
   privacyNotice: {
@@ -564,8 +552,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#1a1a1a',
-    padding: 16,
-    marginBottom: 24,
+    padding: 12,
+    marginBottom: 16,
   },
 
   privacyHeader: {
@@ -600,9 +588,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FF9D42',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     gap: 8,
-    marginBottom: 24,
+    marginBottom: 16,
   },
 
   importButtonText: {
@@ -634,14 +622,14 @@ const styles = StyleSheet.create({
   },
 
   section: {
-    marginBottom: 32,
+    marginBottom: 16,
   },
 
   sectionTitle: {
     fontSize: 18,
     fontWeight: theme.typography.weights.semiBold,
     color: '#FFB366',
-    marginBottom: 16,
+    marginBottom: 12,
   },
 
   scoreCard: {
@@ -855,28 +843,28 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#1a1a1a',
-    padding: 20,
-    marginBottom: 24,
+    padding: 14,
+    marginBottom: 16,
   },
 
   fitnessTestHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 10,
   },
 
   fitnessTestTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: theme.typography.weights.semiBold,
     color: '#FFB366',
   },
 
   fitnessTestDesc: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#CC7A33',
-    lineHeight: 20,
-    marginBottom: 16,
+    lineHeight: 18,
+    marginBottom: 12,
   },
 
   startTestButton: {
@@ -885,7 +873,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FF9D42',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     gap: 8,
   },
 

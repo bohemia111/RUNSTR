@@ -18,8 +18,6 @@ const VALID_ACTIVITIES: ActivityType[] = [
   'walking',
   'cycling',
   'hiking',
-  'swimming',
-  'rowing',
   'workout',
 ];
 const VALID_METRICS: MetricType[] = [

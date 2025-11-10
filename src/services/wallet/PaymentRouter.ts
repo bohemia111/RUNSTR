@@ -16,7 +16,7 @@
 
 import { FEATURES } from '../../config/features';
 import { NWCWalletService } from './NWCWalletService';
-import { WalletCore } from '../nutzap/WalletCore';
+// import { WalletCore } from '../nutzap/WalletCore';
 
 export interface PaymentResult {
   success: boolean;

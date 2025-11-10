@@ -6,6 +6,7 @@
 
 import { GlobalNDKService } from '../nostr/GlobalNDKService';
 import { CompetitionCacheService } from '../cache/CompetitionCacheService';
+import { EventJoinRequestService } from '../events/EventJoinRequestService';
 import type { NDKFilter, NDKEvent } from '@nostr-dev-kit/ndk';
 import type { League, CompetitionEvent } from './SimpleCompetitionService';
 
@@ -16,6 +17,7 @@ export interface LeaderboardEntry {
   score: number;
   formattedScore: string;
   workoutCount: number;
+  participationType?: 'in-person' | 'virtual'; // ✅ NEW: Track how user is participating
 }
 
 export interface Workout {
@@ -120,6 +122,30 @@ export class SimpleLeaderboardService {
     console.log(`🏆 Calculating leaderboard for event: ${event.name}`);
     console.log(`   Scoring type: ${event.scoringType || event.metric}`);
 
+    // ✅ NEW: Fetch join requests to get participation types
+    const participationTypeMap = new Map<string, 'in-person' | 'virtual'>();
+    try {
+      const joinRequestService = EventJoinRequestService.getInstance();
+      const joinRequests = await joinRequestService.getEventJoinRequestsByEventIds([event.id]);
+      const eventRequests = joinRequests.get(event.id) || [];
+
+      // Map hex pubkey -> npub for participation type lookup
+      const { nip19 } = await import('nostr-tools');
+      for (const request of eventRequests) {
+        if (request.participationType) {
+          try {
+            const npub = nip19.npubEncode(request.requesterId);
+            participationTypeMap.set(npub, request.participationType);
+          } catch (error) {
+            console.warn(`Failed to encode npub for ${request.requesterId}:`, error);
+          }
+        }
+      }
+      console.log(`   Loaded ${participationTypeMap.size} participation type preferences`);
+    } catch (error) {
+      console.warn('Failed to fetch participation types (non-critical):', error);
+    }
+
     const eventDate = new Date(event.eventDate);
     const eventStart = new Date(eventDate);
     eventStart.setHours(0, 0, 0, 0);
@@ -175,6 +201,7 @@ export class SimpleLeaderboardService {
     // CRITICAL FIX: Create entries for ALL team members, even those with 0 workouts
     const entries: LeaderboardEntry[] = teamMembers.map((npub) => {
       const memberData = scoresByMember.get(npub);
+      const participationType = participationTypeMap.get(npub); // ✅ NEW: Get participation type
 
       if (memberData) {
         // Member has workouts - use their actual scores
@@ -185,6 +212,7 @@ export class SimpleLeaderboardService {
           score: memberData.score,
           formattedScore: this.formatScore(memberData.score, scoringType),
           workoutCount: memberData.workoutCount,
+          participationType, // ✅ NEW: Include participation type
         };
       } else {
         // Member has NO workouts - show them with 0 score
@@ -195,6 +223,7 @@ export class SimpleLeaderboardService {
           score: 0,
           formattedScore: this.formatScore(0, scoringType),
           workoutCount: 0,
+          participationType, // ✅ NEW: Include participation type
         };
       }
     });

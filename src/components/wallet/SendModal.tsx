@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { theme } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
-import nutzapService from '../../services/nutzap/nutzapService';
+// import nutzapService from '../../services/nutzap/nutzapService';
 import { nip19 } from 'nostr-tools';
 import { FEATURES } from '../../config/features';
 import { NWCStorageService } from '../../services/wallet/NWCStorageService';
