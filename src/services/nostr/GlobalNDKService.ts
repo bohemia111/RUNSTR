@@ -59,9 +59,12 @@ export class GlobalNDKService {
       // If below target threshold (2 relays), trigger background reconnection
       if (status.connectedRelays < 2 && !this.initPromise && AppStateManager.canDoNetworkOps()) {
         console.log(
-          `🔄 GlobalNDK: Only ${status.connectedRelays}/3 relays connected, starting background reconnection...`
+          `🔄 GlobalNDK: Only ${status.connectedRelays}/3 relays connected, scheduling background reconnection...`
         );
-        this.initPromise = this.connectInBackground();
+        // ✅ PERFORMANCE FIX: Defer reconnection to avoid blocking caller
+        setTimeout(() => {
+          this.initPromise = this.connectInBackground();
+        }, 0);
       }
 
       return this.instance;
@@ -79,9 +82,13 @@ export class GlobalNDKService {
     this.instance = degradedNDK;
     this.isInitialized = true;
 
-    // ✅ ANDROID FIX: Start background connection WITHOUT awaiting
+    // ✅ PERFORMANCE FIX: Defer connection to next event loop tick (non-blocking)
+    // This ensures getInstance() returns immediately without blocking UI
     if (!this.initPromise) {
-      this.initPromise = this.connectInBackground();
+      setTimeout(() => {
+        console.log('🔄 GlobalNDK: Starting deferred background connection...');
+        this.initPromise = this.connectInBackground();
+      }, 0);
     }
 
     return degradedNDK;

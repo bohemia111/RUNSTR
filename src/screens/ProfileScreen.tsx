@@ -124,50 +124,34 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               );
             });
 
-          // Start listeners in background
+          // ❌ DISABLED: Background notification subscriptions causing Android crashes
+          // All notification handlers now query on-demand instead of persistent subscriptions
+          console.log('[ProfileScreen] ⚠️  Background notification subscriptions DISABLED for stability');
+
+          /* COMMENTED OUT FOR ANDROID STABILITY:
           challengeNotificationHandler.startListening().catch((err) => {
-            console.warn(
-              '[ProfileScreen] Challenge notification handler failed:',
-              err
-            );
+            console.warn('[ProfileScreen] Challenge notification handler failed:', err);
           });
 
-          // Start challenge response monitoring (kinds 1106, 1107)
           challengeResponseHandler.startListening().catch((err) => {
-            console.warn(
-              '[ProfileScreen] Challenge response handler failed:',
-              err
-            );
+            console.warn('[ProfileScreen] Challenge response handler failed:', err);
           });
 
           eventJoinNotificationHandler.startListening().catch((err) => {
-            console.warn(
-              '[ProfileScreen] Event join notification handler failed:',
-              err
-            );
+            console.warn('[ProfileScreen] Event join notification handler failed:', err);
           });
 
-          // Start team join request monitoring (kind 1104) for captains
           teamJoinNotificationHandler.startListening().catch((err) => {
-            console.warn(
-              '[ProfileScreen] Team join notification handler failed:',
-              err
-            );
+            console.warn('[ProfileScreen] Team join notification handler failed:', err);
           });
 
-          // Start competition event monitoring (kinds 1101, 1102, 1103)
-          // This enables competition announcements, results, and reminders
           const { startCompetitionEventMonitoring } = await import(
             '../services/notifications/NotificationService'
           );
-          startCompetitionEventMonitoring(userIdentifiers.hexPubkey).catch(
-            (err) => {
-              console.warn(
-                '[ProfileScreen] Competition event monitoring failed:',
-                err
-              );
-            }
-          );
+          startCompetitionEventMonitoring(userIdentifiers.hexPubkey).catch((err) => {
+            console.warn('[ProfileScreen] Competition event monitoring failed:', err);
+          });
+          */
 
           console.log(
             '[ProfileScreen] ✅ Notification system initialization started (background)'
@@ -191,7 +175,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     };
   }, []);
 
-  // v0.6.8: Handle app background/foreground to stop/restart notification handlers
+  // ❌ DISABLED: AppState lifecycle management for notification handlers
+  // No longer needed since we're not running background subscriptions
+  /* COMMENTED OUT FOR ANDROID STABILITY:
   useEffect(() => {
     console.log('[ProfileScreen] 🎯 Setting up AppState lifecycle management');
 
@@ -229,6 +215,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       unsubscribe();
     };
   }, []);
+  */
 
   // Load user npub on mount
   useEffect(() => {

@@ -88,10 +88,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         const { hexPubkey } = identifiers;
 
-        // ✅ ANDROID FIX: Initialize cache (now non-blocking with lazy loading)
-        PerformanceLogger.start('AuthContext: unifiedCache.initialize()');
-        await unifiedCache.initialize();
-        PerformanceLogger.end('AuthContext: unifiedCache.initialize()');
+        // ✅ PERFORMANCE FIX: Skip cache initialization - lazy load on demand
+        // This saves 1-2s on app startup by deferring AsyncStorage reads
+        // Cache will initialize automatically on first getCached() call
+        // PerformanceLogger.start('AuthContext: unifiedCache.initialize()');
+        // await unifiedCache.initialize(); // REMOVED
+        // PerformanceLogger.end('AuthContext: unifiedCache.initialize()');
 
         // ✅ PROFILE CACHE FIX: Try memory cache first (instant)
         let cachedUser = unifiedCache.getCached<User>(
@@ -172,7 +174,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /**
    * Load user profile asynchronously (called after initial render)
-   * Now leverages pre-initialized NDK from SplashInitScreen
+   * Uses global NDK instance for Nostr operations
    */
   const loadUserProfile = async (): Promise<void> => {
     try {
@@ -181,7 +183,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Check if NDK was pre-initialized
       const preInitializedNDK = (global as any).preInitializedNDK;
       if (preInitializedNDK) {
-        console.log('✅ Using pre-initialized NDK from SplashInitScreen');
+        console.log('✅ Using pre-initialized NDK instance');
       }
 
       // Try to load from cache first

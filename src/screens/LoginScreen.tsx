@@ -81,9 +81,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
       if (result.success) {
         console.log('✅ LoginScreen: Authentication successful');
-        // Let App.tsx handle onboarding navigation based on sophisticated checks
-        // App.tsx checks both @runstr:is_new_signup AND @runstr:onboarding_completed
-        // to determine if onboarding wizard should be shown
+        // App.tsx will handle navigation to main app
       } else {
         console.error('❌ LoginScreen: Authentication failed:', result.error);
         setError(result.error || 'Authentication failed. Please try again.');
@@ -112,12 +110,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
       if (result.success) {
         console.log('✅ LoginScreen: Signup successful - new identity created');
-
-        // Get the nsec from storage for the onboarding password screen
-        const nsec = await AsyncStorage.getItem('@runstr:user_nsec');
-
-        // Navigate to onboarding for new users
-        navigation.navigate('Onboarding', { nsec });
+        // Password saved silently to storage
+        // App.tsx will detect auth change and show welcome modal on first launch
       } else {
         console.error('❌ LoginScreen: Signup failed:', result.error);
         setError(
@@ -255,7 +249,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                     {isLoading ? (
                       <ActivityIndicator
                         size="small"
-                        color={theme.colors.textOrange}
+                        color={theme.colors.background}
                       />
                     ) : (
                       <Text style={styles.loginButtonText}>Login</Text>
@@ -271,7 +265,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
                     {isLoading ? (
                       <ActivityIndicator
                         size="small"
-                        color={theme.colors.textOrange}
+                        color={theme.colors.background}
                       />
                     ) : (
                       <Text style={styles.signupButtonText}>Start</Text>
@@ -449,9 +443,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loginButton: {
-    backgroundColor: theme.colors.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.orangeBright,
     height: 56,
     borderRadius: 12,
     width: '80%',
@@ -463,7 +455,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     fontSize: 19,
     fontWeight: '600',
-    color: theme.colors.textOrange,
+    color: theme.colors.background,
   },
 
   // Input Form
@@ -614,9 +606,7 @@ const styles = StyleSheet.create({
 
   // Signup button styles
   signupButton: {
-    backgroundColor: theme.colors.cardBackground,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.orangeBright,
     height: 56,
     borderRadius: 12,
     width: '80%',
@@ -628,6 +618,6 @@ const styles = StyleSheet.create({
   signupButtonText: {
     fontSize: 19,
     fontWeight: '600',
-    color: theme.colors.textOrange,
+    color: theme.colors.background,
   },
 });

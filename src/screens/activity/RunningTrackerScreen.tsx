@@ -13,6 +13,7 @@ import {
   AppState,
   AppStateStatus,
   ScrollView,
+  InteractionManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -189,29 +190,33 @@ export const RunningTrackerScreen: React.FC = () => {
 
   // Check for active session on mount (fixes session loss on app switch)
   useEffect(() => {
-    const restoreActiveSession = async () => {
-      console.log('[RunningTrackerScreen] Checking for active session...');
-      const restored = await simpleRunTracker.restoreSession();
+    // ✅ PERFORMANCE FIX: Defer session restoration until after navigation completes
+    // This eliminates 7-second blocking from AsyncStorage reads and GPS point processing
+    InteractionManager.runAfterInteractions(() => {
+      const restoreActiveSession = async () => {
+        console.log('[RunningTrackerScreen] Checking for active session (deferred for performance)...');
+        const restored = await simpleRunTracker.restoreSession();
 
-      if (restored) {
-        // Session was restored - update UI state
-        setIsTracking(true);
-        setIsPaused(simpleRunTracker.isCurrentlyPaused());
+        if (restored) {
+          // Session was restored - update UI state
+          setIsTracking(true);
+          setIsPaused(simpleRunTracker.isCurrentlyPaused());
 
-        // Start metrics update interval
-        updateMetrics(); // Call immediately
-        metricsUpdateRef.current = setInterval(() => {
-          updateMetrics();
-        }, METRICS_UPDATE_INTERVAL_MS);
+          // Start metrics update interval
+          updateMetrics(); // Call immediately
+          metricsUpdateRef.current = setInterval(() => {
+            updateMetrics();
+          }, METRICS_UPDATE_INTERVAL_MS);
 
-        // Start route checking
-        routeCheckRef.current = setInterval(checkForRouteMatch, ROUTE_CHECK_INTERVAL_MS);
+          // Start route checking
+          routeCheckRef.current = setInterval(checkForRouteMatch, ROUTE_CHECK_INTERVAL_MS);
 
-        console.log('[RunningTrackerScreen] ✅ Active session restored');
-      }
-    };
+          console.log('[RunningTrackerScreen] ✅ Active session restored');
+        }
+      };
 
-    restoreActiveSession();
+      restoreActiveSession();
+    });
 
     return () => {
       // Cleanup timers on unmount

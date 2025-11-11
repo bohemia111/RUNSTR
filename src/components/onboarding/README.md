@@ -1,23 +1,29 @@
 # Onboarding Components
 
-Components used in the new user onboarding flow.
+Simplified onboarding components for new user experience.
 
 ## Files
 
-**OnboardingWizard.tsx** - Multi-slide introduction wizard showing app features and benefits
+**WelcomePermissionModal.tsx** - Single welcome modal shown on first app launch with location permission request and app introduction
 
-**ProfileSetupStep.tsx** - Optional profile customization (name, picture, about) with Nostr publishing
+**ProfileSetupStep.tsx** - (UNUSED) Optional profile customization component
 
-**PasswordNotice.tsx** - Critical password (nsec) display and acknowledgement before app access
-
-**PermissionRequestStep.tsx** - Location permission request with clear explanation and platform-specific handling
+**WalletSetupStep.tsx** - (UNUSED) Optional wallet setup component
 
 ## Onboarding Flow
 
-1. **Slides** - OnboardingWizard introduces app features
-2. **Profile** - ProfileSetupStep for optional profile customization
-3. **Password** - PasswordNotice ensures user saves their nsec
-4. **Permissions** - PermissionRequestStep requests location access for workout tracking
-5. **Main App** - User enters authenticated app
+The onboarding flow has been simplified to a single modal approach:
 
-All steps are required except profile setup (skippable) and permissions (can grant later).
+1. **User clicks "Start" or "Login"** → Authentication happens
+2. **First launch only** → WelcomePermissionModal appears with:
+   - Brief app description
+   - Location permission request
+   - Single "Get Started" button
+3. **Main App** → User enters authenticated app immediately
+
+**Key Changes:**
+- No multi-step wizard
+- No splash screens
+- Password saved silently (accessible in Settings → Backup Password)
+- Background data loading (non-blocking)
+- Single modal shown only on first launch

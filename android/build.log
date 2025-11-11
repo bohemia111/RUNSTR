@@ -1,0 +1,132 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors
+> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors
+> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:shared:compileJava NO-SOURCE
+> Task :gradle-plugin:shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:jar UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:settings-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:jar UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:checkKotlinGradlePluginConfigurationErrors
+> Task :gradle-plugin:react-native-gradle-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:react-native-gradle-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:jar UP-TO-DATE
+
+> Configure project :expo
+
+Using expo modules
+  - [32mexpo-application[0m (6.0.2)
+  - [32mexpo-asset[0m (11.0.5)
+  - [32mexpo-av[0m (15.0.2)
+  - [32mexpo-battery[0m (9.0.2)
+  - [32mexpo-blur[0m (14.0.3)
+  - [32mexpo-camera[0m (16.0.18)
+  - [32mexpo-clipboard[0m (7.0.1)
+  - [32mexpo-constants[0m (17.0.8)
+  - [32mexpo-crypto[0m (14.0.2)
+  - [32mexpo-device[0m (7.0.3)
+  - [32mexpo-file-system[0m (18.0.12)
+  - [32mexpo-font[0m (13.0.4)
+  - [32mexpo-haptics[0m (14.0.1)
+  - [32mexpo-image[0m (2.0.7)
+  - [32mexpo-image-loader[0m (5.0.0)
+  - [32mexpo-image-picker[0m (16.0.6)
+  - [32mexpo-intent-launcher[0m (12.0.2)
+  - [32mexpo-keep-awake[0m (14.0.3)
+  - [32mexpo-linear-gradient[0m (14.0.2)
+  - [32mexpo-linking[0m (7.0.5)
+  - [32mexpo-location[0m (18.0.10)
+  - [32mexpo-media-library[0m (17.0.6)
+  - [32mexpo-modules-core[0m (2.2.3)
+  - [32mexpo-notifications[0m (0.29.14)
+  - [32mexpo-secure-store[0m (14.0.1)
+  - [32mexpo-sensors[0m (14.0.2)
+  - [32mexpo-speech[0m (13.0.1)
+  - [32mexpo-splash-screen[0m (0.29.24)
+  - [32mexpo-system-ui[0m (4.0.9)
+  - [32mexpo-task-manager[0m (12.0.6)
+  - [32mexpo-web-browser[0m (14.0.2)
+  - [32munimodules-app-loader[0m (5.0.1)
+
+
+> Configure project :react-native-reanimated
+Android gradle plugin: 8.6.0
+Gradle: 8.10.2
+
+> Task :app:externalNativeBuildCleanDebug
+
+> Task :app:externalNativeBuildCleanRelease FAILED
+Clean react_codegen_RNCSlider-armeabi-v7a, react_codegen_rnviewshot-armeabi-v7a, react_codegen_safeareacontext-armeabi-v7a, react_codegen_rngesturehandler_codegen-armeabi-v7a, react_codegen_RNCWebViewSpec-armeabi-v7a, react_codegen_RNDateTimePickerCGen-armeabi-v7a, appmodules-armeabi-v7a, react_codegen_rnsvg-armeabi-v7a, react_codegen_rnasyncstorage-armeabi-v7a, react_codegen_rnclipboard-armeabi-v7a, react_codegen_rnreanimated-armeabi-v7a, react_codegen_rnscreens-armeabi-v7a, react_codegen_rnpicker-armeabi-v7a
+C/C++: -- GLOB mismatch!
+C/C++: CMake Error in CMakeLists.txt:
+C/C++:   Imported target "fbjni::fbjni" includes non-existent path
+C/C++:     "/Users/dakotabrown/.gradle/caches/8.10.2/transforms/ab403838776104c8b5f93471d162cb09/transformed/fbjni-0.6.0/prefab/modules/fbjni/include"
+C/C++:   in its INTERFACE_INCLUDE_DIRECTORIES.  Possible reasons include:
+C/C++:   * The path was deleted, renamed, or moved to another location.
+C/C++:   * An install or uninstall procedure did not complete successfully.
+C/C++:   * The installation package was faulty and references files it does not
+C/C++:   provide.
+C/C++: CMake Generate step failed.  Build files cannot be regenerated correctly.
+C/C++: ninja: error: rebuilding 'build.ninja': subcommand failed
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:externalNativeBuildCleanRelease'.
+> com.android.ide.common.process.ProcessException: ninja: Entering directory `/Users/dakotabrown/runstr.project/android/app/.cxx/RelWithDebInfo/ev6x6415/armeabi-v7a'
+  [0/2] Re-checking globbed directories...
+  [1/2] Re-running CMake...
+  -- Configuring done
+  -- Generating done
+  FAILED: build.ninja 
+  /Users/dakotabrown/Library/Android/sdk/cmake/3.22.1/bin/cmake --regenerate-during-build -S/Users/dakotabrown/runstr.project/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup -B/Users/dakotabrown/runstr.project/android/app/.cxx/RelWithDebInfo/ev6x6415/armeabi-v7a
+  
+  C++ build system [clean] failed while executing:
+      /Users/dakotabrown/Library/Android/sdk/cmake/3.22.1/bin/ninja \
+        -C \
+        /Users/dakotabrown/runstr.project/android/app/.cxx/RelWithDebInfo/ev6x6415/armeabi-v7a \
+        clean
+    from /Users/dakotabrown/runstr.project/android/app
+  -- GLOB mismatch!
+  CMake Error in CMakeLists.txt:
+    Imported target "fbjni::fbjni" includes non-existent path
+  
+      "/Users/dakotabrown/.gradle/caches/8.10.2/transforms/ab403838776104c8b5f93471d162cb09/transformed/fbjni-0.6.0/prefab/modules/fbjni/include"
+  
+    in its INTERFACE_INCLUDE_DIRECTORIES.  Possible reasons include:
+  
+    * The path was deleted, renamed, or moved to another location.
+  
+    * An install or uninstall procedure did not complete successfully.
+  
+    * The installation package was faulty and references files it does not
+    provide.
+  
+  
+  
+  CMake Generate step failed.  Build files cannot be regenerated correctly.
+  ninja: error: rebuilding 'build.ninja': subcommand failed
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1m
+15 actionable tasks: 5 executed, 10 up-to-date

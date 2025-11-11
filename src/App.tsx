@@ -141,8 +141,6 @@ import { HelpSupportScreen } from './screens/HelpSupportScreen';
 import { ContactSupportScreen } from './screens/ContactSupportScreen';
 import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
-import { OnboardingScreen } from './screens/OnboardingScreen';
-import { SplashInitScreen } from './screens/SplashInitScreen';
 import { CompetitionsListScreen } from './screens/CompetitionsListScreen';
 import { WorkoutHistoryScreen } from './screens/WorkoutHistoryScreen';
 import { MyTeamsScreen } from './screens/MyTeamsScreen';
@@ -158,10 +156,11 @@ import unifiedCache from './services/cache/UnifiedNostrCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PerformanceLogger } from './utils/PerformanceLogger';
 import { AppStateManager } from './services/core/AppStateManager';
-import { challengeCompletionService } from './services/challenge/ChallengeCompletionService';
 import { appPermissionService } from './services/initialization/AppPermissionService';
 import { PermissionRequestModal } from './components/permissions/PermissionRequestModal';
+import { WelcomePermissionModal } from './components/onboarding/WelcomePermissionModal';
 import garminAuthService from './services/fitness/garminAuthService';
+import AppInitializationService from './services/core/AppInitializationService';
 import {
   CustomAlertProvider,
   CustomAlertManager,
@@ -174,11 +173,9 @@ import { parseEventDeepLink, type ParsedEventData } from './utils/eventDeepLink'
 
 // Types for authenticated app navigation
 type AuthenticatedStackParamList = {
-  SplashInit: undefined;
   Auth: undefined;
   Main: undefined;
   MainTabs: undefined;
-  Onboarding: { nsec?: string };
   TeamCreation: undefined;
   EnhancedTeamScreen: {
     team: any;
@@ -232,10 +229,7 @@ const AppContent: React.FC = () => {
     AppStateManager.initialize();
   }, []);
 
-  const [onboardingCompleted, setOnboardingCompleted] = React.useState<
-    boolean | null
-  >(null);
-  const [prefetchCompleted, setPrefetchCompleted] = React.useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = React.useState(false);
   const [showPermissionModal, setShowPermissionModal] = React.useState(false);
 
   // Challenge deep link state
@@ -246,82 +240,30 @@ const AppContent: React.FC = () => {
   const [pendingEventNavigation, setPendingEventNavigation] = React.useState<ParsedEventData | null>(null);
   const navigationRef = React.useRef<any>(null);
 
-  // ✅ PERFORMANCE: Use cache-first strategy - show app immediately if ANY cache exists
+  // Start background data initialization and check for first launch
   React.useEffect(() => {
-    const checkPrefetch = async () => {
-      if (isAuthenticated) {
-        // ✅ FIX: Check AsyncStorage synchronously for cached keys instead of waiting for hydration
-        // This prevents race conditions where cache hydration hasn't finished yet
-        PerformanceLogger.start('App.tsx: AsyncStorage.getAllKeys()');
-        const keys = await AsyncStorage.getAllKeys();
-        PerformanceLogger.end('App.tsx: AsyncStorage.getAllKeys()');
+    if (isAuthenticated && currentUser) {
+      // ✅ PERFORMANCE FIX: Defer initialization by 2 seconds to let app become interactive first
+      // This eliminates 15-18s blocking from NostrPrefetchService network calls
+      console.log('🚀 App: Scheduling background initialization (deferred 2s for performance)...');
 
-        const hasCachedData = keys.some((key) =>
-          key.startsWith('@runstr:unified_cache:')
-        );
+      setTimeout(() => {
+        console.log('🚀 App: Starting background initialization NOW...');
+        AppInitializationService.initializeInBackground().catch((error) => {
+          console.error('❌ Background initialization error:', error);
+        });
+      }, 2000);
 
-        console.log(
-          '📊 App: Cache-first check - found',
-          keys.filter((k) => k.startsWith('@runstr:unified_cache:')).length,
-          'cached entries'
-        );
-
-        // Show app immediately if we have ANY cached data
-        // First-time users (no cache) will see SplashInit
-        // Returning users (has cache) see app immediately, refresh happens in background
-        setPrefetchCompleted(hasCachedData);
-
-        if (hasCachedData) {
-          console.log(
-            '✅ App: Cached data found - skipping SplashInit for instant load'
-          );
-        } else {
-          console.log(
-            '⚡ App: No cached data - showing SplashInit for first-time initialization'
-          );
+      // Check first launch asynchronously (non-blocking)
+      AsyncStorage.getItem('@runstr:first_launch').then((firstLaunch) => {
+        if (firstLaunch !== 'false') {
+          console.log('👋 App: First launch detected - showing welcome modal');
+          setShowWelcomeModal(true);
+          // Mark as not first launch anymore
+          AsyncStorage.setItem('@runstr:first_launch', 'false');
         }
-      } else {
-        setPrefetchCompleted(false);
-      }
-    };
-    checkPrefetch();
-  }, [isAuthenticated]);
-
-  // Check onboarding completion status when user becomes authenticated
-  React.useEffect(() => {
-    const checkOnboarding = async () => {
-      if (isAuthenticated && currentUser) {
-        const AsyncStorage = (
-          await import('@react-native-async-storage/async-storage')
-        ).default;
-
-        // Check if onboarding was already completed
-        const completed = await AsyncStorage.getItem(
-          '@runstr:onboarding_completed'
-        );
-
-        // Check if this is a new signup (from "Start" button)
-        const isNewSignup = await AsyncStorage.getItem('@runstr:is_new_signup');
-
-        // Only show onboarding if:
-        // 1. This is a new signup (Start button was clicked)
-        // 2. AND onboarding hasn't been completed yet
-        const needsOnboarding = isNewSignup === 'true' && completed !== 'true';
-
-        setOnboardingCompleted(!needsOnboarding);
-        console.log(
-          '🎯 App: Onboarding check - isNewSignup:',
-          isNewSignup === 'true',
-          'completed:',
-          completed === 'true',
-          'needsOnboarding:',
-          needsOnboarding
-        );
-      } else {
-        setOnboardingCompleted(null);
-      }
-    };
-    checkOnboarding();
+      });
+    }
   }, [isAuthenticated, currentUser]);
 
   // Check permissions when user becomes authenticated (Android only)
@@ -626,40 +568,10 @@ const AppContent: React.FC = () => {
           }
           */
 
-          // ✅ CHALLENGE COMPLETION: Use AppStateManager to control monitoring
-          console.log('[App] 🏁 Setting up challenge monitoring with AppStateManager...');
-
-          // Register callback to stop/start monitoring based on app state
-          AppStateManager.onStateChange((isActive) => {
-            if (isActive) {
-              // Resume monitoring when app becomes active
-              setTimeout(() => {
-                if (AppStateManager.canDoNetworkOps()) {
-                  challengeCompletionService.startMonitoring();
-                  console.log('[App] ✅ Challenge monitoring resumed (app active)');
-                }
-              }, 1000);
-            } else {
-              // Stop monitoring when app goes to background
-              challengeCompletionService.stopMonitoring();
-              console.log('[App] ⏸️ Challenge monitoring paused (app background)');
-            }
-          });
-
-          // Initial start if app is active
-          setTimeout(() => {
-            try {
-              if (AppStateManager.isActive()) {
-                challengeCompletionService.startMonitoring();
-                console.log('[App] ✅ Challenge completion monitoring active (initial start)');
-              } else {
-                console.log('[App] ⏸️  App not active, skipping challenge monitoring start');
-              }
-            } catch (error) {
-              console.error('[App] ⚠️  Failed to start challenge monitoring:', error);
-              // Non-critical - app continues without monitoring
-            }
-          }, 5000);
+          // ❌ REMOVED: ChallengeCompletionService background monitoring
+          // This was causing Android crashes due to background Nostr queries
+          // Challenges now expire on-demand when users view them
+          console.log('[App] ⚠️  Background challenge monitoring DISABLED for Android stability');
 
           // ✅ PERFORMANCE: Mark initialization as complete
           await AsyncStorage.setItem('@runstr:app_init_completed', 'true');
@@ -672,10 +584,9 @@ const AppContent: React.FC = () => {
 
       initializeData();
 
-      // Cleanup: Stop monitoring when component unmounts (user logs out)
+      // Cleanup: No background services to stop
       return () => {
-        console.log('[App] 🛑 Stopping challenge completion monitoring...');
-        challengeCompletionService.stopMonitoring();
+        console.log('[App] 🛑 Component unmounting (user logged out)');
       };
     }, [user.id]);
 
@@ -700,13 +611,6 @@ const AppContent: React.FC = () => {
             />
           )}
         </AuthenticatedStack.Screen>
-
-        {/* Onboarding Screen */}
-        <AuthenticatedStack.Screen
-          name="Onboarding"
-          component={OnboardingScreen}
-          options={{ headerShown: false }}
-        />
 
         {/* Team Creation Modal */}
         <AuthenticatedStack.Screen
@@ -1191,71 +1095,27 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Simplified navigation - no more SplashInit screen
-  // Show login immediately if not authenticated
-
-  // Refresh onboarding status when app gains focus
-  const handleNavigationStateChange = React.useCallback(async () => {
-    if (isAuthenticated && currentUser) {
-      const AsyncStorage = (
-        await import('@react-native-async-storage/async-storage')
-      ).default;
-      const completed = await AsyncStorage.getItem(
-        '@runstr:onboarding_completed'
-      );
-      const isNewSignup = await AsyncStorage.getItem('@runstr:is_new_signup');
-
-      // Onboarding is complete if either:
-      // 1. The completed flag is set, OR
-      // 2. This is NOT a new signup (returning user)
-      const needsOnboarding = isNewSignup === 'true' && completed !== 'true';
-
-      if (!needsOnboarding && onboardingCompleted === false) {
-        console.log('🎯 App: Onboarding completed, refreshing to main app');
-        setOnboardingCompleted(true);
-      }
-    }
-  }, [isAuthenticated, currentUser, onboardingCompleted]);
+  // Simplified navigation - show login or main app immediately
+  // No splash screens, no onboarding screens
 
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
 
-      <NavigationContainer
-        ref={navigationRef}
-        onStateChange={handleNavigationStateChange}
-      >
+      <NavigationContainer ref={navigationRef}>
         {(() => {
           console.log(
             '🚀 AppContent: Navigation decision - isAuthenticated:',
             isAuthenticated,
             'currentUser:',
             !!currentUser,
-            'prefetchCompleted:',
-            prefetchCompleted,
             'isInitializing:',
             isInitializing
           );
 
-          // Show login immediately if not authenticated
+          // Show login if not authenticated
           if (!isAuthenticated) {
             return <AppNavigator initialRoute="Login" isFirstTime={true} />;
-          }
-
-          // ✅ PERFORMANCE: Only show SplashInit for first-time users (no cache at all)
-          // Returning users see app immediately with cached data, refresh happens in background
-          if (isAuthenticated && !prefetchCompleted) {
-            console.log(
-              '🚀 App: First-time user - showing SplashInit for initial data load'
-            );
-            return (
-              <SplashInitScreen
-                onComplete={() => {
-                  console.log('✅ App: Initial data loaded, showing app');
-                  setPrefetchCompleted(true);
-                }}
-              />
-            );
           }
 
           // User is authenticated but profile still loading
@@ -1270,36 +1130,8 @@ const AppContent: React.FC = () => {
             );
           }
 
-          // Authenticated with loaded profile - check onboarding before showing main app
+          // Show main app immediately after authentication
           if (isAuthenticated && currentUser) {
-            // If onboarding status is still being checked, show loading
-            if (onboardingCompleted === null) {
-              return (
-                <View style={errorStyles.container}>
-                  <ActivityIndicator size="large" color="#ffffff" />
-                  <Text style={errorStyles.instruction}>
-                    Setting up your account...
-                  </Text>
-                </View>
-              );
-            }
-
-            // If onboarding not completed, show onboarding flow
-            if (onboardingCompleted === false) {
-              console.log('🎯 App: Showing onboarding for new user');
-              return (
-                <AuthenticatedStack.Navigator
-                  screenOptions={{ headerShown: false }}
-                >
-                  <AuthenticatedStack.Screen
-                    name="Onboarding"
-                    component={OnboardingScreen}
-                  />
-                </AuthenticatedStack.Navigator>
-              );
-            }
-
-            // Onboarding completed - show main app
             return <AuthenticatedNavigator user={currentUser} />;
           }
 
@@ -1307,6 +1139,12 @@ const AppContent: React.FC = () => {
           return <AppNavigator initialRoute="Login" isFirstTime={true} />;
         })()}
       </NavigationContainer>
+
+      {/* Welcome Permission Modal - Shows on first app launch */}
+      <WelcomePermissionModal
+        visible={showWelcomeModal}
+        onComplete={() => setShowWelcomeModal(false)}
+      />
 
       {/* Permission Request Modal - Shows when Android permissions are missing */}
       {showPermissionModal && (

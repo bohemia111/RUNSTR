@@ -141,8 +141,15 @@ export const TeamDiscoveryManager: React.FC<TeamDiscoveryManagerProps> = ({
   );
 
   /**
-   * Handle app state changes for real-time sync
+   * ❌ DISABLED: Auto-refetch on app foreground (Android/iOS stability)
+   *
+   * This was causing aggressive Nostr queries every time the app returned from background,
+   * even for 2-second interruptions (phone calls, notifications, app switcher).
+   *
+   * Users can still manually pull-to-refresh to get fresh team data.
+   * This aligns with the "no background operations" stability strategy.
    */
+  /* COMMENTED OUT FOR STABILITY:
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active' && visible) {
@@ -157,6 +164,7 @@ export const TeamDiscoveryManager: React.FC<TeamDiscoveryManagerProps> = ({
     );
     return () => subscription?.remove();
   }, [visible, initializeData]);
+  */
 
   /**
    * Initialize data when component mounts or becomes visible

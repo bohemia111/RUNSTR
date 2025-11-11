@@ -31,7 +31,6 @@ import { LeagueDetailScreen } from '../screens/LeagueDetailScreen';
 import { ChallengeDetailScreen } from '../screens/ChallengeDetailScreen';
 import { ChallengeLeaderboardScreen } from '../screens/ChallengeLeaderboardScreen';
 import { LoginScreen } from '../screens/LoginScreen';
-import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { CompetitionsListScreen } from '../screens/CompetitionsListScreen';
 import { WorkoutHistoryScreen } from '../screens/WorkoutHistoryScreen';
 import { QRChallengeScanner } from '../screens/QRChallengeScanner';
@@ -53,11 +52,9 @@ import { useWalletStore } from '../store/walletStore';
 
 // Screen params for type safety
 export type RootStackParamList = {
-  SplashInit: undefined;
   Auth: undefined;
   Main: undefined;
   Login: undefined;
-  Onboarding: { nsec?: string };
   Team: undefined;
   EnhancedTeamScreen: {
     team: any;
@@ -203,13 +200,6 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
       <Stack.Screen
         name="Login"
         component={LoginScreen}
-        options={{ headerShown: false }}
-      />
-
-      {/* Onboarding Screen - Shows after new user signup */}
-      <Stack.Screen
-        name="Onboarding"
-        component={OnboardingScreen}
         options={{ headerShown: false }}
       />
 

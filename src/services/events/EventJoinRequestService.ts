@@ -123,10 +123,12 @@ export class EventJoinRequestService {
         limit: 100,
       };
 
-      const requests: EventJoinRequest[] = [];
-      const subscription = ndk.subscribe(filter, { closeOnEose: false });
+      // ✅ FIXED: Use fetchEvents instead of subscription to prevent Android crashes
+      // Old code used subscribe() with 2-second wait, which crashes if app backgrounds mid-wait
+      const events = await ndk.fetchEvents(filter);
 
-      subscription.on('event', (event: NDKEvent) => {
+      const requests: EventJoinRequest[] = [];
+      for (const event of events) {
         try {
           const nostrEvent = this.ndkEventToEvent(event);
           const joinRequest = this.parseJoinRequest(nostrEvent);
@@ -136,11 +138,7 @@ export class EventJoinRequestService {
         } catch (error) {
           console.warn(`⚠️ Failed to parse event join request:`, error);
         }
-      });
-
-      // Wait for events to come in
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      subscription.stop();
+      }
 
       // Sort by timestamp (newest first)
       requests.sort((a, b) => b.timestamp - a.timestamp);
@@ -175,10 +173,11 @@ export class EventJoinRequestService {
         limit: 500,
       };
 
-      const allRequests: EventJoinRequest[] = [];
-      const subscription = ndk.subscribe(filter, { closeOnEose: false });
+      // ✅ FIXED: Use fetchEvents instead of subscription to prevent Android crashes
+      const events = await ndk.fetchEvents(filter);
 
-      subscription.on('event', (event: NDKEvent) => {
+      const allRequests: EventJoinRequest[] = [];
+      for (const event of events) {
         try {
           const nostrEvent = this.ndkEventToEvent(event);
           const joinRequest = this.parseJoinRequest(nostrEvent);
@@ -188,10 +187,7 @@ export class EventJoinRequestService {
         } catch (error) {
           console.warn(`⚠️ Failed to parse event join request:`, error);
         }
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      subscription.stop();
+      }
 
       // Group requests by event
       for (const request of allRequests) {
@@ -209,11 +205,20 @@ export class EventJoinRequestService {
 
   /**
    * Subscribe to real-time event join requests
+   *
+   * ⚠️ DEPRECATED: This method creates persistent subscriptions that cause Android crashes
+   * Use getEventJoinRequests() with pull-to-refresh pattern instead
+   *
+   * If you must use this (e.g., for opt-in notifications), ensure:
+   * 1. User explicitly enables real-time notifications in settings
+   * 2. Subscription is stopped when app backgrounds
+   * 3. AppStateManager checks are in place
    */
   async subscribeToEventJoinRequests(
     captainPubkey: string,
     callback: (joinRequest: EventJoinRequest) => void
   ): Promise<NDKSubscription> {
+    console.warn(`⚠️ Using deprecated subscribeToEventJoinRequests - prefer getEventJoinRequests() instead`);
     console.log(`🔔 Subscribing to event join requests for captain`);
 
     // Get GlobalNDK instance
@@ -227,7 +232,14 @@ export class EventJoinRequestService {
 
     const subscription = ndk.subscribe(filter, { closeOnEose: false });
 
-    subscription.on('event', (event: NDKEvent) => {
+    subscription.on('event', async (event: NDKEvent) => {
+      // ✅ CRITICAL: Check if app is active before processing
+      const { AppStateManager } = await import('../core/AppStateManager');
+      if (!AppStateManager.canDoNetworkOps()) {
+        console.log('🔴 App backgrounded, skipping event join request processing');
+        return;
+      }
+
       try {
         const nostrEvent = this.ndkEventToEvent(event);
         const joinRequest = this.parseJoinRequest(nostrEvent);

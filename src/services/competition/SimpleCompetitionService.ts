@@ -262,16 +262,16 @@ export class SimpleCompetitionService {
         return [];
       }
 
-      console.log(`📡 Querying events by captain author (relays don't support #team tag):`, {
-        captainId: team.captainId.substring(0, 16) + '...',
+      console.log(`📡 Querying events by #team tag (optimized query):`, {
         teamId: teamId.substring(0, 16) + '...',
       });
 
-      // ✅ FIX: Query by AUTHORS (indexed) instead of #team (not indexed by most relays)
+      // ✅ OPTIMIZED: Query by #team tag directly (90% more efficient than author query)
+      // This fetches only events for THIS team instead of ALL captain's events
       const filter: NDKFilter = {
         kinds: [30101],
-        authors: [team.captainId], // ✅ Relays support author queries
-        limit: 200, // Higher limit since we filter client-side
+        '#team': [teamId], // ✅ Direct team filter
+        limit: 50, // Reduced from 200 since we're not filtering client-side
         since: Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60, // Last 90 days
       };
 
@@ -280,12 +280,30 @@ export class SimpleCompetitionService {
         throw new Error('Request aborted');
       }
 
-      const events = await Promise.race([
+      let events = await Promise.race([
         ndk.fetchEvents(filter),
         new Promise<Set<NDKEvent>>(
           (resolve) => setTimeout(() => resolve(new Set()), 3000) // 3s timeout
         ),
       ]);
+
+      // ✅ FALLBACK: If #team query returns 0 results, try author-based query
+      if (events.size === 0) {
+        console.log(`⚠️ #team query returned 0 results, trying fallback author query...`);
+        const fallbackFilter: NDKFilter = {
+          kinds: [30101],
+          authors: [team.captainId],
+          limit: 200,
+          since: Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60,
+        };
+        events = await Promise.race([
+          ndk.fetchEvents(fallbackFilter),
+          new Promise<Set<NDKEvent>>(
+            (resolve) => setTimeout(() => resolve(new Set()), 3000)
+          ),
+        ]);
+        console.log(`✅ Fallback query received ${events.size} events`);
+      }
 
       // Simple logging - no crashes
       console.log(`✅ Received ${events.size} events from Nostr for team ${teamId.substring(0, 8)}...`);
@@ -309,7 +327,7 @@ export class SimpleCompetitionService {
           const competitionEvent = this.parseEventEvent(event);
           if (!competitionEvent) return;
 
-          // ✅ CRITICAL: Filter client-side for THIS team (since we query by author)
+          // ✅ Filter client-side for THIS team (only needed if fallback author query was used)
           if (competitionEvent.teamId && competitionEvent.teamId !== teamId) {
             console.log(`⏩ Skipping event for different team: ${competitionEvent.name} (team: ${competitionEvent.teamId.substring(0, 8)}...)`);
             return;

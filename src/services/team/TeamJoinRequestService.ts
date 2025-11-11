@@ -117,12 +117,13 @@ export class TeamJoinRequestService {
         limit: 50,
       };
 
+      // ✅ FIXED: Use fetchEvents instead of subscription to prevent Android crashes
+      const events = await ndk.fetchEvents(filter);
+
       const requests: TeamJoinRequest[] = [];
       let processedEvents = 0;
 
-      const subscription = ndk.subscribe(filter, { closeOnEose: false });
-
-      subscription.on('event', (event: NDKEvent) => {
+      for (const event of events) {
         console.log(`📥 Join request received: ${event.id.slice(0, 8)}`);
         processedEvents++;
 
@@ -135,13 +136,7 @@ export class TeamJoinRequestService {
         } catch (error) {
           console.warn(`⚠️ Failed to parse join request ${event.id}:`, error);
         }
-      });
-
-      // Wait for initial results
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Clean up subscription
-      subscription.stop();
+      }
 
       // Sort by timestamp (newest first)
       requests.sort((a, b) => b.timestamp - a.timestamp);
@@ -176,11 +171,12 @@ export class TeamJoinRequestService {
         limit: 20,
       };
 
+      // ✅ FIXED: Use fetchEvents instead of subscription to prevent Android crashes
+      const events = await ndk.fetchEvents(filter);
+
       const requests: TeamJoinRequest[] = [];
 
-      const subscription = ndk.subscribe(filter, { closeOnEose: false });
-
-      subscription.on('event', (event: NDKEvent) => {
+      for (const event of events) {
         try {
           const nostrEvent = this.ndkEventToEvent(event);
           const request = this.parseJoinRequestEvent(nostrEvent);
@@ -190,10 +186,7 @@ export class TeamJoinRequestService {
         } catch (error) {
           console.warn(`⚠️ Failed to parse team join request:`, error);
         }
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      subscription.stop();
+      }
 
       requests.sort((a, b) => b.timestamp - a.timestamp);
 
@@ -232,20 +225,19 @@ export class TeamJoinRequestService {
         limit: 5,
       };
 
+      // ✅ FIXED: Use fetchEvents instead of subscription to prevent Android crashes
+      const events = await ndk.fetchEvents(filter);
+
       let hasPending = false;
 
-      const subscription = ndk.subscribe(filter, { closeOnEose: false });
-
-      subscription.on('event', (event: NDKEvent) => {
+      for (const event of events) {
         const nostrEvent = this.ndkEventToEvent(event);
         const request = this.parseJoinRequestEvent(nostrEvent);
         if (request && request.status === 'pending') {
           hasPending = true;
+          break; // Found one, can exit early
         }
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      subscription.stop();
+      }
 
       console.log(
         `${hasPending ? '✅' : '❌'} Pending request status: ${hasPending}`
@@ -305,11 +297,20 @@ export class TeamJoinRequestService {
 
   /**
    * Subscribe to real-time join request updates for a captain
+   *
+   * ⚠️ DEPRECATED: This method creates persistent subscriptions that cause Android crashes
+   * Use getJoinRequests() with pull-to-refresh pattern instead
+   *
+   * If you must use this (e.g., for opt-in notifications), ensure:
+   * 1. User explicitly enables real-time notifications in settings
+   * 2. Subscription is stopped when app backgrounds
+   * 3. AppStateManager checks are in place
    */
   async subscribeToJoinRequests(
     captainPubkey: string,
     callback: (request: TeamJoinRequest) => void
   ): Promise<NDKSubscription> {
+    console.warn(`⚠️ Using deprecated subscribeToJoinRequests - prefer getJoinRequests() instead`);
     console.log(
       `🔔 Subscribing to join requests for captain: ${captainPubkey.slice(
         0,
@@ -328,7 +329,14 @@ export class TeamJoinRequestService {
 
     const subscription = ndk.subscribe(filter, { closeOnEose: false });
 
-    subscription.on('event', (event: NDKEvent) => {
+    subscription.on('event', async (event: NDKEvent) => {
+      // ✅ CRITICAL: Check if app is active before processing
+      const { AppStateManager } = await import('../core/AppStateManager');
+      if (!AppStateManager.canDoNetworkOps()) {
+        console.log('🔴 App backgrounded, skipping team join request processing');
+        return;
+      }
+
       console.log(`🔔 New join request: ${event.id.slice(0, 8)}`);
 
       try {
