@@ -41,7 +41,7 @@ export class TTSAnnouncementService {
       console.log('🔊 Initializing TTS service with audio ducking...');
 
       // Set up AppState listener for audio cleanup
-      const appStateManager = AppStateManager.getInstance();
+      const appStateManager = AppStateManager;
       this.appStateUnsubscribe = appStateManager.onStateChange(async (isActive) => {
         if (!isActive) {
           // App going to background - release audio session

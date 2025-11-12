@@ -21,6 +21,7 @@ import { useNostrProfiles } from '../../hooks/useCachedData';
 import { NWCLightningButton } from '../lightning/NWCLightningButton';
 import { ChallengeIconButton } from '../ui/ChallengeIconButton';
 import { SimpleChallengeWizardV2 } from '../wizards/SimpleChallengeWizardV2';
+import { normalizeToHex } from '../../utils/ndkConversion';
 import type { Team } from '../../types';
 
 interface TeammateData {
@@ -94,10 +95,17 @@ export const TeammatesView: React.FC<TeammatesViewProps> = ({
             // Skip self
             if (pubkey === userNpub) continue;
 
-            allPubkeys.push(pubkey);
+            // Normalize pubkey to hex format for consistent profile lookups
+            const hexPubkey = normalizeToHex(pubkey);
+            if (!hexPubkey) {
+              console.warn(`[TeammatesView] Invalid pubkey format: ${pubkey.slice(0, 20)}...`);
+              continue;
+            }
+
+            allPubkeys.push(hexPubkey);
             rawTeammates.push({
-              pubkey,
-              name: `${pubkey.slice(0, 8)}...${pubkey.slice(-8)}`, // Placeholder
+              pubkey: hexPubkey,
+              name: `${hexPubkey.slice(0, 8)}...${hexPubkey.slice(-8)}`, // Placeholder
               picture: undefined,
               teamName: team.name,
               teamId: team.id,

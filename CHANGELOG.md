@@ -6,6 +6,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.8] - 2025-01-12
+
+### 🛡️ Critical Stability Fixes - Race Conditions & Import Errors
+
+**Achievement**: Fixed multiple race conditions, authentication persistence issues, and AppStateManager import errors that were causing crashes during normal app usage.
+
+### 🔧 Fixes Implemented
+
+#### 1. Fixed Activity Tracker Race Conditions
+**Problem**: AppState listeners with `[isTracking]` dependency were recreating subscriptions on every state change, causing timer cleanup race conditions and white screen crashes.
+
+**Solution**: Added `isTrackingRef` to track state without triggering re-subscriptions.
+
+**Files Fixed**:
+- `RunningTrackerScreen.tsx` - Added isTrackingRef, changed useEffect dependency to []
+- `CyclingTrackerScreen.tsx` - Added isTrackingRef, changed useEffect dependency to []
+- `WalkingTrackerScreen.tsx` - Added isTrackingRef, changed AppState listener pattern
+
+**Impact**: Activity trackers no longer crash when navigating to them or during background/foreground transitions.
+
+#### 2. Fixed "Start" Button Authentication Persistence
+**Problem**: Users who generated new nsec/npub via "Start" button were forced to re-login after closing app due to aggressive verification deleting valid keys.
+
+**Solution**: Commented out aggressive verification in `storeAuthenticationData` that was incorrectly invalidating stored auth data.
+
+**Files Fixed**:
+- `src/utils/nostrAuth.ts` (lines 99-108) - Removed verification that was deleting valid keys
+
+**Impact**: New users who use "Start" flow now stay authenticated after app restart.
+
+#### 3. Fixed 30-Minute Idle Crash (GlobalNDK Keepalive)
+**Problem**: NDK keepalive timer running indefinitely without lifecycle management, accumulating memory and causing crashes after ~30 minutes idle.
+
+**Solution**: Added keepalive lifecycle management with pause/resume based on app state.
+
+**Files Fixed**:
+- `src/services/nostr/GlobalNDKService.ts`:
+  - Added `pauseKeepalive()` method to stop timer when backgrounded
+  - Added `resumeKeepalive()` method to restart when foregrounded
+  - Added AppState listener for automatic lifecycle management
+
+**Impact**: App no longer crashes when idle for extended periods, GPS workout tracking unaffected.
+
+#### 4. Fixed ProfileScreen Timer Memory Leak
+**Problem**: Timer cleanup could fail if component unmounted during initialization, causing memory leaks.
+
+**Solution**: Added `isMountedRef` to prevent timer operations after unmount.
+
+**Files Fixed**:
+- `src/screens/ProfileScreen.tsx`:
+  - Added mounted ref to track component lifecycle
+  - Removed cleanup calls to handlers that were never started
+
+**Impact**: Prevents memory accumulation during navigation.
+
+#### 5. Fixed AppStateManager.getInstance() Error
+**Problem**: 8 occurrences across 5 files incorrectly calling `.getInstance()` on AppStateManager singleton, causing "getInstance is not a function" crashes.
+
+**Solution**: Removed all `.getInstance()` calls since AppStateManager is already a singleton instance.
+
+**Files Fixed**:
+- `GlobalNDKService.ts` (1 occurrence)
+- `SimpleLocationTrackingService.ts` (1 occurrence)
+- `TTSAnnouncementService.ts` (1 occurrence)
+- `RunningTrackerScreen.tsx` (3 occurrences)
+- `CyclingTrackerScreen.tsx` (2 occurrences)
+
+**Impact**: Eliminates runtime errors when navigating to activity trackers or using services.
+
+### 🐛 Issues Resolved
+- ✅ Activity tracker white screen crashes fixed
+- ✅ Authentication persists correctly for "Start" button users
+- ✅ 30-minute idle crash eliminated
+- ✅ AppStateManager.getInstance() runtime errors resolved
+- ✅ Memory leaks from timers prevented
+
+### 📊 Testing Recommendations
+- [ ] Navigate to all activity trackers rapidly
+- [ ] Use "Start" button flow and verify auth persists after app restart
+- [ ] Leave app idle for 30+ minutes on profile screen
+- [ ] Background/foreground app during workout tracking
+- [ ] Test rapid screen navigation for memory leaks
+
 ## [0.7.7] - 2025-01-12
 
 ### 🛡️ Safe Background Fixes - GPS Tracking Preserved

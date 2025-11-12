@@ -40,7 +40,12 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
   route,
   navigation,
 }) => {
-  const { eventId, eventData: passedEventData } = route.params;
+  const {
+    eventId,
+    eventData: passedEventData,
+    teamId: contextTeamId,  // ✅ NEW: Team context from navigation
+    captainPubkey: contextCaptainPubkey,  // ✅ NEW: Captain context from navigation
+  } = route.params;
 
   const [eventData, setEventData] = useState<any>(passedEventData || null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -156,25 +161,31 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       }
 
       console.log('✅ Event loaded:', event.name);
+
+      // ✅ FIX: Enrich event with team context if missing
+      if ((!event.teamId || event.teamId === '') && contextTeamId) {
+        console.log(`⚡ Enriching event with contextTeamId: ${contextTeamId}`);
+        event.teamId = contextTeamId;
+      }
+      if ((!event.captainPubkey || event.captainPubkey.trim() === '') && contextCaptainPubkey) {
+        console.log(`⚡ Enriching event with contextCaptainPubkey: ${contextCaptainPubkey?.slice(0, 20)}...`);
+        event.captainPubkey = contextCaptainPubkey;
+      }
+
       setEventData(event);
 
-      // ✅ CRITICAL: Validate event has captain pubkey before querying participants
+      // ✅ FIX: Use event.pubkey (Nostr event author) as captain fallback
+      // Every Nostr event has event.pubkey - that's the event creator (captain)
       if (!event.captainPubkey || event.captainPubkey.trim() === '') {
-        console.error(`❌ Event ${eventId} has no captain pubkey - cannot load participants`);
-        console.error('Event data:', JSON.stringify(event, null, 2));
-        setParticipants([]);
-        setLoadingMembers(false);
-        setLoadingLeaderboard(false);
-        setError(
-          `Event Data Incomplete\n\n` +
-          `This event is missing captain information and cannot load participants.\n\n` +
-          `Possible causes:\n` +
-          `• Event was created incorrectly\n` +
-          `• Event data is corrupted on Nostr\n` +
-          `• Event was deleted by captain\n\n` +
-          `Please contact the event organizer for assistance.`
-        );
-        return;
+        const fallbackCaptain = event.pubkey || contextCaptainPubkey;
+        if (fallbackCaptain) {
+          console.log(`⚡ Using fallback captain: ${fallbackCaptain.slice(0, 20)}... (from event.pubkey)`);
+          event.captainPubkey = fallbackCaptain;
+        } else {
+          console.warn(`⚠️ Event ${eventId} has no captain info - participants may not load`);
+          console.warn('Event data:', JSON.stringify(event, null, 2));
+          // Don't crash - continue with limited view
+        }
       }
 
       // PHASE 2: Event participants (show participant count ASAP)
@@ -182,25 +193,46 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       console.log('⏳ Fetching event participants...');
 
       let eventParticipants: string[] = [];
-      try {
-        const NostrListService = (
-          await import('../services/nostr/NostrListService')
-        ).NostrListService.getInstance();
-        eventParticipants = await NostrListService.getListMembers(
-          event.captainPubkey, // Author of the participant list
-          `event-${eventId}-participants` // Event-specific d-tag
-        );
 
-        console.log(
-          `✅ Found ${eventParticipants.length} event participants (not team members)`
-        );
-      } catch (participantError) {
-        console.error('❌ Failed to load event participants:', participantError);
-        // Set empty array and continue - participants list is optional
-        eventParticipants = [];
-      } finally {
-        // Always clear loading state, even if error occurred
-        setParticipants(eventParticipants);
+      // ✅ FIX: Only query participants if we have captain info
+      if (event.captainPubkey && event.captainPubkey.trim() !== '') {
+        try {
+          const NostrListService = (
+            await import('../services/nostr/NostrListService')
+          ).NostrListService.getInstance();
+
+          // DEBUG: Log what we're querying for
+          console.log('🔍 Querying Nostr for event participants:');
+          console.log(`  - Captain pubkey: ${event.captainPubkey.slice(0, 20)}...`);
+          console.log(`  - d-tag: event-${eventId}-participants`);
+
+          eventParticipants = await NostrListService.getListMembers(
+            event.captainPubkey, // Author of the participant list
+            `event-${eventId}-participants` // Event-specific d-tag
+          );
+
+          console.log(
+            `✅ Found ${eventParticipants.length} event participants (not team members)`
+          );
+
+          // DEBUG: Log actual participants
+          if (eventParticipants.length > 0) {
+            console.log('📋 Participant pubkeys:', eventParticipants);
+          } else {
+            console.warn('⚠️ No participants found in kind 30000 list - list may not exist yet or query failed');
+          }
+        } catch (participantError) {
+          console.error('❌ Failed to load event participants:', participantError);
+          // Set empty array and continue - participants list is optional
+          eventParticipants = [];
+        } finally {
+          // Always clear loading state, even if error occurred
+          setParticipants(eventParticipants);
+          setLoadingMembers(false);
+        }
+      } else {
+        console.warn('⚠️ Skipping participant query - no captain information available');
+        setParticipants([]);
         setLoadingMembers(false);
       }
 
@@ -240,6 +272,12 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       setLoadingLeaderboard(true);
       console.log('⏳ Calculating leaderboard...');
 
+      // DEBUG: Log user context
+      console.log('🔍 User context for leaderboard:');
+      console.log(`  - User hex pubkey: ${userHexPubkey}`);
+      console.log(`  - User joined locally: ${userJoinedLocally}`);
+      console.log(`  - User in official list: ${userHexPubkey ? eventParticipants.includes(userHexPubkey) : 'N/A'}`);
+
       // Merge official participants with local user (if applicable)
       const participantsForLeaderboard =
         userHexPubkey &&
@@ -248,37 +286,53 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
           ? [...eventParticipants, userHexPubkey]
           : eventParticipants;
 
+      console.log(`📊 Leaderboard will query for ${participantsForLeaderboard.length} participants`);
+
       if (participantsForLeaderboard.length > eventParticipants.length) {
         console.log(
-          `📊 Including ${
+          `  ↳ Including ${
             participantsForLeaderboard.length - eventParticipants.length
-          } local participant(s) in leaderboard (joined but not captain-approved yet)`
+          } local participant(s) (joined but not captain-approved yet)`
         );
       }
 
-      const SimpleLeaderboardService = (
-        await import('../services/competition/SimpleLeaderboardService')
-      ).default;
-      const rankings = await SimpleLeaderboardService.calculateEventLeaderboard(
-        event,
-        participantsForLeaderboard
-      );
+      if (participantsForLeaderboard.length === 0) {
+        console.error('❌ CRITICAL: participantsForLeaderboard is EMPTY - leaderboard will show nothing!');
+      }
 
-      setLeaderboard(rankings);
-      setLoadingLeaderboard(false);
-      console.log(`✅ Leaderboard calculated: ${rankings.length} entries`);
-
-      // Calculate team goal progress if event has team-total scoring mode
-      if (event.scoringMode === 'team-total' && event.teamGoal) {
-        console.log('🎯 Calculating team goal progress...');
-        const progress = await SimpleLeaderboardService.calculateTeamGoalProgress(
+      // Wrap leaderboard calculation in try-catch-finally to ensure loading state clears
+      try {
+        const SimpleLeaderboardService = (
+          await import('../services/competition/SimpleLeaderboardService')
+        ).default;
+        const rankings = await SimpleLeaderboardService.calculateEventLeaderboard(
           event,
           participantsForLeaderboard
         );
-        setTeamGoalProgress(progress);
-        console.log(`✅ Team goal progress: ${progress.percentage.toFixed(1)}%`);
-      } else {
+
+        setLeaderboard(rankings);
+        console.log(`✅ Leaderboard calculated: ${rankings.length} entries`);
+
+        // Calculate team goal progress if event has team-total scoring mode
+        if (event.scoringMode === 'team-total' && event.teamGoal) {
+          console.log('🎯 Calculating team goal progress...');
+          const progress = await SimpleLeaderboardService.calculateTeamGoalProgress(
+            event,
+            participantsForLeaderboard
+          );
+          setTeamGoalProgress(progress);
+          console.log(`✅ Team goal progress: ${progress.percentage.toFixed(1)}%`);
+        } else {
+          setTeamGoalProgress(null);
+        }
+      } catch (leaderboardError) {
+        console.error('❌ Leaderboard calculation failed:', leaderboardError);
+        // Show empty leaderboard on error instead of infinite loading
+        setLeaderboard([]);
         setTeamGoalProgress(null);
+      } finally {
+        // ✅ CRITICAL: Always clear loading state, even if error occurs
+        setLoadingLeaderboard(false);
       }
 
       // ✅ CRITICAL: Save snapshot for instant future access

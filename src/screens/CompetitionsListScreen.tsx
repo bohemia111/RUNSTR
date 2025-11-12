@@ -146,6 +146,7 @@ export const CompetitionsListScreen: React.FC = () => {
     }
 
     // Fallback to partial data (for events from Nostr without local participation)
+    // ✅ FIX: Use undefined instead of empty strings so EventDetailScreen can fetch fresh data
     return {
       id: comp.id,
       name: comp.name,
@@ -154,8 +155,9 @@ export const CompetitionsListScreen: React.FC = () => {
         ? new Date(comp.startsAt * 1000).toISOString()
         : new Date().toISOString(),
       metric: 'total_distance',
-      teamId: '',
-      captainPubkey: '',
+      teamId: undefined,  // ✅ Let EventDetailScreen fetch fresh
+      captainPubkey: undefined,  // ✅ Let EventDetailScreen fetch fresh
+      pubkey: undefined,  // ✅ Will be fetched from Nostr event
       description: undefined,
       entryFeesSats: comp.prizePool,
     };

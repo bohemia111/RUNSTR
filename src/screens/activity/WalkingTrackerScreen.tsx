@@ -5,9 +5,10 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Platform, AppState, AppStateStatus, ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Platform, ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { AppStateManager } from '../../services/core/AppStateManager';
 import { CustomAlert } from '../../components/ui/CustomAlert';
 import { simpleLocationTrackingService } from '../../services/activity/SimpleLocationTrackingService';
 import { activityMetricsService } from '../../services/activity/ActivityMetricsService';
@@ -30,6 +31,8 @@ import type { NostrProfile } from '../../services/nostr/NostrProfileService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { PublishableWorkout } from '../../services/nostr/workoutPublishingService';
 import { theme } from '../../styles/theme';
+import { appPermissionService } from '../../services/initialization/AppPermissionService';
+import { PermissionRequestModal } from '../../components/permissions/PermissionRequestModal';
 
 const STEP_UPDATE_INTERVAL = 5 * 60 * 1000; // Update every 5 minutes
 
@@ -82,6 +85,7 @@ export const WalkingTrackerScreen: React.FC = () => {
   const pauseStartTimeRef = useRef<number>(0); // When pause started
   const totalPausedTimeRef = useRef<number>(0); // Cumulative pause duration in ms
   const isPausedRef = useRef<boolean>(false); // Ref to avoid stale closure in timer
+  const isTrackingRef = useRef<boolean>(false); // Track isTracking without re-subscribing
 
   // Daily step counter state
   const [dailySteps, setDailySteps] = useState<number | null>(null);
@@ -99,6 +103,7 @@ export const WalkingTrackerScreen: React.FC = () => {
   const [userProfile, setUserProfile] = useState<NostrProfile | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [preparedWorkout, setPreparedWorkout] = useState<PublishableWorkout | null>(null);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -242,7 +247,7 @@ export const WalkingTrackerScreen: React.FC = () => {
   // AppState listener for background/foreground transitions
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active' && isTracking) {
+      if (nextAppState === 'active' && isTrackingRef.current) {
         // App returned to foreground while tracking - sync immediately
         console.log('[WalkingTrackerScreen] App returned to foreground, syncing metrics...');
 
@@ -277,10 +282,27 @@ export const WalkingTrackerScreen: React.FC = () => {
     return () => {
       subscription.remove();
     };
-  }, [isTracking]); // Re-subscribe when tracking state changes
+  }, []); // Subscribe only once to avoid race conditions
+
+  // Update the ref whenever isTracking changes
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
 
   const handleHoldComplete = async () => {
-    console.log('[WalkingTrackerScreen] Hold complete, starting countdown...');
+    console.log('[WalkingTrackerScreen] Hold complete, checking permissions...');
+
+    // ✅ Check permissions BEFORE starting countdown
+    const permissionStatus = await appPermissionService.checkAllPermissions();
+
+    if (!permissionStatus.location) {
+      console.log('[WalkingTrackerScreen] Missing permissions, showing modal');
+      setShowPermissionModal(true);
+      return;
+    }
+
+    // Permissions granted, start countdown
+    console.log('[WalkingTrackerScreen] Permissions granted, starting countdown...');
 
     // Start countdown: 3 → 2 → 1 → GO!
     setCountdown(3);
@@ -818,6 +840,18 @@ export const WalkingTrackerScreen: React.FC = () => {
           console.log('[WalkingTrackerScreen] ✅ Daily steps posted successfully');
         }}
       />
+
+      {/* Permission Request Modal */}
+      {showPermissionModal && (
+        <PermissionRequestModal
+          visible={showPermissionModal}
+          onComplete={() => {
+            setShowPermissionModal(false);
+            // Re-check permissions after modal closes
+            handleHoldComplete();
+          }}
+        />
+      )}
     </View>
   );
 };

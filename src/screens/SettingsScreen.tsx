@@ -46,6 +46,7 @@ import { dailyStepCounterService } from '../services/activity/DailyStepCounterSe
 import { CharitySelectionService } from '../services/charity/CharitySelectionService';
 import type { Charity } from '../constants/charities';
 import { Alert } from 'react-native';
+import { CharitySelectionModal } from '../components/charity/CharitySelectionModal';
 
 interface SettingsScreenProps {
   currentTeam?: Team;
@@ -113,6 +114,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   // Charity Selection state
   const [selectedCharity, setSelectedCharity] = useState<Charity | null>(null);
+  const [showCharityModal, setShowCharityModal] = useState(false);
 
   // NWC Wallet state
   const [hasNWC, setHasNWC] = useState(false);
@@ -473,52 +475,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   };
 
   const handleChangeCharity = () => {
-    // Get all available charities
-    const charities = CharitySelectionService.getAllCharities();
+    setShowCharityModal(true);
+  };
 
-    // Create buttons for each charity
-    const charityButtons = charities.map((charity) => ({
-      text: charity.name,
-      onPress: async () => {
-        try {
-          const success = await CharitySelectionService.setSelectedCharity(
-            charity.id
-          );
-          if (success) {
-            setSelectedCharity(charity);
-            // Show success message
-            setAlertVisible(false);
-            setTimeout(() => {
-              setAlertTitle('Charity Updated');
-              setAlertMessage(
-                `You are now supporting ${charity.name}. All your competition winnings will go to this charity.`
-              );
-              setAlertButtons([{ text: 'OK' }]);
-              setAlertVisible(true);
-            }, 100);
-          }
-        } catch (error) {
-          console.error('Error setting charity:', error);
-          setAlertVisible(false);
-          setTimeout(() => {
-            setAlertTitle('Error');
-            setAlertMessage('Failed to update charity. Please try again.');
-            setAlertButtons([{ text: 'OK' }]);
-            setAlertVisible(true);
-          }, 100);
-        }
-      },
-    }));
+  const handleCharitySelect = async (charity: Charity) => {
+    try {
+      const success = await CharitySelectionService.setSelectedCharity(
+        charity.id
+      );
+      if (success) {
+        setSelectedCharity(charity);
+        setShowCharityModal(false);
+      }
+    } catch (error) {
+      console.error('Error setting charity:', error);
+      setShowCharityModal(false);
+      setTimeout(() => {
+        setAlertTitle('Error');
+        setAlertMessage('Failed to update charity. Please try again.');
+        setAlertButtons([{ text: 'OK' }]);
+        setAlertVisible(true);
+      }, 100);
+    }
+  };
 
-    // Add cancel button
-    charityButtons.push({ text: 'Cancel', style: 'cancel' });
-
-    setAlertTitle('Select Your Charity');
-    setAlertMessage(
-      'Choose which charity will receive your competition winnings'
-    );
-    setAlertButtons(charityButtons as any);
-    setAlertVisible(true);
+  const handleCharityCancel = () => {
+    setShowCharityModal(false);
   };
 
   const handleBackupPassword = () => {
@@ -1061,6 +1043,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         message={alertMessage}
         buttons={alertButtons}
         onClose={() => setAlertVisible(false)}
+      />
+
+      {/* Charity Selection Modal */}
+      <CharitySelectionModal
+        visible={showCharityModal}
+        charities={CharitySelectionService.getAllCharities()}
+        onSelect={handleCharitySelect}
+        onCancel={handleCharityCancel}
       />
 
       {/* Wallet Configuration Modal */}

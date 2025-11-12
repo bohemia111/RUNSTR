@@ -68,6 +68,7 @@ export const CyclingTrackerScreen: React.FC = () => {
   const pauseStartTimeRef = useRef<number>(0); // When pause started
   const totalPausedTimeRef = useRef<number>(0); // Cumulative pause duration in ms
   const isPausedRef = useRef<boolean>(false); // Ref to avoid stale closure in timer
+  const isTrackingRef = useRef<boolean>(false); // Track isTracking without re-subscribing
 
   useEffect(() => {
     return () => {
@@ -78,7 +79,7 @@ export const CyclingTrackerScreen: React.FC = () => {
 
   // AppState listener for background/foreground transitions - using AppStateManager
   useEffect(() => {
-    const appStateManager = AppStateManager.getInstance();
+    const appStateManager = AppStateManager;
     const unsubscribe = appStateManager.onStateChange((isActive) => {
       if (!isActive) {
         // App going to background - clear timers to prevent crashes
@@ -91,7 +92,7 @@ export const CyclingTrackerScreen: React.FC = () => {
           clearInterval(metricsUpdateRef.current);
           metricsUpdateRef.current = null;
         }
-      } else if (isActive && isTracking) {
+      } else if (isActive && isTrackingRef.current) {
         // App returned to foreground while tracking - restart timers and sync
         console.log('[CyclingTrackerScreen] App returned to foreground, restarting timers and syncing...');
 
@@ -144,7 +145,12 @@ export const CyclingTrackerScreen: React.FC = () => {
     return () => {
       unsubscribe();
     };
-  }, [isTracking]); // Re-subscribe when tracking state changes
+  }, []); // Subscribe only once to avoid race conditions
+
+  // Update the ref whenever isTracking changes
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
 
   const startTracking = async () => {
     console.log('[CyclingTrackerScreen] Starting tracking...');
@@ -220,7 +226,7 @@ export const CyclingTrackerScreen: React.FC = () => {
 
   const updateMetrics = () => {
     // CRITICAL: Don't update UI if app is backgrounded
-    const appStateManager = AppStateManager.getInstance();
+    const appStateManager = AppStateManager;
     if (!appStateManager.isActive()) {
       return;
     }

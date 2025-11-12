@@ -245,8 +245,8 @@ export class NostrProfileService {
         });
       });
 
-      // Wait for events (increased to 3s for better relay response time)
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      // Wait for events (1s is sufficient - profiles typically return in <500ms)
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       subscription.stop();
 
       if (profileEvents.length === 0) {

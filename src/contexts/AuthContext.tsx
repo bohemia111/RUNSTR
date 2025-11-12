@@ -359,12 +359,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setInitError(null);
         }, 100);
 
-        // Request location permissions after successful login (in background)
-        setTimeout(async () => {
-          console.log('📍 Requesting location permissions after login...');
-          await locationPermissionService.requestActivityTrackingPermissions();
-        }, 500);
-
         return { success: true };
       } catch (error) {
         console.error('❌ AuthContext: Sign in error:', error);
@@ -407,19 +401,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAuthenticated(true);
       setConnectionStatus('Setting up your fitness journey...');
 
-      // Start loading profile in background while showing splash
-      setTimeout(() => {
-        setCurrentUser(result.user);
-        setIsConnected(true);
-        setConnectionStatus('Connected');
-        setInitError(null);
-      }, 100);
+      // Ensure profile is cached before navigation (fixes blank profile issue)
+      try {
+        const { DirectNostrProfileService } = await import(
+          '../services/user/directNostrProfileService'
+        );
+        await Promise.race([
+          DirectNostrProfileService.getCurrentUserProfile(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Profile cache timeout')), 2000)
+          ),
+        ]);
+        console.log('✅ Profile cached successfully after signup');
+      } catch (error) {
+        console.warn(
+          '⚠️ Profile cache timeout, using signup defaults:',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+      }
 
-      // Request location permissions after successful signup (in background)
-      setTimeout(async () => {
-        console.log('📍 Requesting location permissions after signup...');
-        await locationPermissionService.requestActivityTrackingPermissions();
-      }, 500);
+      // NOW set user in state (profile data ready)
+      setCurrentUser(result.user);
+      setIsConnected(true);
+      setConnectionStatus('Connected');
+      setInitError(null);
 
       return { success: true };
     } catch (error) {
@@ -492,12 +497,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Cache the profile
       const { appCache } = await import('../utils/cache');
       await appCache.set('current_user_profile', result.user, 5 * 60 * 1000);
-
-      // Request location permissions after successful Amber login (in background)
-      setTimeout(async () => {
-        console.log('📍 Requesting location permissions after Amber login...');
-        await locationPermissionService.requestActivityTrackingPermissions();
-      }, 500);
 
       return { success: true };
     } catch (error) {

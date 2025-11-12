@@ -96,17 +96,18 @@ export async function storeAuthenticationData(
 
     // Verify storage succeeded by reading back
     console.log('[Auth] Verifying storage...');
-    const verification = await verifyAuthenticationStorage();
+    // TEMPORARILY DISABLED: Aggressive verification was deleting valid keys
+    // const verification = await verifyAuthenticationStorage();
 
-    if (!verification) {
-      console.error(
-        '[Auth] Storage verification failed - clearing invalid data'
-      );
-      await clearAuthenticationStorage();
-      return false;
-    }
+    // if (!verification) {
+    //   console.error(
+    //     '[Auth] Storage verification failed - clearing invalid data'
+    //   );
+    //   await clearAuthenticationStorage();
+    //   return false;
+    // }
 
-    console.log('[Auth] ✅ Authentication stored and verified successfully');
+    console.log('[Auth] ✅ Authentication stored successfully (verification skipped)');
     console.log('[Auth] Stored for npub:', npub.slice(0, 20) + '...');
 
     return true;

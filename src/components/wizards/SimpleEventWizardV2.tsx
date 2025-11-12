@@ -358,6 +358,28 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
         // Invalidate cache
         unifiedCache.invalidate(CacheKeys.TEAM_EVENTS(teamId));
 
+        // ✅ AUTO-JOIN CAPTAIN TO LOCAL STORAGE
+        // Captain is already in kind 30000 list, now add to local storage for instant UX
+        try {
+          console.log('👤 Auto-joining captain to event locally...');
+          const { EventParticipationStore } = await import('../../services/event/EventParticipationStore');
+
+          await EventParticipationStore.addParticipation({
+            eventId: eventId,
+            eventData: eventCreationData,
+            entryFeePaid: 0, // Captain doesn't pay entry fee
+            paymentMethod: undefined,
+            paidAt: Date.now(),
+            status: 'approved', // Captain is pre-approved
+            localOnly: false, // Already published to kind 30000
+          });
+
+          console.log('✅ Captain auto-joined to event locally');
+        } catch (autoJoinError) {
+          console.error('⚠️ Failed to auto-join captain locally (non-critical):', autoJoinError);
+          // Don't block event creation if this fails
+        }
+
         setPublishSuccess(true);
         setPublishedSuccessfully(true);
 

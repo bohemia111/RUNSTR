@@ -441,9 +441,37 @@ export class SimpleLeaderboardService {
 
       const ndk = await GlobalNDKService.getInstance();
 
+      // ✅ CRITICAL: Convert npubs to hex if needed (NDK requires hex in authors field)
+      const hexPubkeys: string[] = [];
+      for (const pubkey of memberNpubs) {
+        if (pubkey.startsWith('npub1')) {
+          // Convert npub to hex
+          try {
+            const decoded = ndk.nip19.decode(pubkey);
+            hexPubkeys.push(decoded.data as string);
+            console.log(`🔄 Converted npub to hex: ${pubkey.slice(0, 12)}... → ${(decoded.data as string).slice(0, 12)}...`);
+          } catch (decodeError) {
+            console.error(`❌ Failed to decode npub: ${pubkey}`, decodeError);
+            // Skip invalid npubs
+          }
+        } else if (pubkey.length === 64 && /^[0-9a-f]+$/i.test(pubkey)) {
+          // Already hex format
+          hexPubkeys.push(pubkey);
+        } else {
+          console.error(`❌ Invalid pubkey format (not npub or hex): ${pubkey}`);
+        }
+      }
+
+      if (hexPubkeys.length === 0) {
+        console.error('❌ No valid pubkeys after format validation - cannot query workouts');
+        return [];
+      }
+
+      console.log(`✅ Validated ${hexPubkeys.length}/${memberNpubs.length} pubkeys for NDK query`);
+
       const filter: NDKFilter = {
         kinds: [1301],
-        authors: memberNpubs,
+        authors: hexPubkeys, // Use validated hex pubkeys
         since: startTimestamp,
         until: endTimestamp,
         limit: 1000,
@@ -451,13 +479,25 @@ export class SimpleLeaderboardService {
 
       // Add 5-second timeout to prevent UI freeze
       console.log(
-        `⏱️ Fetching workouts with 5s timeout for ${memberNpubs.length} members...`
+        `⏱️ Fetching workouts with 5s timeout for ${hexPubkeys.length} members...`
       );
+      console.log(`🔍 NDK Filter:`, JSON.stringify(filter, null, 2));
       const events = await this.fetchWithTimeout(
         ndk.fetchEvents(filter),
         5000,
         'Workout fetch timeout'
       );
+
+      console.log(`📥 NDK returned ${events.size} workout events`);
+
+      if (events.size === 0) {
+        console.warn('⚠️ No workout events found - leaderboard will be empty');
+        console.warn('   Possible causes:');
+        console.warn('   - No workouts published in date range');
+        console.warn('   - Pubkey format mismatch');
+        console.warn('   - Relay connectivity issues');
+        console.warn('   - Activity type filter too restrictive');
+      }
 
       const workouts: Workout[] = [];
 

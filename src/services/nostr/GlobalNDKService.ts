@@ -25,6 +25,7 @@ export class GlobalNDKService {
   private static lastReconnectAttempt: number = 0;
   private static keepaliveTimer: NodeJS.Timeout | null = null;
   private static isMonitoringConnections = false;
+  private static appStateListenerSetup = false;
 
   /**
    * Default relay configuration
@@ -89,6 +90,21 @@ export class GlobalNDKService {
         console.log('🔄 GlobalNDK: Starting deferred background connection...');
         this.initPromise = this.connectInBackground();
       }, 0);
+    }
+
+    // ✅ NEW: Setup AppState listener for keepalive lifecycle management
+    if (!this.appStateListenerSetup) {
+      AppStateManager.onStateChange((isActive) => {
+        if (!isActive) {
+          // App backgrounded - pause keepalive to prevent WebSocket access
+          this.pauseKeepalive();
+        } else if (this.instance && this.isInitialized) {
+          // App foregrounded and NDK is ready - resume keepalive
+          this.resumeKeepalive();
+        }
+      });
+      this.appStateListenerSetup = true;
+      console.log('📱 GlobalNDK: AppState listener setup for keepalive lifecycle');
     }
 
     return degradedNDK;
@@ -226,6 +242,29 @@ export class GlobalNDKService {
         this.debouncedReconnect();
       }
     }, 30000); // Check every 30 seconds
+  }
+
+  /**
+   * ✅ NEW: Pause keepalive timer when app backgrounds
+   * Prevents timer from firing and accessing WebSockets while suspended
+   */
+  private static pauseKeepalive(): void {
+    if (this.keepaliveTimer) {
+      clearInterval(this.keepaliveTimer);
+      this.keepaliveTimer = null;
+      console.log('⏸️ GlobalNDK: Keepalive paused (app backgrounded)');
+    }
+  }
+
+  /**
+   * ✅ NEW: Resume keepalive timer when app foregrounds
+   * Restarts connection health monitoring when app is active
+   */
+  private static resumeKeepalive(): void {
+    if (!this.keepaliveTimer && this.instance && this.isInitialized) {
+      this.startKeepalive();
+      console.log('▶️ GlobalNDK: Keepalive resumed (app foregrounded)');
+    }
   }
 
   /**

@@ -183,7 +183,12 @@ type AuthenticatedStackParamList = {
     currentUserNpub?: string;
     userIsCaptain?: boolean;
   };
-  EventDetail: { eventId: string; eventData?: any }; // Fixed: Added optional eventData parameter
+  EventDetail: {
+    eventId: string;
+    eventData?: any;
+    teamId?: string;  // ✅ NEW: Team context for fallback
+    captainPubkey?: string;  // ✅ NEW: Captain context for fallback
+  };
   EventCaptainDashboard: { eventId: string; eventData: any };
   LeagueDetail: { leagueId: string; leagueData?: any };
   ChallengeDetail: { challengeId: string };
@@ -768,7 +773,17 @@ const AppContent: React.FC = () => {
                       '  eventData:',
                       eventData ? 'provided' : 'not provided'
                     );
-                    navigation.navigate('EventDetail', { eventId, eventData });
+                    console.log('  team context:', {
+                      teamId: team?.id,
+                      captainId: team?.captainId?.slice(0, 20) + '...'
+                    });
+                    // ✅ FIX: Pass team context explicitly to prevent missing teamId/captainPubkey crash
+                    navigation.navigate('EventDetail', {
+                      eventId,
+                      eventData,
+                      teamId: team?.id,  // Explicit team context
+                      captainPubkey: team?.captainId,  // Explicit captain context
+                    });
                   }}
                   onLeaguePress={(leagueId, leagueData) => {
                     console.log('📍 Navigation: Team → League Detail');

@@ -3,7 +3,7 @@
  * Matches HTML mockup profile screen exactly
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -100,13 +100,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [userNpub, setUserNpub] = useState<string>('');
+  const isMountedRef = useRef(true);
 
   // Wallet features moved to Settings screen
 
   // ✅ PERFORMANCE: Defer notification initialization by 3 seconds
   // Notifications are not critical for initial app load, delay them for better UX
   useEffect(() => {
+    isMountedRef.current = true;
+
     const timer = setTimeout(async () => {
+      // Don't initialize if component already unmounted
+      if (!isMountedRef.current) return;
+
       try {
         const userIdentifiers = await getUserNostrIdentifiers();
         if (userIdentifiers?.hexPubkey) {
@@ -167,11 +173,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
     // Cleanup on unmount
     return () => {
+      isMountedRef.current = false;
       clearTimeout(timer);
-      challengeNotificationHandler.stopListening();
-      challengeResponseHandler.stopListening();
-      eventJoinNotificationHandler.stopListening();
-      teamJoinNotificationHandler.stopListening();
+
+      // ✅ FIX: Don't stop handlers that were never started (commented out above)
+      // This prevents unnecessary cleanup calls that could cause issues
+      // Handlers are currently disabled for stability (see lines 131-154)
     };
   }, []);
 

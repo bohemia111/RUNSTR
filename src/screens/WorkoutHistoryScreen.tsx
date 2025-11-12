@@ -99,23 +99,31 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
           '[WorkoutHistory] No signer available - posting will not work'
         );
       }
-
-      // Load user profile for social cards
-      if (activePubkey) {
-        try {
-          const profile = await nostrProfileService.getProfile(activePubkey);
-          setUserProfile(profile);
-          console.log('[WorkoutHistory] ✅ User profile loaded');
-        } catch (profileError) {
-          console.warn('[WorkoutHistory] Failed to load profile:', profileError);
-        }
-      }
     } catch (error) {
       console.error('[WorkoutHistory] ❌ Failed to load user data:', error);
     } finally {
       setIsInitializing(false);
     }
   };
+
+  // Load user profile in background (non-blocking, for social cards only)
+  useEffect(() => {
+    if (pubkey) {
+      console.log('[WorkoutHistory] Loading profile in background...');
+      nostrProfileService
+        .getProfile(pubkey)
+        .then((profile) => {
+          setUserProfile(profile);
+          console.log('[WorkoutHistory] ✅ User profile loaded (background)');
+        })
+        .catch((profileError) => {
+          console.warn(
+            '[WorkoutHistory] Failed to load profile (background):',
+            profileError
+          );
+        });
+    }
+  }, [pubkey]);
 
   /**
    * Handle posting a HealthKit workout to Nostr as kind 1301 competition entry

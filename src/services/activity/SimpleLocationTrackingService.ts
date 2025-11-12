@@ -143,7 +143,7 @@ export class SimpleLocationTrackingService {
    */
   private setupAppStateListener(): void {
     // Use centralized AppStateManager to prevent conflicts
-    const appStateManager = AppStateManager.getInstance();
+    const appStateManager = AppStateManager;
     this.appStateUnsubscribe = appStateManager.onStateChange(async (isActive) => {
         if (!isActive) {
           // App went to background

@@ -35,7 +35,12 @@ export interface RootStackParamList extends Record<string, object | undefined> {
   Profile: undefined;
   Wallet: undefined;
   ChallengeDetail: { challengeId: string };
-  EventDetail: { eventId: string; eventData?: any };
+  EventDetail: {
+    eventId: string;
+    eventData?: any;
+    teamId?: string;  // ✅ NEW: Team context for fallback
+    captainPubkey?: string;  // ✅ NEW: Captain context for fallback
+  };
   EventCaptainDashboard: { eventId: string; eventData: any };
   LeagueDetail: { leagueId: string; leagueData?: any };
   TeamDiscovery: undefined;

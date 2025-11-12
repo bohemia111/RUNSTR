@@ -144,12 +144,13 @@ export const RunningTrackerScreen: React.FC = () => {
 
   const metricsUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const routeCheckRef = useRef<NodeJS.Timeout | null>(null); // For route matching interval
+  const isTrackingRef = useRef<boolean>(false); // Track isTracking without re-subscribing
   // NOTE: Timer refs removed - SimpleRunTracker handles all timing internally via hybrid timer
 
   // Extract metrics update logic to reusable function (defined early for useEffect)
   const updateMetrics = () => {
     // CRITICAL: Don't update UI if app is backgrounded
-    const appStateManager = AppStateManager.getInstance();
+    const appStateManager = AppStateManager;
     if (!appStateManager.isActive()) {
       return;
     }
@@ -232,7 +233,7 @@ export const RunningTrackerScreen: React.FC = () => {
 
   // AppState listener for background/foreground transitions - using AppStateManager
   useEffect(() => {
-    const appStateManager = AppStateManager.getInstance();
+    const appStateManager = AppStateManager;
     const unsubscribe = appStateManager.onStateChange(async (isActive) => {
       if (!isActive) {
         // App going to background - clear timers to prevent crashes
@@ -245,7 +246,7 @@ export const RunningTrackerScreen: React.FC = () => {
           clearInterval(routeCheckRef.current);
           routeCheckRef.current = null;
         }
-      } else if (isActive && isTracking) {
+      } else if (isActive && isTrackingRef.current) {
         // App returned to foreground - restart timers and sync data
         console.log('[RunningTrackerScreen] App returned to foreground, restarting timers and syncing...');
 
@@ -308,7 +309,12 @@ export const RunningTrackerScreen: React.FC = () => {
     return () => {
       unsubscribe();
     };
-  }, [isTracking]); // Re-subscribe when tracking state changes
+  }, []); // Subscribe only once to avoid race conditions
+
+  // Update the ref whenever isTracking changes
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
 
   const handleHoldComplete = async () => {
     console.log('[RunningTrackerScreen] Hold complete, starting countdown...');
@@ -448,7 +454,7 @@ export const RunningTrackerScreen: React.FC = () => {
 
   const checkForRouteMatch = async () => {
     // CRITICAL: Don't update UI if app is backgrounded
-    const appStateManager = AppStateManager.getInstance();
+    const appStateManager = AppStateManager;
     if (!appStateManager.isActive()) {
       return;
     }
