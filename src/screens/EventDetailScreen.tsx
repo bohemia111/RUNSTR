@@ -3,7 +3,7 @@
  * Uses SimpleCompetitionService and SimpleLeaderboardService
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -36,16 +36,46 @@ interface EventDetailScreenProps {
   navigation: EventDetailNavigationProp;
 }
 
+/**
+ * Normalize eventId from route params to handle malformed d-tag formats
+ * Fixes bug where participant list IDs are passed instead of event IDs
+ *
+ * @example
+ * normalizeEventId('event-event_sunday10k-participants') → 'event_sunday10k'
+ * normalizeEventId('sunday10k') → 'sunday10k'
+ */
+const normalizeEventId = (input: string): string => {
+  if (input.startsWith('event-') && input.endsWith('-participants')) {
+    // Extract ID from malformed d-tag: event-{ID}-participants → {ID}
+    return input.replace(/^event-/, '').replace(/-participants$/, '');
+  }
+  return input;
+};
+
 export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
   route,
   navigation,
 }) => {
   const {
-    eventId,
+    eventId: rawEventId,
     eventData: passedEventData,
     teamId: contextTeamId,  // ✅ NEW: Team context from navigation
     captainPubkey: contextCaptainPubkey,  // ✅ NEW: Captain context from navigation
   } = route.params;
+
+  // ✅ FIX: Memoize eventId normalization to prevent infinite useEffect loop
+  const eventId = useMemo(() => {
+    const normalized = normalizeEventId(rawEventId);
+
+    // DEBUG: Log normalization if ID was malformed
+    if (rawEventId !== normalized) {
+      console.log('🔧 EventDetailScreen: Normalized malformed eventId');
+      console.log(`  - Raw: ${rawEventId}`);
+      console.log(`  - Normalized: ${normalized}`);
+    }
+
+    return normalized;
+  }, [rawEventId]);
 
   const [eventData, setEventData] = useState<any>(passedEventData || null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -188,119 +218,105 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         }
       }
 
-      // PHASE 2: Event participants (show participant count ASAP)
+      // PHASE 2: Event participants - SIMPLIFIED (captain + local storage only)
       setLoadingMembers(true);
-      console.log('⏳ Fetching event participants...');
+      console.log('⏳ Building participant list (captain + local)...');
 
+      // ✅ SIMPLIFIED FIX: No Nostr queries - just captain + local storage
       let eventParticipants: string[] = [];
 
-      // ✅ FIX: Only query participants if we have captain info
+      // Always include captain first
       if (event.captainPubkey && event.captainPubkey.trim() !== '') {
-        try {
-          const NostrListService = (
-            await import('../services/nostr/NostrListService')
-          ).NostrListService.getInstance();
-
-          // DEBUG: Log what we're querying for
-          console.log('🔍 Querying Nostr for event participants:');
-          console.log(`  - Captain pubkey: ${event.captainPubkey.slice(0, 20)}...`);
-          console.log(`  - d-tag: event-${event.id}-participants`);
-
-          eventParticipants = await NostrListService.getListMembers(
-            event.captainPubkey, // Author of the participant list
-            `event-${event.id}-participants` // Event-specific d-tag (use event.id not route param)
-          );
-
-          console.log(
-            `✅ Found ${eventParticipants.length} event participants (not team members)`
-          );
-
-          // DEBUG: Log actual participants
-          if (eventParticipants.length > 0) {
-            console.log('📋 Participant pubkeys:', eventParticipants);
-          } else {
-            console.warn('⚠️ No participants found in kind 30000 list - list may not exist yet or query failed');
-          }
-        } catch (participantError) {
-          console.error('❌ Failed to load event participants:', participantError);
-          // Set empty array and continue - participants list is optional
-          eventParticipants = [];
-        } finally {
-          // Always clear loading state, even if error occurred
-          setParticipants(eventParticipants);
-          setLoadingMembers(false);
-        }
+        eventParticipants.push(event.captainPubkey);
+        console.log(`✅ Added captain to participants: ${event.captainPubkey.slice(0, 20)}...`);
       } else {
-        console.warn('⚠️ Skipping participant query - no captain information available');
-        setParticipants([]);
-        setLoadingMembers(false);
+        console.warn('⚠️ No captain information available - leaderboard may be empty');
       }
 
-      // Check if current user is a participant and/or captain
+      // Check if current user joined locally and add them
       const userHexPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
-      let userJoinedLocally = false;
-
       if (userHexPubkey) {
-        const isUserParticipant = eventParticipants.includes(userHexPubkey);
-        setIsParticipant(isUserParticipant);
-        console.log(
-          `User is${isUserParticipant ? '' : ' not'} an event participant`
-        );
-
-        // Check if user is the captain
-        const isUserCaptain = event.captainPubkey === userHexPubkey;
-        setIsCaptain(isUserCaptain);
-        console.log(`User is${isUserCaptain ? '' : ' not'} the captain`);
-
-        // Check if user joined locally (free or paid) but not in official list yet
         const { EventParticipationStore } = await import(
           '../services/event/EventParticipationStore'
         );
-        userJoinedLocally = await EventParticipationStore.hasUserJoinedLocally(
+        const userJoinedLocally = await EventParticipationStore.hasUserJoinedLocally(
           eventId
         );
 
-        if (userJoinedLocally && !isUserParticipant) {
-          console.log(
-            '👤 User joined locally but not in official list - will include in leaderboard'
-          );
-          setIsParticipant(true); // Show as participant in UI
+        if (userJoinedLocally && !eventParticipants.includes(userHexPubkey)) {
+          eventParticipants.push(userHexPubkey);
+          console.log('✅ Added local participant:', userHexPubkey.slice(0, 20));
         }
       }
 
+      // Step 3: Add captain-approved participants from kind 30000 list
+      if (event.captainPubkey && event.id) {
+        try {
+          console.log('⏳ Fetching approved participants from kind 30000 list...');
+          const { NostrListService } = await import('../services/nostr/NostrListService');
+          const listService = NostrListService.getInstance();
+
+          const approvedParticipants = await listService.getListMembers(
+            event.captainPubkey,
+            `event-${event.id}-participants`
+          );
+
+          console.log(`📋 Found ${approvedParticipants.length} approved participants in kind 30000 list`);
+
+          // Merge approved participants with existing array (deduplication)
+          for (const pubkey of approvedParticipants) {
+            if (!eventParticipants.includes(pubkey)) {
+              eventParticipants.push(pubkey);
+            }
+          }
+
+          console.log(`✅ Total participants after merge: ${eventParticipants.length}`);
+        } catch (error) {
+          console.warn('⚠️ Failed to fetch approved participants (non-blocking):', error);
+          console.warn('   Continuing with captain + local participants only');
+        }
+      }
+
+      setParticipants(eventParticipants);
+      setLoadingMembers(false);
+      console.log(`✅ Participant list built instantly: ${eventParticipants.length} participants`);
+
+      // Set user participation status
+      if (userHexPubkey) {
+        const isUserParticipant = eventParticipants.includes(userHexPubkey);
+        setIsParticipant(isUserParticipant);
+
+        const isUserCaptain = event.captainPubkey === userHexPubkey;
+        setIsCaptain(isUserCaptain);
+
+        console.log(`User is${isUserCaptain ? ' the captain' : isUserParticipant ? ' a participant' : ' not participating'}`);
+      }
+
       // PHASE 3: Leaderboard calculation (heaviest operation, show skeleton)
+      // ✅ FIX: Guard against duplicate calculations if component re-renders
+      if (loadingLeaderboard) {
+        console.warn('⚠️ Leaderboard already calculating - skipping duplicate request');
+        return;
+      }
+
       setLoadingLeaderboard(true);
       console.log('⏳ Calculating leaderboard...');
 
-      // DEBUG: Log user context
-      console.log('🔍 User context for leaderboard:');
-      console.log(`  - User hex pubkey: ${userHexPubkey}`);
-      console.log(`  - User joined locally: ${userJoinedLocally}`);
-      console.log(`  - User in official list: ${userHexPubkey ? eventParticipants.includes(userHexPubkey) : 'N/A'}`);
+      // ✅ SIMPLIFIED: eventParticipants already contains captain + local user
+      const participantsForLeaderboard = eventParticipants;
+      console.log(`📊 Leaderboard will query for ${participantsForLeaderboard.length} participants (captain + local)`);
 
-      // Merge official participants with local user (if applicable)
-      const participantsForLeaderboard =
-        userHexPubkey &&
-        userJoinedLocally &&
-        !eventParticipants.includes(userHexPubkey)
-          ? [...eventParticipants, userHexPubkey]
-          : eventParticipants;
 
-      console.log(`📊 Leaderboard will query for ${participantsForLeaderboard.length} participants`);
-
-      if (participantsForLeaderboard.length > eventParticipants.length) {
-        console.log(
-          `  ↳ Including ${
-            participantsForLeaderboard.length - eventParticipants.length
-          } local participant(s) (joined but not captain-approved yet)`
-        );
-      }
-
+      // ✅ FIX: Show empty state if no participants (don't get stuck loading)
       if (participantsForLeaderboard.length === 0) {
-        console.error('❌ CRITICAL: participantsForLeaderboard is EMPTY - leaderboard will show nothing!');
+        console.warn('⚠️ No participants to display - showing empty leaderboard');
+        setLeaderboard([]);
+        setTeamGoalProgress(null);
+        setLoadingLeaderboard(false);
+        return;
       }
 
-      // Wrap leaderboard calculation in try-catch-finally to ensure loading state clears
+      // Wrap leaderboard calculation in try-catch to ensure loading state clears
       try {
         const SimpleLeaderboardService = (
           await import('../services/competition/SimpleLeaderboardService')
@@ -325,13 +341,15 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         } else {
           setTeamGoalProgress(null);
         }
+
+        // ✅ Clear loading state on success
+        setLoadingLeaderboard(false);
       } catch (leaderboardError) {
         console.error('❌ Leaderboard calculation failed:', leaderboardError);
         // Show empty leaderboard on error instead of infinite loading
         setLeaderboard([]);
         setTeamGoalProgress(null);
-      } finally {
-        // ✅ CRITICAL: Always clear loading state, even if error occurs
+        // ✅ Clear loading state on error
         setLoadingLeaderboard(false);
       }
 
@@ -751,7 +769,7 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
               ]}
             >
               <Text style={styles.statusBadgeText}>
-                {status === 'active' && '🔴 Active'}
+                {status === 'active' && 'Active'}
                 {status === 'past' && '✓ Completed'}
                 {status === 'upcoming' && '⏰ Upcoming'}
               </Text>
@@ -1054,8 +1072,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusBadgeActive: {
-    backgroundColor: theme.colors.error + '20',
-    borderColor: theme.colors.error,
+    backgroundColor: '#FF9D42' + '20',
+    borderColor: '#FF9D42',
   },
   statusBadgePast: {
     backgroundColor: theme.colors.textMuted + '20',

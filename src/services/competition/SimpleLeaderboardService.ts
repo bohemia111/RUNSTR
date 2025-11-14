@@ -121,30 +121,34 @@ export class SimpleLeaderboardService {
   ): Promise<LeaderboardEntry[]> {
     console.log(`🏆 Calculating leaderboard for event: ${event.name}`);
     console.log(`   Scoring type: ${event.scoringType || event.metric}`);
+    console.log(`   📊 DEBUG: Starting leaderboard calculation for ${teamMembers.length} members`);
 
+    // ⚠️ TEMPORARY: Commented out for testing - this fetch can hang indefinitely
     // ✅ NEW: Fetch join requests to get participation types
     const participationTypeMap = new Map<string, 'in-person' | 'virtual'>();
-    try {
-      const joinRequestService = EventJoinRequestService.getInstance();
-      const joinRequests = await joinRequestService.getEventJoinRequestsByEventIds([event.id]);
-      const eventRequests = joinRequests.get(event.id) || [];
+    // try {
+    //   console.log(`   🔍 DEBUG: Starting join request fetch...`);
+    //   const joinRequestService = EventJoinRequestService.getInstance();
+    //   const joinRequests = await joinRequestService.getEventJoinRequestsByEventIds([event.id]);
+    //   const eventRequests = joinRequests.get(event.id) || [];
 
-      // Map hex pubkey -> npub for participation type lookup
-      const { nip19 } = await import('nostr-tools');
-      for (const request of eventRequests) {
-        if (request.participationType) {
-          try {
-            const npub = nip19.npubEncode(request.requesterId);
-            participationTypeMap.set(npub, request.participationType);
-          } catch (error) {
-            console.warn(`Failed to encode npub for ${request.requesterId}:`, error);
-          }
-        }
-      }
-      console.log(`   Loaded ${participationTypeMap.size} participation type preferences`);
-    } catch (error) {
-      console.warn('Failed to fetch participation types (non-critical):', error);
-    }
+    //   // Map hex pubkey -> npub for participation type lookup
+    //   const { nip19 } = await import('nostr-tools');
+    //   for (const request of eventRequests) {
+    //     if (request.participationType) {
+    //       try {
+    //         const npub = nip19.npubEncode(request.requesterId);
+    //         participationTypeMap.set(npub, request.participationType);
+    //       } catch (error) {
+    //         console.warn(`Failed to encode npub for ${request.requesterId}:`, error);
+    //       }
+    //     }
+    //   }
+    //   console.log(`   Loaded ${participationTypeMap.size} participation type preferences`);
+    // } catch (error) {
+    //   console.warn('Failed to fetch participation types (non-critical):', error);
+    // }
+    console.log(`   ✅ DEBUG: Skipped join request fetch (testing mode)`);
 
     const eventDate = new Date(event.eventDate);
     const eventStart = new Date(eventDate);
@@ -153,6 +157,10 @@ export class SimpleLeaderboardService {
     eventEnd.setHours(23, 59, 59, 999);
 
     // Get workouts for event day
+    console.log(`   🔍 DEBUG: Starting workout fetch for ${teamMembers.length} members...`);
+    console.log(`   🔍 DEBUG: Activity type: ${event.activityType}`);
+    console.log(`   🔍 DEBUG: Date range: ${eventStart.toISOString()} to ${eventEnd.toISOString()}`);
+
     const workouts = await this.getWorkouts(
       teamMembers,
       event.activityType,
@@ -160,6 +168,7 @@ export class SimpleLeaderboardService {
       eventEnd
     );
 
+    console.log(`   ✅ DEBUG: Workout fetch complete!`);
     console.log(`   Found ${workouts.length} workouts on event day`);
 
     // Filter workouts by target distance if specified
@@ -474,23 +483,42 @@ export class SimpleLeaderboardService {
         authors: hexPubkeys, // Use validated hex pubkeys
         since: startTimestamp,
         until: endTimestamp,
-        limit: 1000,
+        limit: 500, // ✅ Reduced from 1000 to match working pattern (nuclear approach)
+        // ✅ NO tag filters - activity filtering done client-side
       };
 
-      // Add 5-second timeout to prevent UI freeze
+      // ✅ NUCLEAR PATTERN: Use subscription with guaranteed timeout
       console.log(
-        `⏱️ Fetching workouts with 5s timeout for ${hexPubkeys.length} members...`
+        `⏱️ NUCLEAR: Starting subscription for ${hexPubkeys.length} members...`
       );
       console.log(`🔍 NDK Filter:`, JSON.stringify(filter, null, 2));
-      const events = await this.fetchWithTimeout(
-        ndk.fetchEvents(filter),
-        5000,
-        'Workout fetch timeout'
-      );
 
-      console.log(`📥 NDK returned ${events.size} workout events`);
+      const eventsArray: any[] = [];
+      const subscription = ndk.subscribe(filter, {
+        closeOnEose: false,
+      });
 
-      if (events.size === 0) {
+      subscription.on('event', (event: any) => {
+        console.log(`📥 NUCLEAR: Received kind 1301 event ${eventsArray.length + 1}`);
+        eventsArray.push(event);
+      });
+
+      subscription.on('eose', () => {
+        console.log('📨 NUCLEAR: EOSE received - continuing to wait for timeout...');
+      });
+
+      // ✅ GUARANTEED TIMEOUT: Always fires after 5 seconds
+      console.log('⏰ NUCLEAR: Waiting 5 seconds for all events...');
+      await new Promise<void>((resolve) => {
+        setTimeout(() => {
+          subscription.stop();
+          resolve();
+        }, 5000);
+      });
+
+      console.log(`📥 NUCLEAR: Collected ${eventsArray.length} workout events`);
+
+      if (eventsArray.length === 0) {
         console.warn('⚠️ No workout events found - leaderboard will be empty');
         console.warn('   Possible causes:');
         console.warn('   - No workouts published in date range');
@@ -503,7 +531,6 @@ export class SimpleLeaderboardService {
 
       // ✅ PERFORMANCE: Batch process events to avoid blocking UI (runstr-github pattern)
       const BATCH_SIZE = 100;
-      const eventsArray = Array.from(events);
 
       for (let i = 0; i < eventsArray.length; i += BATCH_SIZE) {
         const batch = eventsArray.slice(i, i + BATCH_SIZE);

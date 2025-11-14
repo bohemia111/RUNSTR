@@ -107,20 +107,21 @@ export class GlobalNDKService {
       }, 0);
     }
 
-    // ✅ NEW: Setup AppState listener for keepalive lifecycle management
-    if (!this.appStateListenerSetup) {
-      AppStateManager.onStateChange((isActive) => {
-        if (!isActive) {
-          // App backgrounded - pause keepalive to prevent WebSocket access
-          this.pauseKeepalive();
-        } else if (this.instance && this.isInitialized) {
-          // App foregrounded and NDK is ready - resume keepalive
-          this.resumeKeepalive();
-        }
-      });
-      this.appStateListenerSetup = true;
-      console.log('📱 GlobalNDK: AppState listener setup for keepalive lifecycle');
-    }
+    // ⚠️ DISABLED: AppState listener for keepalive (v0.7.10)
+    // Keepalive disabled to fix 30-minute crash - no longer need lifecycle management
+    // if (!this.appStateListenerSetup) {
+    //   AppStateManager.onStateChange((isActive) => {
+    //     if (!isActive) {
+    //       // App backgrounded - pause keepalive to prevent WebSocket access
+    //       this.pauseKeepalive();
+    //     } else if (this.instance && this.isInitialized) {
+    //       // App foregrounded and NDK is ready - resume keepalive
+    //       this.resumeKeepalive();
+    //     }
+    //   });
+    //   this.appStateListenerSetup = true;
+    //   console.log('📱 GlobalNDK: AppState listener setup for keepalive lifecycle');
+    // }
 
     return degradedNDK;
   }
@@ -154,9 +155,12 @@ export class GlobalNDKService {
         console.log(
           `✅ GlobalNDK: Background connection successful - ${connectedCount} relays connected`
         );
-        // ✅ NEW: Setup connection monitoring after successful connection
-        this.setupConnectionMonitoring();
-        this.startKeepalive();
+        // ⚠️ DISABLED: Keepalive/monitoring causing 30-minute crash (v0.7.10)
+        // Root cause: Timer + event listener accumulation over time
+        // Solution: Let NDK handle reconnection natively
+        // this.setupConnectionMonitoring();
+        // this.startKeepalive();
+        console.log('✅ GlobalNDK: Relying on NDK native reconnection (keepalive disabled)');
       } else {
         console.warn(
           '⚠️ GlobalNDK: Background connection failed - no relays connected'

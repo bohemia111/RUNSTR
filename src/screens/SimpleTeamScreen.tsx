@@ -401,11 +401,6 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                 onPress={onCaptainDashboard}
                 activeOpacity={0.8}
               >
-                <Ionicons
-                  name="shield"
-                  size={20}
-                  color={theme.colors.background}
-                />
                 <Text style={styles.captainButtonText}>Captain Dashboard</Text>
               </TouchableOpacity>
             )}
@@ -680,7 +675,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.accent,
+    backgroundColor: '#FFB366',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 8,

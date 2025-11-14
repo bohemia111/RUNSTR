@@ -9,6 +9,7 @@ import { NostrAuthProvider } from './providers/nostrAuthProvider';
 import { AppleAuthProvider } from './providers/appleAuthProvider';
 import { AmberAuthProvider } from './providers/amberAuthProvider';
 import { storeAuthenticationData } from '../../utils/nostrAuth';
+import { DirectNostrProfileService } from '../user/directNostrProfileService';
 
 export class AuthService {
   /**
@@ -290,10 +291,8 @@ export class AuthService {
         'AuthService: ✅ Stored and verified Apple-generated Nostr keys'
       );
 
+      // ✅ FIX: Use static import instead of dynamic import (fixes 30-min crash)
       // Load the user profile using the generated Nostr identity
-      const { DirectNostrProfileService } = await import(
-        '../user/directNostrProfileService'
-      );
       let directUser = null;
 
       try {
@@ -358,9 +357,8 @@ export class AuthService {
    */
   static async getCurrentUser(): Promise<User | null> {
     try {
-      const { DirectNostrProfileService } = await import(
-        '../user/directNostrProfileService'
-      );
+      // ✅ FIX: Use static import instead of dynamic import (fixes 30-min crash)
+      // Dynamic import was failing after BackgroundSyncService timer triggered
       let directUser = null;
 
       try {

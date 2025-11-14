@@ -774,6 +774,7 @@ export class SimpleCompetitionService {
         id,
         teamId,
         captainPubkey,
+        pubkey: event.pubkey, // ✅ FIX: Preserve raw Nostr event pubkey for fallback
         name: getTag('name') || 'Unnamed Event',
         description: getTag('description'),
         activityType, // ✅ FIX: Properly read from tags

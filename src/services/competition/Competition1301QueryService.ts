@@ -185,19 +185,16 @@ export class Competition1301QueryService {
       // Use GlobalNDKService for shared relay connections
       const ndk = await GlobalNDKService.getInstance();
 
-      // Build filter for 1301 events
+      // Build filter for 1301 events (NO tag filters - "nuclear" approach)
       const filter: any = {
         kinds: [1301],
         authors: [hexPubkey],
         since: Math.floor(query.startDate.getTime() / 1000),
         until: Math.floor(query.endDate.getTime() / 1000),
         limit: 500,
+        // ✅ REMOVED: #t tag filter (causes "unindexed tag filter" relay errors)
+        // Activity type filtering done client-side after fetching
       };
-
-      // Add activity type filter if not "Any"
-      if (query.activityType !== 'Any') {
-        filter['#t'] = [this.mapActivityTypeToTag(query.activityType)];
-      }
 
       const events: any[] = [];
 
@@ -217,7 +214,21 @@ export class Competition1301QueryService {
       });
 
       // Parse events into NostrWorkout format
-      return events.map((event) => this.parseWorkoutEvent(event));
+      const allWorkouts = events.map((event) => this.parseWorkoutEvent(event));
+
+      // ✅ CLIENT-SIDE FILTERING: Filter by activity type AFTER fetching (nuclear pattern)
+      if (query.activityType === 'Any') {
+        console.log(`📦 Returning all ${allWorkouts.length} workouts (any activity type)`);
+        return allWorkouts;
+      }
+
+      const filteredWorkouts = allWorkouts.filter(
+        (workout) => workout.activityType === query.activityType
+      );
+      console.log(
+        `📦 Filtered ${allWorkouts.length} → ${filteredWorkouts.length} ${query.activityType} workouts`
+      );
+      return filteredWorkouts;
     } catch (error) {
       console.error(`Failed to fetch workouts for ${npub}:`, error);
       return [];

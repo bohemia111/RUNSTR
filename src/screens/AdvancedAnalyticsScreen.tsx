@@ -397,7 +397,6 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
                 style={styles.startTestButton}
                 onPress={handleStartFitnessTest}
               >
-                <Ionicons name="play-circle" size={20} color="#000" />
                 <Text style={styles.startTestButtonText}>Start RUNSTR Test</Text>
               </TouchableOpacity>
             </>
@@ -443,31 +442,36 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Import Nostr History Button (moved to bottom) */}
-        <Text style={styles.fitnessTestDesc}>
-          Sync your published workout history from Nostr relays to keep your
-          local records up to date.
-        </Text>
-        <TouchableOpacity
-          style={styles.importButton}
-          onPress={handleImportNostrHistory}
-          disabled={importing}
-        >
-          <Ionicons name="cloud-download-outline" size={20} color="#000" />
-          <Text style={styles.importButtonText}>
-            {importing
-              ? `Importing... (${importStats?.totalImported || 0} workouts)`
-              : importStats
-              ? '✓ Re-import Public Workouts'
-              : 'Import Public Workouts'}
+        {/* Nostr Health Sync Card */}
+        <View style={styles.fitnessTestCard}>
+          <View style={styles.fitnessTestHeader}>
+            <Ionicons name="cloud-outline" size={24} color="#FF9D42" />
+            <Text style={styles.fitnessTestTitle}>Nostr Health Sync</Text>
+          </View>
+
+          <Text style={styles.fitnessTestDesc}>
+            Sync your health and fitness data from nostr to your local storage.
           </Text>
-        </TouchableOpacity>
-        {importStats && !importing && (
-          <Text style={styles.importStats}>
-            Last imported: {importStats.totalImported} workouts on{' '}
-            {new Date(importStats.importedAt).toLocaleDateString()}
-          </Text>
-        )}
+          <TouchableOpacity
+            style={styles.importButton}
+            onPress={handleImportNostrHistory}
+            disabled={importing}
+          >
+            <Text style={styles.importButtonText}>
+              {importing
+                ? `Importing... (${importStats?.totalImported || 0} workouts)`
+                : importStats
+                ? '✓ Re-import Public Workouts'
+                : 'Import Public Workouts'}
+            </Text>
+          </TouchableOpacity>
+          {importStats && !importing && (
+            <Text style={styles.importStats}>
+              Last imported: {importStats.totalImported} workouts on{' '}
+              {new Date(importStats.importedAt).toLocaleDateString()}
+            </Text>
+          )}
+        </View>
 
         {/* Last Updated */}
         {analytics && (

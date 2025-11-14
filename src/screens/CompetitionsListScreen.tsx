@@ -210,7 +210,7 @@ export const CompetitionsListScreen: React.FC = () => {
     const getStatusColor = () => {
       switch (item.status) {
         case 'active':
-          return '#00ff00';
+          return '#FF9D42';
         case 'upcoming':
           return '#ffa500';
         case 'completed':
