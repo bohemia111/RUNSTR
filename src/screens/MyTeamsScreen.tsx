@@ -205,7 +205,7 @@ export const MyTeamsScreen: React.FC = () => {
             </Text>
             <TouchableOpacity
               style={styles.primaryButton}
-              onPress={() => navigation.navigate('TeamDiscovery')}
+              onPress={() => navigation.navigate('Teams')}
               activeOpacity={0.8}
             >
               <Text style={styles.primaryButtonText}>Find Teams</Text>

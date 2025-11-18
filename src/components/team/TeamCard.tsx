@@ -291,26 +291,15 @@ export const TeamCard: React.FC<TeamCardProps> = ({
         <Text style={styles.categoryHeader}>{teamCategory}</Text>
       )}
       <Pressable
-        style={[styles.card, style, team.bannerImage && styles.cardWithBanner]}
+        style={[styles.card, style]}
         onPress={handleCardPress}
         android_ripple={{ color: theme.colors.buttonHover }}
       >
-        {team.bannerImage ? (
-          // Show only banner image when available
-          <ImageBackground
-            source={{ uri: team.bannerImage }}
-            style={styles.bannerBackground}
-            imageStyle={styles.bannerImage}
-            resizeMode="cover"
-          />
-        ) : (
-          // Fallback: Show only team name when no banner
-          <View style={styles.fallbackContent}>
-            <Text style={styles.fallbackTeamName} numberOfLines={1}>
-              {team.name}
-            </Text>
-          </View>
-        )}
+        <View style={styles.fallbackContent}>
+          <Text style={styles.fallbackTeamName} numberOfLines={1}>
+            {team.name}
+          </Text>
+        </View>
       </Pressable>
     </View>
   );

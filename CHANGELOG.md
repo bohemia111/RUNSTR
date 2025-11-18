@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] - 2025-11-18
+
+**Achievement**: UI improvements and critical bug fixes
+
+### ✨ Features
+- Settings UI/UX update with improved layout and navigation
+- Team discovery screen UI update with consistent text-only cards for all teams
+
+### 🐛 Bug Fixes
+- Fixed Activity Tracker permissions handling
+- Fixed leaderboard data loading and display issues
+- Fixed "Find Teams" button navigation error (now correctly navigates to Teams tab)
+- Fixed team categorization - Ohio Ruckers, Ruckstr, CYCLESTR, Spain scape, LATAM Corre now properly categorized
+- Removed invalid "X" team from discovery
+
+### 🔧 Technical Improvements
+- Simplified TeamCard component for consistent card design across discovery
+- Enhanced categorization keywords (added "ruck", "cycl", "corre", "scape") for better team organization
+- Improved navigation routing for team discovery flow
+
 ## [0.8.4] - 2025-11-17
 
 **Achievement**: Improved avatar fallback system and user experience polish

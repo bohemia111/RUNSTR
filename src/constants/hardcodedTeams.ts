@@ -5,7 +5,7 @@
  * It eliminates the need to query Nostr for team discovery on app startup.
  *
  * Generated: 2025-11-15
- * Teams: 11
+ * Teams: 10
  *
  * To update:
  *   npx ts-node scripts/fetchTeams.ts > src/constants/hardcodedTeams.ts
@@ -564,56 +564,6 @@ export const HARDCODED_TEAMS = [
       "pubkey": "00000000507f1a27b43d2c47da2ee826378dba007501d66691fada36fa931856",
       "id": "c49851dd5aa1b68e6ea5d1f32e97f1b305c122c6d5ee5a8ff64b7db2664f42c9",
       "sig": "5836d792658729649514bb847dce308f6da00fff414a98b5a6702782d0e3c8205a87294a03cb60d713503b8c51dd1d0223fb1d135ba3718af1a2c545d3e29794"
-    }
-  },
-  {
-    "id": "a626e346-e242-4411-9182-ebaa2576a707",
-    "name": "X",
-    "description": "",
-    "captain": "npub1qqqqqqzs0udz0dpa93ra5thgycmcmwsqw5qave53ltdrd75nrptqv5h62x",
-    "captainHex": "00000000507f1a27b43d2c47da2ee826378dba007501d66691fada36fa931856",
-    "createdAt": 1752543493,
-    "rawEvent": {
-      "created_at": 1752543493,
-      "content": "",
-      "tags": [
-        [
-          "d",
-          "a626e346-e242-4411-9182-ebaa2576a707"
-        ],
-        [
-          "name",
-          "X"
-        ],
-        [
-          "public",
-          "false"
-        ],
-        [
-          "captain",
-          "00000000507f1a27b43d2c47da2ee826378dba007501d66691fada36fa931856"
-        ],
-        [
-          "member",
-          "00000000507f1a27b43d2c47da2ee826378dba007501d66691fada36fa931856"
-        ],
-        [
-          "t",
-          "team"
-        ],
-        [
-          "t",
-          "running"
-        ],
-        [
-          "type",
-          "running_club"
-        ]
-      ],
-      "kind": 33404,
-      "pubkey": "00000000507f1a27b43d2c47da2ee826378dba007501d66691fada36fa931856",
-      "id": "5cb8fe0ddea1c900d50e9ec791cbb2c94070fd7a36e36e52676d7526080e5f7a",
-      "sig": "3657528c38f8c560cea504ecb6b9c0deb885b8397ff5c64838b11a69b442a9491eaeb5e3ba0e039c13e0b734fd70626cb6b3302e81c58325e865641787e6f144"
     }
   }
 ];

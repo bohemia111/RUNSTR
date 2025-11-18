@@ -58,12 +58,15 @@ const categorizeTeam = (team: DiscoveryTeam): string => {
     content.includes('run') ||
     content.includes('marathon') ||
     content.includes('5k') ||
-    content.includes('10k')
+    content.includes('10k') ||
+    content.includes('corre') || // Spanish for "run" (LATAM Corre)
+    content.includes('scape') // Running/hiking landscapes (Spain scape)
   ) {
     return 'Running';
   }
   if (
     content.includes('cycling') ||
+    content.includes('cycl') || // Catches "CYCLESTR"
     content.includes('bike') ||
     content.includes('bicycle') ||
     content.includes('ride')
@@ -89,7 +92,8 @@ const categorizeTeam = (team: DiscoveryTeam): string => {
     content.includes('walking') ||
     content.includes('walk') ||
     content.includes('hike') ||
-    content.includes('hiking')
+    content.includes('hiking') ||
+    content.includes('ruck') // Rucking (Ohio Ruckers, Ruckstr)
   ) {
     return 'Walking & Hiking';
   }
