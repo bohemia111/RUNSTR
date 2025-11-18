@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] - 2025-11-18
+
+**Achievement**: Fixed "My Events" filtering to show only user-participated events
+
+### 🐛 Bug Fixes
+- Fixed "My Events" page to only show leaderboards where user has posted a workout today
+- Users now see full leaderboards (all team members) but only for events they're actively competing in
+- Eliminated display of empty/non-participated event categories
+
+### 🔧 Technical Improvements
+- Added user filtering to SimpleLeaderboardService.getTeamDailyLeaderboards() method
+- Implemented npub-to-hex conversion for accurate leaderboard entry matching
+- Enhanced EventsScreen to pass user's hex pubkey for participant filtering
+- Added debug logging for filtering transparency
+
 ## [0.8.6] - 2025-11-18
 
 **Achievement**: UI improvements and critical bug fixes

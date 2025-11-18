@@ -14,7 +14,7 @@ interface DailyLeaderboardCardProps {
   title: string; // "5K Today"
   distance: string; // "5km"
   participants: number; // 7
-  topRunner: LeaderboardEntry | null; // { npub, name, time, rank }
+  entries: LeaderboardEntry[]; // All leaderboard entries (not just top runner)
   onPress: () => void;
 }
 
@@ -22,7 +22,7 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
   title,
   distance,
   participants,
-  topRunner,
+  entries,
   onPress,
 }) => {
   return (
@@ -55,28 +55,28 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
             size={16}
             color={theme.colors.textMuted}
           />
-          <Text style={styles.statText}>{participants} runners</Text>
+          <Text style={styles.statText}>{participants} {participants === 1 ? 'runner' : 'runners'}</Text>
         </View>
       </View>
 
-      {/* Top Runner Preview */}
-      {topRunner && (
-        <View style={styles.topRunnerRow}>
+      {/* All Runners List */}
+      {entries.map((entry, index) => (
+        <View key={entry.npub + index} style={styles.runnerRow}>
           <View style={styles.rankBadge}>
-            <Text style={styles.rankText}>1</Text>
+            <Text style={styles.rankText}>{entry.rank}</Text>
           </View>
           <View style={styles.userRowContainer}>
             <ZappableUserRow
-              npub={topRunner.npub}
-              fallbackName={topRunner.name}
+              npub={entry.npub}
+              fallbackName={entry.name}
               showQuickZap={true}
               showChallengeButton={true}
               zapAmount={21}
             />
           </View>
-          <Text style={styles.runnerTime}>{topRunner.formattedScore}</Text>
+          <Text style={styles.runnerTime}>{entry.formattedScore}</Text>
         </View>
-      )}
+      ))}
     </TouchableOpacity>
   );
 };
@@ -134,18 +134,19 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     marginLeft: 6,
   },
-  topRunnerRow: {
+  runnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 140, 0, 0.05)', // Subtle orange background
     borderRadius: 8,
     padding: 10,
+    marginTop: 8,
   },
   rankBadge: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#FF8C00', // Orange
+    backgroundColor: '#FF8C00', // Orange - consistent with app theme
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,

@@ -18,6 +18,7 @@ Basic reusable UI components for consistent design across the RUNSTR application
 - **ParticipantList.tsx** - List component for displaying competition participants
 - **PrizeDisplay.tsx** - Component for displaying Bitcoin prizes and rewards
 - **ProgressBar.tsx** - Progress indicator component for various contexts
+- **SettingsAccordion.tsx** - Collapsible accordion component for Settings screen with Profile aesthetic
 - **SplashScreen.tsx** - App loading splash screen with RUNSTR branding
 - **StatCard.tsx** - Statistics display card for workout and competition metrics
 - **TimeRemaining.tsx** - Countdown timer component for competitions and events

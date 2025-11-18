@@ -457,7 +457,7 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                   title={`${team.name} 5K`}
                   distance="5km"
                   participants={leaderboards.leaderboard5k.length}
-                  topRunner={leaderboards.leaderboard5k[0]}
+                  entries={leaderboards.leaderboard5k}
                   onPress={() => {
                     // TODO: Navigate to full leaderboard screen
                     console.log('Navigate to 5K leaderboard');
@@ -470,7 +470,7 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                   title={`${team.name} 10K`}
                   distance="10km"
                   participants={leaderboards.leaderboard10k.length}
-                  topRunner={leaderboards.leaderboard10k[0]}
+                  entries={leaderboards.leaderboard10k}
                   onPress={() => {
                     console.log('Navigate to 10K leaderboard');
                   }}
@@ -482,7 +482,7 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                   title={`${team.name} Half Marathon`}
                   distance="21.1km"
                   participants={leaderboards.leaderboardHalf.length}
-                  topRunner={leaderboards.leaderboardHalf[0]}
+                  entries={leaderboards.leaderboardHalf}
                   onPress={() => {
                     console.log('Navigate to Half Marathon leaderboard');
                   }}
@@ -494,7 +494,7 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                   title={`${team.name} Marathon`}
                   distance="42.2km"
                   participants={leaderboards.leaderboardMarathon.length}
-                  topRunner={leaderboards.leaderboardMarathon[0]}
+                  entries={leaderboards.leaderboardMarathon}
                   onPress={() => {
                     console.log('Navigate to Marathon leaderboard');
                   }}

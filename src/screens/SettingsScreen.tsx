@@ -27,6 +27,7 @@ import { DeleteAccountService } from '../services/auth/DeleteAccountService';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { CustomAlert } from '../components/ui/CustomAlert';
+import { SettingsAccordion } from '../components/ui/SettingsAccordion';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, CommonActions } from '@react-navigation/native';
@@ -712,484 +713,477 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         )}
 
-        {/* Account Security Section */}
+        {/* Fitness Tracking Accordion */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ACCOUNT SECURITY</Text>
-          <Card style={styles.card}>
-            <SettingItem
-              title="Backup Password"
-              subtitle={
-                userNsec ? 'Tap to backup your account key' : 'Not available'
-              }
-              onPress={handleBackupPassword}
-              rightElement={
-                <View style={styles.securityIcon}>
-                  <Ionicons
-                    name="lock-closed"
-                    size={20}
-                    color={theme.colors.textMuted}
-                  />
-                </View>
-              }
-            />
-          </Card>
-        </View>
-
-        {/* Coach RUNSTR AI Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>COACH RUNSTR AI</Text>
-          <Card style={styles.card}>
-            <SettingItem
-              title="PPQ.AI API Key"
-              subtitle={
-                apiKeyConfigured
-                  ? 'Configured - AI insights enabled'
-                  : 'Not configured - Tap to set up'
-              }
-              onPress={() => setShowPPQModal(true)}
-              rightElement={
-                <View style={styles.securityIcon}>
-                  <Ionicons
-                    name={apiKeyConfigured ? 'checkmark-circle' : 'add-circle-outline'}
-                    size={20}
-                    color={apiKeyConfigured ? '#FF9D42' : theme.colors.textMuted}
-                  />
-                </View>
-              }
-            />
-          </Card>
-        </View>
-
-        {/* Wallet Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>WALLET</Text>
-          <Card style={styles.card}>
-            {hasNWC ? (
-              <>
-                {/* Balance Display */}
-                <View style={styles.settingItem}>
-                  <View style={styles.settingInfo}>
-                    <Text style={styles.settingTitle}>Balance</Text>
-                    <Text style={styles.walletBalance}>
-                      {formatBalance(walletBalance)}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.refreshButton}
-                    onPress={loadWalletBalance}
-                  >
-                    <Ionicons
-                      name="refresh"
-                      size={20}
-                      color={theme.colors.text}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Wallet Actions */}
-                <View style={styles.walletActions}>
-                  <TouchableOpacity
-                    key="send-button"
-                    style={styles.walletActionButton}
-                    onPress={() => setShowSendModal(true)}
-                  >
-                    <Ionicons
-                      name="arrow-up-outline"
-                      size={20}
-                      color={theme.colors.text}
-                    />
-                    <Text style={styles.walletActionText}>Send</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    key="receive-button"
-                    style={styles.walletActionButton}
-                    onPress={() => setShowReceiveModal(true)}
-                  >
-                    <Ionicons
-                      name="arrow-down-outline"
-                      size={20}
-                      color={theme.colors.text}
-                    />
-                    <Text style={styles.walletActionText}>Receive</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    key="history-button"
-                    style={styles.walletActionButton}
-                    onPress={() => setShowHistoryModal(true)}
-                  >
-                    <Ionicons
-                      name="time-outline"
-                      size={20}
-                      color={theme.colors.text}
-                    />
-                    <Text style={styles.walletActionText}>History</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Disconnect Option */}
-                <TouchableOpacity
-                  style={styles.disconnectWalletButton}
-                  onPress={handleDisconnectWallet}
-                >
-                  <Text style={styles.disconnectWalletText}>
-                    Disconnect Wallet
+          <SettingsAccordion title="FITNESS TRACKING" defaultExpanded={false}>
+            <Card style={styles.accordionCard}>
+              {/* Background Step Tracking */}
+              <View style={styles.settingItem}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Background Step Tracking</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Automatically count steps throughout the day
                   </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              /* Connect Wallet Prompt */
-              <View style={styles.connectWalletContainer}>
+                </View>
+                <Switch
+                  value={backgroundTrackingEnabled}
+                  onValueChange={handleBackgroundTrackingToggle}
+                  trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                  thumbColor={theme.colors.orangeBright}
+                />
+              </View>
+
+              {/* Health Profile */}
+              <SettingItem
+                title="Health Profile"
+                subtitle="Set weight, height, age for better analytics (optional)"
+                onPress={() => (navigation as any).navigate('HealthProfile')}
+              />
+            </Card>
+          </SettingsAccordion>
+        </View>
+
+        {/* Competition Settings Accordion */}
+        <View style={styles.section}>
+          <SettingsAccordion title="COMPETITION SETTINGS" defaultExpanded={false}>
+            <Card style={styles.accordionCard}>
+              {/* Competition Team */}
+              <TouchableOpacity
+                style={styles.competitionTeamSelector}
+                onPress={() => setShowTeamSelectionModal(true)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Your Competition Team</Text>
+                  <Text style={styles.competitionTeamName}>
+                    {competitionTeam
+                      ? followedTeams.find((t) => t.teamId === competitionTeam)
+                          ?.teamName || competitionTeam
+                      : 'No team selected'}
+                  </Text>
+                  <Text style={styles.settingSubtitle}>
+                    {competitionTeam
+                      ? 'Workouts appear on team leaderboards'
+                      : 'Tap to select a team'}
+                  </Text>
+                </View>
                 <Ionicons
-                  name="wallet-outline"
-                  size={48}
+                  name="chevron-forward"
+                  size={20}
                   color={theme.colors.textMuted}
                 />
-                <Text style={styles.connectWalletTitle}>
-                  Connect Your Wallet
-                </Text>
-                <Text style={styles.connectWalletDescription}>
-                  Connect a Lightning wallet via Nostr Wallet Connect (NWC) to send and receive Bitcoin payments
-                </Text>
+              </TouchableOpacity>
 
-                {/* Two connection options */}
-                <TouchableOpacity
-                  key="scan-qr-button"
-                  style={styles.connectWalletButton}
-                  onPress={() => setShowQRScanner(true)}
-                >
-                  <Ionicons
-                    name="qr-code-outline"
-                    size={20}
-                    color={theme.colors.background}
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text style={styles.connectWalletButtonText}>
-                    Scan QR Code
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  key="manual-entry-button"
-                  style={[styles.connectWalletButton, styles.connectWalletButtonSecondary]}
-                  onPress={() => setShowWalletConfig(true)}
-                >
-                  <Ionicons
-                    name="create-outline"
-                    size={20}
-                    color={theme.colors.text}
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text style={[styles.connectWalletButtonText, styles.connectWalletButtonTextSecondary]}>
-                    Enter Manually
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </Card>
-        </View>
-
-        {/* Activity Preferences Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ACTIVITY PREFERENCES</Text>
-          <Card style={styles.card}>
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Background Step Tracking</Text>
-                <Text style={styles.settingSubtitle}>
-                  Automatically count steps throughout the day
-                </Text>
-              </View>
-              <Switch
-                value={backgroundTrackingEnabled}
-                onValueChange={handleBackgroundTrackingToggle}
-                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
-                thumbColor={theme.colors.orangeBright}
-              />
-            </View>
-          </Card>
-        </View>
-
-        {/* Health Profile Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>HEALTH PROFILE</Text>
-          <Card style={styles.card}>
-            <SettingItem
-              title="Health Profile"
-              subtitle="Set weight, height, age for better analytics (optional)"
-              onPress={() => (navigation as any).navigate('HealthProfile')}
-            />
-          </Card>
-        </View>
-
-        {/* Competition Team Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>COMPETITION TEAM</Text>
-          <Card style={styles.card}>
-            <TouchableOpacity
-              style={styles.competitionTeamSelector}
-              onPress={() => setShowTeamSelectionModal(true)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Your Competition Team</Text>
-                <Text style={styles.competitionTeamName}>
-                  {competitionTeam
-                    ? followedTeams.find((t) => t.teamId === competitionTeam)
-                        ?.teamName || competitionTeam
-                    : 'No team selected'}
-                </Text>
-                <Text style={styles.settingSubtitle}>
-                  {competitionTeam
-                    ? 'Workouts appear on team leaderboards'
-                    : 'Tap to select a team'}
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={theme.colors.textMuted}
-              />
-            </TouchableOpacity>
-          </Card>
-        </View>
-
-        {/* Charity Selection Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>CHARITY SUPPORT</Text>
-          <Card style={styles.card}>
-            <SettingItem
-              title="Selected Charity"
-              subtitle={
-                selectedCharity
-                  ? `${selectedCharity.name} - All competition winnings go here`
-                  : 'Loading...'
-              }
-              onPress={handleChangeCharity}
-              rightElement={
-                <View style={styles.charityIcon}>
-                  <Ionicons
-                    name="heart"
-                    size={20}
-                    color={theme.colors.accent}
-                  />
-                </View>
-              }
-            />
-          </Card>
-        </View>
-
-        {/* Voice Announcements Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>VOICE ANNOUNCEMENTS</Text>
-          <Card style={styles.card}>
-            {/* Enable TTS */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>
-                  Enable Voice Announcements
-                </Text>
-                <Text style={styles.settingSubtitle}>
-                  Hear workout summaries read aloud
-                </Text>
-              </View>
-              <Switch
-                value={ttsSettings.enabled}
-                onValueChange={(value) =>
-                  handleTTSSettingChange('enabled', value)
+              {/* Charity Support */}
+              <SettingItem
+                title="Selected Charity"
+                subtitle={
+                  selectedCharity
+                    ? `${selectedCharity.name} - All competition winnings go here`
+                    : 'Loading...'
                 }
-                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
-                thumbColor={theme.colors.orangeBright}
-              />
-            </View>
-
-            {/* Announce on Summary */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Workout Summary</Text>
-                <Text style={styles.settingSubtitle}>
-                  Announce stats when workout completes
-                </Text>
-              </View>
-              <Switch
-                value={ttsSettings.announceOnSummary}
-                onValueChange={(value) =>
-                  handleTTSSettingChange('announceOnSummary', value)
+                onPress={handleChangeCharity}
+                rightElement={
+                  <View style={styles.charityIcon}>
+                    <Ionicons
+                      name="heart"
+                      size={20}
+                      color={theme.colors.accent}
+                    />
+                  </View>
                 }
-                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
-                thumbColor={theme.colors.orangeBright}
-                disabled={!ttsSettings.enabled}
               />
-            </View>
+            </Card>
+          </SettingsAccordion>
+        </View>
 
-            {/* Include Splits */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Include Split Details</Text>
-                <Text style={styles.settingSubtitle}>
-                  Announce kilometer splits in summary
-                </Text>
-              </View>
-              <Switch
-                value={ttsSettings.includeSplits}
-                onValueChange={(value) =>
-                  handleTTSSettingChange('includeSplits', value)
+        {/* Coach RUNSTR AI Accordion (includes Voice Announcements) */}
+        <View style={styles.section}>
+          <SettingsAccordion title="COACH RUNSTR AI" defaultExpanded={false}>
+            <Card style={styles.accordionCard}>
+              {/* PPQ.AI API Key */}
+              <SettingItem
+                title="PPQ.AI API Key"
+                subtitle={
+                  apiKeyConfigured
+                    ? 'Configured - AI insights enabled'
+                    : 'Not configured - Tap to set up'
                 }
-                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
-                thumbColor={theme.colors.orangeBright}
-                disabled={!ttsSettings.enabled}
-              />
-            </View>
-
-            {/* Live Split Announcements */}
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>
-                  Live Split Announcements
-                </Text>
-                <Text style={styles.settingSubtitle}>
-                  Announce each kilometer as you run
-                </Text>
-              </View>
-              <Switch
-                value={ttsSettings.announceLiveSplits}
-                onValueChange={(value) =>
-                  handleTTSSettingChange('announceLiveSplits', value)
+                onPress={() => setShowPPQModal(true)}
+                rightElement={
+                  <View style={styles.securityIcon}>
+                    <Ionicons
+                      name={apiKeyConfigured ? 'checkmark-circle' : 'add-circle-outline'}
+                      size={20}
+                      color={apiKeyConfigured ? '#FF9D42' : theme.colors.textMuted}
+                    />
+                  </View>
                 }
-                trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
-                thumbColor={theme.colors.orangeBright}
-                disabled={!ttsSettings.enabled}
               />
-            </View>
 
-            {/* Speech Rate Slider */}
-            <View style={styles.settingItem}>
-              <View style={styles.sliderContainer}>
-                <View style={styles.sliderHeader}>
-                  <Text style={styles.settingTitle}>Speech Speed</Text>
-                  <Text style={styles.sliderValue}>
-                    {ttsSettings.speechRate.toFixed(1)}x
-                  </Text>
-                </View>
-                <Text style={styles.settingSubtitle}>
-                  Adjust how fast announcements are read
-                </Text>
-                <View style={styles.sliderRow}>
-                  <Text style={styles.sliderLabel}>Slow</Text>
-                  <Slider
-                    style={styles.slider}
-                    minimumValue={0.5}
-                    maximumValue={2.0}
-                    step={0.1}
-                    value={ttsSettings.speechRate}
+              {/* Voice Announcements Subsection */}
+              <View style={styles.voiceSubsection}>
+                <Text style={styles.subsectionTitle}>Voice Announcements</Text>
+
+                {/* Enable TTS */}
+                <View style={styles.settingItem}>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>
+                      Enable Voice Announcements
+                    </Text>
+                    <Text style={styles.settingSubtitle}>
+                      Hear workout summaries read aloud
+                    </Text>
+                  </View>
+                  <Switch
+                    value={ttsSettings.enabled}
                     onValueChange={(value) =>
-                      handleTTSSettingChange('speechRate', value)
+                      handleTTSSettingChange('enabled', value)
                     }
-                    minimumTrackTintColor={theme.colors.accent}
-                    maximumTrackTintColor="#3e3e3e"
-                    thumbTintColor={theme.colors.accent}
+                    trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                    thumbColor={theme.colors.orangeBright}
+                  />
+                </View>
+
+                {/* Announce on Summary */}
+                <View style={styles.settingItem}>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>Workout Summary</Text>
+                    <Text style={styles.settingSubtitle}>
+                      Announce stats when workout completes
+                    </Text>
+                  </View>
+                  <Switch
+                    value={ttsSettings.announceOnSummary}
+                    onValueChange={(value) =>
+                      handleTTSSettingChange('announceOnSummary', value)
+                    }
+                    trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                    thumbColor={theme.colors.orangeBright}
                     disabled={!ttsSettings.enabled}
                   />
-                  <Text style={styles.sliderLabel}>Fast</Text>
                 </View>
-              </View>
-            </View>
 
-            {/* Test Button */}
-            <TouchableOpacity
-              style={[
-                styles.testButton,
-                !ttsSettings.enabled && styles.testButtonDisabled,
-              ]}
-              onPress={handleTestTTS}
-              disabled={!ttsSettings.enabled}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="volume-high"
-                size={20}
-                color={
-                  ttsSettings.enabled
-                    ? theme.colors.text
-                    : theme.colors.textMuted
-                }
-              />
-              <Text
-                style={[
-                  styles.testButtonText,
-                  !ttsSettings.enabled && styles.testButtonTextDisabled,
-                ]}
-              >
-                Test Announcement
-              </Text>
-            </TouchableOpacity>
-          </Card>
+                {/* Include Splits */}
+                <View style={styles.settingItem}>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>Include Split Details</Text>
+                    <Text style={styles.settingSubtitle}>
+                      Announce kilometer splits in summary
+                    </Text>
+                  </View>
+                  <Switch
+                    value={ttsSettings.includeSplits}
+                    onValueChange={(value) =>
+                      handleTTSSettingChange('includeSplits', value)
+                    }
+                    trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                    thumbColor={theme.colors.orangeBright}
+                    disabled={!ttsSettings.enabled}
+                  />
+                </View>
+
+                {/* Live Split Announcements */}
+                <View style={styles.settingItem}>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>
+                      Live Split Announcements
+                    </Text>
+                    <Text style={styles.settingSubtitle}>
+                      Announce each kilometer as you run
+                    </Text>
+                  </View>
+                  <Switch
+                    value={ttsSettings.announceLiveSplits}
+                    onValueChange={(value) =>
+                      handleTTSSettingChange('announceLiveSplits', value)
+                    }
+                    trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                    thumbColor={theme.colors.orangeBright}
+                    disabled={!ttsSettings.enabled}
+                  />
+                </View>
+
+                {/* Speech Rate Slider */}
+                <View style={styles.settingItem}>
+                  <View style={styles.sliderContainer}>
+                    <View style={styles.sliderHeader}>
+                      <Text style={styles.settingTitle}>Speech Speed</Text>
+                      <Text style={styles.sliderValue}>
+                        {ttsSettings.speechRate.toFixed(1)}x
+                      </Text>
+                    </View>
+                    <Text style={styles.settingSubtitle}>
+                      Adjust how fast announcements are read
+                    </Text>
+                    <View style={styles.sliderRow}>
+                      <Text style={styles.sliderLabel}>Slow</Text>
+                      <Slider
+                        style={styles.slider}
+                        minimumValue={0.5}
+                        maximumValue={2.0}
+                        step={0.1}
+                        value={ttsSettings.speechRate}
+                        onValueChange={(value) =>
+                          handleTTSSettingChange('speechRate', value)
+                        }
+                        minimumTrackTintColor={theme.colors.accent}
+                        maximumTrackTintColor="#3e3e3e"
+                        thumbTintColor={theme.colors.accent}
+                        disabled={!ttsSettings.enabled}
+                      />
+                      <Text style={styles.sliderLabel}>Fast</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Test Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.testButton,
+                    !ttsSettings.enabled && styles.testButtonDisabled,
+                  ]}
+                  onPress={handleTestTTS}
+                  disabled={!ttsSettings.enabled}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="volume-high"
+                    size={20}
+                    color={
+                      ttsSettings.enabled
+                        ? theme.colors.text
+                        : theme.colors.textMuted
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.testButtonText,
+                      !ttsSettings.enabled && styles.testButtonTextDisabled,
+                    ]}
+                  >
+                    Test Announcement
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Card>
+          </SettingsAccordion>
         </View>
 
-        {/* Support & Legal Section */}
+        {/* Advanced Accordion (collapsed by default) */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SUPPORT & LEGAL</Text>
-          <Card style={styles.card}>
-            <SettingItem
-              title="Help & Support"
-              subtitle="FAQ and troubleshooting"
-              onPress={onHelp}
-            />
-            <SettingItem
-              title="Contact Support"
-              subtitle="Get direct help"
-              onPress={onContactSupport}
-            />
-            <SettingItem
-              title="Privacy Policy"
-              subtitle="How we protect your data"
-              onPress={onPrivacyPolicy}
-            />
-          </Card>
+          <SettingsAccordion title="ADVANCED" defaultExpanded={false}>
+            <Card style={styles.accordionCard}>
+              {/* Account Security */}
+              <SettingItem
+                title="Backup Password"
+                subtitle={
+                  userNsec ? 'Tap to backup your account key' : 'Not available'
+                }
+                onPress={handleBackupPassword}
+                rightElement={
+                  <View style={styles.securityIcon}>
+                    <Ionicons
+                      name="lock-closed"
+                      size={20}
+                      color={theme.colors.textMuted}
+                    />
+                  </View>
+                }
+              />
+
+              {/* Wallet Subsection */}
+              <View style={styles.voiceSubsection}>
+                <Text style={styles.subsectionTitle}>Wallet</Text>
+
+                {hasNWC ? (
+                  <>
+                    {/* Balance Display */}
+                    <View style={styles.settingItem}>
+                      <View style={styles.settingInfo}>
+                        <Text style={styles.settingTitle}>Balance</Text>
+                        <Text style={styles.walletBalance}>
+                          {formatBalance(walletBalance)}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.refreshButton}
+                        onPress={loadWalletBalance}
+                      >
+                        <Ionicons
+                          name="refresh"
+                          size={20}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Wallet Actions */}
+                    <View style={styles.walletActions}>
+                      <TouchableOpacity
+                        key="send-button"
+                        style={styles.walletActionButton}
+                        onPress={() => setShowSendModal(true)}
+                      >
+                        <Ionicons
+                          name="arrow-up-outline"
+                          size={20}
+                          color={theme.colors.text}
+                        />
+                        <Text style={styles.walletActionText}>Send</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        key="receive-button"
+                        style={styles.walletActionButton}
+                        onPress={() => setShowReceiveModal(true)}
+                      >
+                        <Ionicons
+                          name="arrow-down-outline"
+                          size={20}
+                          color={theme.colors.text}
+                        />
+                        <Text style={styles.walletActionText}>Receive</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        key="history-button"
+                        style={styles.walletActionButton}
+                        onPress={() => setShowHistoryModal(true)}
+                      >
+                        <Ionicons
+                          name="time-outline"
+                          size={20}
+                          color={theme.colors.text}
+                        />
+                        <Text style={styles.walletActionText}>History</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Disconnect Option */}
+                    <TouchableOpacity
+                      style={styles.disconnectWalletButton}
+                      onPress={handleDisconnectWallet}
+                    >
+                      <Text style={styles.disconnectWalletText}>
+                        Disconnect Wallet
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  /* Connect Wallet Prompt */
+                  <View style={styles.connectWalletContainer}>
+                    <Ionicons
+                      name="wallet-outline"
+                      size={48}
+                      color={theme.colors.textMuted}
+                    />
+                    <Text style={styles.connectWalletTitle}>
+                      Connect Your Wallet
+                    </Text>
+                    <Text style={styles.connectWalletDescription}>
+                      Connect a Lightning wallet via Nostr Wallet Connect (NWC) to send and receive Bitcoin payments
+                    </Text>
+
+                    {/* Two connection options */}
+                    <TouchableOpacity
+                      key="scan-qr-button"
+                      style={styles.connectWalletButton}
+                      onPress={() => setShowQRScanner(true)}
+                    >
+                      <Ionicons
+                        name="qr-code-outline"
+                        size={20}
+                        color={theme.colors.background}
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text style={styles.connectWalletButtonText}>
+                        Scan QR Code
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      key="manual-entry-button"
+                      style={[styles.connectWalletButton, styles.connectWalletButtonSecondary]}
+                      onPress={() => setShowWalletConfig(true)}
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={20}
+                        color={theme.colors.text}
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text style={[styles.connectWalletButtonText, styles.connectWalletButtonTextSecondary]}>
+                        Enter Manually
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </Card>
+          </SettingsAccordion>
+        </View>
+
+        {/* Support & Legal Accordion */}
+        <View style={styles.section}>
+          <SettingsAccordion title="SUPPORT & LEGAL" defaultExpanded={false}>
+            <Card style={styles.accordionCard}>
+              <SettingItem
+                title="Help & Support"
+                subtitle="FAQ and troubleshooting"
+                onPress={onHelp}
+              />
+              <SettingItem
+                title="Contact Support"
+                subtitle="Get direct help"
+                onPress={onContactSupport}
+              />
+              <SettingItem
+                title="Privacy Policy"
+                subtitle="How we protect your data"
+                onPress={onPrivacyPolicy}
+              />
+            </Card>
+          </SettingsAccordion>
         </View>
 
         {/* Account Actions */}
         <View style={styles.section}>
-          <Card style={styles.card}>
-            <TouchableOpacity
-              style={styles.signOutButton}
-              onPress={handleSignOut}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.signOutButtonText}>Sign Out</Text>
-            </TouchableOpacity>
-          </Card>
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={handleSignOut}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.signOutButtonText}>Sign Out</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Delete Account - Destructive Action */}
         <View style={styles.section}>
-          <Card style={styles.card}>
-            <TouchableOpacity
-              style={[
-                styles.deleteAccountButton,
-                isDeletingAccount && styles.buttonDisabled,
-              ]}
-              onPress={handleDeleteAccount}
-              activeOpacity={0.8}
-              disabled={isDeletingAccount}
-            >
-              {isDeletingAccount ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#fca5a5" />
-                  <Text
-                    style={[styles.deleteAccountButtonText, { marginLeft: 8 }]}
-                  >
-                    Deleting Account...
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.deleteAccountButtonText}>
-                  Delete Account
+          <TouchableOpacity
+            style={[
+              styles.deleteAccountButton,
+              isDeletingAccount && styles.buttonDisabled,
+            ]}
+            onPress={handleDeleteAccount}
+            activeOpacity={0.8}
+            disabled={isDeletingAccount}
+          >
+            {isDeletingAccount ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#fca5a5" />
+                <Text
+                  style={[styles.deleteAccountButtonText, { marginLeft: 8 }]}
+                >
+                  Deleting Account...
                 </Text>
-              )}
-            </TouchableOpacity>
-          </Card>
+              </View>
+            ) : (
+              <Text style={styles.deleteAccountButtonText}>
+                Delete Account
+              </Text>
+            )}
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -1340,11 +1334,34 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
 
+  accordionCard: {
+    marginBottom: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingHorizontal: 12,
+  },
+
   cardTitle: {
     fontSize: 12,
     fontWeight: theme.typography.weights.semiBold,
     marginBottom: 12,
     color: theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  voiceSubsection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+
+  subsectionTitle: {
+    fontSize: 13,
+    fontWeight: theme.typography.weights.semiBold,
+    color: '#FFB366', // Light orange to match Profile screen
+    marginBottom: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -1382,7 +1399,7 @@ const styles = StyleSheet.create({
 
   // Sign Out Button
   signOutButton: {
-    backgroundColor: theme.colors.orangeDeep,
+    backgroundColor: '#FFB366', // Light orange to match Profile screen
     borderRadius: theme.borderRadius.medium,
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -1392,24 +1409,22 @@ const styles = StyleSheet.create({
   signOutButtonText: {
     fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
-    color: theme.colors.accentText,
+    color: '#000000', // Black text for contrast on light orange
   },
 
-  // Delete Account Button - More destructive styling
+  // Delete Account Button
   deleteAccountButton: {
-    backgroundColor: theme.colors.orangeBurnt,
+    backgroundColor: '#FFB366', // Same light orange as Sign Out
     borderRadius: theme.borderRadius.medium,
     paddingVertical: 12,
     paddingHorizontal: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.orangeDeep,
   },
 
   deleteAccountButtonText: {
     fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
-    color: theme.colors.accentText,
+    color: '#000000', // Black text for contrast on light orange
   },
 
   buttonDisabled: {
