@@ -168,7 +168,9 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
     // Phase 1: Long press = NWC quick zap (power users)
     console.log('[NWCLightningButton] Starting long press timer...');
     longPressTimer.current = setTimeout(() => {
-      console.log('[NWCLightningButton] Long press detected, performing quick zap');
+      console.log(
+        '[NWCLightningButton] Long press detected, performing quick zap'
+      );
       performQuickZap();
       longPressTimer.current = null;
     }, LONG_PRESS_DURATION);
@@ -183,7 +185,9 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
     if (longPressTimer.current) {
       // Timer still active = quick tap (not long press)
       // Phase 1: Tap = External wallet (default, most accessible)
-      console.log('[NWCLightningButton] Quick tap detected, opening external wallet modal');
+      console.log(
+        '[NWCLightningButton] Quick tap detected, opening external wallet modal'
+      );
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
 

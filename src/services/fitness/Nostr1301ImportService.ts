@@ -81,26 +81,26 @@ export class Nostr1301ImportService {
           onProgress({
             total: nostrWorkouts.length,
             imported: i,
-            current: `${nostrWorkout.type} - ${new Date(nostrWorkout.startTime).toLocaleDateString()}`,
+            current: `${nostrWorkout.type} - ${new Date(
+              nostrWorkout.startTime
+            ).toLocaleDateString()}`,
             percentage: Math.round((i / nostrWorkouts.length) * 100),
           });
         }
 
         try {
           // Convert NostrWorkout to LocalWorkout format
-          await LocalWorkoutStorageService.saveImportedNostrWorkout(
-            {
-              id: nostrWorkout.nostrEventId || nostrWorkout.id,
-              type: this.normalizeWorkoutType(nostrWorkout.type),
-              startTime: nostrWorkout.startTime,
-              endTime: nostrWorkout.endTime,
-              duration: nostrWorkout.duration,
-              distance: nostrWorkout.distance,
-              calories: nostrWorkout.calories,
-              reps: nostrWorkout.reps,
-              sets: nostrWorkout.sets,
-            }
-          );
+          await LocalWorkoutStorageService.saveImportedNostrWorkout({
+            id: nostrWorkout.nostrEventId || nostrWorkout.id,
+            type: this.normalizeWorkoutType(nostrWorkout.type),
+            startTime: nostrWorkout.startTime,
+            endTime: nostrWorkout.endTime,
+            duration: nostrWorkout.duration,
+            distance: nostrWorkout.distance,
+            calories: nostrWorkout.calories,
+            reps: nostrWorkout.reps,
+            sets: nostrWorkout.sets,
+          });
 
           importedCount++;
           activityTypesSet.add(nostrWorkout.type);
@@ -141,7 +141,9 @@ export class Nostr1301ImportService {
       });
 
       console.log(
-        `✅ Import complete: ${importedCount} workouts imported (${oldestDate.split('T')[0]} → ${newestDate.split('T')[0]})`
+        `✅ Import complete: ${importedCount} workouts imported (${
+          oldestDate.split('T')[0]
+        } → ${newestDate.split('T')[0]})`
       );
 
       return {

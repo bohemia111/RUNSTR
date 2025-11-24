@@ -98,7 +98,9 @@ export const ChallengeAnnouncementPreview: React.FC<
       const signer = await signingService.getSigner();
 
       if (!signer) {
-        throw new Error('No signer available. Please ensure you are logged in.');
+        throw new Error(
+          'No signer available. Please ensure you are logged in.'
+        );
       }
 
       const userPubkey = await signingService.getUserPubkey();
@@ -113,14 +115,24 @@ export const ChallengeAnnouncementPreview: React.FC<
           : `${Math.floor(challengeData.duration / 24)}d`;
 
       // Create kind 1 Nostr event with embedded image
-      const challengeContent = `⚡ Challenge Issued: ${challengeData.challengeName}
+      const challengeContent = `⚡ Challenge Issued: ${
+        challengeData.challengeName
+      }
 
 🏃 ${challengeData.distance} km
 ⏱️ ${durationText}
-${challengeData.wager > 0 ? `💰 Wager: ${challengeData.wager.toLocaleString()} sats` : '🆓 No wager'}
+${
+  challengeData.wager > 0
+    ? `💰 Wager: ${challengeData.wager.toLocaleString()} sats`
+    : '🆓 No wager'
+}
 🏆 Fastest time wins
 
-${challengeData.opponentName ? `Challenging ${challengeData.opponentName} to a race!` : 'Open challenge - who wants to race?'}
+${
+  challengeData.opponentName
+    ? `Challenging ${challengeData.opponentName} to a race!`
+    : 'Open challenge - who wants to race?'
+}
 
 Join here: ${deepLink}
 
@@ -156,10 +168,15 @@ Join here: ${deepLink}
       Alert.alert(
         'Challenge Shared!',
         'Your challenge announcement has been published to Nostr.',
-        [{ text: 'OK', onPress: () => {
-          onPublished?.();
-          onClose();
-        }}]
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              onPublished?.();
+              onClose();
+            },
+          },
+        ]
       );
     } catch (error) {
       console.error('❌ Failed to publish announcement:', error);
@@ -170,7 +187,9 @@ Join here: ${deepLink}
       );
       Alert.alert(
         'Error',
-        `Failed to publish announcement: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Failed to publish announcement: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
         [{ text: 'OK' }]
       );
     } finally {
@@ -259,7 +278,10 @@ Join here: ${deepLink}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.shareButton, isPublishing && styles.buttonDisabled]}
+              style={[
+                styles.shareButton,
+                isPublishing && styles.buttonDisabled,
+              ]}
               onPress={handleShare}
               disabled={isPublishing}
               activeOpacity={0.7}

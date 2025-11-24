@@ -97,7 +97,15 @@ interface EventFormData {
   eventDate: Date | null;
   eventTime: string;
   isRecurring: boolean;
-  recurrenceDay: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday' | null;
+  recurrenceDay:
+    | 'monday'
+    | 'tuesday'
+    | 'wednesday'
+    | 'thursday'
+    | 'friday'
+    | 'saturday'
+    | 'sunday'
+    | null;
 }
 
 interface Props {
@@ -139,7 +147,13 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertButtons, setAlertButtons] = useState<Array<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }>>([]);
+  const [alertButtons, setAlertButtons] = useState<
+    Array<{
+      text: string;
+      onPress?: () => void;
+      style?: 'default' | 'cancel' | 'destructive';
+    }>
+  >([]);
 
   // Card renderer ref and state for image upload
   const cardRendererRef = useRef<View>(null);
@@ -157,20 +171,25 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
 
   // Validation: Enable buttons only when required fields are filled
   const isFormValid = !!(
-    formData.selectedPreset &&
-    formData.eventName.trim().length > 0 &&
-    formData.eventDate &&
-    (formData.isRecurring ? formData.recurrenceDay : true) // Require day if recurring
+    (
+      formData.selectedPreset &&
+      formData.eventName.trim().length > 0 &&
+      formData.eventDate &&
+      (formData.isRecurring ? formData.recurrenceDay : true)
+    ) // Require day if recurring
   );
 
   // Helper to update any field in formData
-  const updateField = <K extends keyof EventFormData>(field: K, value: EventFormData[K]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const updateField = <K extends keyof EventFormData>(
+    field: K,
+    value: EventFormData[K]
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   // Select a preset (5K/10K/Half Marathon)
   const selectPreset = (preset: EventPreset) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       selectedPreset: preset,
       eventName: preset.name, // Auto-fill event name
@@ -197,7 +216,10 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
       { label: 'Today', date: today },
       { label: 'Tomorrow', date: tomorrow },
       {
-        label: currentDay === 0 || currentDay === 6 ? 'This Weekend (Today)' : 'This Weekend',
+        label:
+          currentDay === 0 || currentDay === 6
+            ? 'This Weekend (Today)'
+            : 'This Weekend',
         date: thisWeekend,
       },
       { label: 'Next Week', date: nextWeek },
@@ -236,7 +258,9 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
       const signer = await signingService.getSigner();
       if (!signer) {
         setAlertTitle('Authentication Required');
-        setAlertMessage('Unable to sign event. Please ensure you are logged in.');
+        setAlertMessage(
+          'Unable to sign event. Please ensure you are logged in.'
+        );
         setAlertButtons([{ text: 'OK', style: 'destructive' }]);
         setAlertVisible(true);
         return;
@@ -294,11 +318,16 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
           listType: 'people' as const,
         };
 
-        const listEventTemplate = listService.prepareListCreation(participantListData, captainPubkey);
+        const listEventTemplate = listService.prepareListCreation(
+          participantListData,
+          captainPubkey
+        );
         const ndk = await GlobalNDKService.getInstance();
         const listNdkEvent = new NDKEvent(ndk, listEventTemplate);
 
-        console.log(`📋 [KIND 30000] Signing event with d-tag: ${participantListData.dTag}`);
+        console.log(
+          `📋 [KIND 30000] Signing event with d-tag: ${participantListData.dTag}`
+        );
         await listNdkEvent.sign(signer);
 
         console.log('📋 [KIND 30000] Publishing to relays...');
@@ -306,8 +335,10 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
 
         // Log relay results
         const relayUrls = Array.from(publishResult);
-        console.log(`📋 [KIND 30000] Published to ${relayUrls.length} relay(s):`);
-        relayUrls.forEach(relay => {
+        console.log(
+          `📋 [KIND 30000] Published to ${relayUrls.length} relay(s):`
+        );
+        relayUrls.forEach((relay) => {
           console.log(`   ✅ ${relay.url || 'Unknown relay'}`);
         });
 
@@ -318,38 +349,59 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
         participantListPublished = true;
         console.log('✅ [KIND 30000] Participant list published successfully');
       } catch (error) {
-        participantListError = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`❌ [KIND 30000] Failed to publish participant list: ${participantListError}`);
+        participantListError =
+          error instanceof Error ? error.message : 'Unknown error';
+        console.error(
+          `❌ [KIND 30000] Failed to publish participant list: ${participantListError}`
+        );
         console.error('Full error:', error);
       }
 
       // ===== PUBLISH EVENT DEFINITION (kind 30101) =====
       try {
         console.log('🎯 [KIND 30101] Creating event definition...');
-        const result = await NostrCompetitionService.createEvent(eventCreationData, signer);
+        const result = await NostrCompetitionService.createEvent(
+          eventCreationData,
+          signer
+        );
 
         if (!result.success) {
           throw new Error(result.message || 'Failed to create event');
         }
 
-        console.log(`✅ [KIND 30101] Event definition published successfully: ${result.competitionId}`);
+        console.log(
+          `✅ [KIND 30101] Event definition published successfully: ${result.competitionId}`
+        );
 
         // Log relay information from result if available
         if (result.relayCount !== undefined) {
-          console.log(`🎯 [KIND 30101] Published to ${result.relayCount} relay(s)`);
+          console.log(
+            `🎯 [KIND 30101] Published to ${result.relayCount} relay(s)`
+          );
         }
 
         eventDefinitionPublished = true;
       } catch (error) {
-        eventDefinitionError = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`❌ [KIND 30101] Failed to publish event definition: ${eventDefinitionError}`);
+        eventDefinitionError =
+          error instanceof Error ? error.message : 'Unknown error';
+        console.error(
+          `❌ [KIND 30101] Failed to publish event definition: ${eventDefinitionError}`
+        );
         console.error('Full error:', error);
       }
 
       // ===== VALIDATE BOTH EVENTS PUBLISHED =====
       console.log('🔍 Validating publish results...');
-      console.log(`   - Participant list (kind 30000): ${participantListPublished ? '✅ SUCCESS' : '❌ FAILED'}`);
-      console.log(`   - Event definition (kind 30101): ${eventDefinitionPublished ? '✅ SUCCESS' : '❌ FAILED'}`);
+      console.log(
+        `   - Participant list (kind 30000): ${
+          participantListPublished ? '✅ SUCCESS' : '❌ FAILED'
+        }`
+      );
+      console.log(
+        `   - Event definition (kind 30101): ${
+          eventDefinitionPublished ? '✅ SUCCESS' : '❌ FAILED'
+        }`
+      );
 
       if (participantListPublished && eventDefinitionPublished) {
         // ✅ BOTH PUBLISHED SUCCESSFULLY
@@ -362,7 +414,9 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
         // Captain is already in kind 30000 list, now add to local storage for instant UX
         try {
           console.log('👤 Auto-joining captain to event locally...');
-          const { EventParticipationStore } = await import('../../services/event/EventParticipationStore');
+          const { EventParticipationStore } = await import(
+            '../../services/event/EventParticipationStore'
+          );
 
           await EventParticipationStore.addParticipation({
             eventId: eventId,
@@ -376,7 +430,10 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
 
           console.log('✅ Captain auto-joined to event locally');
         } catch (autoJoinError) {
-          console.error('⚠️ Failed to auto-join captain locally (non-critical):', autoJoinError);
+          console.error(
+            '⚠️ Failed to auto-join captain locally (non-critical):',
+            autoJoinError
+          );
           // Don't block event creation if this fails
         }
 
@@ -385,7 +442,9 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
 
         // Show success alert
         setAlertTitle('Event Published!');
-        setAlertMessage('Your event has been created on Nostr. Members can now join!');
+        setAlertMessage(
+          'Your event has been created on Nostr. Members can now join!'
+        );
         setAlertButtons([{ text: 'OK', style: 'default' }]);
         setAlertVisible(true);
       } else if (!participantListPublished && !eventDefinitionPublished) {
@@ -394,28 +453,32 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
         setAlertTitle('Publishing Failed');
         setAlertMessage(
           `Failed to publish both events:\n\n` +
-          `Participant list: ${participantListError}\n` +
-          `Event definition: ${eventDefinitionError}`
+            `Participant list: ${participantListError}\n` +
+            `Event definition: ${eventDefinitionError}`
         );
         setAlertButtons([{ text: 'OK', style: 'destructive' }]);
         setAlertVisible(true);
       } else if (!participantListPublished) {
         // ⚠️ PARTICIPANT LIST FAILED, EVENT SUCCEEDED
-        console.warn('⚠️ Partial failure: Event published but participant list failed');
+        console.warn(
+          '⚠️ Partial failure: Event published but participant list failed'
+        );
         setAlertTitle('Partial Failure');
         setAlertMessage(
           `Event was created, but participant list failed:\n\n${participantListError}\n\n` +
-          `You may need to manually add participants.`
+            `You may need to manually add participants.`
         );
         setAlertButtons([{ text: 'OK', style: 'destructive' }]);
         setAlertVisible(true);
       } else {
         // ⚠️ EVENT FAILED, PARTICIPANT LIST SUCCEEDED
-        console.warn('⚠️ Partial failure: Participant list published but event failed');
+        console.warn(
+          '⚠️ Partial failure: Participant list published but event failed'
+        );
         setAlertTitle('Partial Failure');
         setAlertMessage(
           `Participant list was created, but event failed:\n\n${eventDefinitionError}\n\n` +
-          `Please try creating the event again.`
+            `Please try creating the event again.`
         );
         setAlertButtons([{ text: 'OK', style: 'destructive' }]);
         setAlertVisible(true);
@@ -425,7 +488,11 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
       console.error('❌ Unexpected error during event publishing:', error);
 
       setAlertTitle('Error');
-      setAlertMessage(`Failed to publish event: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAlertMessage(
+        `Failed to publish event: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
       setAlertButtons([{ text: 'OK', style: 'destructive' }]);
       setAlertVisible(true);
     } finally {
@@ -506,7 +573,7 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
       setGeneratedSVG(cardData.svgContent);
 
       // Wait for WorkoutCardRenderer to paint the SVG
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       console.log('✅ Renderer should have painted SVG');
 
       // Capture the rendered card as PNG
@@ -569,13 +636,17 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
         const [h, m] = formData.eventTime.split(':').map(Number);
         const period = h >= 12 ? 'PM' : 'AM';
         const displayHours = h % 12 || 12;
-        const formattedTime = `${displayHours}:${m.toString().padStart(2, '0')} ${period}`;
+        const formattedTime = `${displayHours}:${m
+          .toString()
+          .padStart(2, '0')} ${period}`;
 
         // Build text content without emoji
         eventContent = `New Event: ${formData.eventName}
 
 ${formattedDate} at ${formattedTime}
-${formData.selectedPreset.activityType} - ${formData.selectedPreset.targetValue} ${formData.selectedPreset.targetUnit}
+${formData.selectedPreset.activityType} - ${
+          formData.selectedPreset.targetValue
+        } ${formData.selectedPreset.targetUnit}
 Team: ${team?.name || 'RUNSTR'}
 
 #RUNSTR #Bitcoin #Fitness`;
@@ -600,7 +671,9 @@ Team: ${team?.name || 'RUNSTR'}
       if (imageUrl) {
         const imetaTag = ['imeta', `url ${imageUrl}`];
         if (imageDimensions) {
-          imetaTag.push(`dim ${imageDimensions.width}x${imageDimensions.height}`);
+          imetaTag.push(
+            `dim ${imageDimensions.width}x${imageDimensions.height}`
+          );
         }
         imetaTag.push('m image/png');
         tags.push(imetaTag);
@@ -621,19 +694,31 @@ Team: ${team?.name || 'RUNSTR'}
       // Show custom styled success alert
       console.log('🎉 About to show success alert for social posting...');
       setAlertTitle('Posted!');
-      setAlertMessage('Your event announcement has been shared to the social feed.');
+      setAlertMessage(
+        'Your event announcement has been shared to the social feed.'
+      );
       setAlertButtons([{ text: 'OK', style: 'default' }]);
       setAlertVisible(true);
       console.log('✅ Alert state set for social post');
     } catch (error) {
       console.error('❌ Failed to post to social:', error);
-      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
-      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error(
+        '❌ Error details:',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+      console.error(
+        '❌ Error stack:',
+        error instanceof Error ? error.stack : 'No stack trace'
+      );
 
       // Show custom styled error alert
       console.log('⚠️ Showing error alert for social posting...');
       setAlertTitle('Error');
-      setAlertMessage(`Failed to share announcement: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAlertMessage(
+        `Failed to share announcement: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
       setAlertButtons([{ text: 'OK', style: 'destructive' }]);
       setAlertVisible(true);
       console.log('✅ Error alert state set');
@@ -645,11 +730,20 @@ Team: ${team?.name || 'RUNSTR'}
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Create Event</Text>
@@ -661,21 +755,25 @@ Team: ${team?.name || 'RUNSTR'}
           {/* Distance Presets */}
           <Text style={styles.sectionTitle}>Choose Distance</Text>
           <View style={styles.presetsGrid}>
-            {EVENT_PRESETS.map(preset => (
+            {EVENT_PRESETS.map((preset) => (
               <TouchableOpacity
                 key={preset.id}
                 style={[
                   styles.presetCard,
-                  formData.selectedPreset?.id === preset.id && styles.presetCardSelected,
+                  formData.selectedPreset?.id === preset.id &&
+                    styles.presetCardSelected,
                 ]}
                 onPress={() => selectPreset(preset)}
                 activeOpacity={0.7}
               >
-                {preset.emoji && <Text style={styles.presetEmoji}>{preset.emoji}</Text>}
+                {preset.emoji && (
+                  <Text style={styles.presetEmoji}>{preset.emoji}</Text>
+                )}
                 <Text
                   style={[
                     styles.presetName,
-                    formData.selectedPreset?.id === preset.id && styles.presetNameSelected,
+                    formData.selectedPreset?.id === preset.id &&
+                      styles.presetNameSelected,
                   ]}
                 >
                   {preset.name}
@@ -690,7 +788,7 @@ Team: ${team?.name || 'RUNSTR'}
             <TextInput
               style={styles.textInput}
               value={formData.eventName}
-              onChangeText={text => updateField('eventName', text)}
+              onChangeText={(text) => updateField('eventName', text)}
               placeholder="e.g., Saturday Morning 5K"
               placeholderTextColor={theme.colors.textMuted}
             />
@@ -700,9 +798,12 @@ Team: ${team?.name || 'RUNSTR'}
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Event Description (Optional)</Text>
             <TextInput
-              style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
+              style={[
+                styles.textInput,
+                { height: 80, textAlignVertical: 'top' },
+              ]}
               value={formData.description}
-              onChangeText={text => updateField('description', text)}
+              onChangeText={(text) => updateField('description', text)}
               placeholder="Optional details about your event..."
               placeholderTextColor={theme.colors.textMuted}
               multiline
@@ -719,7 +820,8 @@ Team: ${team?.name || 'RUNSTR'}
                   key={index}
                   style={[
                     styles.quickDateOption,
-                    formData.eventDate?.toDateString() === option.date.toDateString() &&
+                    formData.eventDate?.toDateString() ===
+                      option.date.toDateString() &&
                       styles.quickDateOptionSelected,
                   ]}
                   onPress={() => updateField('eventDate', option.date)}
@@ -728,13 +830,16 @@ Team: ${team?.name || 'RUNSTR'}
                   <Text
                     style={[
                       styles.quickDateOptionText,
-                      formData.eventDate?.toDateString() === option.date.toDateString() &&
+                      formData.eventDate?.toDateString() ===
+                        option.date.toDateString() &&
                         styles.quickDateOptionTextSelected,
                     ]}
                   >
                     {option.label}
                   </Text>
-                  <Text style={styles.quickDateOptionDate}>{option.date.toLocaleDateString()}</Text>
+                  <Text style={styles.quickDateOptionDate}>
+                    {option.date.toLocaleDateString()}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -746,12 +851,14 @@ Team: ${team?.name || 'RUNSTR'}
             <TextInput
               style={styles.textInput}
               value={formData.eventTime}
-              onChangeText={text => updateField('eventTime', text)}
+              onChangeText={(text) => updateField('eventTime', text)}
               placeholder="09:00"
               placeholderTextColor={theme.colors.textMuted}
               keyboardType="numbers-and-punctuation"
             />
-            <Text style={styles.formHelper}>24-hour format (e.g., 09:00, 14:30)</Text>
+            <Text style={styles.formHelper}>
+              24-hour format (e.g., 09:00, 14:30)
+            </Text>
           </View>
 
           {/* Recurring Option */}
@@ -759,8 +866,13 @@ Team: ${team?.name || 'RUNSTR'}
             <View style={styles.recurringRow}>
               <Text style={styles.formLabel}>Repeat Weekly?</Text>
               <TouchableOpacity
-                style={[styles.toggleButton, formData.isRecurring && styles.toggleButtonActive]}
-                onPress={() => updateField('isRecurring', !formData.isRecurring)}
+                style={[
+                  styles.toggleButton,
+                  formData.isRecurring && styles.toggleButtonActive,
+                ]}
+                onPress={() =>
+                  updateField('isRecurring', !formData.isRecurring)
+                }
                 activeOpacity={0.7}
               >
                 <Text
@@ -776,12 +888,21 @@ Team: ${team?.name || 'RUNSTR'}
 
             {formData.isRecurring && (
               <View style={styles.recurrenceDaysContainer}>
-                {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                {[
+                  'monday',
+                  'tuesday',
+                  'wednesday',
+                  'thursday',
+                  'friday',
+                  'saturday',
+                  'sunday',
+                ].map((day) => (
                   <TouchableOpacity
                     key={day}
                     style={[
                       styles.dayButton,
-                      formData.recurrenceDay === day && styles.dayButtonSelected,
+                      formData.recurrenceDay === day &&
+                        styles.dayButtonSelected,
                     ]}
                     onPress={() =>
                       updateField(
@@ -794,7 +915,8 @@ Team: ${team?.name || 'RUNSTR'}
                     <Text
                       style={[
                         styles.dayButtonText,
-                        formData.recurrenceDay === day && styles.dayButtonTextSelected,
+                        formData.recurrenceDay === day &&
+                          styles.dayButtonTextSelected,
                       ]}
                     >
                       {day.substring(0, 3).toUpperCase()}
@@ -820,7 +942,10 @@ Team: ${team?.name || 'RUNSTR'}
             activeOpacity={0.7}
           >
             {isPublishingSocial ? (
-              <ActivityIndicator size="small" color={theme.colors.orangeBright} />
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.orangeBright}
+              />
             ) : postedSuccessfully ? (
               <>
                 <Text style={styles.socialButtonText}>Posted ✓</Text>

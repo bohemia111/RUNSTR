@@ -310,7 +310,9 @@ export class TeamJoinRequestService {
     captainPubkey: string,
     callback: (request: TeamJoinRequest) => void
   ): Promise<NDKSubscription> {
-    console.warn(`⚠️ Using deprecated subscribeToJoinRequests - prefer getJoinRequests() instead`);
+    console.warn(
+      `⚠️ Using deprecated subscribeToJoinRequests - prefer getJoinRequests() instead`
+    );
     console.log(
       `🔔 Subscribing to join requests for captain: ${captainPubkey.slice(
         0,
@@ -333,7 +335,9 @@ export class TeamJoinRequestService {
       // ✅ CRITICAL: Check if app is active before processing
       const { AppStateManager } = await import('../core/AppStateManager');
       if (!AppStateManager.canDoNetworkOps()) {
-        console.log('🔴 App backgrounded, skipping team join request processing');
+        console.log(
+          '🔴 App backgrounded, skipping team join request processing'
+        );
         return;
       }
 

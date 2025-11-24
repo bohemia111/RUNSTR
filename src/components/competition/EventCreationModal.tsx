@@ -139,7 +139,11 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
       const signingService = UnifiedSigningService.getInstance();
       const signer = await signingService.getSigner();
       if (!signer) {
-        CustomAlert.alert('Error', 'No authentication found. Please login first.', [{ text: 'OK' }]);
+        CustomAlert.alert(
+          'Error',
+          'No authentication found. Please login first.',
+          [{ text: 'OK' }]
+        );
         setIsCreating(false);
         return;
       }
@@ -171,7 +175,9 @@ export const EventCreationModal: React.FC<EventCreationModalProps> = ({
         entryFeesSats: 0, // Default to free
         maxParticipants: 50,
         requireApproval: false,
-        targetValue: formData.goalValue ? Number(formData.goalValue) : undefined,
+        targetValue: formData.goalValue
+          ? Number(formData.goalValue)
+          : undefined,
         targetUnit: formData.goalUnit,
       };
 

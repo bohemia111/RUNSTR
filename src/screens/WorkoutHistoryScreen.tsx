@@ -135,7 +135,10 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       );
 
       if (!signer) {
-        CustomAlertManager.alert('Error', 'No signer available. Please log in again.');
+        CustomAlertManager.alert(
+          'Error',
+          'No signer available. Please log in again.'
+        );
         return;
       }
 
@@ -175,7 +178,10 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
             `You earned ${result.rewardAmount} sats for today's workout!`
           );
         } else {
-          CustomAlertManager.alert('Success', 'Workout entered into competition!');
+          CustomAlertManager.alert(
+            'Success',
+            'Workout entered into competition!'
+          );
         }
       } else {
         throw new Error(result.error || 'Failed to publish workout');
@@ -199,7 +205,10 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       );
 
       if (!signer) {
-        CustomAlertManager.alert('Error', 'No signer available. Please log in again.');
+        CustomAlertManager.alert(
+          'Error',
+          'No signer available. Please log in again.'
+        );
         return;
       }
 
@@ -237,7 +246,10 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       }
     } catch (error) {
       console.error('[WorkoutHistory] ❌ Social share failed:', error);
-      CustomAlertManager.alert('Error', 'Failed to share workout. Please try again.');
+      CustomAlertManager.alert(
+        'Error',
+        'Failed to share workout. Please try again.'
+      );
     }
   };
 
@@ -264,7 +276,10 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       );
 
       if (!signer) {
-        CustomAlertManager.alert('Error', 'No signer available. Please log in again.');
+        CustomAlertManager.alert(
+          'Error',
+          'No signer available. Please log in again.'
+        );
         return;
       }
 

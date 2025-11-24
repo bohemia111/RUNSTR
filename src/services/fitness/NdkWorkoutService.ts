@@ -345,7 +345,9 @@ export class NdkWorkoutService {
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
       console.log(
-        `🎯 NDK Batch ${batchIndex + 1}/3: Querying ${batch.map((r) => r.name).join(' + ')}...`
+        `🎯 NDK Batch ${batchIndex + 1}/3: Querying ${batch
+          .map((r) => r.name)
+          .join(' + ')}...`
       );
 
       // Run 2 queries in parallel per batch

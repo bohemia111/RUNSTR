@@ -78,7 +78,9 @@ export const ReviewLaunchStep: React.FC<ReviewLaunchStepProps> = ({
 
       if (!privateKey) {
         setAlertTitle('Authentication Required');
-        setAlertMessage('Team creation requires direct key access. Amber authentication is not yet supported for team creation.');
+        setAlertMessage(
+          'Team creation requires direct key access. Amber authentication is not yet supported for team creation.'
+        );
         setAlertButtons([{ text: 'OK' }]);
         setAlertVisible(true);
         setIsLaunching(false);
@@ -142,7 +144,10 @@ export const ReviewLaunchStep: React.FC<ReviewLaunchStepProps> = ({
 
           console.log('ReviewLaunchStep: Team saved to AsyncStorage');
         } catch (storageError) {
-          console.error('ReviewLaunchStep: Failed to save team to AsyncStorage:', storageError);
+          console.error(
+            'ReviewLaunchStep: Failed to save team to AsyncStorage:',
+            storageError
+          );
           // Don't fail the whole process if local storage fails
         }
 

@@ -386,7 +386,10 @@ export class LocalWorkoutStorageService {
 
       // Update RUNSTR.md context file for AI coach
       RunstrContextGenerator.updateContext().catch((error) => {
-        console.warn('Failed to update RUNSTR context after workout save:', error);
+        console.warn(
+          'Failed to update RUNSTR context after workout save:',
+          error
+        );
       });
     } catch (error) {
       console.error('❌ Failed to save workout to storage:', error);
@@ -604,7 +607,9 @@ export class LocalWorkoutStorageService {
 
       await this.saveWorkout(localWorkout);
       console.log(
-        `✅ Imported Nostr workout: ${workoutId} (${workout.type}, ${new Date(workout.startTime).toLocaleDateString()})`
+        `✅ Imported Nostr workout: ${workoutId} (${workout.type}, ${new Date(
+          workout.startTime
+        ).toLocaleDateString()})`
       );
       return workoutId;
     } catch (error) {

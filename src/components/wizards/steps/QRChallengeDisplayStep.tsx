@@ -95,9 +95,9 @@ export const QRChallengeDisplayStep: React.FC<QRChallengeDisplayStepProps> = ({
    */
   const handleShareCode = async () => {
     try {
-      const message = `Challenge me on RUNSTR!\n\n${
-        challengeData.activity
-      } - ${challengeData.metric} - ${challengeData.duration} days${
+      const message = `Challenge me on RUNSTR!\n\n${challengeData.activity} - ${
+        challengeData.metric
+      } - ${challengeData.duration} days${
         challengeData.wager > 0
           ? `\n${challengeData.wager.toLocaleString()} sats`
           : ''
@@ -138,7 +138,12 @@ export const QRChallengeDisplayStep: React.FC<QRChallengeDisplayStepProps> = ({
       {/* Challenge Summary */}
       <View style={styles.summaryCard}>
         <View style={styles.summaryRow}>
-          <Ionicons name={activityIconName} size={20} color={theme.colors.accent} style={styles.summaryIcon} />
+          <Ionicons
+            name={activityIconName}
+            size={20}
+            color={theme.colors.accent}
+            style={styles.summaryIcon}
+          />
           <Text style={styles.summaryText}>
             {challengeData.activity.charAt(0).toUpperCase() +
               challengeData.activity.slice(1)}
@@ -146,7 +151,12 @@ export const QRChallengeDisplayStep: React.FC<QRChallengeDisplayStepProps> = ({
         </View>
 
         <View style={styles.summaryRow}>
-          <Ionicons name="stats-chart" size={20} color={theme.colors.textSecondary} style={styles.summaryIcon} />
+          <Ionicons
+            name="stats-chart"
+            size={20}
+            color={theme.colors.textSecondary}
+            style={styles.summaryIcon}
+          />
           <Text style={styles.summaryText}>
             {challengeData.metric.charAt(0).toUpperCase() +
               challengeData.metric.slice(1)}
@@ -154,13 +164,23 @@ export const QRChallengeDisplayStep: React.FC<QRChallengeDisplayStepProps> = ({
         </View>
 
         <View style={styles.summaryRow}>
-          <Ionicons name="calendar" size={20} color={theme.colors.textSecondary} style={styles.summaryIcon} />
+          <Ionicons
+            name="calendar"
+            size={20}
+            color={theme.colors.textSecondary}
+            style={styles.summaryIcon}
+          />
           <Text style={styles.summaryText}>{challengeData.duration} days</Text>
         </View>
 
         {challengeData.wager > 0 && (
           <View style={styles.summaryRow}>
-            <Ionicons name="flash" size={20} color={theme.colors.accent} style={styles.summaryIcon} />
+            <Ionicons
+              name="flash"
+              size={20}
+              color={theme.colors.accent}
+              style={styles.summaryIcon}
+            />
             <Text style={styles.summaryText}>
               {challengeData.wager.toLocaleString()} sats
             </Text>

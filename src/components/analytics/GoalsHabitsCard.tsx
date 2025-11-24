@@ -53,7 +53,7 @@ export const GoalsHabitsCard: React.FC = () => {
   ) => {
     try {
       await createHabit(name, type, icon, color);
-      setRefreshKey(prev => prev + 1);
+      setRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error('[GoalsHabitsCard] Error creating habit:', error);
       Alert.alert('Error', 'Failed to create habit');
@@ -63,7 +63,7 @@ export const GoalsHabitsCard: React.FC = () => {
   const handleCheckIn = async (habitId: string) => {
     try {
       await checkInHabit(habitId);
-      setRefreshKey(prev => prev + 1);
+      setRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error('[GoalsHabitsCard] Error checking in:', error);
       Alert.alert('Error', 'Failed to check in');
@@ -82,7 +82,7 @@ export const GoalsHabitsCard: React.FC = () => {
           onPress: async () => {
             try {
               await deleteHabit(habit.id);
-              setRefreshKey(prev => prev + 1);
+              setRefreshKey((prev) => prev + 1);
             } catch (error) {
               console.error('[GoalsHabitsCard] Error deleting habit:', error);
               Alert.alert('Error', 'Failed to delete habit');
@@ -102,30 +102,55 @@ export const GoalsHabitsCard: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="trophy-outline" size={20} color={theme.colors.orangeBright} />
+          <Ionicons
+            name="trophy-outline"
+            size={20}
+            color={theme.colors.orangeBright}
+          />
           <Text style={styles.headerTitle}>Goals & Habits</Text>
         </View>
-        <TouchableOpacity onPress={() => setShowModal(true)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="add-circle-outline" size={24} color={theme.colors.orangeBright} />
+        <TouchableOpacity
+          onPress={() => setShowModal(true)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons
+            name="add-circle-outline"
+            size={24}
+            color={theme.colors.orangeBright}
+          />
         </TouchableOpacity>
       </View>
 
       {/* Habits List */}
       {habits.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="flower-outline" size={48} color={theme.colors.textMuted} />
+          <Ionicons
+            name="flower-outline"
+            size={48}
+            color={theme.colors.textMuted}
+          />
           <Text style={styles.emptyText}>No habits yet</Text>
           <Text style={styles.emptySubtext}>
             Track abstinence or build positive habits
           </Text>
-          <TouchableOpacity style={styles.addFirstButton} onPress={() => setShowModal(true)}>
-            <Ionicons name="add-circle-outline" size={20} color={theme.colors.accentText} />
+          <TouchableOpacity
+            style={styles.addFirstButton}
+            onPress={() => setShowModal(true)}
+          >
+            <Ionicons
+              name="add-circle-outline"
+              size={20}
+              color={theme.colors.accentText}
+            />
             <Text style={styles.addFirstButtonText}>Add Your First Habit</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView style={styles.habitsList} showsVerticalScrollIndicator={false}>
-          {habits.map(habit => {
+        <ScrollView
+          style={styles.habitsList}
+          showsVerticalScrollIndicator={false}
+        >
+          {habits.map((habit) => {
             const checkedIn = isCheckedInToday(habit);
             return (
               <View key={habit.id} style={styles.habitCard}>
@@ -141,7 +166,11 @@ export const GoalsHabitsCard: React.FC = () => {
                   <View style={styles.habitDetails}>
                     <Text style={styles.habitName}>{habit.name}</Text>
                     <View style={styles.streakContainer}>
-                      <Ionicons name="flame" size={16} color={theme.colors.orangeBright} />
+                      <Ionicons
+                        name="flame"
+                        size={16}
+                        color={theme.colors.orangeBright}
+                      />
                       <Text style={styles.streakText}>
                         {habit.currentStreak} day streak
                       </Text>
@@ -183,7 +212,11 @@ export const GoalsHabitsCard: React.FC = () => {
                     onPress={() => handleDeleteHabit(habit)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name="trash-outline" size={18} color={theme.colors.textMuted} />
+                    <Ionicons
+                      name="trash-outline"
+                      size={18}
+                      color={theme.colors.textMuted}
+                    />
                   </TouchableOpacity>
                 </View>
               </View>

@@ -241,7 +241,9 @@ export class UnifiedCacheService {
 
     this.memoryCache.set(key, entry);
     await this.saveToStorage(key, entry);
-    console.log(`✅ UnifiedCache: Manually cached ${key} with ${ttlSeconds}s TTL`);
+    console.log(
+      `✅ UnifiedCache: Manually cached ${key} with ${ttlSeconds}s TTL`
+    );
   }
 
   /**

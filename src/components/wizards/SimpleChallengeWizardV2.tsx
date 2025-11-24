@@ -73,7 +73,15 @@ interface ChallengeFormData {
   challengeDate: Date | null;
   challengeTime: string;
   isRecurring: boolean;
-  recurrenceDay: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday' | null;
+  recurrenceDay:
+    | 'monday'
+    | 'tuesday'
+    | 'wednesday'
+    | 'thursday'
+    | 'friday'
+    | 'saturday'
+    | 'sunday'
+    | null;
 }
 
 interface Props {
@@ -109,7 +117,9 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
 
   const [isPublishingChallenge, setIsPublishingChallenge] = useState(false);
   const [isPublishingSocial, setIsPublishingSocial] = useState(false);
-  const [generatedChallengeId, setGeneratedChallengeId] = useState<string | null>(null);
+  const [generatedChallengeId, setGeneratedChallengeId] = useState<
+    string | null
+  >(null);
 
   // Track which actions have been completed
   const [publishedSuccessfully, setPublishedSuccessfully] = useState(false);
@@ -119,7 +129,13 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertButtons, setAlertButtons] = useState<Array<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }>>([]);
+  const [alertButtons, setAlertButtons] = useState<
+    Array<{
+      text: string;
+      onPress?: () => void;
+      style?: 'default' | 'cancel' | 'destructive';
+    }>
+  >([]);
 
   // Card renderer ref and state for image upload
   const cardRendererRef = useRef<View>(null);
@@ -135,7 +151,7 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
 
       // Pre-populate opponent if provided
       if (preSelectedOpponent) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           opponentPubkey: preSelectedOpponent.pubkey,
           opponentName: preSelectedOpponent.name,
@@ -154,13 +170,16 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
   );
 
   // Helper to update any field in formData
-  const updateField = <K extends keyof ChallengeFormData>(field: K, value: ChallengeFormData[K]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const updateField = <K extends keyof ChallengeFormData>(
+    field: K,
+    value: ChallengeFormData[K]
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   // Select a preset (5K/10K/Half Marathon)
   const selectPreset = (preset: ChallengePreset) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       selectedPreset: preset,
       challengeName: `${preset.name} Challenge`, // Auto-fill challenge name
@@ -187,7 +206,10 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
       { label: 'Today', date: today },
       { label: 'Tomorrow', date: tomorrow },
       {
-        label: currentDay === 0 || currentDay === 6 ? 'This Weekend (Today)' : 'This Weekend',
+        label:
+          currentDay === 0 || currentDay === 6
+            ? 'This Weekend (Today)'
+            : 'This Weekend',
         date: thisWeekend,
       },
       { label: 'Next Week', date: nextWeek },
@@ -196,7 +218,8 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
 
   // Publish Challenge to Nostr (kind 30102 only)
   const handlePublishChallenge = async () => {
-    if (!isFormValid || !formData.selectedPreset || !formData.challengeDate) return;
+    if (!isFormValid || !formData.selectedPreset || !formData.challengeDate)
+      return;
 
     try {
       setIsPublishingChallenge(true);
@@ -220,7 +243,9 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
       const signer = await signingService.getSigner();
       if (!signer) {
         setAlertTitle('Authentication Required');
-        setAlertMessage('Unable to sign challenge. Please ensure you are logged in.');
+        setAlertMessage(
+          'Unable to sign challenge. Please ensure you are logged in.'
+        );
         setAlertButtons([{ text: 'OK', style: 'destructive' }]);
         setAlertVisible(true);
         return;
@@ -258,7 +283,8 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
       const ndk = await GlobalNDKService.getInstance();
       const event = new NDKEvent(ndk);
       event.kind = 30102;
-      event.content = formData.description || `${formData.challengeName} - ${durationHours}h`;
+      event.content =
+        formData.description || `${formData.challengeName} - ${durationHours}h`;
 
       const tags: string[][] = [
         ['d', challengeId],
@@ -292,7 +318,7 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
       const relayUrls = Array.from(publishResult);
 
       console.log(`✅ Published to ${relayUrls.length} relay(s):`);
-      relayUrls.forEach(relay => {
+      relayUrls.forEach((relay) => {
         console.log(`   ✅ ${relay.url || 'Unknown relay'}`);
       });
 
@@ -304,7 +330,9 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
 
       // Show success alert
       setAlertTitle('Challenge Created!');
-      setAlertMessage(`Your challenge to ${formData.opponentName} has been created on Nostr!`);
+      setAlertMessage(
+        `Your challenge to ${formData.opponentName} has been created on Nostr!`
+      );
       setAlertButtons([{ text: 'OK', style: 'default' }]);
       setAlertVisible(true);
 
@@ -313,7 +341,11 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
       console.error('❌ Failed to publish challenge:', error);
 
       setAlertTitle('Error');
-      setAlertMessage(`Failed to publish challenge: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAlertMessage(
+        `Failed to publish challenge: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
       setAlertButtons([{ text: 'OK', style: 'destructive' }]);
       setAlertVisible(true);
     } finally {
@@ -402,7 +434,7 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
       setGeneratedSVG(cardData.svgContent);
 
       // Wait for WorkoutCardRenderer to paint the SVG
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       console.log('✅ Renderer should have painted SVG');
 
       // Capture the rendered card as PNG
@@ -451,18 +483,25 @@ export const SimpleChallengeWizardV2: React.FC<Props> = ({
         challengeContent = `I just challenged @${formData.opponentName} to a ${formData.selectedPreset.name}!\n\n${imageUrl}\n\n${cardData.deepLink}\n\n#RUNSTR #Bitcoin #Fitness`;
       } else {
         // Fallback to text-only if image upload failed
-        const formattedDate = formData.challengeDate.toLocaleDateString('en-US', {
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric',
-        });
+        const formattedDate = formData.challengeDate.toLocaleDateString(
+          'en-US',
+          {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+          }
+        );
 
         const [h, m] = formData.challengeTime.split(':').map(Number);
         const period = h >= 12 ? 'PM' : 'AM';
         const displayHours = h % 12 || 12;
-        const formattedTime = `${displayHours}:${m.toString().padStart(2, '0')} ${period}`;
+        const formattedTime = `${displayHours}:${m
+          .toString()
+          .padStart(2, '0')} ${period}`;
 
-        challengeContent = `I just challenged @${formData.opponentName} to a ${formData.selectedPreset.name}!
+        challengeContent = `I just challenged @${formData.opponentName} to a ${
+          formData.selectedPreset.name
+        }!
 
 ${formattedDate} at ${formattedTime}
 Running - ${formData.selectedPreset.distance} km
@@ -490,7 +529,9 @@ Team: ${team?.name || 'RUNSTR'}
       if (imageUrl) {
         const imetaTag = ['imeta', `url ${imageUrl}`];
         if (imageDimensions) {
-          imetaTag.push(`dim ${imageDimensions.width}x${imageDimensions.height}`);
+          imetaTag.push(
+            `dim ${imageDimensions.width}x${imageDimensions.height}`
+          );
         }
         imetaTag.push('m image/png');
         tags.push(imetaTag);
@@ -511,7 +552,9 @@ Team: ${team?.name || 'RUNSTR'}
       // Show success alert
       console.log('🎉 About to show success alert for social posting...');
       setAlertTitle('Posted!');
-      setAlertMessage('Your challenge announcement has been shared to the social feed.');
+      setAlertMessage(
+        'Your challenge announcement has been shared to the social feed.'
+      );
       setAlertButtons([{ text: 'OK', style: 'default' }]);
       setAlertVisible(true);
       console.log('✅ Alert state set for social post');
@@ -519,7 +562,11 @@ Team: ${team?.name || 'RUNSTR'}
       console.error('❌ Failed to post to social:', error);
 
       setAlertTitle('Error');
-      setAlertMessage(`Failed to share announcement: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAlertMessage(
+        `Failed to share announcement: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
       setAlertButtons([{ text: 'OK', style: 'destructive' }]);
       setAlertVisible(true);
     } finally {
@@ -529,11 +576,20 @@ Team: ${team?.name || 'RUNSTR'}
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Create Challenge</Text>
@@ -545,21 +601,25 @@ Team: ${team?.name || 'RUNSTR'}
           {/* Distance Presets */}
           <Text style={styles.sectionTitle}>Choose Distance</Text>
           <View style={styles.presetsGrid}>
-            {CHALLENGE_PRESETS.map(preset => (
+            {CHALLENGE_PRESETS.map((preset) => (
               <TouchableOpacity
                 key={preset.id}
                 style={[
                   styles.presetCard,
-                  formData.selectedPreset?.id === preset.id && styles.presetCardSelected,
+                  formData.selectedPreset?.id === preset.id &&
+                    styles.presetCardSelected,
                 ]}
                 onPress={() => selectPreset(preset)}
                 activeOpacity={0.7}
               >
-                {preset.emoji && <Text style={styles.presetEmoji}>{preset.emoji}</Text>}
+                {preset.emoji && (
+                  <Text style={styles.presetEmoji}>{preset.emoji}</Text>
+                )}
                 <Text
                   style={[
                     styles.presetName,
-                    formData.selectedPreset?.id === preset.id && styles.presetNameSelected,
+                    formData.selectedPreset?.id === preset.id &&
+                      styles.presetNameSelected,
                   ]}
                 >
                   {preset.name}
@@ -574,7 +634,7 @@ Team: ${team?.name || 'RUNSTR'}
             <TextInput
               style={styles.textInput}
               value={formData.challengeName}
-              onChangeText={text => updateField('challengeName', text)}
+              onChangeText={(text) => updateField('challengeName', text)}
               placeholder="e.g., Saturday Morning 5K Challenge"
               placeholderTextColor={theme.colors.textMuted}
             />
@@ -586,23 +646,30 @@ Team: ${team?.name || 'RUNSTR'}
             <TextInput
               style={styles.textInput}
               value={formData.opponentName}
-              onChangeText={text => updateField('opponentName', text)}
+              onChangeText={(text) => updateField('opponentName', text)}
               placeholder="Opponent's username"
               placeholderTextColor={theme.colors.textMuted}
               editable={!preSelectedOpponent} // Lock if pre-selected
             />
             <Text style={styles.formHelper}>
-              {preSelectedOpponent ? 'Pre-selected opponent' : 'Enter opponent username or select from team'}
+              {preSelectedOpponent
+                ? 'Pre-selected opponent'
+                : 'Enter opponent username or select from team'}
             </Text>
           </View>
 
           {/* Challenge Description (Optional) */}
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Challenge Description (Optional)</Text>
+            <Text style={styles.formLabel}>
+              Challenge Description (Optional)
+            </Text>
             <TextInput
-              style={[styles.textInput, { height: 80, textAlignVertical: 'top' }]}
+              style={[
+                styles.textInput,
+                { height: 80, textAlignVertical: 'top' },
+              ]}
               value={formData.description}
-              onChangeText={text => updateField('description', text)}
+              onChangeText={(text) => updateField('description', text)}
               placeholder="Optional details about your challenge..."
               placeholderTextColor={theme.colors.textMuted}
               multiline
@@ -619,7 +686,8 @@ Team: ${team?.name || 'RUNSTR'}
                   key={index}
                   style={[
                     styles.quickDateOption,
-                    formData.challengeDate?.toDateString() === option.date.toDateString() &&
+                    formData.challengeDate?.toDateString() ===
+                      option.date.toDateString() &&
                       styles.quickDateOptionSelected,
                   ]}
                   onPress={() => updateField('challengeDate', option.date)}
@@ -628,13 +696,16 @@ Team: ${team?.name || 'RUNSTR'}
                   <Text
                     style={[
                       styles.quickDateOptionText,
-                      formData.challengeDate?.toDateString() === option.date.toDateString() &&
+                      formData.challengeDate?.toDateString() ===
+                        option.date.toDateString() &&
                         styles.quickDateOptionTextSelected,
                     ]}
                   >
                     {option.label}
                   </Text>
-                  <Text style={styles.quickDateOptionDate}>{option.date.toLocaleDateString()}</Text>
+                  <Text style={styles.quickDateOptionDate}>
+                    {option.date.toLocaleDateString()}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -646,12 +717,14 @@ Team: ${team?.name || 'RUNSTR'}
             <TextInput
               style={styles.textInput}
               value={formData.challengeTime}
-              onChangeText={text => updateField('challengeTime', text)}
+              onChangeText={(text) => updateField('challengeTime', text)}
               placeholder="09:00"
               placeholderTextColor={theme.colors.textMuted}
               keyboardType="numbers-and-punctuation"
             />
-            <Text style={styles.formHelper}>24-hour format (e.g., 09:00, 14:30)</Text>
+            <Text style={styles.formHelper}>
+              24-hour format (e.g., 09:00, 14:30)
+            </Text>
           </View>
 
           {/* Recurring Option */}
@@ -659,8 +732,13 @@ Team: ${team?.name || 'RUNSTR'}
             <View style={styles.recurringRow}>
               <Text style={styles.formLabel}>Repeat Weekly?</Text>
               <TouchableOpacity
-                style={[styles.toggleButton, formData.isRecurring && styles.toggleButtonActive]}
-                onPress={() => updateField('isRecurring', !formData.isRecurring)}
+                style={[
+                  styles.toggleButton,
+                  formData.isRecurring && styles.toggleButtonActive,
+                ]}
+                onPress={() =>
+                  updateField('isRecurring', !formData.isRecurring)
+                }
                 activeOpacity={0.7}
               >
                 <Text
@@ -676,12 +754,21 @@ Team: ${team?.name || 'RUNSTR'}
 
             {formData.isRecurring && (
               <View style={styles.recurrenceDaysContainer}>
-                {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                {[
+                  'monday',
+                  'tuesday',
+                  'wednesday',
+                  'thursday',
+                  'friday',
+                  'saturday',
+                  'sunday',
+                ].map((day) => (
                   <TouchableOpacity
                     key={day}
                     style={[
                       styles.dayButton,
-                      formData.recurrenceDay === day && styles.dayButtonSelected,
+                      formData.recurrenceDay === day &&
+                        styles.dayButtonSelected,
                     ]}
                     onPress={() =>
                       updateField(
@@ -694,7 +781,8 @@ Team: ${team?.name || 'RUNSTR'}
                     <Text
                       style={[
                         styles.dayButtonText,
-                        formData.recurrenceDay === day && styles.dayButtonTextSelected,
+                        formData.recurrenceDay === day &&
+                          styles.dayButtonTextSelected,
                       ]}
                     >
                       {day.substring(0, 3).toUpperCase()}
@@ -720,7 +808,10 @@ Team: ${team?.name || 'RUNSTR'}
             activeOpacity={0.7}
           >
             {isPublishingSocial ? (
-              <ActivityIndicator size="small" color={theme.colors.orangeBright} />
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.orangeBright}
+              />
             ) : postedSuccessfully ? (
               <>
                 <Text style={styles.socialButtonText}>Posted ✓</Text>

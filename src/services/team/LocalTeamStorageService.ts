@@ -21,7 +21,9 @@ export class LocalTeamStorageService {
    * Save a newly-created team to AsyncStorage
    * @param team Team data to save
    */
-  static async saveCreatedTeam(team: Omit<LocalTeam, 'localOnly'>): Promise<void> {
+  static async saveCreatedTeam(
+    team: Omit<LocalTeam, 'localOnly'>
+  ): Promise<void> {
     try {
       const existingTeams = await this.getCreatedTeams();
 
@@ -32,9 +34,12 @@ export class LocalTeamStorageService {
       };
 
       // Check for duplicates
-      const isDuplicate = existingTeams.some(t => t.id === team.id);
+      const isDuplicate = existingTeams.some((t) => t.id === team.id);
       if (isDuplicate) {
-        console.log('[LocalTeamStorage] Team already exists, updating:', team.id);
+        console.log(
+          '[LocalTeamStorage] Team already exists, updating:',
+          team.id
+        );
         await this.updateCreatedTeam(team.id, localTeam);
         return;
       }
@@ -102,12 +107,17 @@ export class LocalTeamStorageService {
         allTeams.forEach((team, index) => {
           console.log(`  [${index}] ${team.name}:`);
           console.log(`      captainId: ${team.captainId?.slice(0, 20)}...`);
-          console.log(`      normalized: ${team.captainId?.toLowerCase().trim().slice(0, 20)}...`);
+          console.log(
+            `      normalized: ${team.captainId
+              ?.toLowerCase()
+              .trim()
+              .slice(0, 20)}...`
+          );
         });
       }
 
       // Filter teams with normalized comparison
-      const captainTeams = allTeams.filter(team => {
+      const captainTeams = allTeams.filter((team) => {
         const normalizedTeamCaptainId = team.captainId?.toLowerCase().trim();
         const matches = normalizedTeamCaptainId === normalizedCaptainId;
 
@@ -124,12 +134,15 @@ export class LocalTeamStorageService {
       console.log('[LocalTeamStorage] 📊 Captain teams result:', {
         captainNpub: captainNpub?.slice(0, 20) + '...',
         teamCount: captainTeams.length,
-        teamNames: captainTeams.map(t => t.name),
+        teamNames: captainTeams.map((t) => t.name),
       });
 
       return captainTeams;
     } catch (error) {
-      console.error('[LocalTeamStorage] ❌ Error getting captain teams:', error);
+      console.error(
+        '[LocalTeamStorage] ❌ Error getting captain teams:',
+        error
+      );
       return [];
     }
   }
@@ -145,7 +158,7 @@ export class LocalTeamStorageService {
   ): Promise<void> {
     try {
       const teams = await this.getCreatedTeams();
-      const teamIndex = teams.findIndex(t => t.id === teamId);
+      const teamIndex = teams.findIndex((t) => t.id === teamId);
 
       if (teamIndex === -1) {
         throw new Error(`Team not found: ${teamId}`);
@@ -176,7 +189,7 @@ export class LocalTeamStorageService {
   static async deleteCreatedTeam(teamId: string): Promise<void> {
     try {
       const teams = await this.getCreatedTeams();
-      const filteredTeams = teams.filter(t => t.id !== teamId);
+      const filteredTeams = teams.filter((t) => t.id !== teamId);
 
       await AsyncStorage.setItem(
         this.STORAGE_KEY,
@@ -198,7 +211,7 @@ export class LocalTeamStorageService {
   static async getTeamById(teamId: string): Promise<LocalTeam | null> {
     try {
       const teams = await this.getCreatedTeams();
-      const team = teams.find(t => t.id === teamId);
+      const team = teams.find((t) => t.id === teamId);
       return team || null;
     } catch (error) {
       console.error('[LocalTeamStorage] Error getting team by ID:', error);
@@ -216,7 +229,10 @@ export class LocalTeamStorageService {
       const team = await this.getTeamById(teamId);
       return team !== null;
     } catch (error) {
-      console.error('[LocalTeamStorage] Error checking if team is local:', error);
+      console.error(
+        '[LocalTeamStorage] Error checking if team is local:',
+        error
+      );
       return false;
     }
   }

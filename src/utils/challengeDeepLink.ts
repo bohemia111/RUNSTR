@@ -131,7 +131,9 @@ export function parseChallengeDeepLink(url: string): ParsedChallengeData {
       creatorName: '',
       challengeId: '',
       isValid: false,
-      error: `Failed to parse URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to parse URL: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`,
     };
   }
 }
@@ -146,15 +148,17 @@ export function isChallengeDeepLink(url: string): boolean {
 /**
  * Generate challenge description for display
  */
-export function getChallengeDescription(challenge: ChallengeDeepLinkData): string {
+export function getChallengeDescription(
+  challenge: ChallengeDeepLinkData
+): string {
   const preset = getChallengePreset(challenge.type);
   const durationText =
-    challenge.duration === 1
-      ? '1 day'
-      : `${challenge.duration} days`;
+    challenge.duration === 1 ? '1 day' : `${challenge.duration} days`;
   const wagerText = challenge.wager > 0 ? ` - ${challenge.wager} sats` : '';
 
-  return `${preset?.name || challenge.type} challenge for ${durationText}${wagerText}`;
+  return `${
+    preset?.name || challenge.type
+  } challenge for ${durationText}${wagerText}`;
 }
 
 /**

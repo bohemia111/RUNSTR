@@ -207,7 +207,13 @@ export class NostrMobileConnectionManager {
         const { AppStateManager } = require('../core/AppStateManager');
         if (!AppStateManager.canDoNetworkOps()) {
           console.log('🔴 App backgrounded, skipping WebSocket status check');
-          this.emit('connectionsPaused', { total: 0, connected: 0, connecting: 0, disconnected: 0, error: 0 });
+          this.emit('connectionsPaused', {
+            total: 0,
+            connected: 0,
+            connecting: 0,
+            disconnected: 0,
+            error: 0,
+          });
           return;
         }
 
@@ -216,9 +222,18 @@ export class NostrMobileConnectionManager {
           console.log(`📊 Pausing ${stats.connected} connected relays`);
           this.emit('connectionsPaused', stats);
         } catch (error) {
-          console.error('❌ Error getting connection status during pause:', error);
+          console.error(
+            '❌ Error getting connection status during pause:',
+            error
+          );
           // Return safe defaults if WebSockets are dead
-          this.emit('connectionsPaused', { total: 0, connected: 0, connecting: 0, disconnected: 0, error: 0 });
+          this.emit('connectionsPaused', {
+            total: 0,
+            connected: 0,
+            connecting: 0,
+            disconnected: 0,
+            error: 0,
+          });
         }
       }, 0);
     } catch (error) {

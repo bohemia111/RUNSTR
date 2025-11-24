@@ -88,7 +88,9 @@ export class NotificationService {
     /* COMMENTED OUT FOR STABILITY:
     await this.startCompetitionEventMonitoring();
     */
-    console.log('[NotificationService] ⚠️ Competition event monitoring DISABLED for stability');
+    console.log(
+      '[NotificationService] ⚠️ Competition event monitoring DISABLED for stability'
+    );
   }
 
   // Schedule a notification

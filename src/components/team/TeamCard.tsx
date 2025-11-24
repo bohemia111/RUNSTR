@@ -216,7 +216,9 @@ export const TeamCard: React.FC<TeamCardProps> = ({
           );
 
           if (result.success) {
-            console.log(`📤 Join request published for ${team.name} (event: ${result.eventId})`);
+            console.log(
+              `📤 Join request published for ${team.name} (event: ${result.eventId})`
+            );
           } else {
             console.warn(`⚠️ Failed to publish join request: ${result.error}`);
             // Don't show error to user - they're already "joined" locally
@@ -230,7 +232,10 @@ export const TeamCard: React.FC<TeamCardProps> = ({
 
       // ✅ IMPROVEMENT 1: Optimistic ProfileData Update
       // Immediately add team to profileData so My Teams screen shows it instantly
-      if (navigationData.profileData?.teams && !navigationData.profileData.teams.some(t => t.id === team.id)) {
+      if (
+        navigationData.profileData?.teams &&
+        !navigationData.profileData.teams.some((t) => t.id === team.id)
+      ) {
         const optimisticTeam = {
           id: team.id,
           name: team.name,
@@ -249,7 +254,9 @@ export const TeamCard: React.FC<TeamCardProps> = ({
         const currentTeams = profileDataRef.teams || [];
         profileDataRef.teams = [...currentTeams, optimisticTeam];
 
-        console.log(`⚡ Optimistically added ${team.name} to profileData (instant My Teams update)`);
+        console.log(
+          `⚡ Optimistically added ${team.name} to profileData (instant My Teams update)`
+        );
       }
 
       // ✅ IMPROVEMENT 2: Success Feedback
@@ -280,10 +287,20 @@ export const TeamCard: React.FC<TeamCardProps> = ({
       }
     } catch (error) {
       console.error('Failed to join team:', error);
-      CustomAlertManager.alert('Error', 'Failed to join team. Please try again.');
+      CustomAlertManager.alert(
+        'Error',
+        'Failed to join team. Please try again.'
+      );
       setButtonState('join');
     }
-  }, [currentUserNpub, buttonState, team, membershipService, onJoinRequest, navigationData]);
+  }, [
+    currentUserNpub,
+    buttonState,
+    team,
+    membershipService,
+    onJoinRequest,
+    navigationData,
+  ]);
 
   return (
     <View>

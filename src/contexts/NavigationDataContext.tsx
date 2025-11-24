@@ -249,12 +249,17 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
 
           // Ensure discovered teams exist
           if (discoveredTeams.size === 0) {
-            PerformanceLogger.start('  └─ discoverFitnessTeams() [NOSTR QUERY]', 1);
+            PerformanceLogger.start(
+              '  └─ discoverFitnessTeams() [NOSTR QUERY]',
+              1
+            );
             // ✅ PERFORMANCE FIX: Move blocking Nostr query off main thread
             await new Promise<void>((resolve) => {
               InteractionManager.runAfterInteractions(async () => {
                 await teamService.discoverFitnessTeams();
-                PerformanceLogger.end('  └─ discoverFitnessTeams() [NOSTR QUERY]');
+                PerformanceLogger.end(
+                  '  └─ discoverFitnessTeams() [NOSTR QUERY]'
+                );
                 resolve();
               });
             });
@@ -290,7 +295,9 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
           }
 
           // 1.5. Check hardcoded teams for captain matches (LOCAL CHECK - NO NOSTR)
-          console.log('[getAllUserTeams] 🔍 Checking hardcoded teams for captain matches...');
+          console.log(
+            '[getAllUserTeams] 🔍 Checking hardcoded teams for captain matches...'
+          );
           console.log(`[getAllUserTeams] 📊 User identifiers:`, {
             hexPubkey: userIdentifiers.hexPubkey?.slice(0, 20) + '...',
             npub: userIdentifiers.npub?.slice(0, 20) + '...',
@@ -300,18 +307,30 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
           for (const hardcodedTeam of HARDCODED_TEAMS) {
             // Skip if already added from Captain Cache
             if (userTeams.some((t) => t.id === hardcodedTeam.id)) {
-              console.log(`[getAllUserTeams] ⏭️  Skipping ${hardcodedTeam.name} (already in captain teams)`);
+              console.log(
+                `[getAllUserTeams] ⏭️  Skipping ${hardcodedTeam.name} (already in captain teams)`
+              );
               continue;
             }
 
             // Check if user is captain (compare hex OR npub, normalized)
-            const userHexMatches = userIdentifiers.hexPubkey?.toLowerCase().trim() === hardcodedTeam.captainHex?.toLowerCase().trim();
-            const userNpubMatches = userIdentifiers.npub?.toLowerCase().trim() === hardcodedTeam.captain?.toLowerCase().trim();
+            const userHexMatches =
+              userIdentifiers.hexPubkey?.toLowerCase().trim() ===
+              hardcodedTeam.captainHex?.toLowerCase().trim();
+            const userNpubMatches =
+              userIdentifiers.npub?.toLowerCase().trim() ===
+              hardcodedTeam.captain?.toLowerCase().trim();
 
             if (userHexMatches || userNpubMatches) {
               hardcodedCaptainMatches++;
-              console.log(`[getAllUserTeams] ✅ CAPTAIN MATCH FOUND: ${hardcodedTeam.name}`);
-              console.log(`[getAllUserTeams]    - Matched via: ${userHexMatches ? 'HEX' : 'NPUB'}`);
+              console.log(
+                `[getAllUserTeams] ✅ CAPTAIN MATCH FOUND: ${hardcodedTeam.name}`
+              );
+              console.log(
+                `[getAllUserTeams]    - Matched via: ${
+                  userHexMatches ? 'HEX' : 'NPUB'
+                }`
+              );
 
               // Get team from discovered teams for full data
               const team = discoveredTeams.get(hardcodedTeam.id);
@@ -330,7 +349,9 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
                 });
               } else {
                 // Fallback: use hardcoded team data if not in discovered teams yet
-                console.log(`[getAllUserTeams] ⚠️  Team not in discovered teams yet, using hardcoded data`);
+                console.log(
+                  `[getAllUserTeams] ⚠️  Team not in discovered teams yet, using hardcoded data`
+                );
                 userTeams.push({
                   id: hardcodedTeam.id,
                   name: hardcodedTeam.name,
@@ -339,15 +360,21 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
                   memberCount: 0,
                   isActive: true,
                   role: 'captain',
-                  bannerImage: hardcodedTeam.rawEvent?.tags?.find(t => t[0] === 'banner')?.[1],
+                  bannerImage: hardcodedTeam.rawEvent?.tags?.find(
+                    (t) => t[0] === 'banner'
+                  )?.[1],
                   captainId: hardcodedTeam.captainHex,
-                  charityId: hardcodedTeam.rawEvent?.tags?.find(t => t[0] === 'charity')?.[1],
+                  charityId: hardcodedTeam.rawEvent?.tags?.find(
+                    (t) => t[0] === 'charity'
+                  )?.[1],
                 });
               }
             }
           }
 
-          console.log(`[getAllUserTeams] 📊 Hardcoded captain check complete: ${hardcodedCaptainMatches} matches found`);
+          console.log(
+            `[getAllUserTeams] 📊 Hardcoded captain check complete: ${hardcodedCaptainMatches} matches found`
+          );
 
           // 2. Get all local memberships
           console.log(`Found ${localMemberships.length} local memberships`);
@@ -795,9 +822,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
       fetchProfileData(currentUser);
     } else if (currentUser && !profileData) {
       // ✅ PROFILE CACHE FIX: User loaded from cache but profileData not built yet
-      console.log(
-        '✅ NavigationData: Building profileData for cached user'
-      );
+      console.log('✅ NavigationData: Building profileData for cached user');
       fetchProfileData(currentUser);
     }
   }, [currentUser, user?.id, profileData]);
@@ -927,8 +952,12 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
           unifiedCache.subscribe(
             CacheKeys.USER_PROFILE(hexPubkey),
             (profile) => {
-              console.log('🔄 Profile updated from cache');
+              console.log(
+                '🔄 Profile updated from cache, rebuilding profileData'
+              );
               setUser(profile);
+              // ✅ PROFILE UPDATE FIX: Rebuild profileData when cache updates
+              fetchProfileData(profile);
             }
           ),
           unifiedCache.subscribe(CacheKeys.USER_TEAMS(hexPubkey), (teams) => {
@@ -955,37 +984,40 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
   }, []);
 
   // ✅ PERFORMANCE FIX: Memoize context value to prevent unnecessary re-renders
-  const value = useMemo<NavigationData>(() => ({
-    user,
-    teamData,
-    profileData,
-    walletData,
-    captainDashboardData,
-    availableTeams,
-    isLoading,
-    isLoadingTeam,
-    error,
-    refresh,
-    loadTeams,
-    loadWallet,
-    loadCaptainDashboard,
-    prefetchLeaguesInBackground,
-  }), [
-    user,
-    teamData,
-    profileData,
-    walletData,
-    captainDashboardData,
-    availableTeams,
-    isLoading,
-    isLoadingTeam,
-    error,
-    refresh,
-    loadTeams,
-    loadWallet,
-    loadCaptainDashboard,
-    prefetchLeaguesInBackground,
-  ]);
+  const value = useMemo<NavigationData>(
+    () => ({
+      user,
+      teamData,
+      profileData,
+      walletData,
+      captainDashboardData,
+      availableTeams,
+      isLoading,
+      isLoadingTeam,
+      error,
+      refresh,
+      loadTeams,
+      loadWallet,
+      loadCaptainDashboard,
+      prefetchLeaguesInBackground,
+    }),
+    [
+      user,
+      teamData,
+      profileData,
+      walletData,
+      captainDashboardData,
+      availableTeams,
+      isLoading,
+      isLoadingTeam,
+      error,
+      refresh,
+      loadTeams,
+      loadWallet,
+      loadCaptainDashboard,
+      prefetchLeaguesInBackground,
+    ]
+  );
 
   return (
     <NavigationDataContext.Provider value={value}>

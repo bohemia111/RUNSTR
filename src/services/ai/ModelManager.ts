@@ -52,9 +52,11 @@ export class ModelManager {
   static async setSelectedModel(modelId: string): Promise<void> {
     try {
       // Validate model exists
-      const modelExists = this.AVAILABLE_MODELS.some(m => m.id === modelId);
+      const modelExists = this.AVAILABLE_MODELS.some((m) => m.id === modelId);
       if (!modelExists) {
-        console.warn(`Model ${modelId} not found in available models, using default`);
+        console.warn(
+          `Model ${modelId} not found in available models, using default`
+        );
         await AsyncStorage.setItem(MODEL_STORAGE_KEY, DEFAULT_MODEL);
         return;
       }
@@ -69,7 +71,7 @@ export class ModelManager {
    * Get model name from ID
    */
   static getModelName(modelId: string): string {
-    const model = this.AVAILABLE_MODELS.find(m => m.id === modelId);
+    const model = this.AVAILABLE_MODELS.find((m) => m.id === modelId);
     return model?.name || modelId;
   }
 

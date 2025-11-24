@@ -117,7 +117,9 @@ export class GarminActivityService {
       console.error('❌ Garmin sync failed:', error);
       return {
         success: false,
-        error: `Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: `Sync failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
       };
     } finally {
       this.syncInProgress = false;
@@ -250,9 +252,7 @@ export class GarminActivityService {
 
       const data: GarminActivity[] = await response.json();
 
-      console.log(
-        `📱 Garmin API returned ${data?.length || 0} activities`
-      );
+      console.log(`📱 Garmin API returned ${data?.length || 0} activities`);
 
       // Garmin API returns array directly (not wrapped in object)
       return Array.isArray(data) ? data : [];
@@ -311,7 +311,8 @@ export class GarminActivityService {
       // Convert Garmin timestamp to ISO string
       // Garmin provides Unix timestamp in seconds + offset for local time
       const startTimeMs =
-        (activity.startTimeInSeconds + activity.startTimeOffsetInSeconds) * 1000;
+        (activity.startTimeInSeconds + activity.startTimeOffsetInSeconds) *
+        1000;
       const endTimeMs = startTimeMs + activity.durationInSeconds * 1000;
 
       const startTime = new Date(startTimeMs).toISOString();
@@ -386,7 +387,9 @@ export class GarminActivityService {
 
       console.log(
         `✅ Cached Garmin workout - ${workout.type}, ${workout.duration}s, ${
-          workout.distance ? (workout.distance / 1000).toFixed(2) + 'km' : 'no distance'
+          workout.distance
+            ? (workout.distance / 1000).toFixed(2) + 'km'
+            : 'no distance'
         }`
       );
       return 'saved';
@@ -407,7 +410,9 @@ export class GarminActivityService {
 
       // Get all cached Garmin workouts for this user
       const keys = await AsyncStorage.getAllKeys();
-      const garminKeys = keys.filter((key) => key.startsWith('garmin_workout_'));
+      const garminKeys = keys.filter((key) =>
+        key.startsWith('garmin_workout_')
+      );
 
       if (garminKeys.length === 0) {
         console.log('No cached Garmin workouts found');
@@ -505,7 +510,9 @@ export class GarminActivityService {
   }> {
     try {
       const keys = await AsyncStorage.getAllKeys();
-      const garminKeys = keys.filter((key) => key.startsWith('garmin_workout_'));
+      const garminKeys = keys.filter((key) =>
+        key.startsWith('garmin_workout_')
+      );
 
       let totalCount = 0;
       let recentCount = 0;

@@ -20,9 +20,7 @@ export class StreakAnalyticsService {
   /**
    * Calculate streaks for all activity types user has done
    */
-  static calculateActivityStreaks(
-    workouts: LocalWorkout[]
-  ): ActivityStreak[] {
+  static calculateActivityStreaks(workouts: LocalWorkout[]): ActivityStreak[] {
     if (workouts.length === 0) {
       return [];
     }
@@ -33,9 +31,7 @@ export class StreakAnalyticsService {
     // Calculate streaks for each activity type
     const streaks: ActivityStreak[] = [];
 
-    for (const [activityType, typeWorkouts] of Object.entries(
-      workoutsByType
-    )) {
+    for (const [activityType, typeWorkouts] of Object.entries(workoutsByType)) {
       const streak = this.calculateStreakForActivity(
         activityType as WorkoutType,
         typeWorkouts
@@ -121,8 +117,9 @@ export class StreakAnalyticsService {
    */
   private static calculateCurrentStreak(sortedDates: string[]): number {
     const today = new Date().toLocaleDateString('en-CA');
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
-      .toLocaleDateString('en-CA');
+    const yesterday = new Date(
+      Date.now() - 24 * 60 * 60 * 1000
+    ).toLocaleDateString('en-CA');
 
     // Streak must include today OR yesterday (grace period)
     const lastDate = sortedDates[sortedDates.length - 1];

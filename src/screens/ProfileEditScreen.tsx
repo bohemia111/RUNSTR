@@ -3,7 +3,7 @@
  * Allows users to update their display name, bio, profile picture, Lightning address, etc.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -32,7 +32,7 @@ import { validateProfile } from '../utils/profileValidation';
 
 export const ProfileEditScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { currentUser, refreshAuthentication } = useAuth();
+  const { currentUser } = useAuth();
 
   // Form state
   const [profile, setProfile] = useState<EditableProfile>({
@@ -50,10 +50,12 @@ export const ProfileEditScreen: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
   const [originalProfile, setOriginalProfile] = useState<EditableProfile>({});
 
-  // Load current profile data on mount
-  useEffect(() => {
-    loadCurrentProfile();
-  }, []);
+  // Load current profile data on mount and when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadCurrentProfile();
+    }, [])
+  );
 
   // Auto-save draft to AsyncStorage
   useEffect(() => {
@@ -165,10 +167,11 @@ export const ProfileEditScreen: React.FC = () => {
           [
             {
               text: 'OK',
-              onPress: async () => {
-                // Refresh auth context to update user data
-                await refreshAuthentication();
-                navigation.goBack();
+              onPress: () => {
+                // Wait for alert dismiss animation before navigating
+                setTimeout(() => {
+                  navigation.goBack();
+                }, 100);
               },
             },
           ]

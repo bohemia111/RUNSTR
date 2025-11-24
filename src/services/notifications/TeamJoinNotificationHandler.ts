@@ -45,8 +45,7 @@ export class TeamJoinNotificationHandler {
 
   static getInstance(): TeamJoinNotificationHandler {
     if (!TeamJoinNotificationHandler.instance) {
-      TeamJoinNotificationHandler.instance =
-        new TeamJoinNotificationHandler();
+      TeamJoinNotificationHandler.instance = new TeamJoinNotificationHandler();
     }
     return TeamJoinNotificationHandler.instance;
   }
@@ -65,9 +64,7 @@ export class TeamJoinNotificationHandler {
     try {
       const userIdentifiers = await getUserNostrIdentifiers();
       if (!userIdentifiers?.hexPubkey) {
-        console.warn(
-          '[TeamJoinHandler] User not authenticated, cannot start'
-        );
+        console.warn('[TeamJoinHandler] User not authenticated, cannot start');
         return;
       }
 
@@ -100,10 +97,7 @@ export class TeamJoinNotificationHandler {
       this.isActive = true;
       console.log('[TeamJoinHandler] ✅ Team join request monitoring active');
     } catch (error) {
-      console.error(
-        '[TeamJoinHandler] Failed to start monitoring:',
-        error
-      );
+      console.error('[TeamJoinHandler] Failed to start monitoring:', error);
       throw error;
     }
   }
@@ -144,8 +138,8 @@ export class TeamJoinNotificationHandler {
       );
 
       // Parse event tags to get team info
-      const teamIdTag = ndkEvent.tags.find(t => t[0] === 'team-id');
-      const teamNameTag = ndkEvent.tags.find(t => t[0] === 'team-name');
+      const teamIdTag = ndkEvent.tags.find((t) => t[0] === 'team-id');
+      const teamNameTag = ndkEvent.tags.find((t) => t[0] === 'team-name');
 
       if (!teamIdTag || !teamIdTag[1]) {
         console.warn('[TeamJoinHandler] Missing team-id tag');
@@ -258,7 +252,10 @@ export class TeamJoinNotificationHandler {
       try {
         callback(notification);
       } catch (error) {
-        console.error('[TeamJoinHandler] Error in notification callback:', error);
+        console.error(
+          '[TeamJoinHandler] Error in notification callback:',
+          error
+        );
       }
     });
   }

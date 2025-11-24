@@ -58,8 +58,8 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
   const {
     eventId: rawEventId,
     eventData: passedEventData,
-    teamId: contextTeamId,  // ✅ NEW: Team context from navigation
-    captainPubkey: contextCaptainPubkey,  // ✅ NEW: Captain context from navigation
+    teamId: contextTeamId, // ✅ NEW: Team context from navigation
+    captainPubkey: contextCaptainPubkey, // ✅ NEW: Captain context from navigation
   } = route.params;
 
   // ✅ FIX: Memoize eventId normalization to prevent infinite useEffect loop
@@ -88,7 +88,9 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState('');
-  const [participationType, setParticipationType] = useState<'in-person' | 'virtual'>('virtual'); // ✅ NEW: Default to virtual (safer assumption)
+  const [participationType, setParticipationType] = useState<
+    'in-person' | 'virtual'
+  >('virtual'); // ✅ NEW: Default to virtual (safer assumption)
   const [teamGoalProgress, setTeamGoalProgress] = useState<{
     current: number;
     goal: number;
@@ -152,7 +154,9 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
 
           // For active/upcoming events, refresh in background
           if (snapshot.eventStatus !== 'completed') {
-            console.log('🔄 Scheduling background refresh for active/upcoming event');
+            console.log(
+              '🔄 Scheduling background refresh for active/upcoming event'
+            );
             loadFreshDataInBackground(eventId, event);
           }
 
@@ -172,7 +176,9 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
 
         // ✅ FIX: If Nostr fetch failed but we have eventData prop, use it
         if (!event && eventData) {
-          console.warn('⚠️ Nostr fetch failed, using passed event data as fallback');
+          console.warn(
+            '⚠️ Nostr fetch failed, using passed event data as fallback'
+          );
           event = {
             ...eventData,
             teamId: eventData.teamId || initialTeamId,
@@ -196,8 +202,16 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         console.log(`⚡ Enriching event with contextTeamId: ${contextTeamId}`);
         event.teamId = contextTeamId;
       }
-      if ((!event.captainPubkey || event.captainPubkey.trim() === '') && contextCaptainPubkey) {
-        console.log(`⚡ Enriching event with contextCaptainPubkey: ${contextCaptainPubkey?.slice(0, 20)}...`);
+      if (
+        (!event.captainPubkey || event.captainPubkey.trim() === '') &&
+        contextCaptainPubkey
+      ) {
+        console.log(
+          `⚡ Enriching event with contextCaptainPubkey: ${contextCaptainPubkey?.slice(
+            0,
+            20
+          )}...`
+        );
         event.captainPubkey = contextCaptainPubkey;
       }
 
@@ -208,10 +222,17 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       if (!event.captainPubkey || event.captainPubkey.trim() === '') {
         const fallbackCaptain = event.pubkey || contextCaptainPubkey;
         if (fallbackCaptain) {
-          console.log(`⚡ Using fallback captain: ${fallbackCaptain.slice(0, 20)}... (from event.pubkey)`);
+          console.log(
+            `⚡ Using fallback captain: ${fallbackCaptain.slice(
+              0,
+              20
+            )}... (from event.pubkey)`
+          );
           event.captainPubkey = fallbackCaptain;
         } else {
-          console.warn(`⚠️ Event ${eventId} has no captain info - participants may not load`);
+          console.warn(
+            `⚠️ Event ${eventId} has no captain info - participants may not load`
+          );
           console.warn('Event data:', JSON.stringify(event, null, 2));
           // Don't crash - continue with limited view
         }
@@ -227,9 +248,16 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       // Always include captain first
       if (event.captainPubkey && event.captainPubkey.trim() !== '') {
         eventParticipants.push(event.captainPubkey);
-        console.log(`✅ Added captain to participants: ${event.captainPubkey.slice(0, 20)}...`);
+        console.log(
+          `✅ Added captain to participants: ${event.captainPubkey.slice(
+            0,
+            20
+          )}...`
+        );
       } else {
-        console.warn('⚠️ No captain information available - leaderboard may be empty');
+        console.warn(
+          '⚠️ No captain information available - leaderboard may be empty'
+        );
       }
 
       // Check if current user joined locally and add them
@@ -238,21 +266,27 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         const { EventParticipationStore } = await import(
           '../services/event/EventParticipationStore'
         );
-        const userJoinedLocally = await EventParticipationStore.hasUserJoinedLocally(
-          eventId
-        );
+        const userJoinedLocally =
+          await EventParticipationStore.hasUserJoinedLocally(eventId);
 
         if (userJoinedLocally && !eventParticipants.includes(userHexPubkey)) {
           eventParticipants.push(userHexPubkey);
-          console.log('✅ Added local participant:', userHexPubkey.slice(0, 20));
+          console.log(
+            '✅ Added local participant:',
+            userHexPubkey.slice(0, 20)
+          );
         }
       }
 
       // Step 3: Add captain-approved participants from kind 30000 list
       if (event.captainPubkey && event.id) {
         try {
-          console.log('⏳ Fetching approved participants from kind 30000 list...');
-          const { NostrListService } = await import('../services/nostr/NostrListService');
+          console.log(
+            '⏳ Fetching approved participants from kind 30000 list...'
+          );
+          const { NostrListService } = await import(
+            '../services/nostr/NostrListService'
+          );
           const listService = NostrListService.getInstance();
 
           const approvedParticipants = await listService.getListMembers(
@@ -260,7 +294,9 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
             `event-${event.id}-participants`
           );
 
-          console.log(`📋 Found ${approvedParticipants.length} approved participants in kind 30000 list`);
+          console.log(
+            `📋 Found ${approvedParticipants.length} approved participants in kind 30000 list`
+          );
 
           // Merge approved participants with existing array (deduplication)
           for (const pubkey of approvedParticipants) {
@@ -269,16 +305,23 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
             }
           }
 
-          console.log(`✅ Total participants after merge: ${eventParticipants.length}`);
+          console.log(
+            `✅ Total participants after merge: ${eventParticipants.length}`
+          );
         } catch (error) {
-          console.warn('⚠️ Failed to fetch approved participants (non-blocking):', error);
+          console.warn(
+            '⚠️ Failed to fetch approved participants (non-blocking):',
+            error
+          );
           console.warn('   Continuing with captain + local participants only');
         }
       }
 
       setParticipants(eventParticipants);
       setLoadingMembers(false);
-      console.log(`✅ Participant list built instantly: ${eventParticipants.length} participants`);
+      console.log(
+        `✅ Participant list built instantly: ${eventParticipants.length} participants`
+      );
 
       // Set user participation status
       if (userHexPubkey) {
@@ -288,13 +331,23 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         const isUserCaptain = event.captainPubkey === userHexPubkey;
         setIsCaptain(isUserCaptain);
 
-        console.log(`User is${isUserCaptain ? ' the captain' : isUserParticipant ? ' a participant' : ' not participating'}`);
+        console.log(
+          `User is${
+            isUserCaptain
+              ? ' the captain'
+              : isUserParticipant
+              ? ' a participant'
+              : ' not participating'
+          }`
+        );
       }
 
       // PHASE 3: Leaderboard calculation (heaviest operation, show skeleton)
       // ✅ FIX: Guard against duplicate calculations if component re-renders
       if (loadingLeaderboard) {
-        console.warn('⚠️ Leaderboard already calculating - skipping duplicate request');
+        console.warn(
+          '⚠️ Leaderboard already calculating - skipping duplicate request'
+        );
         return;
       }
 
@@ -303,12 +356,15 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
 
       // ✅ SIMPLIFIED: eventParticipants already contains captain + local user
       const participantsForLeaderboard = eventParticipants;
-      console.log(`📊 Leaderboard will query for ${participantsForLeaderboard.length} participants (captain + local)`);
-
+      console.log(
+        `📊 Leaderboard will query for ${participantsForLeaderboard.length} participants (captain + local)`
+      );
 
       // ✅ FIX: Show empty state if no participants (don't get stuck loading)
       if (participantsForLeaderboard.length === 0) {
-        console.warn('⚠️ No participants to display - showing empty leaderboard');
+        console.warn(
+          '⚠️ No participants to display - showing empty leaderboard'
+        );
         setLeaderboard([]);
         setTeamGoalProgress(null);
         setLoadingLeaderboard(false);
@@ -320,10 +376,11 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         const SimpleLeaderboardService = (
           await import('../services/competition/SimpleLeaderboardService')
         ).default;
-        const rankings = await SimpleLeaderboardService.calculateEventLeaderboard(
-          event,
-          participantsForLeaderboard
-        );
+        const rankings =
+          await SimpleLeaderboardService.calculateEventLeaderboard(
+            event,
+            participantsForLeaderboard
+          );
 
         setLeaderboard(rankings);
         console.log(`✅ Leaderboard calculated: ${rankings.length} entries`);
@@ -331,12 +388,15 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         // Calculate team goal progress if event has team-total scoring mode
         if (event.scoringMode === 'team-total' && event.teamGoal) {
           console.log('🎯 Calculating team goal progress...');
-          const progress = await SimpleLeaderboardService.calculateTeamGoalProgress(
-            event,
-            participantsForLeaderboard
-          );
+          const progress =
+            await SimpleLeaderboardService.calculateTeamGoalProgress(
+              event,
+              participantsForLeaderboard
+            );
           setTeamGoalProgress(progress);
-          console.log(`✅ Team goal progress: ${progress.percentage.toFixed(1)}%`);
+          console.log(
+            `✅ Team goal progress: ${progress.percentage.toFixed(1)}%`
+          );
         } else {
           setTeamGoalProgress(null);
         }
@@ -367,7 +427,10 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
           });
           console.log('💾 Event snapshot saved for instant future display');
         } catch (snapshotError) {
-          console.warn('⚠️ Failed to save snapshot (non-critical):', snapshotError);
+          console.warn(
+            '⚠️ Failed to save snapshot (non-critical):',
+            snapshotError
+          );
           // Don't throw - snapshot is optional optimization
         }
       }
@@ -385,7 +448,10 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
             `• Moved to different relays\n` +
             `• Created with an invalid ID\n\n` +
             `Event ID: ${eventId}`;
-        } else if (err.message.includes('timeout') || err.message.includes('timed out')) {
+        } else if (
+          err.message.includes('timeout') ||
+          err.message.includes('timed out')
+        ) {
           errorMessage =
             `Connection Timeout\n\n` +
             `Unable to reach Nostr relays.\n\n` +
@@ -407,7 +473,10 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
     }
   };
 
-  const loadFreshDataInBackground = async (eventId: string, cachedEvent: any) => {
+  const loadFreshDataInBackground = async (
+    eventId: string,
+    cachedEvent: any
+  ) => {
     // Non-blocking background refresh for active/upcoming events
     try {
       console.log('🔄 Background refresh started for event:', eventId);
@@ -423,7 +492,10 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       ).default;
 
       // Fetch fresh data
-      const freshEvent = await SimpleCompetitionService.getInstance().getEventByIdOrDTag(eventId);
+      const freshEvent =
+        await SimpleCompetitionService.getInstance().getEventByIdOrDTag(
+          eventId
+        );
       if (!freshEvent) {
         console.warn('⚠️ Background refresh: Event not found');
         return;
@@ -434,18 +506,20 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
         `event-${freshEvent.id}-participants` // Use freshEvent.id (d-tag) not route param
       );
 
-      const freshLeaderboard = await SimpleLeaderboardService.calculateEventLeaderboard(
-        freshEvent,
-        freshParticipants
-      );
+      const freshLeaderboard =
+        await SimpleLeaderboardService.calculateEventLeaderboard(
+          freshEvent,
+          freshParticipants
+        );
 
       // Calculate team goal progress for background refresh
       let freshTeamGoalProgress = null;
       if (freshEvent.scoringMode === 'team-total' && freshEvent.teamGoal) {
-        freshTeamGoalProgress = await SimpleLeaderboardService.calculateTeamGoalProgress(
-          freshEvent,
-          freshParticipants
-        );
+        freshTeamGoalProgress =
+          await SimpleLeaderboardService.calculateTeamGoalProgress(
+            freshEvent,
+            freshParticipants
+          );
       }
 
       // Update UI with fresh data (only if still on this screen)
@@ -475,7 +549,10 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
 
       console.log('✅ Background refresh complete and snapshot updated');
     } catch (error) {
-      console.warn('⚠️ Background refresh failed (showing cached data):', error);
+      console.warn(
+        '⚠️ Background refresh failed (showing cached data):',
+        error
+      );
       // Don't show error to user - cached data is still displayed
     }
   };
@@ -540,7 +617,10 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
       }
 
       // Free event or paid event without Lightning address (fallback to NWC)
-      const result = await eventJoinService.joinFreeEvent(qrEventData, participationType);
+      const result = await eventJoinService.joinFreeEvent(
+        qrEventData,
+        participationType
+      );
 
       if (result.success) {
         // Store participation locally for instant UX
@@ -703,12 +783,16 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
           <Text style={styles.errorText}>
             {error || 'Event not found'}
             {'\n\n'}
-            This event may have been deleted or is no longer available on Nostr relays.
+            This event may have been deleted or is no longer available on Nostr
+            relays.
           </Text>
           <TouchableOpacity onPress={loadEventData} style={styles.retryButton}>
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleBack} style={styles.backToListButton}>
+          <TouchableOpacity
+            onPress={handleBack}
+            style={styles.backToListButton}
+          >
             <Text style={styles.backToListButtonText}>Back to Events</Text>
           </TouchableOpacity>
         </View>
@@ -767,7 +851,11 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
           {eventData.location && (
             <View style={styles.eventInfoRow}>
               <View style={styles.locationHeader}>
-                <Ionicons name="location" size={16} color={theme.colors.accent} />
+                <Ionicons
+                  name="location"
+                  size={16}
+                  color={theme.colors.accent}
+                />
                 <Text style={styles.eventLabel}>Location</Text>
               </View>
               <Text style={styles.eventValue}>{eventData.location}</Text>
@@ -787,7 +875,11 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
               {/* ✅ FIX: Use scoringType instead of metric */}
               {eventData.scoringType === 'completion' && 'Completion'}
               {eventData.scoringType === 'fastest_time' && 'Fastest Time'}
-              {!eventData.scoringType && (eventData.metric?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Total Distance')}
+              {!eventData.scoringType &&
+                (eventData.metric
+                  ?.replace(/_/g, ' ')
+                  .replace(/\b\w/g, (l) => l.toUpperCase()) ||
+                  'Total Distance')}
             </Text>
           </View>
 
@@ -807,14 +899,15 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
             </View>
           )}
 
-          {eventData.paymentDestination === 'charity' && eventData.paymentRecipientName && (
-            <View style={styles.charityCard}>
-              <Ionicons name="heart" size={20} color={theme.colors.accent} />
-              <Text style={styles.charityText}>
-                100% of entry fees support {eventData.paymentRecipientName}
-              </Text>
-            </View>
-          )}
+          {eventData.paymentDestination === 'charity' &&
+            eventData.paymentRecipientName && (
+              <View style={styles.charityCard}>
+                <Ionicons name="heart" size={20} color={theme.colors.accent} />
+                <Text style={styles.charityText}>
+                  100% of entry fees support {eventData.paymentRecipientName}
+                </Text>
+              </View>
+            )}
 
           {eventData.targetDistance && (
             <View style={styles.eventInfoRow}>
@@ -864,11 +957,17 @@ export const EventDetailScreen: React.FC<EventDetailScreenProps> = ({
           <View style={styles.participationTypeContainer}>
             {eventData.location && (
               <View style={styles.locationRow}>
-                <Ionicons name="location" size={16} color={theme.colors.textSecondary} />
+                <Ionicons
+                  name="location"
+                  size={16}
+                  color={theme.colors.textSecondary}
+                />
                 <Text style={styles.locationText}>{eventData.location}</Text>
               </View>
             )}
-            <Text style={styles.participationTypeLabel}>Participation Type:</Text>
+            <Text style={styles.participationTypeLabel}>
+              Participation Type:
+            </Text>
             <View style={styles.radioGroup}>
               <TouchableOpacity
                 style={styles.radioOption}

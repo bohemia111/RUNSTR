@@ -5,7 +5,16 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Platform, ScrollView, View, Text, StyleSheet, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
+import {
+  Platform,
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  AppState,
+  AppStateStatus,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { AppStateManager } from '../../services/core/AppStateManager';
@@ -18,7 +27,10 @@ import LocalWorkoutStorageService from '../../services/fitness/LocalWorkoutStora
 import { RouteSelectionModal } from '../../components/routes/RouteSelectionModal';
 import routeMatchingService from '../../services/routes/RouteMatchingService';
 import type { SavedRoute } from '../../services/routes/RouteStorageService';
-import { DailyStepGoalCard, type PostingState } from '../../components/activity/DailyStepGoalCard';
+import {
+  DailyStepGoalCard,
+  type PostingState,
+} from '../../components/activity/DailyStepGoalCard';
 import { dailyStepCounterService } from '../../services/activity/DailyStepCounterService';
 import { dailyStepGoalService } from '../../services/activity/DailyStepGoalService';
 import type { DailyStepData } from '../../services/activity/DailyStepCounterService';
@@ -90,7 +102,9 @@ export const WalkingTrackerScreen: React.FC = () => {
   // Daily step counter state
   const [dailySteps, setDailySteps] = useState<number | null>(null);
   const [stepGoal, setStepGoal] = useState<number>(10000);
-  const [stepProgress, setStepProgress] = useState<StepGoalProgress | null>(null);
+  const [stepProgress, setStepProgress] = useState<StepGoalProgress | null>(
+    null
+  );
   const [stepCounterLoading, setStepCounterLoading] = useState(true);
   const [stepCounterError, setStepCounterError] = useState<string | null>(null);
   const [postingState, setPostingState] = useState<PostingState>('idle');
@@ -102,14 +116,16 @@ export const WalkingTrackerScreen: React.FC = () => {
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [userProfile, setUserProfile] = useState<NostrProfile | null>(null);
   const [userId, setUserId] = useState<string>('');
-  const [preparedWorkout, setPreparedWorkout] = useState<PublishableWorkout | null>(null);
+  const [preparedWorkout, setPreparedWorkout] =
+    useState<PublishableWorkout | null>(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (metricsUpdateRef.current) clearInterval(metricsUpdateRef.current);
-      if (stepUpdateIntervalRef.current) clearInterval(stepUpdateIntervalRef.current);
+      if (stepUpdateIntervalRef.current)
+        clearInterval(stepUpdateIntervalRef.current);
     };
   }, []);
 
@@ -127,7 +143,10 @@ export const WalkingTrackerScreen: React.FC = () => {
           setUserProfile(profile);
         }
       } catch (error) {
-        console.error('[WalkingTrackerScreen] Failed to load user profile:', error);
+        console.error(
+          '[WalkingTrackerScreen] Failed to load user profile:',
+          error
+        );
       }
     };
 
@@ -147,12 +166,15 @@ export const WalkingTrackerScreen: React.FC = () => {
           // Device doesn't support pedometer - GPS-only mode
           setStepCounterLoading(false);
           setShowBackgroundBanner(false);
-          console.log('[WalkingTrackerScreen] Pedometer not available - using GPS-only mode');
+          console.log(
+            '[WalkingTrackerScreen] Pedometer not available - using GPS-only mode'
+          );
           return;
         }
 
         // Check if permissions already granted (don't request yet)
-        const permissionStatus = await dailyStepCounterService.checkPermissionStatus();
+        const permissionStatus =
+          await dailyStepCounterService.checkPermissionStatus();
 
         if (permissionStatus === 'granted') {
           // Permissions already granted - enable background mode
@@ -166,15 +188,25 @@ export const WalkingTrackerScreen: React.FC = () => {
             setStepGoal(goal);
 
             if (stepData) {
-              const progress = dailyStepGoalService.calculateProgress(stepData.steps, goal);
+              const progress = dailyStepGoalService.calculateProgress(
+                stepData.steps,
+                goal
+              );
               setStepProgress(progress);
             }
 
             setIsBackgroundActive(true);
             setShowBackgroundBanner(false);
-            console.log(`[WalkingTrackerScreen] ✅ Background tracking active: ${stepData?.steps || 0} steps`);
+            console.log(
+              `[WalkingTrackerScreen] ✅ Background tracking active: ${
+                stepData?.steps || 0
+              } steps`
+            );
           } catch (error) {
-            console.error('[WalkingTrackerScreen] Error fetching steps:', error);
+            console.error(
+              '[WalkingTrackerScreen] Error fetching steps:',
+              error
+            );
             setIsBackgroundActive(false);
             setShowBackgroundBanner(true);
           }
@@ -182,12 +214,17 @@ export const WalkingTrackerScreen: React.FC = () => {
           // Permissions not granted - show optional banner
           setIsBackgroundActive(false);
           setShowBackgroundBanner(true);
-          console.log('[WalkingTrackerScreen] Background tracking available - showing banner');
+          console.log(
+            '[WalkingTrackerScreen] Background tracking available - showing banner'
+          );
         }
 
         setStepCounterLoading(false);
       } catch (error) {
-        console.error('[WalkingTrackerScreen] Error checking background tracking:', error);
+        console.error(
+          '[WalkingTrackerScreen] Error checking background tracking:',
+          error
+        );
         setStepCounterLoading(false);
         setShowBackgroundBanner(false);
       }
@@ -204,7 +241,10 @@ export const WalkingTrackerScreen: React.FC = () => {
             if (stepData) {
               setDailySteps(stepData.steps);
               const goal = await dailyStepGoalService.getGoal();
-              const progress = dailyStepGoalService.calculateProgress(stepData.steps, goal);
+              const progress = dailyStepGoalService.calculateProgress(
+                stepData.steps,
+                goal
+              );
               setStepProgress(progress);
             }
           } catch (error) {
@@ -228,16 +268,22 @@ export const WalkingTrackerScreen: React.FC = () => {
     const checkIfPosted = async () => {
       try {
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const alreadyPosted = await LocalWorkoutStorageService.hasDailyStepsForDate(today);
+        const alreadyPosted =
+          await LocalWorkoutStorageService.hasDailyStepsForDate(today);
 
         if (alreadyPosted) {
           setPostingState('posted');
-          console.log('[WalkingTrackerScreen] Daily steps already posted today');
+          console.log(
+            '[WalkingTrackerScreen] Daily steps already posted today'
+          );
         } else {
           setPostingState('idle');
         }
       } catch (error) {
-        console.error('[WalkingTrackerScreen] Error checking posted status:', error);
+        console.error(
+          '[WalkingTrackerScreen] Error checking posted status:',
+          error
+        );
       }
     };
 
@@ -249,7 +295,9 @@ export const WalkingTrackerScreen: React.FC = () => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active' && isTrackingRef.current) {
         // App returned to foreground while tracking - sync immediately
-        console.log('[WalkingTrackerScreen] App returned to foreground, syncing metrics...');
+        console.log(
+          '[WalkingTrackerScreen] App returned to foreground, syncing metrics...'
+        );
 
         // Force immediate sync of metrics
         const session = simpleLocationTrackingService.getCurrentSession();
@@ -265,19 +313,26 @@ export const WalkingTrackerScreen: React.FC = () => {
             distance: activityMetricsService.formatDistance(session.distance),
             duration: activityMetricsService.formatDuration(currentElapsed),
             steps: activityMetricsService.formatSteps(steps),
-            elevation: activityMetricsService.formatElevation(session.elevationGain),
+            elevation: activityMetricsService.formatElevation(
+              session.elevationGain
+            ),
           });
           setElapsedTime(currentElapsed);
 
           console.log(
-            `[WalkingTrackerScreen] ✅ Synced: ${(session.distance / 1000).toFixed(2)} km, ` +
-            `${currentElapsed}s, ${steps} steps, tracking continued in background`
+            `[WalkingTrackerScreen] ✅ Synced: ${(
+              session.distance / 1000
+            ).toFixed(2)} km, ` +
+              `${currentElapsed}s, ${steps} steps, tracking continued in background`
           );
         }
       }
     };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    const subscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange
+    );
 
     return () => {
       subscription.remove();
@@ -290,7 +345,9 @@ export const WalkingTrackerScreen: React.FC = () => {
   }, [isTracking]);
 
   const handleHoldComplete = async () => {
-    console.log('[WalkingTrackerScreen] Hold complete, checking permissions...');
+    console.log(
+      '[WalkingTrackerScreen] Hold complete, checking permissions...'
+    );
 
     // ✅ Check permissions BEFORE starting countdown
     const permissionStatus = await appPermissionService.checkAllPermissions();
@@ -302,7 +359,9 @@ export const WalkingTrackerScreen: React.FC = () => {
     }
 
     // Permissions granted, start countdown
-    console.log('[WalkingTrackerScreen] Permissions granted, starting countdown...');
+    console.log(
+      '[WalkingTrackerScreen] Permissions granted, starting countdown...'
+    );
 
     // Start countdown: 3 → 2 → 1 → GO!
     setCountdown(3);
@@ -378,7 +437,9 @@ export const WalkingTrackerScreen: React.FC = () => {
     // Initialize route matching if a route is selected
     if (selectedRoute) {
       routeMatchingService.startMatching(selectedRoute);
-      console.log(`[WalkingTrackerScreen] Started route matching for: ${selectedRoute.name}`);
+      console.log(
+        `[WalkingTrackerScreen] Started route matching for: ${selectedRoute.name}`
+      );
     }
 
     timerRef.current = setInterval(() => {
@@ -464,7 +525,7 @@ export const WalkingTrackerScreen: React.FC = () => {
     );
 
     // Convert LocationPoint[] to GPSCoordinate[] for route saving
-    const gpsCoordinates = session.positions.map(point => ({
+    const gpsCoordinates = session.positions.map((point) => ({
       latitude: point.latitude,
       longitude: point.longitude,
       altitude: point.altitude,
@@ -489,7 +550,7 @@ export const WalkingTrackerScreen: React.FC = () => {
         duration: elapsedTime,
         calories,
         elevation: session.elevationGain,
-        steps,
+        metadata: { steps },
         localWorkoutId: workoutId,
         gpsCoordinates, // Pass GPS data for route saving
       });
@@ -503,7 +564,7 @@ export const WalkingTrackerScreen: React.FC = () => {
         duration: elapsedTime,
         calories,
         elevation: session.elevationGain,
-        steps,
+        metadata: { steps },
         gpsCoordinates, // Pass GPS data even if local save failed
       });
       setSummaryModalVisible(true);
@@ -523,7 +584,9 @@ export const WalkingTrackerScreen: React.FC = () => {
   };
 
   const handleRequestPermission = async () => {
-    console.log('[WalkingTrackerScreen] User requested background tracking permission');
+    console.log(
+      '[WalkingTrackerScreen] User requested background tracking permission'
+    );
     setStepCounterLoading(true);
     setStepCounterError(null);
 
@@ -531,7 +594,9 @@ export const WalkingTrackerScreen: React.FC = () => {
       const granted = await dailyStepCounterService.requestPermissions();
 
       if (granted) {
-        console.log('[WalkingTrackerScreen] ✅ Permission granted - activating background tracking');
+        console.log(
+          '[WalkingTrackerScreen] ✅ Permission granted - activating background tracking'
+        );
 
         // Fetch step data
         const stepData = await dailyStepCounterService.getTodaySteps();
@@ -539,7 +604,10 @@ export const WalkingTrackerScreen: React.FC = () => {
           setDailySteps(stepData.steps);
           const goal = await dailyStepGoalService.getGoal();
           setStepGoal(goal);
-          const progress = dailyStepGoalService.calculateProgress(stepData.steps, goal);
+          const progress = dailyStepGoalService.calculateProgress(
+            stepData.steps,
+            goal
+          );
           setStepProgress(progress);
         }
 
@@ -548,16 +616,25 @@ export const WalkingTrackerScreen: React.FC = () => {
         setShowBackgroundBanner(false);
         setStepCounterLoading(false);
 
-        console.log(`[WalkingTrackerScreen] ✅ Background tracking activated: ${stepData?.steps || 0} steps`);
+        console.log(
+          `[WalkingTrackerScreen] ✅ Background tracking activated: ${
+            stepData?.steps || 0
+          } steps`
+        );
       } else {
-        console.warn('[WalkingTrackerScreen] ⚠️ Permission denied - GPS-only mode continues');
+        console.warn(
+          '[WalkingTrackerScreen] ⚠️ Permission denied - GPS-only mode continues'
+        );
         setStepCounterError('Background tracking requires motion permissions');
         setShowBackgroundBanner(true);
         setIsBackgroundActive(false);
         setStepCounterLoading(false);
       }
     } catch (error) {
-      console.error('[WalkingTrackerScreen] ❌ Error requesting permission:', error);
+      console.error(
+        '[WalkingTrackerScreen] ❌ Error requesting permission:',
+        error
+      );
       setStepCounterError('Failed to enable background tracking');
       setShowBackgroundBanner(true);
       setIsBackgroundActive(false);
@@ -583,7 +660,9 @@ export const WalkingTrackerScreen: React.FC = () => {
 
     try {
       setPostingState('posting');
-      console.log(`[WalkingTrackerScreen] Preparing to post ${dailySteps} daily steps`);
+      console.log(
+        `[WalkingTrackerScreen] Preparing to post ${dailySteps} daily steps`
+      );
 
       // Calculate time from midnight to now
       const now = new Date();
@@ -636,9 +715,14 @@ export const WalkingTrackerScreen: React.FC = () => {
       // Reset posting state after opening modal
       setPostingState('idle');
 
-      console.log(`[WalkingTrackerScreen] ✅ Opening social share modal for ${dailySteps} steps`);
+      console.log(
+        `[WalkingTrackerScreen] ✅ Opening social share modal for ${dailySteps} steps`
+      );
     } catch (error) {
-      console.error('[WalkingTrackerScreen] ❌ Failed to post daily steps:', error);
+      console.error(
+        '[WalkingTrackerScreen] ❌ Failed to post daily steps:',
+        error
+      );
       setPostingState('idle');
 
       // Show error alert
@@ -664,7 +748,10 @@ export const WalkingTrackerScreen: React.FC = () => {
 
       // Recalculate progress
       if (dailySteps !== null) {
-        const progress = dailyStepGoalService.calculateProgress(dailySteps, newGoal);
+        const progress = dailyStepGoalService.calculateProgress(
+          dailySteps,
+          newGoal
+        );
         setStepProgress(progress);
       }
 
@@ -704,24 +791,44 @@ export const WalkingTrackerScreen: React.FC = () => {
         <View style={styles.metricsContainer}>
           <View style={styles.metricsRow}>
             <View style={styles.metricCard}>
-              <Ionicons name="navigate" size={20} color={theme.colors.textMuted} style={styles.metricIcon} />
+              <Ionicons
+                name="navigate"
+                size={20}
+                color={theme.colors.textMuted}
+                style={styles.metricIcon}
+              />
               <Text style={styles.metricValue}>{metrics.distance}</Text>
               <Text style={styles.metricLabel}>Distance</Text>
             </View>
             <View style={styles.metricCard}>
-              <Ionicons name="time" size={20} color={theme.colors.textMuted} style={styles.metricIcon} />
+              <Ionicons
+                name="time"
+                size={20}
+                color={theme.colors.textMuted}
+                style={styles.metricIcon}
+              />
               <Text style={styles.metricValue}>{metrics.duration}</Text>
               <Text style={styles.metricLabel}>Duration</Text>
             </View>
           </View>
           <View style={styles.metricsRow}>
             <View style={styles.metricCard}>
-              <Ionicons name="walk" size={20} color={theme.colors.textMuted} style={styles.metricIcon} />
+              <Ionicons
+                name="walk"
+                size={20}
+                color={theme.colors.textMuted}
+                style={styles.metricIcon}
+              />
               <Text style={styles.metricValue}>{metrics.steps}</Text>
               <Text style={styles.metricLabel}>Steps</Text>
             </View>
             <View style={styles.metricCard}>
-              <Ionicons name="trending-up" size={20} color={theme.colors.textMuted} style={styles.metricIcon} />
+              <Ionicons
+                name="trending-up"
+                size={20}
+                color={theme.colors.textMuted}
+                style={styles.metricIcon}
+              />
               <Text style={styles.metricValue}>{metrics.elevation}</Text>
               <Text style={styles.metricLabel}>Elevation</Text>
             </View>
@@ -737,14 +844,18 @@ export const WalkingTrackerScreen: React.FC = () => {
                 onPress={() => setRouteSelectionVisible(true)}
               >
                 <Ionicons
-                  name={selectedRoute ? "map" : "map-outline"}
+                  name={selectedRoute ? 'map' : 'map-outline'}
                   size={20}
-                  color={selectedRoute ? theme.colors.accent : theme.colors.text}
+                  color={
+                    selectedRoute ? theme.colors.accent : theme.colors.text
+                  }
                 />
-                <Text style={[
-                  styles.routesButtonText,
-                  selectedRoute && { color: theme.colors.accent }
-                ]}>
+                <Text
+                  style={[
+                    styles.routesButtonText,
+                    selectedRoute && { color: theme.colors.accent },
+                  ]}
+                >
                   {selectedRoute ? selectedRoute.name : 'Routes'}
                 </Text>
               </TouchableOpacity>
@@ -762,15 +873,28 @@ export const WalkingTrackerScreen: React.FC = () => {
           ) : (
             <>
               {!isPaused ? (
-                <TouchableOpacity style={styles.pauseButton} onPress={pauseTracking}>
+                <TouchableOpacity
+                  style={styles.pauseButton}
+                  onPress={pauseTracking}
+                >
                   <Ionicons name="pause" size={30} color={theme.colors.text} />
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={styles.resumeButton} onPress={resumeTracking}>
-                  <Ionicons name="play" size={30} color={theme.colors.background} />
+                <TouchableOpacity
+                  style={styles.resumeButton}
+                  onPress={resumeTracking}
+                >
+                  <Ionicons
+                    name="play"
+                    size={30}
+                    color={theme.colors.background}
+                  />
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.stopButton} onPress={stopTracking}>
+              <TouchableOpacity
+                style={styles.stopButton}
+                onPress={stopTracking}
+              >
                 <Ionicons name="stop" size={30} color={theme.colors.text} />
               </TouchableOpacity>
             </>
@@ -837,7 +961,9 @@ export const WalkingTrackerScreen: React.FC = () => {
           setShowSocialModal(false);
           setPreparedWorkout(null);
           setPostingState('posted');
-          console.log('[WalkingTrackerScreen] ✅ Daily steps posted successfully');
+          console.log(
+            '[WalkingTrackerScreen] ✅ Daily steps posted successfully'
+          );
         }}
       />
 

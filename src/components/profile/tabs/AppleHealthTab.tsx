@@ -40,10 +40,11 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
   const [permissionRequested, setPermissionRequested] = useState(false);
 
   useEffect(() => {
-    checkPermissionAndLoadWorkouts();
+    // Only check status on mount, don't auto-request permissions
+    checkPermissionStatus();
   }, []);
 
-  const checkPermissionAndLoadWorkouts = async () => {
+  const checkPermissionStatus = async () => {
     try {
       // First check if HealthKit is available
       const quickStatus = healthKitService.getStatus();
@@ -53,23 +54,30 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
         return;
       }
 
-      // Verify actual iOS permission state (not just cached value)
-      const status = await healthKitService.getStatusWithRealCheck();
+      // Check cached permission state (doesn't trigger iOS permission dialog)
+      // This prevents HealthKit popup from appearing on app startup
+      const status = healthKitService.getStatus();
 
-      if (!status.authorized) {
-        // Auto-request permissions on first visit
-        console.log('🍎 HealthKit not authorized, auto-requesting permissions...');
-        await requestPermission();
-      } else {
+      if (status.authorized) {
         // Already authorized, load workouts
         setHasPermission(true);
         await loadAppleHealthWorkouts();
+      } else {
+        // Not authorized - just update state, don't auto-request
+        console.log('🍎 HealthKit not authorized - showing connect button');
+        setHasPermission(false);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error checking HealthKit permission:', error);
       setHasPermission(false);
       setIsLoading(false);
     }
+  };
+
+  const handleConnectHealthKit = async () => {
+    // Manual permission request triggered by user action
+    await requestPermission();
   };
 
   const requestPermission = async () => {
@@ -231,7 +239,10 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
 
   const handleCompete = async (workout: Workout) => {
     if (!onCompete) {
-      CustomAlertManager.alert('Error', 'Competition entry functionality not available');
+      CustomAlertManager.alert(
+        'Error',
+        'Competition entry functionality not available'
+      );
       return;
     }
 
@@ -240,13 +251,19 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
       CustomAlertManager.alert('Success', 'Workout entered into competition!');
     } catch (error) {
       console.error('Competition entry failed:', error);
-      CustomAlertManager.alert('Error', 'Failed to enter workout into competition');
+      CustomAlertManager.alert(
+        'Error',
+        'Failed to enter workout into competition'
+      );
     }
   };
 
   const handleSocialShare = async (workout: Workout) => {
     if (!onSocialShare) {
-      CustomAlertManager.alert('Error', 'Social sharing functionality not available');
+      CustomAlertManager.alert(
+        'Error',
+        'Social sharing functionality not available'
+      );
       return;
     }
 
@@ -326,7 +343,7 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
           </Text>
           <TouchableOpacity
             style={styles.permissionButton}
-            onPress={requestPermission}
+            onPress={handleConnectHealthKit}
             disabled={permissionRequested}
           >
             <Text style={styles.permissionButtonText}>
@@ -426,13 +443,19 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   permissionButton: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: '#0a0a0a',
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1a1a1a',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   permissionButtonText: {
-    color: theme.colors.accentText,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '600',
   },

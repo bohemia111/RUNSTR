@@ -102,7 +102,9 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
 
         CustomAlertManager.alert(
           'Sync Complete',
-          `Synced ${result.newWorkouts} new workout${result.newWorkouts === 1 ? '' : 's'} from Garmin. ${result.skippedWorkouts} already synced.`
+          `Synced ${result.newWorkouts} new workout${
+            result.newWorkouts === 1 ? '' : 's'
+          } from Garmin. ${result.skippedWorkouts} already synced.`
         );
       } else {
         throw new Error(result.error || 'Sync failed');
@@ -143,9 +145,7 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
       );
 
       setWorkouts(garminWorkouts || []);
-      console.log(
-        `✅ Loaded ${garminWorkouts?.length || 0} Garmin workouts`
-      );
+      console.log(`✅ Loaded ${garminWorkouts?.length || 0} Garmin workouts`);
 
       // Get last sync time
       const stats = await garminActivityService.getSyncStats(userId);
@@ -188,10 +188,16 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
               setIsConnected(false);
               setWorkouts([]);
               setLastSyncAt(null);
-              CustomAlertManager.alert('Success', 'Garmin account disconnected');
+              CustomAlertManager.alert(
+                'Success',
+                'Garmin account disconnected'
+              );
             } catch (error) {
               console.error('Failed to disconnect Garmin:', error);
-              CustomAlertManager.alert('Error', 'Failed to disconnect Garmin account');
+              CustomAlertManager.alert(
+                'Error',
+                'Failed to disconnect Garmin account'
+              );
             }
           },
         },
@@ -201,7 +207,10 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
 
   const handleCompete = async (workout: Workout) => {
     if (!onCompete) {
-      CustomAlertManager.alert('Error', 'Competition entry functionality not available');
+      CustomAlertManager.alert(
+        'Error',
+        'Competition entry functionality not available'
+      );
       return;
     }
 
@@ -210,13 +219,19 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
       CustomAlertManager.alert('Success', 'Workout entered into competition!');
     } catch (error) {
       console.error('Competition entry failed:', error);
-      CustomAlertManager.alert('Error', 'Failed to enter workout into competition');
+      CustomAlertManager.alert(
+        'Error',
+        'Failed to enter workout into competition'
+      );
     }
   };
 
   const handleSocialShare = async (workout: Workout) => {
     if (!onSocialShare) {
-      CustomAlertManager.alert('Error', 'Social sharing functionality not available');
+      CustomAlertManager.alert(
+        'Error',
+        'Social sharing functionality not available'
+      );
       return;
     }
 
@@ -264,10 +279,7 @@ export const GarminHealthTab: React.FC<GarminHealthTabProps> = ({
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <LoadingOverlay
-          message="Loading Garmin workouts..."
-          visible={true}
-        />
+        <LoadingOverlay message="Loading Garmin workouts..." visible={true} />
       </View>
     );
   }

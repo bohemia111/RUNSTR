@@ -97,9 +97,7 @@ export class CaptainEventStore {
   static async getTeamEvents(teamId: string): Promise<CaptainEventRecord[]> {
     try {
       const allEvents = await this.getMyEvents();
-      const teamEvents = allEvents.filter(
-        (e) => e.eventData.teamId === teamId
-      );
+      const teamEvents = allEvents.filter((e) => e.eventData.teamId === teamId);
 
       console.log(
         `📋 Found ${teamEvents.length} captain events for team: ${teamId}`

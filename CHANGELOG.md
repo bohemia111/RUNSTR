@@ -6,6 +6,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2025-01-23
+
+**Achievement**: Critical bug fixes for account persistence, profile editing, and social card improvements
+
+### 🐛 Critical Bug Fixes
+
+**Auto-Generated Account Persistence**:
+- Fixed critical issue where auto-generated Nostr accounts (npub/nsec) were not persisting across app restarts
+- Changed `@runstr:is_new_signup` flag from 'true' to 'false' to treat auto-generated accounts like manual logins
+- Ensures Bitcoiners using auto-generated keys don't lose their accounts on app restart
+- Modified AuthContext.tsx line 412
+
+**Profile Edit Screen Improvements**:
+- Fixed profile edit screen stale data issues by replacing `useEffect` with `useFocusEffect`
+- Removed async `refreshAuthentication()` call causing timing issues
+- Added 100ms delay for smoother navigation animations
+- Profile changes now save reliably without crashes or data inconsistencies
+- Updated ProfileEditScreen.tsx
+
+**Walk Activity Social Cards**:
+- Fixed confusing "0 km" display on step counter posts
+- Added `isStepCounterPost()` method to distinguish step-only tracking from GPS-tracked walks
+- Step counter posts now show only steps count (no distance)
+- GPS-tracked walks display distance, steps, duration, and calories
+- Enhanced workoutCardGenerator.ts with smarter card generation logic
+
+**Splash Icon Refinements**:
+- Updated splash screen assets for improved visual consistency
+- Better icon display across iOS and Android devices
+
+### 📱 Platform Updates
+- iOS: Version 0.9.1 (Build 77)
+- Android: Version 0.9.1 (Build 77)
+
+## [0.9.0] - 2025-01-22
+
+**Achievement**: Personal Records, startup improvements, and splash screen fixes
+
+### 🐛 Critical Bug Fixes
+
+**App Startup Fix**:
+- Fixed app freeze on initial startup when requesting HealthKit permissions
+- Moved HealthKit permission request to Apple Health tab (requires manual connection)
+- Removed automatic HealthKit initialization on app launch
+- Improved WorkoutTabNavigator to only mount active tab
+
+**Splash Screen Fixes**:
+- Fixed iOS splash screen ghosting effect (replaced splash assets)
+- Fixed Android circular splash crop (changed Theme from SplashScreen to AppCompat.NoActionBar)
+- Updated all iOS xcassets images (1x, 2x, 3x for both light and dark mode)
+- Modified android/app/src/main/res/values/styles.xml for full-screen splash display
+
+### ✨ New Features
+
+**Achievements Section**:
+- Added comprehensive personal records (PRs) section in Stats screen
+- Cardio PRs: Fastest 5K, 10K, half marathon, marathon times
+- Strength PRs: Maximum single weight lifted, best weight × rep combination
+- Wellness PRs: Longest meditation/yoga streaks
+- Nutrition PRs: Longest meal logging streak, maximum fasting duration
+- Beautiful collapsible UI with trophy icons and RUNSTR branding
+- PersonalRecordsService for PR calculations across all workout types
+- AchievementsCard component with orange/gold theme matching RUNSTR design
+
+### 🔧 Technical Improvements
+
+**Performance**:
+- WorkoutTabNavigator optimized to only mount active tab (reduces memory usage)
+- AppleHealthTab now requires manual "Connect Apple Health" button tap
+- Improved app startup time by deferring HealthKit initialization
+
+**UI/UX Enhancements**:
+- Styled "Connect Apple Health" button to match app design
+- Added deprecation warnings for disabled background sync services
+- Cleaner native workout session handling
+
+### 📱 Platform Updates
+- iOS: Version 0.9.0 (Build 76)
+- Android: Version 0.9.0 (Build 76)
+
 ## [0.8.9] - 2025-01-21
 
 **Achievement**: Apple Run tracker stability fixes and Coach RUNSTR AI enhancements

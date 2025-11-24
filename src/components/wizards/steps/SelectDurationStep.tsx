@@ -32,7 +32,8 @@ export const SelectDurationStep: React.FC<SelectDurationStepProps> = ({
             key={duration.value}
             style={[
               styles.durationOption,
-              selectedDuration === duration.value && styles.durationOptionSelected,
+              selectedDuration === duration.value &&
+                styles.durationOptionSelected,
             ]}
             onPress={() => onSelectDuration(duration.value)}
             activeOpacity={0.7}
@@ -40,7 +41,8 @@ export const SelectDurationStep: React.FC<SelectDurationStepProps> = ({
             <Text
               style={[
                 styles.durationLabel,
-                selectedDuration === duration.value && styles.durationLabelSelected,
+                selectedDuration === duration.value &&
+                  styles.durationLabelSelected,
               ]}
             >
               {duration.label}

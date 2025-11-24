@@ -82,11 +82,9 @@ export const QRChallengeScanner: React.FC<QRChallengeScannerProps> = ({
     }
 
     // Neither challenge nor event - show error
-    Alert.alert(
-      'Invalid QR Code',
-      'This QR code is not a valid event',
-      [{ text: 'Try Again', onPress: () => setScanned(false) }]
-    );
+    Alert.alert('Invalid QR Code', 'This QR code is not a valid event', [
+      { text: 'Try Again', onPress: () => setScanned(false) },
+    ]);
   };
 
   /**

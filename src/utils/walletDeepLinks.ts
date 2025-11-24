@@ -19,7 +19,9 @@ export interface WalletDeepLinkResult {
  * @param invoice - BOLT11 Lightning invoice
  * @returns Promise with success status
  */
-export async function openInCashApp(invoice: string): Promise<WalletDeepLinkResult> {
+export async function openInCashApp(
+  invoice: string
+): Promise<WalletDeepLinkResult> {
   try {
     // Cash App uses universal links for Lightning invoices
     // Format: https://cash.app/launch/lightning/{invoice}
@@ -45,7 +47,8 @@ export async function openInCashApp(invoice: string): Promise<WalletDeepLinkResu
             onPress: () => {
               const appStoreUrl = Platform.select({
                 ios: 'https://apps.apple.com/us/app/cash-app/id711923939',
-                android: 'https://play.google.com/store/apps/details?id=com.squareup.cash',
+                android:
+                  'https://play.google.com/store/apps/details?id=com.squareup.cash',
               });
               if (appStoreUrl) {
                 Linking.openURL(appStoreUrl);
@@ -73,7 +76,9 @@ export async function openInCashApp(invoice: string): Promise<WalletDeepLinkResu
  * @param invoice - BOLT11 Lightning invoice
  * @returns Promise with success status
  */
-export async function openInStrike(invoice: string): Promise<WalletDeepLinkResult> {
+export async function openInStrike(
+  invoice: string
+): Promise<WalletDeepLinkResult> {
   try {
     // Strike uses custom URL scheme: strike://qr?lightning={invoice}
     const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
@@ -98,7 +103,8 @@ export async function openInStrike(invoice: string): Promise<WalletDeepLinkResul
             onPress: () => {
               const appStoreUrl = Platform.select({
                 ios: 'https://apps.apple.com/us/app/strike-bitcoin-payments/id1488724463',
-                android: 'https://play.google.com/store/apps/details?id=zapsolutions.strike',
+                android:
+                  'https://play.google.com/store/apps/details?id=zapsolutions.strike',
               });
               if (appStoreUrl) {
                 Linking.openURL(appStoreUrl);
@@ -126,7 +132,9 @@ export async function openInStrike(invoice: string): Promise<WalletDeepLinkResul
  * @param invoice - BOLT11 Lightning invoice
  * @returns Promise with success status
  */
-export async function openInZeus(invoice: string): Promise<WalletDeepLinkResult> {
+export async function openInZeus(
+  invoice: string
+): Promise<WalletDeepLinkResult> {
   try {
     // Zeus uses custom URL scheme: zeus:lightning={invoice}
     const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
@@ -151,7 +159,8 @@ export async function openInZeus(invoice: string): Promise<WalletDeepLinkResult>
             onPress: () => {
               const appStoreUrl = Platform.select({
                 ios: 'https://apps.apple.com/app/zeus-ln/id1456038895',
-                android: 'https://play.google.com/store/apps/details?id=app.zeusln.zeus',
+                android:
+                  'https://play.google.com/store/apps/details?id=app.zeusln.zeus',
               });
               if (appStoreUrl) {
                 Linking.openURL(appStoreUrl);
@@ -179,7 +188,9 @@ export async function openInZeus(invoice: string): Promise<WalletDeepLinkResult>
  * @param invoice - BOLT11 Lightning invoice
  * @returns Promise with success status
  */
-export async function openInPhoenix(invoice: string): Promise<WalletDeepLinkResult> {
+export async function openInPhoenix(
+  invoice: string
+): Promise<WalletDeepLinkResult> {
   try {
     // Phoenix uses custom URL scheme: phoenix://pay?invoice={invoice}
     const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
@@ -204,7 +215,8 @@ export async function openInPhoenix(invoice: string): Promise<WalletDeepLinkResu
             onPress: () => {
               const appStoreUrl = Platform.select({
                 ios: 'https://apps.apple.com/app/phoenix-wallet/id1544097028',
-                android: 'https://play.google.com/store/apps/details?id=fr.acinq.phoenix.mainnet',
+                android:
+                  'https://play.google.com/store/apps/details?id=fr.acinq.phoenix.mainnet',
               });
               if (appStoreUrl) {
                 Linking.openURL(appStoreUrl);
@@ -232,7 +244,9 @@ export async function openInPhoenix(invoice: string): Promise<WalletDeepLinkResu
  * @param invoice - BOLT11 Lightning invoice
  * @returns Promise with success status
  */
-export async function openInWalletOfSatoshi(invoice: string): Promise<WalletDeepLinkResult> {
+export async function openInWalletOfSatoshi(
+  invoice: string
+): Promise<WalletDeepLinkResult> {
   try {
     // Wallet of Satoshi uses custom URL scheme: walletofsatoshi:lightning={invoice}
     const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
@@ -257,7 +271,8 @@ export async function openInWalletOfSatoshi(invoice: string): Promise<WalletDeep
             onPress: () => {
               const appStoreUrl = Platform.select({
                 ios: 'https://apps.apple.com/app/wallet-of-satoshi/id1438599608',
-                android: 'https://play.google.com/store/apps/details?id=com.livingroomofsatoshi.wallet',
+                android:
+                  'https://play.google.com/store/apps/details?id=com.livingroomofsatoshi.wallet',
               });
               if (appStoreUrl) {
                 Linking.openURL(appStoreUrl);
@@ -285,7 +300,9 @@ export async function openInWalletOfSatoshi(invoice: string): Promise<WalletDeep
  * @param invoice - BOLT11 Lightning invoice
  * @returns Promise with success status
  */
-export async function openInBreez(invoice: string): Promise<WalletDeepLinkResult> {
+export async function openInBreez(
+  invoice: string
+): Promise<WalletDeepLinkResult> {
   try {
     // Breez uses custom URL scheme: breez:lightning:{invoice}
     const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
@@ -310,7 +327,8 @@ export async function openInBreez(invoice: string): Promise<WalletDeepLinkResult
             onPress: () => {
               const appStoreUrl = Platform.select({
                 ios: 'https://apps.apple.com/app/breez/id1463506703',
-                android: 'https://play.google.com/store/apps/details?id=com.breez.client',
+                android:
+                  'https://play.google.com/store/apps/details?id=com.breez.client',
               });
               if (appStoreUrl) {
                 Linking.openURL(appStoreUrl);
@@ -338,7 +356,9 @@ export async function openInBreez(invoice: string): Promise<WalletDeepLinkResult
  * @param invoice - BOLT11 Lightning invoice
  * @returns Promise with success status
  */
-export async function openInGenericWallet(invoice: string): Promise<WalletDeepLinkResult> {
+export async function openInGenericWallet(
+  invoice: string
+): Promise<WalletDeepLinkResult> {
   try {
     // Standard Lightning URI: lightning:{invoice}
     const cleanInvoice = invoice.toLowerCase().replace(/^lightning:/, '');
@@ -377,7 +397,9 @@ export async function openInGenericWallet(invoice: string): Promise<WalletDeepLi
  * @param invoice - BOLT11 Lightning invoice
  * @returns Promise with success status
  */
-export async function openInBestAvailableWallet(invoice: string): Promise<WalletDeepLinkResult> {
+export async function openInBestAvailableWallet(
+  invoice: string
+): Promise<WalletDeepLinkResult> {
   console.log('[WalletDeepLinks] Auto-detecting best wallet...');
 
   try {
@@ -402,7 +424,9 @@ export async function openInBestAvailableWallet(invoice: string): Promise<Wallet
     // Fall back to generic Lightning URI (Alby, BlueWallet, Zeus, etc.)
     const lightningUri = `lightning:${cleanInvoice}`;
     if (await Linking.canOpenURL(lightningUri)) {
-      console.log('[WalletDeepLinks] Generic Lightning wallet detected, opening...');
+      console.log(
+        '[WalletDeepLinks] Generic Lightning wallet detected, opening...'
+      );
       await Linking.openURL(lightningUri);
       return { success: true };
     }
@@ -434,4 +458,4 @@ export const SUPPORTED_WALLETS = [
   'Zeus',
 ] as const;
 
-export type SupportedWallet = typeof SUPPORTED_WALLETS[number];
+export type SupportedWallet = (typeof SUPPORTED_WALLETS)[number];

@@ -47,7 +47,10 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
 }) => {
   const { profile } = useNostrProfile(npub);
   const [charityModalVisible, setCharityModalVisible] = useState(false);
-  const [selectedCharity, setSelectedCharity] = useState<{ name: string; address: string } | null>(null);
+  const [selectedCharity, setSelectedCharity] = useState<{
+    name: string;
+    address: string;
+  } | null>(null);
 
   // Resolve display name with fallback chain (treat empty strings as falsy)
   // Priority: profile name → profile display_name → fallbackName → Anonymous (if no profile) → truncated npub
@@ -55,7 +58,11 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
     profile?.name ||
     profile?.display_name ||
     (fallbackName && fallbackName.trim() !== '' ? fallbackName : null) ||
-    (!profile ? 'Anonymous' : (npub?.startsWith('npub1') ? `${npub.slice(0, 12)}...` : 'Anonymous'));
+    (!profile
+      ? 'Anonymous'
+      : npub?.startsWith('npub1')
+      ? `${npub.slice(0, 12)}...`
+      : 'Anonymous');
 
   const avatarUrl = profile?.picture;
 

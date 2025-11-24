@@ -44,10 +44,7 @@ export class WellnessAnalytics {
     workouts: LocalWorkout[]
   ): LocalWorkout[] {
     return workouts
-      .filter(
-        (w) =>
-          w.type === 'meditation' || w.type === 'wellness'
-      )
+      .filter((w) => w.type === 'meditation' || w.type === 'wellness')
       .sort(
         (a, b) =>
           new Date(a.startTime).getTime() - new Date(b.startTime).getTime()

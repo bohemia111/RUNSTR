@@ -24,7 +24,9 @@ import { EnhancedSocialShareModal } from '../../components/profile/shared/Enhanc
 import { WorkoutPublishingService } from '../../services/nostr/workoutPublishingService';
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import { CustomAlert } from '../../components/ui/CustomAlert';
-import CalorieEstimationService, { type MealSize } from '../../services/fitness/CalorieEstimationService';
+import CalorieEstimationService, {
+  type MealSize,
+} from '../../services/fitness/CalorieEstimationService';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import type { Workout } from '../../types/workout';
@@ -102,11 +104,14 @@ export const DietTrackerScreen: React.FC = () => {
           if (nostrProfile) {
             setUserAvatar(nostrProfile.picture);
             setUserName(nostrProfile.display_name || nostrProfile.name);
-            console.log('[DietTracker] ✅ User profile loaded for social cards');
+            console.log(
+              '[DietTracker] ✅ User profile loaded for social cards'
+            );
           }
         }
 
-        const userSigner = await UnifiedSigningService.getInstance().getSigner();
+        const userSigner =
+          await UnifiedSigningService.getInstance().getSigner();
         if (userSigner) setSigner(userSigner);
       } catch (error) {
         console.warn('[DietTracker] Failed to initialize:', error);
@@ -151,7 +156,10 @@ export const DietTrackerScreen: React.FC = () => {
       const startTime = new Date();
       await Promise.all([
         AsyncStorage.setItem(IS_FASTING_KEY, 'true'),
-        AsyncStorage.setItem(ACTIVE_FAST_START_KEY, startTime.getTime().toString()),
+        AsyncStorage.setItem(
+          ACTIVE_FAST_START_KEY,
+          startTime.getTime().toString()
+        ),
       ]);
       setIsFasting(true);
       setFastStartTime(startTime);
@@ -320,28 +328,38 @@ export const DietTrackerScreen: React.FC = () => {
     try {
       // If savedWorkout not in state, try retrieving from storage (like MeditationTracker)
       if (!savedWorkout) {
-        console.log('[DietTracker] Workout not in state, retrieving from storage...');
+        console.log(
+          '[DietTracker] Workout not in state, retrieving from storage...'
+        );
         const allWorkouts = await LocalWorkoutStorageService.getAllWorkouts();
         const latestWorkout = allWorkouts[0]; // Most recent workout
 
         if (latestWorkout) {
-          console.log('[DietTracker] Retrieved latest workout from storage:', latestWorkout.id);
+          console.log(
+            '[DietTracker] Retrieved latest workout from storage:',
+            latestWorkout.id
+          );
           setSavedWorkout(latestWorkout as any);
-          console.log('🔍 [DietTracker] About to set showShareModal = true (from storage)');
+          console.log(
+            '🔍 [DietTracker] About to set showShareModal = true (from storage)'
+          );
           setShowShareModal(true);
         } else {
           throw new Error('No workout found to share');
         }
       } else {
         console.log('[DietTracker] Using savedWorkout from state');
-        console.log('🔍 [DietTracker] About to set showShareModal = true (from state)');
+        console.log(
+          '🔍 [DietTracker] About to set showShareModal = true (from state)'
+        );
         setShowShareModal(true);
       }
     } catch (error) {
       console.error('❌ Failed to prepare workout for sharing:', error);
       setAlertConfig({
         title: 'Error',
-        message: 'No workout data available. Please try logging your meal/fast again.',
+        message:
+          'No workout data available. Please try logging your meal/fast again.',
         buttons: [{ text: 'OK', style: 'default' }],
       });
       setAlertVisible(true);
@@ -364,7 +382,12 @@ export const DietTrackerScreen: React.FC = () => {
       });
 
       if (!signer || !userId) {
-        console.log('❌ [DietTracker] Authentication missing - signer:', !!signer, 'userId:', !!userId);
+        console.log(
+          '❌ [DietTracker] Authentication missing - signer:',
+          !!signer,
+          'userId:',
+          !!userId
+        );
         setAlertConfig({
           title: 'Authentication Required',
           message: 'Please log in with your Nostr key to post workouts.',
@@ -389,10 +412,15 @@ export const DietTrackerScreen: React.FC = () => {
       console.log('📥 [DietTracker] Publishing result:', result);
 
       if (result.success && result.eventId) {
-        console.log('✅ [DietTracker] Publishing successful! Event ID:', result.eventId);
+        console.log(
+          '✅ [DietTracker] Publishing successful! Event ID:',
+          result.eventId
+        );
 
         // Mark as synced in local storage
-        console.log('💾 [DietTracker] Marking workout as synced in local storage...');
+        console.log(
+          '💾 [DietTracker] Marking workout as synced in local storage...'
+        );
         await LocalWorkoutStorageService.markAsSynced(
           savedWorkout.id,
           result.eventId
@@ -406,7 +434,9 @@ export const DietTrackerScreen: React.FC = () => {
         setTimeout(() => {
           setAlertConfig({
             title: 'Success!',
-            message: `Your ${summaryType === 'meal' ? 'meal' : 'fast'} has been saved to Nostr!`,
+            message: `Your ${
+              summaryType === 'meal' ? 'meal' : 'fast'
+            } has been saved to Nostr!`,
             buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
           });
           setAlertVisible(true);
@@ -466,7 +496,11 @@ export const DietTrackerScreen: React.FC = () => {
    */
   const getFastingMilestone = (
     seconds: number
-  ): { hours: number; label: string; icon: keyof typeof Ionicons.glyphMap } | null => {
+  ): {
+    hours: number;
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  } | null => {
     const hours = seconds / 3600;
 
     // Fasting milestones (ordered from highest to lowest for correct detection)
@@ -477,7 +511,11 @@ export const DietTrackerScreen: React.FC = () => {
       { hours: 24, label: '24h OMAD', icon: 'star' as const },
       { hours: 20, label: '20h Warrior', icon: 'flash' as const },
       { hours: 18, label: '18h Extended', icon: 'trending-up' as const },
-      { hours: 16, label: '16h Intermittent', icon: 'checkmark-circle' as const },
+      {
+        hours: 16,
+        label: '16h Intermittent',
+        icon: 'checkmark-circle' as const,
+      },
       { hours: 12, label: '12h Circadian', icon: 'moon' as const },
     ];
 
@@ -687,7 +725,9 @@ export const DietTrackerScreen: React.FC = () => {
               size={20}
               color={theme.colors.background}
             />
-            <Text style={styles.breakFastButtonText}>Break Fast + Log Meal</Text>
+            <Text style={styles.breakFastButtonText}>
+              Break Fast + Log Meal
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -722,10 +762,16 @@ export const DietTrackerScreen: React.FC = () => {
               {summaryType === 'meal' && savedWorkout && (
                 <>
                   <Text style={styles.summaryType}>
-                    {MEAL_TYPES.find((m) => m.value === (savedWorkout as any).mealType)?.label}
+                    {
+                      MEAL_TYPES.find(
+                        (m) => m.value === (savedWorkout as any).mealType
+                      )?.label
+                    }
                   </Text>
                   <Text style={styles.summaryTime}>
-                    {new Date((savedWorkout as any).mealTime).toLocaleTimeString('en-US', {
+                    {new Date(
+                      (savedWorkout as any).mealTime
+                    ).toLocaleTimeString('en-US', {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
@@ -745,7 +791,9 @@ export const DietTrackerScreen: React.FC = () => {
             {savedWorkout?.notes && (
               <View style={styles.notesDisplay}>
                 <Text style={styles.notesDisplayLabel}>Notes:</Text>
-                <Text style={styles.notesDisplayText}>{savedWorkout.notes}</Text>
+                <Text style={styles.notesDisplayText}>
+                  {savedWorkout.notes}
+                </Text>
               </View>
             )}
 
@@ -766,7 +814,10 @@ export const DietTrackerScreen: React.FC = () => {
                 disabled={isCompeting}
               >
                 {isCompeting ? (
-                  <ActivityIndicator size="small" color={theme.colors.background} />
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.background}
+                  />
                 ) : (
                   <>
                     <Ionicons
@@ -799,8 +850,12 @@ export const DietTrackerScreen: React.FC = () => {
             onSuccess={() => {
               setAlertConfig({
                 title: 'Success!',
-                message: `Your ${summaryType === 'meal' ? 'meal' : 'fast'} has been shared to Nostr with a beautiful card!`,
-                buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
+                message: `Your ${
+                  summaryType === 'meal' ? 'meal' : 'fast'
+                } has been shared to Nostr with a beautiful card!`,
+                buttons: [
+                  { text: 'OK', style: 'default', onPress: handleDone },
+                ],
               });
               setAlertVisible(true);
             }}

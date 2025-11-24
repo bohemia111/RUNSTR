@@ -58,11 +58,15 @@ export class ChallengeService {
       const ndk = await GlobalNDKService.getInstance();
 
       // Generate unique challenge ID
-      const challengeId = `challenge_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const challengeId = `challenge_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(7)}`;
 
       // Calculate timestamps
       const startDate = new Date();
-      const endDate = new Date(startDate.getTime() + challengeData.duration * 60 * 60 * 1000);
+      const endDate = new Date(
+        startDate.getTime() + challengeData.duration * 60 * 60 * 1000
+      );
 
       // Get creator pubkey from signer
       const creatorPubkey = signer.user?.pubkey || '';
@@ -159,7 +163,9 @@ export class ChallengeService {
    * @param event - Kind 30102 challenge event
    * @returns Parsed challenge definition
    */
-  private parseChallengeEvent(event: NDKEvent): NostrChallengeDefinition | null {
+  private parseChallengeEvent(
+    event: NDKEvent
+  ): NostrChallengeDefinition | null {
     try {
       const tags = new Map(event.tags.map((t) => [t[0], t[1]]));
       const participants = this.extractParticipants(event);
@@ -173,7 +179,9 @@ export class ChallengeService {
         distance: parseFloat(tags.get('distance') || '5'),
         metric: 'fastest_time',
         startDate: tags.get('start_date') || new Date().toISOString(),
-        endDate: tags.get('end_date') || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        endDate:
+          tags.get('end_date') ||
+          new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         duration: 24,
         participants,
         maxParticipants: 2,
@@ -323,7 +331,9 @@ export class ChallengeService {
       // Parse challenge metadata
       const tags = new Map(challengeEvent.tags.map((t) => [t[0], t[1]]));
       const startDate = tags.get('start_date') || new Date().toISOString();
-      const endDate = tags.get('end_date') || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const endDate =
+        tags.get('end_date') ||
+        new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const startTime = Math.floor(new Date(startDate).getTime() / 1000);
       const endTime = Math.floor(new Date(endDate).getTime() / 1000);
 
@@ -363,7 +373,8 @@ export class ChallengeService {
       const tied =
         participantProgress.length > 1 &&
         participantProgress[0].currentProgress > 0 &&
-        participantProgress[0].currentProgress === participantProgress[1].currentProgress;
+        participantProgress[0].currentProgress ===
+          participantProgress[1].currentProgress;
 
       return {
         challengeId,
@@ -371,7 +382,8 @@ export class ChallengeService {
         metric: 'fastest_time',
         target: parseFloat(tags.get('distance') || '5'),
         wager: parseInt(tags.get('wager') || '0'),
-        status: (tags.get('status') as ChallengeStatus) || ChallengeStatus.ACTIVE,
+        status:
+          (tags.get('status') as ChallengeStatus) || ChallengeStatus.ACTIVE,
         startsAt: startTime,
         expiresAt: endTime,
         leader,
@@ -546,7 +558,6 @@ export class ChallengeService {
     return 0;
   }
 
-
   /**
    * Store challenge locally
    */
@@ -602,7 +613,9 @@ export class ChallengeService {
    * Get all user's challenges (tag-based)
    * Queries kind 30102 events where user is tagged in 'p' tags
    */
-  async getUserChallenges(userPubkey: string): Promise<NostrChallengeDefinition[]> {
+  async getUserChallenges(
+    userPubkey: string
+  ): Promise<NostrChallengeDefinition[]> {
     try {
       const ndk = await GlobalNDKService.getInstance();
 

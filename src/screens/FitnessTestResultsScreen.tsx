@@ -175,9 +175,10 @@ export const FitnessTestResultsScreen: React.FC = () => {
     );
   }
 
-  const gradeInfo = FITNESS_TEST_GRADES.find((g) => g.name === testResult.grade);
-  const isPersonalBest =
-    personalBest && testResult.id === personalBest.id;
+  const gradeInfo = FITNESS_TEST_GRADES.find(
+    (g) => g.name === testResult.grade
+  );
+  const isPersonalBest = personalBest && testResult.id === personalBest.id;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -203,7 +204,11 @@ export const FitnessTestResultsScreen: React.FC = () => {
             <Text style={styles.scoreTitle}>Your Score</Text>
             {isPersonalBest && (
               <View style={styles.pbBadge}>
-                <Ionicons name="trophy" size={16} color={theme.colors.background} />
+                <Ionicons
+                  name="trophy"
+                  size={16}
+                  color={theme.colors.background}
+                />
                 <Text style={styles.pbText}>PB</Text>
               </View>
             )}
@@ -293,7 +298,11 @@ export const FitnessTestResultsScreen: React.FC = () => {
             disabled={publishing || !!testResult.kind1301EventId}
           >
             <Ionicons
-              name={testResult.kind1301EventId ? 'checkmark-circle' : 'cloud-upload-outline'}
+              name={
+                testResult.kind1301EventId
+                  ? 'checkmark-circle'
+                  : 'cloud-upload-outline'
+              }
               size={20}
               color={
                 testResult.kind1301EventId
@@ -307,9 +316,7 @@ export const FitnessTestResultsScreen: React.FC = () => {
                 testResult.kind1301EventId && styles.publishedButtonText,
               ]}
             >
-              {testResult.kind1301EventId
-                ? 'Published'
-                : 'Public'}
+              {testResult.kind1301EventId ? 'Published' : 'Public'}
             </Text>
           </TouchableOpacity>
 
@@ -323,7 +330,11 @@ export const FitnessTestResultsScreen: React.FC = () => {
             disabled={publishing || !!testResult.kind1EventId}
           >
             <Ionicons
-              name={testResult.kind1EventId ? 'checkmark-circle' : 'chatbubble-outline'}
+              name={
+                testResult.kind1EventId
+                  ? 'checkmark-circle'
+                  : 'chatbubble-outline'
+              }
               size={20}
               color={
                 testResult.kind1EventId
@@ -337,9 +348,7 @@ export const FitnessTestResultsScreen: React.FC = () => {
                 testResult.kind1EventId && styles.publishedButtonText,
               ]}
             >
-              {testResult.kind1EventId
-                ? 'Posted'
-                : 'Post'}
+              {testResult.kind1EventId ? 'Posted' : 'Post'}
             </Text>
           </TouchableOpacity>
 
@@ -357,7 +366,11 @@ export const FitnessTestResultsScreen: React.FC = () => {
           style={styles.historyButton}
           onPress={handleViewHistory}
         >
-          <Ionicons name="list-outline" size={20} color={theme.colors.textSecondary} />
+          <Ionicons
+            name="list-outline"
+            size={20}
+            color={theme.colors.textSecondary}
+          />
           <Text style={styles.historyButtonText}>View Test History</Text>
         </TouchableOpacity>
 

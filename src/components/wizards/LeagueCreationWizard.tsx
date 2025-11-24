@@ -230,7 +230,9 @@ export const LeagueCreationWizard: React.FC<LeagueCreationWizardProps> = ({
       const signer = await unifiedSigningService.getSigner();
       if (!signer) {
         setAlertTitle('Authentication Required');
-        setAlertMessage('Unable to sign league. Please ensure you are logged in.');
+        setAlertMessage(
+          'Unable to sign league. Please ensure you are logged in.'
+        );
         setAlertButtons([{ text: 'OK' }]);
         setAlertVisible(true);
         setIsCreating(false);

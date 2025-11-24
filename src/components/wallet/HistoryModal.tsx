@@ -59,19 +59,21 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
       if (result.success && result.transactions) {
         // Convert NWC transaction format to UI format
-        const formattedTransactions: Transaction[] = result.transactions.map((tx) => ({
-          id: tx.payment_hash,
-          type: tx.type,
-          invoice: tx.invoice,
-          description: tx.description,
-          preimage: tx.preimage,
-          payment_hash: tx.payment_hash,
-          amount: tx.amount,
-          fees_paid: tx.fees_paid,
-          created_at: tx.created_at,
-          settled_at: tx.settled_at,
-          metadata: tx.metadata,
-        }));
+        const formattedTransactions: Transaction[] = result.transactions.map(
+          (tx) => ({
+            id: tx.payment_hash,
+            type: tx.type,
+            invoice: tx.invoice,
+            description: tx.description,
+            preimage: tx.preimage,
+            payment_hash: tx.payment_hash,
+            amount: tx.amount,
+            fees_paid: tx.fees_paid,
+            created_at: tx.created_at,
+            settled_at: tx.settled_at,
+            metadata: tx.metadata,
+          })
+        );
         setTransactions(formattedTransactions);
       } else {
         console.error('Failed to load transactions:', result.error);
@@ -118,7 +120,9 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   };
 
   const getTransactionTitle = (type: 'incoming' | 'outgoing'): string => {
-    return type === 'outgoing' ? 'Lightning Payment Sent' : 'Lightning Payment Received';
+    return type === 'outgoing'
+      ? 'Lightning Payment Sent'
+      : 'Lightning Payment Received';
   };
 
   const renderTransaction = ({ item }: { item: Transaction }) => (
@@ -140,7 +144,9 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             {item.description}
           </Text>
         )}
-        <Text style={styles.transactionTime}>{formatTime(item.created_at)}</Text>
+        <Text style={styles.transactionTime}>
+          {formatTime(item.created_at)}
+        </Text>
       </View>
 
       <View style={styles.transactionAmount}>
@@ -151,7 +157,9 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
           {item.amount}
         </Text>
         <Text style={styles.amountUnit}>sats</Text>
-        {item.fees_paid && <Text style={styles.feeText}>fee: {item.fees_paid}</Text>}
+        {item.fees_paid && (
+          <Text style={styles.feeText}>fee: {item.fees_paid}</Text>
+        )}
       </View>
     </View>
   );

@@ -36,11 +36,14 @@ export class GlobalNDKService {
   private static readonly MAX_TOTAL_RECONNECTIONS = 50;
 
   // ✅ NEW: Store relay listeners for proper cleanup
-  private static relayListeners = new Map<any, {
-    connect: () => void,
-    disconnect: () => void,
-    notice: (notice: string) => void
-  }>();
+  private static relayListeners = new Map<
+    any,
+    {
+      connect: () => void;
+      disconnect: () => void;
+      notice: (notice: string) => void;
+    }
+  >();
 
   /**
    * Default relay configuration
@@ -73,7 +76,11 @@ export class GlobalNDKService {
 
       // ✅ FIX: Don't reconnect if app is backgrounded (prevents Android crash)
       // If below target threshold (2 relays), trigger background reconnection
-      if (status.connectedRelays < 2 && !this.initPromise && AppStateManager.canDoNetworkOps()) {
+      if (
+        status.connectedRelays < 2 &&
+        !this.initPromise &&
+        AppStateManager.canDoNetworkOps()
+      ) {
         console.log(
           `🔄 GlobalNDK: Only ${status.connectedRelays}/3 relays connected, scheduling background reconnection...`
         );
@@ -160,7 +167,9 @@ export class GlobalNDKService {
         // Solution: Let NDK handle reconnection natively
         // this.setupConnectionMonitoring();
         // this.startKeepalive();
-        console.log('✅ GlobalNDK: Relying on NDK native reconnection (keepalive disabled)');
+        console.log(
+          '✅ GlobalNDK: Relying on NDK native reconnection (keepalive disabled)'
+        );
       } else {
         console.warn(
           '⚠️ GlobalNDK: Background connection failed - no relays connected'
@@ -229,7 +238,11 @@ export class GlobalNDKService {
       relay.on('notice', onNotice);
 
       // ✅ MEMORY LEAK FIX: Store listeners for cleanup
-      this.relayListeners.set(relay, { connect: onConnect, disconnect: onDisconnect, notice: onNotice });
+      this.relayListeners.set(relay, {
+        connect: onConnect,
+        disconnect: onDisconnect,
+        notice: onNotice,
+      });
     }
 
     console.log('✅ GlobalNDK: Connection monitoring active');
@@ -255,7 +268,9 @@ export class GlobalNDKService {
     this.keepaliveTimer = setInterval(() => {
       // CRITICAL FIX v0.6.8: Check if app is active before ANY WebSocket operations
       if (!AppStateManager.canDoNetworkOps()) {
-        console.log('🔴 GlobalNDK: App is backgrounded, skipping keepalive check');
+        console.log(
+          '🔴 GlobalNDK: App is backgrounded, skipping keepalive check'
+        );
         return;
       }
 
@@ -321,7 +336,9 @@ export class GlobalNDKService {
   private static debouncedReconnect(): void {
     // CRITICAL FIX v0.6.8: Don't reconnect if app is backgrounded
     if (!AppStateManager.canDoNetworkOps()) {
-      console.log('🔴 GlobalNDK: App is backgrounded, skipping reconnection attempt');
+      console.log(
+        '🔴 GlobalNDK: App is backgrounded, skipping reconnection attempt'
+      );
       return;
     }
 
@@ -332,7 +349,9 @@ export class GlobalNDKService {
       );
       // Reset counter and pause reconnections for 5 minutes
       setTimeout(() => {
-        console.log('🔄 GlobalNDK: Reconnection cooldown complete, resetting counter');
+        console.log(
+          '🔄 GlobalNDK: Reconnection cooldown complete, resetting counter'
+        );
         this.totalReconnectionAttempts = 0;
       }, 300000); // 5 minute cooldown
       return;
@@ -389,7 +408,9 @@ export class GlobalNDKService {
    * Called when keepalive reaches max iterations
    */
   private static restartKeepalive(): void {
-    console.log('🔄 GlobalNDK: Restarting keepalive after reaching max iterations...');
+    console.log(
+      '🔄 GlobalNDK: Restarting keepalive after reaching max iterations...'
+    );
 
     // Stop current keepalive
     this.pauseKeepalive();

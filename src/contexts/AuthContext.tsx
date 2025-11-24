@@ -102,19 +102,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // ✅ PERFORMANCE FIX: If memory cache empty, try AsyncStorage (no artificial timeout)
         if (!cachedUser) {
-          console.log('⚡ AuthContext: Memory cache miss, checking AsyncStorage...');
+          console.log(
+            '⚡ AuthContext: Memory cache miss, checking AsyncStorage...'
+          );
           try {
-            PerformanceLogger.start('AuthContext: getCachedAsync (AsyncStorage read)', 1);
-            cachedUser = await unifiedCache.getCachedAsync<User>(CacheKeys.USER_PROFILE(hexPubkey));
-            PerformanceLogger.end('AuthContext: getCachedAsync (AsyncStorage read)');
+            PerformanceLogger.start(
+              'AuthContext: getCachedAsync (AsyncStorage read)',
+              1
+            );
+            cachedUser = await unifiedCache.getCachedAsync<User>(
+              CacheKeys.USER_PROFILE(hexPubkey)
+            );
+            PerformanceLogger.end(
+              'AuthContext: getCachedAsync (AsyncStorage read)'
+            );
             if (cachedUser) {
               console.log('✅ AuthContext: Loaded user from AsyncStorage');
             }
           } catch (asyncCacheError) {
-            console.warn('⚠️ AuthContext: AsyncStorage cache check failed:', asyncCacheError);
+            console.warn(
+              '⚠️ AuthContext: AsyncStorage cache check failed:',
+              asyncCacheError
+            );
           }
         } else {
-          console.log('⚡ AuthContext: Loaded user from memory cache (instant)');
+          console.log(
+            '⚡ AuthContext: Loaded user from memory cache (instant)'
+          );
         }
 
         if (cachedUser) {
@@ -394,8 +408,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       console.log('✅ AuthContext: Signup successful - new identity created');
 
-      // Mark this as a new signup (for onboarding flow)
-      await AsyncStorage.setItem('@runstr:is_new_signup', 'true');
+      // Mark this as completed signup (same as manual login for persistence)
+      // Changed from 'true' to 'false' to fix auto-generated account persistence issue
+      await AsyncStorage.setItem('@runstr:is_new_signup', 'false');
 
       // Direct state updates (like iOS app)
       setIsAuthenticated(true);
@@ -574,7 +589,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await notificationCleanupService.cleanupAllHandlers();
         console.log('✅ AuthContext: Notification handlers cleaned up');
       } catch (cleanupError) {
-        console.error('⚠️ AuthContext: Failed to cleanup notifications:', cleanupError);
+        console.error(
+          '⚠️ AuthContext: Failed to cleanup notifications:',
+          cleanupError
+        );
         // Don't fail logout if notification cleanup fails
       }
 

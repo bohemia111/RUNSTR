@@ -53,10 +53,10 @@ export class EventSnapshotStore {
       return Infinity;
     } else if (daysSince < 0) {
       // Upcoming events: 5 minutes
-      return Date.now() + (5 * 60 * 1000);
+      return Date.now() + 5 * 60 * 1000;
     } else {
       // Active events (today): 1 minute
-      return Date.now() + (60 * 1000);
+      return Date.now() + 60 * 1000;
     }
   }
 
@@ -71,7 +71,9 @@ export class EventSnapshotStore {
   /**
    * Determine event status based on date
    */
-  private static getEventStatus(eventDate: string): 'upcoming' | 'active' | 'completed' {
+  private static getEventStatus(
+    eventDate: string
+  ): 'upcoming' | 'active' | 'completed' {
     const event = new Date(eventDate);
     const now = new Date();
 
@@ -99,7 +101,7 @@ export class EventSnapshotStore {
       const snapshots = await this.getAllSnapshots();
 
       // Remove old snapshot if exists
-      const filtered = snapshots.filter(s => s.eventId !== params.eventId);
+      const filtered = snapshots.filter((s) => s.eventId !== params.eventId);
 
       // Create new snapshot
       const snapshot: EventSnapshot = {
@@ -122,7 +124,7 @@ export class EventSnapshotStore {
         // Sort by lastUpdated (oldest first)
         filtered.sort((a, b) => a.lastUpdated - b.lastUpdated);
         // Remove oldest non-completed events
-        const toRemove = filtered.find(s => s.eventStatus !== 'completed');
+        const toRemove = filtered.find((s) => s.eventStatus !== 'completed');
         if (toRemove) {
           const index = filtered.indexOf(toRemove);
           filtered.splice(index, 1);
@@ -134,7 +136,9 @@ export class EventSnapshotStore {
 
       await AsyncStorage.setItem(key, JSON.stringify(filtered));
       console.log(
-        `💾 Saved event snapshot: ${params.eventData.name} (${snapshot.eventStatus}, TTL: ${snapshot.ttl === Infinity ? 'never' : 'expires'})`
+        `💾 Saved event snapshot: ${params.eventData.name} (${
+          snapshot.eventStatus
+        }, TTL: ${snapshot.ttl === Infinity ? 'never' : 'expires'})`
       );
     } catch (error) {
       console.error('❌ Failed to save event snapshot:', error);
@@ -148,7 +152,7 @@ export class EventSnapshotStore {
   static async getSnapshot(eventId: string): Promise<EventSnapshot | null> {
     try {
       const snapshots = await this.getAllSnapshots();
-      const snapshot = snapshots.find(s => s.eventId === eventId);
+      const snapshot = snapshots.find((s) => s.eventId === eventId);
 
       if (!snapshot) {
         console.log(`📭 No snapshot found for event: ${eventId}`);
@@ -163,7 +167,11 @@ export class EventSnapshotStore {
       }
 
       console.log(
-        `⚡ Retrieved snapshot for event: ${snapshot.eventData.name} (cached ${Math.floor((Date.now() - snapshot.lastUpdated) / 1000)}s ago)`
+        `⚡ Retrieved snapshot for event: ${
+          snapshot.eventData.name
+        } (cached ${Math.floor(
+          (Date.now() - snapshot.lastUpdated) / 1000
+        )}s ago)`
       );
       return snapshot;
     } catch (error) {
@@ -188,12 +196,14 @@ export class EventSnapshotStore {
       const snapshots: EventSnapshot[] = JSON.parse(data);
 
       // Auto-cleanup expired snapshots
-      const valid = snapshots.filter(s => !this.isExpired(s));
+      const valid = snapshots.filter((s) => !this.isExpired(s));
 
       if (valid.length !== snapshots.length) {
         // Some were expired - save cleaned list
         await AsyncStorage.setItem(key, JSON.stringify(valid));
-        console.log(`🧹 Auto-cleaned ${snapshots.length - valid.length} expired snapshots`);
+        console.log(
+          `🧹 Auto-cleaned ${snapshots.length - valid.length} expired snapshots`
+        );
       }
 
       return valid;
@@ -210,7 +220,7 @@ export class EventSnapshotStore {
     try {
       const key = await this.getStorageKey();
       const snapshots = await this.getAllSnapshots();
-      const filtered = snapshots.filter(s => s.eventId !== eventId);
+      const filtered = snapshots.filter((s) => s.eventId !== eventId);
 
       await AsyncStorage.setItem(key, JSON.stringify(filtered));
       console.log(`🗑️ Deleted snapshot for event: ${eventId}`);
@@ -285,9 +295,10 @@ export class EventSnapshotStore {
 
       return {
         total: snapshots.length,
-        completed: snapshots.filter(s => s.eventStatus === 'completed').length,
-        active: snapshots.filter(s => s.eventStatus === 'active').length,
-        upcoming: snapshots.filter(s => s.eventStatus === 'upcoming').length,
+        completed: snapshots.filter((s) => s.eventStatus === 'completed')
+          .length,
+        active: snapshots.filter((s) => s.eventStatus === 'active').length,
+        upcoming: snapshots.filter((s) => s.eventStatus === 'upcoming').length,
         storageKB: Math.round(storageBytes / 1024),
       };
     } catch (error) {

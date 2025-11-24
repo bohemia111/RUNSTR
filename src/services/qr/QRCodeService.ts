@@ -99,7 +99,9 @@ class QRCodeService {
     try {
       // Normalize: trim whitespace and decode URL encoding
       const normalized = qrString.trim();
-      const decoded = normalized.includes('%') ? decodeURIComponent(normalized) : normalized;
+      const decoded = normalized.includes('%')
+        ? decodeURIComponent(normalized)
+        : normalized;
 
       // Check for NWC connection string (case-insensitive for robustness)
       if (decoded.toLowerCase().startsWith('nostr+walletconnect://')) {
@@ -153,8 +155,7 @@ class QRCodeService {
 
     if (data.type === 'nwc') {
       return !!(
-        data.connectionString &&
-        typeof data.connectionString === 'string'
+        data.connectionString && typeof data.connectionString === 'string'
       );
     }
 

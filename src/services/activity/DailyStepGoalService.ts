@@ -85,7 +85,10 @@ export class DailyStepGoalService {
    * Calculate progress toward daily goal
    */
   calculateProgress(currentSteps: number, goalSteps: number): StepGoalProgress {
-    const percentage = Math.min(Math.round((currentSteps / goalSteps) * 100), 100);
+    const percentage = Math.min(
+      Math.round((currentSteps / goalSteps) * 100),
+      100
+    );
     const achieved = currentSteps >= goalSteps;
     const remaining = Math.max(goalSteps - currentSteps, 0);
 
@@ -115,11 +118,11 @@ export class DailyStepGoalService {
    */
   getGoalPresets(): number[] {
     return [
-      5000,   // Beginner
-      7500,   // Moderate
-      10000,  // Standard (WHO recommendation)
-      12500,  // Active
-      15000,  // Very Active
+      5000, // Beginner
+      7500, // Moderate
+      10000, // Standard (WHO recommendation)
+      12500, // Active
+      15000, // Very Active
     ];
   }
 

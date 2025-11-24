@@ -15,7 +15,10 @@ import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { SplitTrackingService, type Split } from './SplitTrackingService';
-import { startNativeWorkoutSession, stopNativeWorkoutSession } from './WorkoutSessionBridge';
+import {
+  startNativeWorkoutSession,
+  stopNativeWorkoutSession,
+} from './WorkoutSessionBridge';
 import TTSAnnouncementService from './TTSAnnouncementService';
 
 // Storage keys
@@ -79,7 +82,9 @@ class SimpleDurationTracker {
     this.totalPausedTime = 0;
     this.pauseStartTime = 0;
 
-    console.log('[SimpleDurationTracker] Started - pure timestamp tracking (no timer)');
+    console.log(
+      '[SimpleDurationTracker] Started - pure timestamp tracking (no timer)'
+    );
   }
 
   stop() {
@@ -96,7 +101,11 @@ class SimpleDurationTracker {
       const pauseDuration = Date.now() - this.pauseStartTime;
       this.totalPausedTime += pauseDuration;
       this.pauseStartTime = 0;
-      console.log(`[SimpleDurationTracker] Resumed (paused for ${(pauseDuration / 1000).toFixed(1)}s)`);
+      console.log(
+        `[SimpleDurationTracker] Resumed (paused for ${(
+          pauseDuration / 1000
+        ).toFixed(1)}s)`
+      );
     }
   }
 
@@ -108,7 +117,9 @@ class SimpleDurationTracker {
   getDuration(): number {
     // If paused, calculate frozen duration using pauseStartTime
     if (this.pauseStartTime > 0) {
-      return Math.floor((this.pauseStartTime - this.startTime - this.totalPausedTime) / 1000);
+      return Math.floor(
+        (this.pauseStartTime - this.startTime - this.totalPausedTime) / 1000
+      );
     }
     // Otherwise calculate from current time
     const now = Date.now();
@@ -116,7 +127,8 @@ class SimpleDurationTracker {
   }
 
   getTotalPausedTime(): number {
-    const currentPause = this.pauseStartTime > 0 ? Date.now() - this.pauseStartTime : 0;
+    const currentPause =
+      this.pauseStartTime > 0 ? Date.now() - this.pauseStartTime : 0;
     return Math.floor((this.totalPausedTime + currentPause) / 1000);
   }
 
@@ -145,7 +157,9 @@ class SimpleDurationTracker {
     this.totalPausedTime = state.totalPausedTime;
     this.pauseStartTime = state.pauseStartTime;
 
-    console.log('[SimpleDurationTracker] State restored - timestamp tracking active');
+    console.log(
+      '[SimpleDurationTracker] State restored - timestamp tracking active'
+    );
   }
 }
 
@@ -225,7 +239,9 @@ export class SimpleRunTracker {
 
     // INSTANT: Start timer immediately (user sees 1, 2, 3... right away!)
     this.durationTracker.start(this.startTime);
-    console.log('[SimpleRunTracker] ⏱️ INSTANT START - Stopwatch counting 1, 2, 3, 4, 5...');
+    console.log(
+      '[SimpleRunTracker] ⏱️ INSTANT START - Stopwatch counting 1, 2, 3, 4, 5...'
+    );
 
     // Start split tracking for running activities
     if (activityType === 'running') {
@@ -234,11 +250,15 @@ export class SimpleRunTracker {
     }
 
     if (presetDistance) {
-      console.log(`[SimpleRunTracker] 🎯 Preset distance: ${(presetDistance / 1000).toFixed(2)} km`);
+      console.log(
+        `[SimpleRunTracker] 🎯 Preset distance: ${(
+          presetDistance / 1000
+        ).toFixed(2)} km`
+      );
     }
 
     // Background tasks (don't block UI)
-    this.initializeGPS(activityType).catch(error => {
+    this.initializeGPS(activityType).catch((error) => {
       console.error('[SimpleRunTracker] GPS initialization failed:', error);
       // Timer still runs even if GPS fails!
     });
@@ -250,17 +270,27 @@ export class SimpleRunTracker {
    * Initialize GPS in background (non-blocking)
    * Like reference implementation - GPS starts async
    */
-  private async initializeGPS(activityType: 'running' | 'walking' | 'cycling'): Promise<void> {
+  private async initializeGPS(
+    activityType: 'running' | 'walking' | 'cycling'
+  ): Promise<void> {
     try {
       console.log(`[SimpleRunTracker] Initializing GPS for ${activityType}...`);
 
       // iOS: Start native HKWorkoutSession FIRST (signals active workout to iOS)
       // This grants unlimited background location tracking privileges
       // Android: No-op (background tracking already works)
-      await startNativeWorkoutSession(activityType);
+      // DISABLED: Native workout session requires RUNSTRWorkoutBridge.m/swift native modules
+      // which are not yet implemented. Commenting out to prevent crashes on real devices.
+      // Note: This means iOS background tracking may be limited to ~30 minutes.
+      // await startNativeWorkoutSession(activityType);
+      console.log(
+        '[SimpleRunTracker] Native workout session disabled - using standard background tracking'
+      );
 
       // Clean up any existing GPS watchers
-      const isAlreadyRunning = await Location.hasStartedLocationUpdatesAsync(SIMPLE_TRACKER_TASK);
+      const isAlreadyRunning = await Location.hasStartedLocationUpdatesAsync(
+        SIMPLE_TRACKER_TASK
+      );
       if (isAlreadyRunning) {
         console.log('[SimpleRunTracker] Cleaning up previous GPS session...');
         await Location.stopLocationUpdatesAsync(SIMPLE_TRACKER_TASK);
@@ -279,7 +309,9 @@ export class SimpleRunTracker {
         timeInterval: 1000, // 1 second
         distanceInterval: 2, // 2 meters
         foregroundService: {
-          notificationTitle: `RUNSTR - ${activityType.charAt(0).toUpperCase() + activityType.slice(1)} Tracking`,
+          notificationTitle: `RUNSTR - ${
+            activityType.charAt(0).toUpperCase() + activityType.slice(1)
+          } Tracking`,
           notificationBody: 'Tap to return to your run',
           notificationColor: '#FF6B35',
         },
@@ -300,7 +332,9 @@ export class SimpleRunTracker {
    */
   async pauseTracking(): Promise<void> {
     if (!this.isTracking || this.isPaused) {
-      console.warn('[SimpleRunTracker] Cannot pause - not tracking or already paused');
+      console.warn(
+        '[SimpleRunTracker] Cannot pause - not tracking or already paused'
+      );
       return;
     }
 
@@ -319,7 +353,9 @@ export class SimpleRunTracker {
    */
   async resumeTracking(): Promise<void> {
     if (!this.isTracking || !this.isPaused) {
-      console.warn('[SimpleRunTracker] Cannot resume - not tracking or not paused');
+      console.warn(
+        '[SimpleRunTracker] Cannot resume - not tracking or not paused'
+      );
       return;
     }
 
@@ -345,7 +381,9 @@ export class SimpleRunTracker {
 
     // FIX: Flush any pending GPS points before stopping
     if (this.pendingPoints.length > 0) {
-      console.log(`[SimpleRunTracker] Flushing ${this.pendingPoints.length} pending GPS points before stop...`);
+      console.log(
+        `[SimpleRunTracker] Flushing ${this.pendingPoints.length} pending GPS points before stop...`
+      );
       this.flushPendingPointsToStorage();
       // Wait for write queue to complete
       await this.writeQueue;
@@ -353,7 +391,9 @@ export class SimpleRunTracker {
 
     // Stop GPS
     try {
-      const isRunning = await Location.hasStartedLocationUpdatesAsync(SIMPLE_TRACKER_TASK);
+      const isRunning = await Location.hasStartedLocationUpdatesAsync(
+        SIMPLE_TRACKER_TASK
+      );
       if (isRunning) {
         await Location.stopLocationUpdatesAsync(SIMPLE_TRACKER_TASK);
       }
@@ -370,13 +410,18 @@ export class SimpleRunTracker {
 
     // Sync final GPS points from storage to cache
     await this.syncGpsPointsFromStorage();
-    console.log(`[SimpleRunTracker] Retrieved ${this.cachedGpsPoints.length} GPS points`);
+    console.log(
+      `[SimpleRunTracker] Retrieved ${this.cachedGpsPoints.length} GPS points`
+    );
 
     // Calculate distance from GPS points (post-processing)
     const distance = this.calculateTotalDistance(this.cachedGpsPoints);
 
     // Get splits for running activities
-    const splits = this.activityType === 'running' ? this.splitTracker.getSplits() : undefined;
+    const splits =
+      this.activityType === 'running'
+        ? this.splitTracker.getSplits()
+        : undefined;
 
     // Create final session (using cached GPS points)
     const session: RunSession = {
@@ -393,7 +438,9 @@ export class SimpleRunTracker {
       splits,
     };
 
-    console.log(`[SimpleRunTracker] ✅ Splits recorded: ${splits?.length || 0} km markers`);
+    console.log(
+      `[SimpleRunTracker] ✅ Splits recorded: ${splits?.length || 0} km markers`
+    );
 
     // Reset state
     this.isTracking = false;
@@ -406,7 +453,11 @@ export class SimpleRunTracker {
     await AsyncStorage.removeItem(SESSION_STATE_KEY);
     await AsyncStorage.removeItem(GPS_POINTS_KEY);
 
-    console.log(`[SimpleRunTracker] ✅ Session completed: ${(distance / 1000).toFixed(2)} km in ${session.duration}s`);
+    console.log(
+      `[SimpleRunTracker] ✅ Session completed: ${(distance / 1000).toFixed(
+        2
+      )} km in ${session.duration}s`
+    );
 
     return session;
   }
@@ -424,7 +475,10 @@ export class SimpleRunTracker {
     const distance = this.calculateTotalDistance(this.cachedGpsPoints);
 
     // Get splits for running activities
-    const splits = this.activityType === 'running' ? this.splitTracker.getSplits() : undefined;
+    const splits =
+      this.activityType === 'running'
+        ? this.splitTracker.getSplits()
+        : undefined;
 
     return {
       id: this.sessionId || `run_${Date.now()}`,
@@ -448,7 +502,9 @@ export class SimpleRunTracker {
     try {
       const points = await this.getStoredPoints();
       this.cachedGpsPoints = points;
-      console.log(`[SimpleRunTracker] Synced ${points.length} GPS points to cache (for distance only)`);
+      console.log(
+        `[SimpleRunTracker] Synced ${points.length} GPS points to cache (for distance only)`
+      );
       // Timer runs independently - no GPS duration updates!
     } catch (error) {
       console.error('[SimpleRunTracker] Error syncing GPS points:', error);
@@ -477,7 +533,9 @@ export class SimpleRunTracker {
 
     if (currentDistance >= this.presetDistance) {
       console.log(
-        `[SimpleRunTracker] 🎯 AUTO-STOP: Reached preset distance ${(this.presetDistance / 1000).toFixed(2)} km`
+        `[SimpleRunTracker] 🎯 AUTO-STOP: Reached preset distance ${(
+          this.presetDistance / 1000
+        ).toFixed(2)} km`
       );
 
       // Trigger callback if set (UI will call stopTracking)
@@ -526,11 +584,15 @@ export class SimpleRunTracker {
 
       if (newSplit) {
         console.log(
-          `[SimpleRunTracker] 🏃 Split ${newSplit.number}: ${this.splitTracker.formatSplitTime(newSplit.splitTime)} (${this.splitTracker.formatPace(newSplit.pace)}/km)`
+          `[SimpleRunTracker] 🏃 Split ${
+            newSplit.number
+          }: ${this.splitTracker.formatSplitTime(
+            newSplit.splitTime
+          )} (${this.splitTracker.formatPace(newSplit.pace)}/km)`
         );
 
         // Announce split via TTS (non-blocking)
-        TTSAnnouncementService.announceSplit(newSplit).catch(err => {
+        TTSAnnouncementService.announceSplit(newSplit).catch((err) => {
           console.error('[SimpleRunTracker] Failed to announce split:', err);
         });
       }
@@ -547,8 +609,9 @@ export class SimpleRunTracker {
 
     // Only flush to storage periodically or if we have many pending points
     const now = Date.now();
-    const shouldFlush = (now - this.lastFlushTime > this.FLUSH_INTERVAL_MS) ||
-                       (this.pendingPoints.length > 100);
+    const shouldFlush =
+      now - this.lastFlushTime > this.FLUSH_INTERVAL_MS ||
+      this.pendingPoints.length > 100;
 
     if (shouldFlush && !this.isWriting) {
       this.flushPendingPointsToStorage();
@@ -586,7 +649,7 @@ export class SimpleRunTracker {
           this.isWriting = false;
         }
       })
-      .catch(err => {
+      .catch((err) => {
         console.error('[SimpleRunTracker] Write queue error:', err);
         this.isWriting = false;
       });
@@ -615,10 +678,13 @@ export class SimpleRunTracker {
 
       console.log(
         `[SimpleRunTracker] 💾 Incremental save: Added ${newPoints.length} points, ` +
-        `${trimmed.length} total in storage (was ${existing.length})`
+          `${trimmed.length} total in storage (was ${existing.length})`
       );
     } catch (error) {
-      console.error('[SimpleRunTracker] Error appending GPS points to storage:', error);
+      console.error(
+        '[SimpleRunTracker] Error appending GPS points to storage:',
+        error
+      );
       // Don't let storage errors crash the tracking - in-memory cache is primary
     }
   }
@@ -633,7 +699,10 @@ export class SimpleRunTracker {
       const trimmed = points.length > 5000 ? points.slice(-5000) : points;
       await AsyncStorage.setItem(GPS_POINTS_KEY, JSON.stringify(trimmed));
     } catch (error) {
-      console.error('[SimpleRunTracker] Error saving GPS points to storage:', error);
+      console.error(
+        '[SimpleRunTracker] Error saving GPS points to storage:',
+        error
+      );
     }
   }
 
@@ -753,7 +822,10 @@ export class SimpleRunTracker {
 
       // Restore session data
       this.sessionId = sessionState.sessionId;
-      this.activityType = sessionState.activityType as 'running' | 'walking' | 'cycling';
+      this.activityType = sessionState.activityType as
+        | 'running'
+        | 'walking'
+        | 'cycling';
       this.isTracking = sessionState.isTracking;
       this.isPaused = sessionState.isPaused;
       this.startTime = sessionState.startTime;
@@ -770,9 +842,15 @@ export class SimpleRunTracker {
       // Sync GPS points from storage to cache
       await this.syncGpsPointsFromStorage();
 
-      console.log(`[SimpleRunTracker] ✅ Session restored: ${sessionState.sessionId}`);
+      console.log(
+        `[SimpleRunTracker] ✅ Session restored: ${sessionState.sessionId}`
+      );
       if (this.presetDistance) {
-        console.log(`[SimpleRunTracker] 🎯 Restored preset distance: ${(this.presetDistance / 1000).toFixed(2)} km`);
+        console.log(
+          `[SimpleRunTracker] 🎯 Restored preset distance: ${(
+            this.presetDistance / 1000
+          ).toFixed(2)} km`
+        );
       }
       return true;
     } catch (error) {

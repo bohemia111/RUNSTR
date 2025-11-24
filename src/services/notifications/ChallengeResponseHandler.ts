@@ -9,7 +9,10 @@ import type { NDKSubscription, NDKEvent } from '@nostr-dev-kit/ndk';
 import { getCachedProfile } from './profileHelper';
 import { getUserNostrIdentifiers } from '../../utils/nostr';
 import { unifiedNotificationStore } from './UnifiedNotificationStore';
-import { CHALLENGE_ACCEPT_KIND, CHALLENGE_DECLINE_KIND } from '../../types/challenge';
+import {
+  CHALLENGE_ACCEPT_KIND,
+  CHALLENGE_DECLINE_KIND,
+} from '../../types/challenge';
 import type { ChallengeNotificationMetadata } from '../../types/unifiedNotifications';
 import { TTLDeduplicator } from '../../utils/TTLDeduplicator';
 
@@ -110,7 +113,10 @@ export class ChallengeResponseHandler {
         this.subscription.stop();
         this.subscription = null;
       } catch (error) {
-        console.warn('[ChallengeResponseHandler] Failed to stop subscription:', error);
+        console.warn(
+          '[ChallengeResponseHandler] Failed to stop subscription:',
+          error
+        );
       }
     }
 
@@ -139,11 +145,13 @@ export class ChallengeResponseHandler {
       );
 
       // Parse event tags to get challenge info
-      const challengeIdTag = ndkEvent.tags.find(t => t[0] === 'e');
+      const challengeIdTag = ndkEvent.tags.find((t) => t[0] === 'e');
       const challengeId = challengeIdTag?.[1];
 
       if (!challengeId) {
-        console.warn('[ChallengeResponseHandler] Missing challenge ID in event');
+        console.warn(
+          '[ChallengeResponseHandler] Missing challenge ID in event'
+        );
         return;
       }
 
@@ -181,7 +189,10 @@ export class ChallengeResponseHandler {
         } by ${notification.responderName}`
       );
     } catch (error) {
-      console.error('[ChallengeResponseHandler] Failed to process response:', error);
+      console.error(
+        '[ChallengeResponseHandler] Failed to process response:',
+        error
+      );
     }
   }
 

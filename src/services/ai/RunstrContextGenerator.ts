@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import LocalWorkoutStorageService, { type LocalWorkout } from '../fitness/LocalWorkoutStorageService';
+import LocalWorkoutStorageService, {
+  type LocalWorkout,
+} from '../fitness/LocalWorkoutStorageService';
 import FitnessTestService from '../fitness/FitnessTestService';
 import type { FitnessTestResult } from '../../types/fitnessTest';
 
@@ -79,7 +81,10 @@ export class RunstrContextGenerator {
     try {
       const context = await this.generateContext();
       await AsyncStorage.setItem(CONTEXT_STORAGE_KEY, context);
-      await AsyncStorage.setItem(CONTEXT_TIMESTAMP_KEY, new Date().toISOString());
+      await AsyncStorage.setItem(
+        CONTEXT_TIMESTAMP_KEY,
+        new Date().toISOString()
+      );
     } catch (error) {
       console.error('Error updating RUNSTR context:', error);
     }
@@ -108,24 +113,33 @@ export class RunstrContextGenerator {
     try {
       // Get existing memory
       const memoryJson = await AsyncStorage.getItem(CONVERSATION_MEMORY_KEY);
-      const memory: ConversationMemory[] = memoryJson ? JSON.parse(memoryJson) : [];
+      const memory: ConversationMemory[] = memoryJson
+        ? JSON.parse(memoryJson)
+        : [];
 
       // Create summary from response (first 150 chars)
-      const summary = response.split('\n').slice(0, 2).join(' ').substring(0, 150);
+      const summary = response
+        .split('\n')
+        .slice(0, 2)
+        .join(' ')
+        .substring(0, 150);
 
       // Add new entry
       memory.unshift({
         timestamp: new Date().toISOString(),
         type,
         query,
-        summary
+        summary,
       });
 
       // Keep only last MAX_MEMORY_ENTRIES
       const trimmedMemory = memory.slice(0, MAX_MEMORY_ENTRIES);
 
       // Save back
-      await AsyncStorage.setItem(CONVERSATION_MEMORY_KEY, JSON.stringify(trimmedMemory));
+      await AsyncStorage.setItem(
+        CONVERSATION_MEMORY_KEY,
+        JSON.stringify(trimmedMemory)
+      );
 
       // Update context file
       await this.updateContext();
@@ -232,15 +246,21 @@ export class RunstrContextGenerator {
       // Latest test
       const latest = history[0];
       const date = new Date(latest.timestamp).toISOString().split('T')[0];
-      lines.push(`Latest (${date}): ${latest.compositeScore}/300 (${latest.grade})`);
+      lines.push(
+        `Latest (${date}): ${latest.compositeScore}/300 (${latest.grade})`
+      );
 
       // Component breakdown
       const components: string[] = [];
       if (latest.pushups) {
-        components.push(`Pushups: ${latest.pushups.reps} → ${latest.pushups.score}pts`);
+        components.push(
+          `Pushups: ${latest.pushups.reps} → ${latest.pushups.score}pts`
+        );
       }
       if (latest.situps) {
-        components.push(`Situps: ${latest.situps.reps} → ${latest.situps.score}pts`);
+        components.push(
+          `Situps: ${latest.situps.reps} → ${latest.situps.score}pts`
+        );
       }
       if (latest.run && latest.run.timeSeconds) {
         const runTime = this.formatDuration(latest.run.timeSeconds);
@@ -262,9 +282,11 @@ export class RunstrContextGenerator {
       if (history.length > 1) {
         const historyScores = history
           .slice(1, 6)
-          .map(test => {
+          .map((test) => {
             const testDate = new Date(test.timestamp);
-            const month = testDate.toLocaleDateString('en-US', { month: 'short' });
+            const month = testDate.toLocaleDateString('en-US', {
+              month: 'short',
+            });
             return `${test.compositeScore} (${month})`;
           })
           .join(', ');
@@ -289,7 +311,7 @@ export class RunstrContextGenerator {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const recentWorkouts = allWorkouts.filter(w => {
+      const recentWorkouts = allWorkouts.filter((w) => {
         const workoutDate = new Date(w.startTime);
         return workoutDate >= thirtyDaysAgo;
       });
@@ -301,19 +323,28 @@ export class RunstrContextGenerator {
       const lines: string[] = ['## Recent Performance (Last 30 Days)'];
 
       // Calculate totals
-      const totalDistance = recentWorkouts.reduce((sum, w) => sum + (w.distance || 0), 0);
-      const totalDuration = recentWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0);
-      const totalCalories = recentWorkouts.reduce((sum, w) => sum + (w.calories || 0), 0);
+      const totalDistance = recentWorkouts.reduce(
+        (sum, w) => sum + (w.distance || 0),
+        0
+      );
+      const totalDuration = recentWorkouts.reduce(
+        (sum, w) => sum + (w.duration || 0),
+        0
+      );
+      const totalCalories = recentWorkouts.reduce(
+        (sum, w) => sum + (w.calories || 0),
+        0
+      );
 
       lines.push(
         `Total: ${recentWorkouts.length} workouts, ` +
-        `${(totalDistance / 1000).toFixed(1)}km, ` +
-        `${this.formatDuration(totalDuration)}`
+          `${(totalDistance / 1000).toFixed(1)}km, ` +
+          `${this.formatDuration(totalDuration)}`
       );
 
       // Breakdown by activity type
       const byType: { [key: string]: { count: number; distance: number } } = {};
-      recentWorkouts.forEach(w => {
+      recentWorkouts.forEach((w) => {
         if (!byType[w.type]) {
           byType[w.type] = { count: 0, distance: 0 };
         }
@@ -324,7 +355,11 @@ export class RunstrContextGenerator {
       Object.entries(byType).forEach(([type, stats]) => {
         const typeName = type.charAt(0).toUpperCase() + type.slice(1);
         if (stats.distance > 0) {
-          lines.push(`- ${typeName}: ${stats.count} workouts (${(stats.distance / 1000).toFixed(1)}km)`);
+          lines.push(
+            `- ${typeName}: ${stats.count} workouts (${(
+              stats.distance / 1000
+            ).toFixed(1)}km)`
+          );
         } else {
           lines.push(`- ${typeName}: ${stats.count} sessions`);
         }
@@ -351,7 +386,8 @@ export class RunstrContextGenerator {
 
       recentWorkouts.forEach((workout, index) => {
         const date = new Date(workout.startTime).toISOString().split('T')[0];
-        const type = workout.type.charAt(0).toUpperCase() + workout.type.slice(1);
+        const type =
+          workout.type.charAt(0).toUpperCase() + workout.type.slice(1);
 
         let details = `${index + 1}. [${date}] ${type}`;
 
@@ -375,7 +411,9 @@ export class RunstrContextGenerator {
         if (workout.type === 'strength' && workout.repsBreakdown) {
           const repsStr = workout.repsBreakdown.join(',');
           const sets = workout.sets || workout.repsBreakdown.length;
-          details += ` - ${workout.exerciseType || 'Exercise'} ${sets}x[${repsStr}]`;
+          details += ` - ${
+            workout.exerciseType || 'Exercise'
+          } ${sets}x[${repsStr}]`;
         }
 
         lines.push(details);
@@ -399,13 +437,17 @@ export class RunstrContextGenerator {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const recentWorkouts = allWorkouts.filter(w => {
+      const recentWorkouts = allWorkouts.filter((w) => {
         const workoutDate = new Date(w.startTime);
         return workoutDate >= sevenDaysAgo;
       });
 
-      const dietWorkouts = recentWorkouts.filter(w => w.type === 'diet' || w.type === 'fasting');
-      const meditationWorkouts = recentWorkouts.filter(w => w.type === 'meditation');
+      const dietWorkouts = recentWorkouts.filter(
+        (w) => w.type === 'diet' || w.type === 'fasting'
+      );
+      const meditationWorkouts = recentWorkouts.filter(
+        (w) => w.type === 'meditation'
+      );
 
       if (dietWorkouts.length === 0 && meditationWorkouts.length === 0) {
         return null;
@@ -414,8 +456,8 @@ export class RunstrContextGenerator {
       const lines: string[] = ['## Diet & Wellness (Last 7 Days)'];
 
       if (dietWorkouts.length > 0) {
-        const meals = dietWorkouts.filter(w => w.type === 'diet');
-        const fasting = dietWorkouts.filter(w => w.type === 'fasting');
+        const meals = dietWorkouts.filter((w) => w.type === 'diet');
+        const fasting = dietWorkouts.filter((w) => w.type === 'fasting');
 
         if (meals.length > 0) {
           lines.push(`- Meals: ${meals.length} logged`);
@@ -423,15 +465,23 @@ export class RunstrContextGenerator {
 
         if (fasting.length > 0) {
           const fastingDurations = fasting
-            .map(w => `${Math.round((w.fastingDuration || 0) / 3600)}h`)
+            .map((w) => `${Math.round((w.fastingDuration || 0) / 3600)}h`)
             .join(', ');
-          lines.push(`- Fasting: ${fasting.length} sessions (${fastingDurations})`);
+          lines.push(
+            `- Fasting: ${fasting.length} sessions (${fastingDurations})`
+          );
         }
       }
 
       if (meditationWorkouts.length > 0) {
-        const avgDuration = meditationWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0) / meditationWorkouts.length;
-        lines.push(`- Meditation: ${meditationWorkouts.length} sessions (avg ${Math.round(avgDuration / 60)}min)`);
+        const avgDuration =
+          meditationWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0) /
+          meditationWorkouts.length;
+        lines.push(
+          `- Meditation: ${
+            meditationWorkouts.length
+          } sessions (avg ${Math.round(avgDuration / 60)}min)`
+        );
       }
 
       lines.push('');
@@ -455,9 +505,10 @@ export class RunstrContextGenerator {
 
       const lines: string[] = ['## Conversation Memory'];
 
-      memory.forEach(entry => {
+      memory.forEach((entry) => {
         const date = new Date(entry.timestamp).toISOString().split('T')[0];
-        const typeLabel = entry.type.charAt(0).toUpperCase() + entry.type.slice(1);
+        const typeLabel =
+          entry.type.charAt(0).toUpperCase() + entry.type.slice(1);
         lines.push(`[${date} | ${typeLabel}] ${entry.query}`);
         lines.push(`- ${entry.summary}`);
         lines.push('');

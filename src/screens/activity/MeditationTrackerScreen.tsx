@@ -103,20 +103,28 @@ export const MeditationTrackerScreen: React.FC = () => {
           if (nostrProfile) {
             setUserAvatar(nostrProfile.picture);
             setUserName(nostrProfile.display_name || nostrProfile.name);
-            console.log('[MeditationTracker] ✅ User profile loaded for social cards');
+            console.log(
+              '[MeditationTracker] ✅ User profile loaded for social cards'
+            );
           }
         }
 
-        const userSigner = await UnifiedSigningService.getInstance().getSigner();
+        const userSigner =
+          await UnifiedSigningService.getInstance().getSigner();
         if (userSigner) setSigner(userSigner);
 
         // Load health profile for calorie estimation
-        const profileData = await AsyncStorage.getItem('@runstr:health_profile');
+        const profileData = await AsyncStorage.getItem(
+          '@runstr:health_profile'
+        );
         if (profileData) {
           const profile: HealthProfile = JSON.parse(profileData);
           if (profile.weight) {
             setUserWeight(profile.weight);
-            console.log('[MeditationTracker] ✅ User weight loaded:', profile.weight);
+            console.log(
+              '[MeditationTracker] ✅ User weight loaded:',
+              profile.weight
+            );
           }
         }
       } catch (error) {
@@ -269,7 +277,10 @@ export const MeditationTrackerScreen: React.FC = () => {
 
       if (result.success && result.eventId) {
         // Mark as synced in local storage
-        await LocalWorkoutStorageService.markAsSynced(workout.id, result.eventId);
+        await LocalWorkoutStorageService.markAsSynced(
+          workout.id,
+          result.eventId
+        );
 
         setAlertConfig({
           title: 'Success!',
@@ -489,7 +500,10 @@ export const MeditationTrackerScreen: React.FC = () => {
               <Text style={styles.postButtonText}>Post</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.competeButton} onPress={handleCompete}>
+            <TouchableOpacity
+              style={styles.competeButton}
+              onPress={handleCompete}
+            >
               <Ionicons
                 name="cloud-upload-outline"
                 size={20}

@@ -83,7 +83,11 @@ export class EventAnnouncementCardGenerator {
       });
 
       // Generate SVG content
-      const svgContent = this.createAnnouncementSVG(event, deepLink, dimensions);
+      const svgContent = this.createAnnouncementSVG(
+        event,
+        deepLink,
+        dimensions
+      );
 
       return {
         svgContent,
@@ -134,9 +138,10 @@ export class EventAnnouncementCardGenerator {
     const timeText = event.eventTime ? this.formatTime(event.eventTime) : null;
 
     // Format recurring schedule if applicable
-    const recurringText = event.isRecurring && event.recurrenceDay
-      ? this.formatRecurringSchedule(event.recurrenceDay)
-      : null;
+    const recurringText =
+      event.isRecurring && event.recurrenceDay
+        ? this.formatRecurringSchedule(event.recurrenceDay)
+        : null;
 
     // Wrap description text (if provided)
     const descriptionLines = event.description
@@ -157,9 +162,10 @@ export class EventAnnouncementCardGenerator {
     if (durationText) currentY += lineHeight;
 
     // Description section (if present)
-    const descriptionStartY = descriptionLines.length > 0 ? currentY + 10 : null;
+    const descriptionStartY =
+      descriptionLines.length > 0 ? currentY + 10 : null;
     if (descriptionLines.length > 0) {
-      currentY += 10 + (descriptionLines.length * 25); // 25px per line
+      currentY += 10 + descriptionLines.length * 25; // 25px per line
     }
 
     // Distance box Y position (add padding)

@@ -12,6 +12,8 @@ import { NostrCacheService } from '../cache/NostrCacheService';
 import { getNsec, getNpub } from '../../utils/nostrAuth';
 import { npubToHex } from '../../utils/ndkConversion';
 import type { Event } from 'nostr-tools';
+import unifiedCache from '../cache/UnifiedNostrCache';
+import { CacheKeys, CacheTTL } from '../../constants/cacheTTL';
 
 export interface EditableProfile {
   name?: string; // Display name
@@ -101,8 +103,8 @@ export class NostrProfilePublisher {
         };
       }
 
-      // Clear cache to force refresh
-      await this.clearProfileCache();
+      // Update cache to trigger UI refresh immediately
+      await this.updateProfileCache(profile, nsec);
 
       console.log(
         `✅ Profile published to ${publishResult.successful.length} relays`
@@ -196,19 +198,6 @@ export class NostrProfilePublisher {
     nsec: string
   ): Promise<Event | null> {
     try {
-      // Get user's npub for pubkey
-      const npub = await getNpub();
-      if (!npub) {
-        console.error('No npub found');
-        return null;
-      }
-
-      const hexPubkey = npubToHex(npub);
-      if (!hexPubkey) {
-        console.error('Failed to convert npub to hex');
-        return null;
-      }
-
       // Build metadata content
       const metadata: any = {};
 
@@ -237,15 +226,34 @@ export class NostrProfilePublisher {
 
       const content = JSON.stringify(metadata);
 
-      // Create the event using NostrProtocolHandler
-      const event = await this.protocolHandler.createAndSignEvent(
-        0, // kind 0 for metadata
+      // Create event template
+      const eventTemplate = {
+        kind: 0,
         content,
-        [], // No tags for kind 0
-        nsec
+        tags: [],
+        created_at: Math.floor(Date.now() / 1000),
+      };
+
+      // Use UnifiedSigningService to get the appropriate signer (supports both nsec and Amber)
+      const { UnifiedSigningService } = await import(
+        '../auth/UnifiedSigningService'
+      );
+      const signingService = UnifiedSigningService.getInstance();
+      const signer = await signingService.getSigner();
+
+      if (!signer) {
+        console.error('No signer available for profile update');
+        return null;
+      }
+
+      // Sign the event using NostrProtocolHandler's signEventWithSigner method
+      const signedEvent = await this.protocolHandler.signEventWithSigner(
+        eventTemplate,
+        signer
       );
 
-      return event;
+      console.log('✅ Created and signed kind 0 event:', signedEvent.id);
+      return signedEvent;
     } catch (error) {
       console.error('Error creating kind 0 event:', error);
       return null;
@@ -268,25 +276,67 @@ export class NostrProfilePublisher {
   }
 
   /**
-   * Clear profile cache after successful update
+   * Update profile cache after successful publish
+   * This triggers cache subscribers to update UI immediately
    */
-  private async clearProfileCache(): Promise<void> {
+  private async updateProfileCache(
+    profile: EditableProfile,
+    nsec: string
+  ): Promise<void> {
     try {
       const npub = await getNpub();
-      if (npub) {
-        // Clear from NostrCacheService
-        await NostrCacheService.clearProfileCache(npub);
+      const hexPubkey = npubToHex(npub);
 
-        // Clear from NostrProfileService's in-memory cache
-        const hexPubkey = npubToHex(npub);
-        if (hexPubkey) {
-          nostrProfileService.clearCache(hexPubkey);
-        }
-
-        console.log('✅ Profile cache cleared');
+      if (!npub || !hexPubkey) {
+        console.warn('⚠️ Cannot update cache: missing npub or hexPubkey');
+        return;
       }
+
+      // Get existing user data from cache to preserve fields like role, teamId, etc.
+      const existingUser = unifiedCache.getCached(
+        CacheKeys.USER_PROFILE(hexPubkey)
+      );
+
+      // Merge existing data with new profile fields
+      const updatedUser = {
+        // Preserve existing fields
+        ...(existingUser || {}),
+        id: existingUser?.id || hexPubkey,
+        npub: npub,
+        createdAt: existingUser?.createdAt || new Date().toISOString(),
+        lastSyncAt: new Date().toISOString(),
+
+        // Update with new profile fields
+        name: profile.display_name || profile.name || existingUser?.name || '',
+        displayName:
+          profile.display_name ||
+          profile.name ||
+          existingUser?.displayName ||
+          '',
+        bio: profile.about || '',
+        picture: profile.picture || '',
+        banner: profile.banner || '',
+        lud16: profile.lud16 || '',
+        website: profile.website || '',
+        nip05: profile.nip05 || '',
+      };
+
+      // Update UnifiedNostrCache (this triggers cache subscribers!)
+      await unifiedCache.set(
+        CacheKeys.USER_PROFILE(hexPubkey),
+        updatedUser,
+        CacheTTL.USER_PROFILE,
+        true // persist to AsyncStorage
+      );
+
+      // Also update old NostrCacheService for backward compatibility
+      await NostrCacheService.setCachedProfile(npub, updatedUser);
+
+      console.log(
+        '✅ Profile cache updated with new data - UI will refresh automatically'
+      );
     } catch (error) {
-      console.error('Error clearing profile cache:', error);
+      console.error('Error updating profile cache:', error);
     }
   }
 

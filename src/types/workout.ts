@@ -49,7 +49,13 @@ export interface Workout {
   weightsPerSet?: number[]; // Weight per set in lbs (for varying weights across sets)
   exerciseType?: string; // Specific exercise (pushups, bench, curls, etc.)
   // Meditation fields
-  meditationType?: 'guided' | 'unguided' | 'breathwork' | 'body_scan' | 'gratitude' | string;
+  meditationType?:
+    | 'guided'
+    | 'unguided'
+    | 'breathwork'
+    | 'body_scan'
+    | 'gratitude'
+    | string;
   // Diet fields
   mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | string;
   mealSize?: 'small' | 'medium' | 'large' | string;

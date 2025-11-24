@@ -4,13 +4,18 @@
  */
 
 import UnifiedNostrCache from '../cache/UnifiedNostrCache';
-import { nostrProfileService, type NostrProfile } from '../nostr/NostrProfileService';
+import {
+  nostrProfileService,
+  type NostrProfile,
+} from '../nostr/NostrProfileService';
 
 /**
  * Get profile with UnifiedNostrCache
  * This ensures all notification handlers use the same cached profiles
  */
-export async function getCachedProfile(pubkey: string): Promise<NostrProfile | null> {
+export async function getCachedProfile(
+  pubkey: string
+): Promise<NostrProfile | null> {
   const cacheKey = `profile:${pubkey}`;
 
   try {
@@ -29,7 +34,10 @@ export async function getCachedProfile(pubkey: string): Promise<NostrProfile | n
 
     return profile;
   } catch (error) {
-    console.error(`[ProfileHelper] Failed to get profile for ${pubkey}:`, error);
+    console.error(
+      `[ProfileHelper] Failed to get profile for ${pubkey}:`,
+      error
+    );
 
     // Return a basic fallback profile
     return {

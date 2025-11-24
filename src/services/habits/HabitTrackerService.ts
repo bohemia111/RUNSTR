@@ -82,7 +82,7 @@ export async function createHabit(
 export async function checkInHabit(habitId: string): Promise<Habit> {
   try {
     const habits = await getAllHabits();
-    const habitIndex = habits.findIndex(h => h.id === habitId);
+    const habitIndex = habits.findIndex((h) => h.id === habitId);
 
     if (habitIndex === -1) {
       throw new Error(`Habit not found: ${habitId}`);
@@ -122,7 +122,7 @@ export async function checkInHabit(habitId: string): Promise<Habit> {
 export async function deleteHabit(habitId: string): Promise<void> {
   try {
     const habits = await getAllHabits();
-    const filtered = habits.filter(h => h.id !== habitId);
+    const filtered = habits.filter((h) => h.id !== habitId);
     await saveHabits(filtered);
   } catch (error) {
     console.error('[HabitTrackerService] Error deleting habit:', error);
@@ -142,7 +142,10 @@ export function isCheckedInToday(habit: Habit): boolean {
  * Calculate current streak from check-in array
  * Returns both current streak and longest streak
  */
-export function calculateStreak(checkIns: string[]): { current: number; longest: number } {
+export function calculateStreak(checkIns: string[]): {
+  current: number;
+  longest: number;
+} {
   if (checkIns.length === 0) {
     return { current: 0, longest: 0 };
   }
@@ -248,12 +251,52 @@ function getPreviousDateString(dateString: string): string {
  * Predefined habit templates with icons and colors
  */
 export const HABIT_TEMPLATES = [
-  { name: 'No Smoking', icon: 'ban-outline', color: '#FF6B6B', type: 'abstinence' as const },
-  { name: 'No Drinking', icon: 'wine-outline', color: '#FF9D42', type: 'abstinence' as const },
-  { name: 'No Sugar', icon: 'ice-cream-outline', color: '#FF9D42', type: 'abstinence' as const },
-  { name: 'No Caffeine', icon: 'cafe-outline', color: '#8B5A3C', type: 'abstinence' as const },
-  { name: 'Daily Meditation', icon: 'body-outline', color: '#4ECDC4', type: 'positive' as const },
-  { name: 'Read Daily', icon: 'book-outline', color: '#95E1D3', type: 'positive' as const },
-  { name: 'Journal', icon: 'pencil-outline', color: '#FFE66D', type: 'positive' as const },
-  { name: 'Exercise', icon: 'barbell-outline', color: '#FF9D42', type: 'positive' as const },
+  {
+    name: 'No Smoking',
+    icon: 'ban-outline',
+    color: '#FF6B6B',
+    type: 'abstinence' as const,
+  },
+  {
+    name: 'No Drinking',
+    icon: 'wine-outline',
+    color: '#FF9D42',
+    type: 'abstinence' as const,
+  },
+  {
+    name: 'No Sugar',
+    icon: 'ice-cream-outline',
+    color: '#FF9D42',
+    type: 'abstinence' as const,
+  },
+  {
+    name: 'No Caffeine',
+    icon: 'cafe-outline',
+    color: '#8B5A3C',
+    type: 'abstinence' as const,
+  },
+  {
+    name: 'Daily Meditation',
+    icon: 'body-outline',
+    color: '#4ECDC4',
+    type: 'positive' as const,
+  },
+  {
+    name: 'Read Daily',
+    icon: 'book-outline',
+    color: '#95E1D3',
+    type: 'positive' as const,
+  },
+  {
+    name: 'Journal',
+    icon: 'pencil-outline',
+    color: '#FFE66D',
+    type: 'positive' as const,
+  },
+  {
+    name: 'Exercise',
+    icon: 'barbell-outline',
+    color: '#FF9D42',
+    type: 'positive' as const,
+  },
 ];

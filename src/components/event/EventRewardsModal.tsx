@@ -131,7 +131,9 @@ export const EventRewardsModal: React.FC<EventRewardsModalProps> = ({
                 <Text style={styles.sectionTitle}>Entry Fees</Text>
                 <View style={styles.entryFeeCard}>
                   <View style={styles.entryFeeRow}>
-                    <Text style={styles.entryFeeLabel}>Fee per participant:</Text>
+                    <Text style={styles.entryFeeLabel}>
+                      Fee per participant:
+                    </Text>
                     <Text style={styles.entryFeeValue}>
                       {entryFeesSats.toLocaleString()} sats
                     </Text>
@@ -141,7 +143,9 @@ export const EventRewardsModal: React.FC<EventRewardsModalProps> = ({
                     <>
                       <View style={styles.entryFeeRow}>
                         <Text style={styles.entryFeeLabel}>Participants:</Text>
-                        <Text style={styles.entryFeeValue}>{participantCount}</Text>
+                        <Text style={styles.entryFeeValue}>
+                          {participantCount}
+                        </Text>
                       </View>
                       <View style={styles.divider} />
                       <View style={styles.entryFeeRow}>
@@ -190,7 +194,10 @@ export const EventRewardsModal: React.FC<EventRewardsModalProps> = ({
             </View>
 
             {/* Close Button */}
-            <TouchableOpacity style={styles.closeButtonBottom} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.closeButtonBottom}
+              onPress={onClose}
+            >
               <Text style={styles.closeButtonBottomText}>Close</Text>
             </TouchableOpacity>
           </ScrollView>

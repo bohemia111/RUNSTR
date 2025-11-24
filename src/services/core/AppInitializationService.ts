@@ -43,7 +43,9 @@ class AppInitializationService {
         // ✅ FREEZE FIX: Wait for UI interactions to complete before heavy network operations
         // This prevents blocking the main thread during permission flows and screen transitions
         console.log('⏸️ AppInit: Waiting for UI interactions to complete...');
-        await new Promise(resolve => InteractionManager.runAfterInteractions(resolve));
+        await new Promise((resolve) =>
+          InteractionManager.runAfterInteractions(resolve)
+        );
         console.log('🚀 AppInit: Starting background data loading...');
 
         // Step 1: Connect to Nostr relays
@@ -58,7 +60,9 @@ class AppInitializationService {
           await GlobalNDKService.waitForMinimumConnection(2, 2000);
           console.log('✅ AppInit: Nostr connected');
         } catch (ndkError) {
-          console.error('⚠️ AppInit: NDK connection failed, continuing offline');
+          console.error(
+            '⚠️ AppInit: NDK connection failed, continuing offline'
+          );
           GlobalNDKService.startBackgroundRetry();
         }
 
@@ -77,9 +81,11 @@ class AppInitializationService {
 
           // Step 3: Prefetch all user data (teams, workouts, wallet, competitions)
           console.log('📦 AppInit: Prefetching all data...');
-          await nostrPrefetchService.prefetchAllUserData((step, total, message) => {
-            console.log(`📊 AppInit: ${message} (${step}/${total})`);
-          });
+          await nostrPrefetchService.prefetchAllUserData(
+            (step, total, message) => {
+              console.log(`📊 AppInit: ${message} (${step}/${total})`);
+            }
+          );
 
           console.log('✅ AppInit: All data loaded!');
         }
@@ -113,7 +119,9 @@ class AppInitializationService {
    */
   async hasCompleted(): Promise<boolean> {
     try {
-      const completed = await AsyncStorage.getItem('@runstr:app_init_completed');
+      const completed = await AsyncStorage.getItem(
+        '@runstr:app_init_completed'
+      );
       return completed === 'true';
     } catch {
       return false;

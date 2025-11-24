@@ -14,13 +14,17 @@ interface HolisticHealthScoreCardProps {
   healthScore?: HolisticHealthScore;
 }
 
-export const HolisticHealthScoreCard: React.FC<HolisticHealthScoreCardProps> = ({
-  healthScore,
-}) => {
+export const HolisticHealthScoreCard: React.FC<
+  HolisticHealthScoreCardProps
+> = ({ healthScore }) => {
   if (!healthScore) {
     return (
       <View style={styles.emptyCard}>
-        <Ionicons name="fitness-outline" size={32} color={theme.colors.textMuted} />
+        <Ionicons
+          name="fitness-outline"
+          size={32}
+          color={theme.colors.textMuted}
+        />
         <Text style={styles.emptyText}>
           Complete more workouts to see your holistic health score
         </Text>
@@ -53,17 +57,32 @@ export const HolisticHealthScoreCard: React.FC<HolisticHealthScoreCardProps> = (
       <View style={styles.header}>
         <Text style={styles.heading}>Health Score</Text>
         <View style={styles.trendBadge}>
-          <Ionicons name={getTrendIcon() as any} size={16} color={getTrendColor()} />
+          <Ionicons
+            name={getTrendIcon() as any}
+            size={16}
+            color={getTrendColor()}
+          />
           <Text style={[styles.trendText, { color: getTrendColor() }]}>
-            {healthScore.trend.charAt(0).toUpperCase() + healthScore.trend.slice(1)}
+            {healthScore.trend.charAt(0).toUpperCase() +
+              healthScore.trend.slice(1)}
           </Text>
         </View>
       </View>
 
       {/* Overall Score Circle */}
       <View style={styles.scoreSection}>
-        <View style={[styles.scoreCircle, { borderColor: getScoreColor(healthScore.overall) }]}>
-          <Text style={[styles.scoreValue, { color: getScoreColor(healthScore.overall) }]}>
+        <View
+          style={[
+            styles.scoreCircle,
+            { borderColor: getScoreColor(healthScore.overall) },
+          ]}
+        >
+          <Text
+            style={[
+              styles.scoreValue,
+              { color: getScoreColor(healthScore.overall) },
+            ]}
+          >
             {healthScore.overall}
           </Text>
           <Text style={styles.scoreLabel}>/ 100</Text>
@@ -101,9 +120,18 @@ export const HolisticHealthScoreCard: React.FC<HolisticHealthScoreCardProps> = (
 
       {/* Balance Indicator */}
       <View style={styles.balanceSection}>
-        <Ionicons name="analytics-outline" size={16} color={theme.colors.textMuted} />
+        <Ionicons
+          name="analytics-outline"
+          size={16}
+          color={theme.colors.textMuted}
+        />
         <Text style={styles.balanceLabel}>Balance Score</Text>
-        <Text style={[styles.balanceValue, { color: getScoreColor(healthScore.balance) }]}>
+        <Text
+          style={[
+            styles.balanceValue,
+            { color: getScoreColor(healthScore.balance) },
+          ]}
+        >
           {healthScore.balance}/100
         </Text>
       </View>
@@ -114,7 +142,11 @@ export const HolisticHealthScoreCard: React.FC<HolisticHealthScoreCardProps> = (
           <Text style={styles.recommendationsTitle}>Top Recommendations</Text>
           {healthScore.recommendations.slice(0, 2).map((rec, index) => (
             <View key={index} style={styles.recommendationItem}>
-              <Ionicons name="checkmark-circle-outline" size={16} color={theme.colors.orangeBright} />
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={16}
+                color={theme.colors.orangeBright}
+              />
               <Text style={styles.recommendationText}>{rec}</Text>
             </View>
           ))}
@@ -132,7 +164,12 @@ interface CategoryBarProps {
   icon: string;
 }
 
-const CategoryBar: React.FC<CategoryBarProps> = ({ label, score, color, icon }) => {
+const CategoryBar: React.FC<CategoryBarProps> = ({
+  label,
+  score,
+  color,
+  icon,
+}) => {
   return (
     <View style={styles.categoryRow}>
       <View style={styles.categoryLeft}>

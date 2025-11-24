@@ -15,9 +15,11 @@ interface CorrelationInsightCardProps {
   icon?: keyof typeof Ionicons.glyphMap;
 }
 
-export const CorrelationInsightCard: React.FC<
-  CorrelationInsightCardProps
-> = ({ title, correlation, icon = 'link' }) => {
+export const CorrelationInsightCard: React.FC<CorrelationInsightCardProps> = ({
+  title,
+  correlation,
+  icon = 'link',
+}) => {
   // Get color based on correlation strength and direction
   const getCorrelationColor = () => {
     if (correlation.strength === 'strong') return '#FFB366'; // Light orange for strong
@@ -26,7 +28,10 @@ export const CorrelationInsightCard: React.FC<
   };
 
   const getStrengthLabel = () => {
-    return `${correlation.strength.charAt(0).toUpperCase() + correlation.strength.slice(1)} ${correlation.direction} correlation`;
+    return `${
+      correlation.strength.charAt(0).toUpperCase() +
+      correlation.strength.slice(1)
+    } ${correlation.direction} correlation`;
   };
 
   return (

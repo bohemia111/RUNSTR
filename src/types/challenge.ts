@@ -126,8 +126,20 @@ export enum UserActivityStatus {
 
 // Legacy type exports for backward compatibility (will be gradually removed)
 export type DurationOption = 1 | 7 | 30; // Days
-export type ActivityType = 'running' | 'walking' | 'cycling' | 'strength' | 'meditation' | 'diet';
-export type MetricType = 'distance' | 'duration' | 'reps' | 'days' | 'count' | 'calories';
+export type ActivityType =
+  | 'running'
+  | 'walking'
+  | 'cycling'
+  | 'strength'
+  | 'meditation'
+  | 'diet';
+export type MetricType =
+  | 'distance'
+  | 'duration'
+  | 'reps'
+  | 'days'
+  | 'count'
+  | 'calories';
 
 // Nostr event kinds for challenges
 export const CHALLENGE_REQUEST_KIND = 1105;

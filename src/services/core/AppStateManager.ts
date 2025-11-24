@@ -42,7 +42,9 @@ class AppStateManagerClass {
       return;
     }
 
-    console.log('🎯 Initializing AppStateManager - Single source of truth for app state');
+    console.log(
+      '🎯 Initializing AppStateManager - Single source of truth for app state'
+    );
 
     this.currentAppState = AppState.currentState;
     this.isAppActive = this.currentAppState === 'active';
@@ -68,8 +70,13 @@ class AppStateManagerClass {
     this.currentAppState = nextAppState;
 
     // Going to background
-    if (previousState === 'active' && nextAppState.match(/inactive|background/)) {
-      console.log('🔴 App going to background - BLOCKING all network operations');
+    if (
+      previousState === 'active' &&
+      nextAppState.match(/inactive|background/)
+    ) {
+      console.log(
+        '🔴 App going to background - BLOCKING all network operations'
+      );
 
       // CRITICAL: Set flag IMMEDIATELY on Android to prevent any operations
       if (Platform.OS === 'android') {
@@ -85,7 +92,10 @@ class AppStateManagerClass {
       this.notifyCallbacks(false);
     }
     // Coming to foreground
-    else if (previousState.match(/inactive|background/) && nextAppState === 'active') {
+    else if (
+      previousState.match(/inactive|background/) &&
+      nextAppState === 'active'
+    ) {
       console.log('🟢 App returning to foreground - Resuming operations');
 
       // Delay resume slightly to ensure app is fully ready
@@ -152,7 +162,9 @@ class AppStateManagerClass {
    */
   private processQueuedOperations(): void {
     if (this.operationQueue.length > 0) {
-      console.log(`🔄 Processing ${this.operationQueue.length} queued operations`);
+      console.log(
+        `🔄 Processing ${this.operationQueue.length} queued operations`
+      );
       const operations = [...this.operationQueue];
       this.operationQueue = [];
 
@@ -213,4 +225,5 @@ export const AppStateManager = AppStateManagerClass.getInstance();
 // Export convenience functions for easy use
 export const canDoNetworkOps = (): boolean => AppStateManager.canDoNetworkOps();
 export const isAppActive = (): boolean => AppStateManager.isActive();
-export const queueForResume = (op: () => void): void => AppStateManager.queueForResume(op);
+export const queueForResume = (op: () => void): void =>
+  AppStateManager.queueForResume(op);

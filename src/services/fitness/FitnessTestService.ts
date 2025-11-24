@@ -125,7 +125,9 @@ export class FitnessTestService {
         throw new Error('No active test found');
       }
 
-      const testDuration = Math.floor((Date.now() - activeTest.startTime) / 1000);
+      const testDuration = Math.floor(
+        (Date.now() - activeTest.startTime) / 1000
+      );
 
       // Query local workout storage for qualifying workouts
       const workouts = await LocalWorkoutStorageService.getAllWorkouts();
@@ -212,7 +214,9 @@ export class FitnessTestService {
       // Clear active test
       await AsyncStorage.removeItem(STORAGE_KEYS.ACTIVE_TEST);
 
-      console.log(`✅ Fitness test completed: ${compositeScore}/300 (${grade.name})`);
+      console.log(
+        `✅ Fitness test completed: ${compositeScore}/300 (${grade.name})`
+      );
       return result;
     } catch (error) {
       console.error('❌ Failed to finish test:', error);
@@ -290,7 +294,10 @@ export class FitnessTestService {
 
       // Update RUNSTR.md context file for AI coach
       RunstrContextGenerator.updateContext().catch((error) => {
-        console.warn('Failed to update RUNSTR context after fitness test:', error);
+        console.warn(
+          'Failed to update RUNSTR context after fitness test:',
+          error
+        );
       });
     } catch (error) {
       console.error('❌ Failed to save test result:', error);

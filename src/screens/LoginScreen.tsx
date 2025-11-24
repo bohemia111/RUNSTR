@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingTop: 80,
-    paddingBottom: 0,
+    paddingBottom: 40,
     overflow: 'hidden',
   },
   headerSmall: {
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     paddingVertical: 10,
-    marginTop: -40,
+    marginTop: 20,
   },
   buttonContainer: {
     alignItems: 'center',

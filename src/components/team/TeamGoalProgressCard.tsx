@@ -33,7 +33,7 @@ export const TeamGoalProgressCard: React.FC<TeamGoalProgressCardProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <Ionicons
-          name={isComplete ? "trophy" : "flag"}
+          name={isComplete ? 'trophy' : 'flag'}
           size={20}
           color={isComplete ? theme.colors.orangeBright : theme.colors.text}
         />
@@ -48,7 +48,9 @@ export const TeamGoalProgressCard: React.FC<TeamGoalProgressCardProps> = ({
       </View>
 
       {/* Percentage */}
-      <Text style={[styles.percentage, isComplete && styles.percentageComplete]}>
+      <Text
+        style={[styles.percentage, isComplete && styles.percentageComplete]}
+      >
         {displayPercentage.toFixed(1)}% Complete
       </Text>
 
@@ -59,7 +61,7 @@ export const TeamGoalProgressCard: React.FC<TeamGoalProgressCardProps> = ({
             style={[
               styles.progressBarFill,
               isComplete && styles.progressBarFillComplete,
-              { width: `${displayPercentage}%` }
+              { width: `${displayPercentage}%` },
             ]}
           />
         </View>
@@ -68,7 +70,11 @@ export const TeamGoalProgressCard: React.FC<TeamGoalProgressCardProps> = ({
       {/* Status Message */}
       {isComplete ? (
         <View style={styles.completeBadge}>
-          <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+          <Ionicons
+            name="checkmark-circle"
+            size={16}
+            color={theme.colors.success}
+          />
           <Text style={styles.completeText}>Goal Achieved</Text>
         </View>
       ) : (

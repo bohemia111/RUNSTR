@@ -146,13 +146,19 @@ export class WorkoutPublishingService {
       }
 
       // Get competition team for tagging (use workout's team if available, otherwise fetch current)
-      const competitionTeam = workout.competitionTeam || await LocalTeamMembershipService.getCompetitionTeam();
+      const competitionTeam =
+        workout.competitionTeam ||
+        (await LocalTeamMembershipService.getCompetitionTeam());
 
       // Create unsigned NDKEvent
       const ndkEvent = new NDKEvent(ndk);
       ndkEvent.kind = 1301;
       ndkEvent.content = this.generateWorkoutDescription(workout);
-      ndkEvent.tags = await this.createNIP101eWorkoutTags(workout, pubkey, competitionTeam);
+      ndkEvent.tags = await this.createNIP101eWorkoutTags(
+        workout,
+        pubkey,
+        competitionTeam
+      );
       ndkEvent.created_at = Math.floor(
         new Date(workout.startTime).getTime() / 1000
       );
@@ -252,13 +258,17 @@ export class WorkoutPublishingService {
 
         try {
           // Fetch competition team name for card branding
-          const competitionTeamId = await LocalTeamMembershipService.getCompetitionTeam();
+          const competitionTeamId =
+            await LocalTeamMembershipService.getCompetitionTeam();
           let teamName: string | undefined;
 
           if (competitionTeamId) {
             try {
-              const NdkTeamService = (await import('../team/NdkTeamService')).default;
-              const teamData = await NdkTeamService.getTeamById(competitionTeamId);
+              const NdkTeamService = (await import('../team/NdkTeamService'))
+                .default;
+              const teamData = await NdkTeamService.getTeamById(
+                competitionTeamId
+              );
               teamName = teamData?.name ? `Team ${teamData.name}` : undefined;
             } catch (err) {
               console.warn('⚠️ Failed to fetch team name for card:', err);
@@ -280,11 +290,14 @@ export class WorkoutPublishingService {
           // Note: Image conversion will happen in the UI layer (SocialShareModal)
           // using WorkoutCardRenderer + captureRef, then pass cardImageUri in options
           if (options.cardImageUri) {
-            console.log('📤 Uploading card image to nostr.build with NIP-98 auth...', {
-              uri: options.cardImageUri,
-              filename: `runstr-workout-${workout.id}.png`,
-              hasSigner: !!signer,
-            });
+            console.log(
+              '📤 Uploading card image to nostr.build with NIP-98 auth...',
+              {
+                uri: options.cardImageUri,
+                filename: `runstr-workout-${workout.id}.png`,
+                hasSigner: !!signer,
+              }
+            );
             const uploadResult = await this.imageUploadService.uploadImage(
               options.cardImageUri,
               `runstr-workout-${workout.id}.png`,
@@ -318,7 +331,11 @@ export class WorkoutPublishingService {
       // Create unsigned NDKEvent
       const ndkEvent = new NDKEvent(ndk);
       ndkEvent.kind = 1;
-      ndkEvent.content = await this.generateSocialPostContent(workout, options, imageUrl);
+      ndkEvent.content = await this.generateSocialPostContent(
+        workout,
+        options,
+        imageUrl
+      );
       ndkEvent.tags = this.createSocialPostTags(
         workout,
         imageUrl,
@@ -1051,7 +1068,8 @@ export class WorkoutPublishingService {
     const activityHashtag = this.getActivityHashtag(workout.type);
 
     // Get competition team for hashtag
-    const competitionTeam = await LocalTeamMembershipService.getCompetitionTeam();
+    const competitionTeam =
+      await LocalTeamMembershipService.getCompetitionTeam();
 
     // If we have an image, keep it minimal - the card has all the stats
     if (imageUrl) {

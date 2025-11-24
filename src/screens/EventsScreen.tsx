@@ -35,7 +35,9 @@ interface TeamLeaderboards {
 }
 
 export const EventsScreen: React.FC = () => {
-  const [teamLeaderboards, setTeamLeaderboards] = useState<TeamLeaderboards[]>([]);
+  const [teamLeaderboards, setTeamLeaderboards] = useState<TeamLeaderboards[]>(
+    []
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -43,22 +45,32 @@ export const EventsScreen: React.FC = () => {
   const { profileData } = useNavigationData();
   const userTeams = profileData?.teams || [];
   const userNpub = profileData?.user?.npub;
-  const userHexPubkey = userNpub ? (npubToHex(userNpub) || undefined) : undefined; // Convert npub to hex for filtering
+  const userHexPubkey = userNpub ? npubToHex(userNpub) || undefined : undefined; // Convert npub to hex for filtering
 
   // Load leaderboards for all user's teams
   const loadAllLeaderboards = async () => {
     try {
       setIsLoading(true);
-      console.log(`[EventsScreen] 📊 Loading leaderboards for ${userTeams.length} teams`);
-      console.log(`[EventsScreen] 👤 User hex: ${userHexPubkey?.substring(0, 8)}...`);
+      console.log(
+        `[EventsScreen] 📊 Loading leaderboards for ${userTeams.length} teams`
+      );
+      console.log(
+        `[EventsScreen] 👤 User hex: ${userHexPubkey?.substring(0, 8)}...`
+      );
 
       const allTeamLeaderboards: TeamLeaderboards[] = [];
 
       for (const team of userTeams) {
         try {
-          console.log(`[EventsScreen] 🔍 Fetching leaderboards for team: ${team.name} (${team.id})`);
+          console.log(
+            `[EventsScreen] 🔍 Fetching leaderboards for team: ${team.name} (${team.id})`
+          );
 
-          const dailyLeaderboards = await SimpleLeaderboardService.getTeamDailyLeaderboards(team.id, userHexPubkey);
+          const dailyLeaderboards =
+            await SimpleLeaderboardService.getTeamDailyLeaderboards(
+              team.id,
+              userHexPubkey
+            );
 
           allTeamLeaderboards.push({
             teamId: team.id,
@@ -69,17 +81,17 @@ export const EventsScreen: React.FC = () => {
             leaderboardMarathon: dailyLeaderboards.leaderboardMarathon,
           });
 
-          console.log(
-            `[EventsScreen] ✅ ${team.name} leaderboards loaded:`,
-            {
-              '5k': dailyLeaderboards.leaderboard5k.length,
-              '10k': dailyLeaderboards.leaderboard10k.length,
-              'half': dailyLeaderboards.leaderboardHalf.length,
-              'marathon': dailyLeaderboards.leaderboardMarathon.length,
-            }
-          );
+          console.log(`[EventsScreen] ✅ ${team.name} leaderboards loaded:`, {
+            '5k': dailyLeaderboards.leaderboard5k.length,
+            '10k': dailyLeaderboards.leaderboard10k.length,
+            half: dailyLeaderboards.leaderboardHalf.length,
+            marathon: dailyLeaderboards.leaderboardMarathon.length,
+          });
         } catch (error) {
-          console.error(`[EventsScreen] ❌ Error loading leaderboards for ${team.name}:`, error);
+          console.error(
+            `[EventsScreen] ❌ Error loading leaderboards for ${team.name}:`,
+            error
+          );
         }
       }
 

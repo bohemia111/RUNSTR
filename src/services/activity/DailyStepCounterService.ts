@@ -36,10 +36,15 @@ export class DailyStepCounterService {
   async isAvailable(): Promise<boolean> {
     try {
       const available = await Pedometer.isAvailableAsync();
-      console.log(`[DailyStepCounterService] Pedometer available: ${available}`);
+      console.log(
+        `[DailyStepCounterService] Pedometer available: ${available}`
+      );
       return available;
     } catch (error) {
-      console.error('[DailyStepCounterService] Error checking availability:', error);
+      console.error(
+        '[DailyStepCounterService] Error checking availability:',
+        error
+      );
       return false;
     }
   }
@@ -53,19 +58,24 @@ export class DailyStepCounterService {
     try {
       const available = await this.isAvailable();
       if (!available) {
-        console.warn('[DailyStepCounterService] Pedometer not available on this device');
+        console.warn(
+          '[DailyStepCounterService] Pedometer not available on this device'
+        );
         return false;
       }
 
       // Android 10+ (API 29+) requires explicit ACTIVITY_RECOGNITION permission
       if (Platform.OS === 'android' && Platform.Version >= 29) {
-        console.log('[DailyStepCounterService] Requesting ACTIVITY_RECOGNITION permission (Android 10+)');
+        console.log(
+          '[DailyStepCounterService] Requesting ACTIVITY_RECOGNITION permission (Android 10+)'
+        );
 
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
           {
             title: 'Motion Permission Required',
-            message: 'RUNSTR needs access to your motion data to count your daily steps and track walking activities.',
+            message:
+              'RUNSTR needs access to your motion data to count your daily steps and track walking activities.',
             buttonPositive: 'Allow',
             buttonNegative: 'Deny',
           }
@@ -76,7 +86,9 @@ export class DailyStepCounterService {
           return false;
         }
 
-        console.log('[DailyStepCounterService] ACTIVITY_RECOGNITION permission granted');
+        console.log(
+          '[DailyStepCounterService] ACTIVITY_RECOGNITION permission granted'
+        );
       }
 
       // Test if we can access step data (iOS auto-prompts here)
@@ -84,7 +96,9 @@ export class DailyStepCounterService {
       const testStart = new Date(now.getTime() - 1000); // 1 second ago
       await Pedometer.getStepCountAsync(testStart, now);
 
-      console.log('[DailyStepCounterService] Permissions granted - step data accessible');
+      console.log(
+        '[DailyStepCounterService] Permissions granted - step data accessible'
+      );
       return true;
     } catch (error) {
       console.error('[DailyStepCounterService] Permission error:', error);
@@ -95,7 +109,9 @@ export class DailyStepCounterService {
   /**
    * Check if motion permission is currently granted (Android only)
    */
-  async checkPermissionStatus(): Promise<'granted' | 'denied' | 'never_ask_again' | 'unknown'> {
+  async checkPermissionStatus(): Promise<
+    'granted' | 'denied' | 'never_ask_again' | 'unknown'
+  > {
     if (Platform.OS !== 'android' || Platform.Version < 29) {
       return 'granted'; // iOS or older Android versions don't need explicit permission
     }
@@ -114,7 +130,8 @@ export class DailyStepCounterService {
         PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
         {
           title: 'Motion Permission Required',
-          message: 'RUNSTR needs access to your motion data to count your daily steps.',
+          message:
+            'RUNSTR needs access to your motion data to count your daily steps.',
           buttonPositive: 'Allow',
           buttonNegative: 'Deny',
         }
@@ -128,7 +145,10 @@ export class DailyStepCounterService {
         return 'denied';
       }
     } catch (error) {
-      console.error('[DailyStepCounterService] Error checking permission:', error);
+      console.error(
+        '[DailyStepCounterService] Error checking permission:',
+        error
+      );
       return 'unknown';
     }
   }
@@ -160,7 +180,9 @@ export class DailyStepCounterService {
       start.setHours(0, 0, 0, 0); // Midnight today
       const end = new Date(); // Now
 
-      console.log(`[DailyStepCounterService] Querying steps from ${start.toISOString()} to ${end.toISOString()}`);
+      console.log(
+        `[DailyStepCounterService] Querying steps from ${start.toISOString()} to ${end.toISOString()}`
+      );
 
       // Query pedometer data
       const result = await Pedometer.getStepCountAsync(start, end);
@@ -180,7 +202,9 @@ export class DailyStepCounterService {
       // Update cache
       this.cachedSteps = stepData;
 
-      console.log(`[DailyStepCounterService] ✅ Today's steps: ${result.steps}`);
+      console.log(
+        `[DailyStepCounterService] ✅ Today's steps: ${result.steps}`
+      );
       return stepData;
     } catch (error) {
       console.error('[DailyStepCounterService] Error getting steps:', error);
@@ -196,7 +220,10 @@ export class DailyStepCounterService {
       const result = await Pedometer.getStepCountAsync(start, end);
       return result ? result.steps : null;
     } catch (error) {
-      console.error('[DailyStepCounterService] Error getting steps for range:', error);
+      console.error(
+        '[DailyStepCounterService] Error getting steps for range:',
+        error
+      );
       return null;
     }
   }
@@ -229,11 +256,16 @@ export class DailyStepCounterService {
     const startSubscription = async () => {
       try {
         subscription = Pedometer.watchStepCount((result) => {
-          console.log(`[DailyStepCounterService] Live step update: ${result.steps}`);
+          console.log(
+            `[DailyStepCounterService] Live step update: ${result.steps}`
+          );
           callback(result.steps);
         });
       } catch (error) {
-        console.error('[DailyStepCounterService] Error subscribing to live steps:', error);
+        console.error(
+          '[DailyStepCounterService] Error subscribing to live steps:',
+          error
+        );
       }
     };
 

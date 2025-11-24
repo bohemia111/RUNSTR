@@ -141,7 +141,8 @@ export class NostrCompetitionDiscoveryService {
           type: 'challenge',
           status: this.mapChallengeStatus(challenge.status),
           participantCount: challenge.participants.length,
-          yourRole: challenge.creatorPubkey === hexPubkey ? 'challenger' : 'challenged',
+          yourRole:
+            challenge.creatorPubkey === hexPubkey ? 'challenger' : 'challenged',
           startsAt: new Date(challenge.startDate).getTime() / 1000,
           endsAt: new Date(challenge.endDate).getTime() / 1000,
           wager: challenge.wager,
@@ -188,13 +189,20 @@ export class NostrCompetitionDiscoveryService {
   /**
    * Map kind 30102 challenge status to UserCompetition status
    */
-  private mapChallengeStatus(status: string): 'upcoming' | 'active' | 'completed' {
+  private mapChallengeStatus(
+    status: string
+  ): 'upcoming' | 'active' | 'completed' {
     switch (status) {
-      case 'open': return 'upcoming';
-      case 'active': return 'active';
-      case 'completed': return 'completed';
-      case 'cancelled': return 'completed';
-      default: return 'upcoming';
+      case 'open':
+        return 'upcoming';
+      case 'active':
+        return 'active';
+      case 'completed':
+        return 'completed';
+      case 'cancelled':
+        return 'completed';
+      default:
+        return 'upcoming';
     }
   }
 

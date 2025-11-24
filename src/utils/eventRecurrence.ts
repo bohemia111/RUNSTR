@@ -160,10 +160,10 @@ function getBiweeklyPeriod(
   periodEnd.setMinutes(periodEnd.getMinutes() + durationMinutes);
 
   // Calculate period number (which biweekly occurrence)
-  const periodNumber = Math.floor(
-    (periodStart.getTime() - startDate.getTime()) /
-      (1000 * 60 * 60 * 24 * 14)
-  ) + 1;
+  const periodNumber =
+    Math.floor(
+      (periodStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 14)
+    ) + 1;
 
   return { periodStart, periodEnd, periodNumber };
 }
@@ -330,7 +330,9 @@ export function isEventActive(event: NostrEventDefinition): boolean {
   if (!event.recurrence || event.recurrence === 'none') {
     const eventStart = new Date(event.eventDate);
     const eventEnd = new Date(eventStart);
-    eventEnd.setMinutes(eventEnd.getMinutes() + (event.durationMinutes || 1440));
+    eventEnd.setMinutes(
+      eventEnd.getMinutes() + (event.durationMinutes || 1440)
+    );
     const now = new Date();
     return now >= eventStart && now <= eventEnd;
   }
@@ -350,7 +352,9 @@ export function getPeriodTimestamps(
     // Non-recurring: use event date + duration
     const eventStart = new Date(event.eventDate);
     const eventEnd = new Date(eventStart);
-    eventEnd.setMinutes(eventEnd.getMinutes() + (event.durationMinutes || 1440));
+    eventEnd.setMinutes(
+      eventEnd.getMinutes() + (event.durationMinutes || 1440)
+    );
 
     return {
       since: Math.floor(eventStart.getTime() / 1000),

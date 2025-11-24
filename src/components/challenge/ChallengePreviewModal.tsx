@@ -54,7 +54,8 @@ export const ChallengePreviewModal: React.FC<ChallengePreviewModalProps> = ({
             </View>
 
             <Text style={styles.errorText}>
-              {challengeData?.error || 'This challenge link is invalid or expired.'}
+              {challengeData?.error ||
+                'This challenge link is invalid or expired.'}
             </Text>
 
             <TouchableOpacity style={styles.closeOnlyButton} onPress={onClose}>
@@ -112,7 +113,9 @@ export const ChallengePreviewModal: React.FC<ChallengePreviewModalProps> = ({
             <View style={styles.challengerAvatar}>
               <Text style={styles.challengerInitial}>{challengerInitial}</Text>
             </View>
-            <Text style={styles.challengerName}>{challengeData.creatorName}</Text>
+            <Text style={styles.challengerName}>
+              {challengeData.creatorName}
+            </Text>
             <Text style={styles.challengerSubtitle}>challenged you!</Text>
           </View>
 
@@ -150,7 +153,10 @@ export const ChallengePreviewModal: React.FC<ChallengePreviewModalProps> = ({
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
             <TouchableOpacity
-              style={[styles.declineButton, isAccepting && styles.buttonDisabled]}
+              style={[
+                styles.declineButton,
+                isAccepting && styles.buttonDisabled,
+              ]}
               onPress={onDecline}
               disabled={isAccepting}
             >
@@ -158,12 +164,18 @@ export const ChallengePreviewModal: React.FC<ChallengePreviewModalProps> = ({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.acceptButton, isAccepting && styles.buttonDisabled]}
+              style={[
+                styles.acceptButton,
+                isAccepting && styles.buttonDisabled,
+              ]}
               onPress={handleAccept}
               disabled={isAccepting}
             >
               {isAccepting ? (
-                <ActivityIndicator size="small" color={theme.colors.accentText} />
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.accentText}
+                />
               ) : (
                 <Text style={styles.acceptButtonText}>Accept</Text>
               )}

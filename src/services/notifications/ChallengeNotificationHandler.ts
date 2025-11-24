@@ -208,7 +208,9 @@ export class ChallengeNotificationHandler {
         // Check if app is active before processing events
         const { AppStateManager } = await import('../core/AppStateManager');
         if (!AppStateManager.canDoNetworkOps()) {
-          console.log('🔴 App backgrounded, skipping challenge event processing');
+          console.log(
+            '🔴 App backgrounded, skipping challenge event processing'
+          );
           return;
         }
 
@@ -225,9 +227,7 @@ export class ChallengeNotificationHandler {
 
         // Skip if user is the creator (don't notify yourself)
         if (event.pubkey === userIdentifiers.hexPubkey) {
-          console.log(
-            `Skipping self-created challenge: ${challengeId}`
-          );
+          console.log(`Skipping self-created challenge: ${challengeId}`);
           return;
         }
 
@@ -387,7 +387,13 @@ export class ChallengeNotificationHandler {
       await unifiedNotificationStore.addNotification(
         'challenge_received',
         `${notification.challengerName || 'Someone'} challenged you!`,
-        `${notification.challengeName} • ${notification.distance} km • ${notification.duration}h${notification.wagerAmount > 0 ? ` • ${notification.wagerAmount} sats` : ''}`,
+        `${notification.challengeName} • ${notification.distance} km • ${
+          notification.duration
+        }h${
+          notification.wagerAmount > 0
+            ? ` • ${notification.wagerAmount} sats`
+            : ''
+        }`,
         metadata,
         {
           icon: 'trophy',

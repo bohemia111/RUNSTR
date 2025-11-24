@@ -147,21 +147,26 @@ export class NostrCompetitionService {
       } else {
         // For nsec users, create a signer from the private key
         const { NDKPrivateKeySigner } = await import('@nostr-dev-kit/ndk');
-        const signer = new NDKPrivateKeySigner(captainPrivateKeyOrSigner as string);
+        const signer = new NDKPrivateKeySigner(
+          captainPrivateKeyOrSigner as string
+        );
         await ndkEvent.sign(signer);
       }
 
       // Publish to relays with timeout
       const publishPromise = ndkEvent.publish();
-      const timeoutPromise = new Promise<Set<any>>((resolve) =>
-        setTimeout(() => resolve(new Set()), 10000) // 10s timeout
+      const timeoutPromise = new Promise<Set<any>>(
+        (resolve) => setTimeout(() => resolve(new Set()), 10000) // 10s timeout
       );
 
       const relaySet = await Promise.race([publishPromise, timeoutPromise]);
       const publishedRelayCount = relaySet.size;
 
       if (publishedRelayCount > 0) {
-        console.log(`✅ League published successfully to ${publishedRelayCount} relays:`, competitionId);
+        console.log(
+          `✅ League published successfully to ${publishedRelayCount} relays:`,
+          competitionId
+        );
         return {
           eventId: ndkEvent.id,
           success: true,
@@ -203,17 +208,22 @@ export class NostrCompetitionService {
 
       // ✅ FIX: Validate required fields before publishing
       if (!eventData.teamId || eventData.teamId.trim() === '') {
-        console.error('❌ Event creation failed: teamId is required but was empty');
+        console.error(
+          '❌ Event creation failed: teamId is required but was empty'
+        );
         return {
           eventId: '',
           competitionId: '',
           success: false,
-          message: 'Team ID is required to create an event. Please ensure you are creating the event from a team page.',
+          message:
+            'Team ID is required to create an event. Please ensure you are creating the event from a team page.',
         };
       }
 
       if (!eventData.name || eventData.name.trim() === '') {
-        console.error('❌ Event creation failed: name is required but was empty');
+        console.error(
+          '❌ Event creation failed: name is required but was empty'
+        );
         return {
           eventId: '',
           competitionId: '',
@@ -223,7 +233,9 @@ export class NostrCompetitionService {
       }
 
       if (!eventData.activityType) {
-        console.error('❌ Event creation failed: activityType is required but was missing');
+        console.error(
+          '❌ Event creation failed: activityType is required but was missing'
+        );
         return {
           eventId: '',
           competitionId: '',
@@ -241,13 +253,16 @@ export class NostrCompetitionService {
       const isSigner = typeof captainPrivateKeyOrSigner !== 'string';
 
       // ✅ FIX: Use provided ID if available (from wizard), otherwise generate new one
-      const competitionId = eventData.id || NostrCompetitionService.generateCompetitionId(
-        'event',
-        eventData.name
-      );
+      const competitionId =
+        eventData.id ||
+        NostrCompetitionService.generateCompetitionId('event', eventData.name);
       const now = Math.floor(Date.now() / 1000);
 
-      console.log(`📋 Using event ID: ${competitionId}${eventData.id ? ' (from wizard)' : ' (generated)'}`);
+      console.log(
+        `📋 Using event ID: ${competitionId}${
+          eventData.id ? ' (from wizard)' : ' (generated)'
+        }`
+      );
 
       // Get captain's public key based on auth method
       let captainPubkey: string;
@@ -377,7 +392,9 @@ export class NostrCompetitionService {
       } else {
         // For nsec users, create a signer from the private key
         const { NDKPrivateKeySigner } = await import('@nostr-dev-kit/ndk');
-        const signer = new NDKPrivateKeySigner(captainPrivateKeyOrSigner as string);
+        const signer = new NDKPrivateKeySigner(
+          captainPrivateKeyOrSigner as string
+        );
         await ndkEvent.sign(signer);
       }
 
@@ -390,32 +407,40 @@ export class NostrCompetitionService {
         tags: ndkEvent.tags,
         content_preview: ndkEvent.content.substring(0, 200) + '...',
       });
-      console.log('🔍 Event definition in content:', JSON.parse(ndkEvent.content));
+      console.log(
+        '🔍 Event definition in content:',
+        JSON.parse(ndkEvent.content)
+      );
 
       // Publish to relays with timeout
       const publishPromise = ndkEvent.publish();
-      const timeoutPromise = new Promise<Set<any>>((resolve) =>
-        setTimeout(() => resolve(new Set()), 10000) // 10s timeout
+      const timeoutPromise = new Promise<Set<any>>(
+        (resolve) => setTimeout(() => resolve(new Set()), 10000) // 10s timeout
       );
 
       const relaySet = await Promise.race([publishPromise, timeoutPromise]);
       const publishedRelayCount = relaySet.size;
 
       if (publishedRelayCount > 0) {
-        console.log(`✅ Event published successfully to ${publishedRelayCount} relays:`, competitionId);
+        console.log(
+          `✅ Event published successfully to ${publishedRelayCount} relays:`,
+          competitionId
+        );
 
         // ✅ DEBUG: Verify tags persisted after publish
         console.log('🔍 Verifying published event has team tag:', {
           eventId: ndkEvent.id,
-          teamTag: ndkEvent.tags.find(t => t[0] === 'team'),
-          captainTag: ndkEvent.tags.find(t => t[0] === 'captain'),
-          nameTag: ndkEvent.tags.find(t => t[0] === 'name'),
-          allTags: ndkEvent.tags.slice(0, 15).map(t => `[${t[0]}, ${t[1]}]`),
+          teamTag: ndkEvent.tags.find((t) => t[0] === 'team'),
+          captainTag: ndkEvent.tags.find((t) => t[0] === 'captain'),
+          nameTag: ndkEvent.tags.find((t) => t[0] === 'name'),
+          allTags: ndkEvent.tags.slice(0, 15).map((t) => `[${t[0]}, ${t[1]}]`),
         });
 
         // ✅ NEW: Save event locally for captain dashboard re-announcement
         try {
-          const { CaptainEventStore } = await import('../event/CaptainEventStore');
+          const { CaptainEventStore } = await import(
+            '../event/CaptainEventStore'
+          );
           const competitionEvent = {
             id: competitionId,
             teamId: eventData.teamId,
@@ -436,9 +461,15 @@ export class NostrCompetitionService {
             scoringMode: eventData.scoringMode,
             teamGoal: eventData.teamGoal,
           };
-          await CaptainEventStore.saveCreatedEvent(competitionId, competitionEvent);
+          await CaptainEventStore.saveCreatedEvent(
+            competitionId,
+            competitionEvent
+          );
         } catch (error) {
-          console.warn('⚠️ Failed to save event locally (non-critical):', error);
+          console.warn(
+            '⚠️ Failed to save event locally (non-critical):',
+            error
+          );
           // Don't fail the whole operation if local save fails
         }
 

@@ -38,8 +38,8 @@ export interface RootStackParamList extends Record<string, object | undefined> {
   EventDetail: {
     eventId: string;
     eventData?: any;
-    teamId?: string;  // ✅ NEW: Team context for fallback
-    captainPubkey?: string;  // ✅ NEW: Captain context for fallback
+    teamId?: string; // ✅ NEW: Team context for fallback
+    captainPubkey?: string; // ✅ NEW: Captain context for fallback
   };
   EventCaptainDashboard: { eventId: string; eventData: any };
   LeagueDetail: { leagueId: string; leagueData?: any };

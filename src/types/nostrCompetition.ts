@@ -75,7 +75,12 @@ export type ScoringMode = 'individual' | 'team-total';
 export type NostrScoringFrequency = 'daily' | 'weekly' | 'total';
 
 // Recurrence Types (for recurring events)
-export type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly';
+export type RecurrenceFrequency =
+  | 'none'
+  | 'daily'
+  | 'weekly'
+  | 'biweekly'
+  | 'monthly';
 
 export type RecurrenceDay =
   | 'monday'
@@ -208,7 +213,10 @@ export interface NostrChallengeDefinition {
 // Competition Event Interface (generic)
 export interface NostrCompetitionEvent extends Event {
   kind: 30100 | 30101 | 30102;
-  parsedContent: NostrLeagueDefinition | NostrEventDefinition | NostrChallengeDefinition;
+  parsedContent:
+    | NostrLeagueDefinition
+    | NostrEventDefinition
+    | NostrChallengeDefinition;
 }
 
 // League Event Template

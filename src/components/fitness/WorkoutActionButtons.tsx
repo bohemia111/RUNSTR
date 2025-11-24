@@ -148,7 +148,8 @@ export const WorkoutActionButtons: React.FC<WorkoutActionButtonsProps> = ({
       success && styles.successButtonText,
     ];
 
-    const iconName = variant === 'save' ? 'cloud-upload-outline' : 'chatbubble-outline';
+    const iconName =
+      variant === 'save' ? 'cloud-upload-outline' : 'chatbubble-outline';
     const successText = variant === 'save' ? 'Published!' : 'Shared!';
 
     return (
@@ -169,9 +170,7 @@ export const WorkoutActionButtons: React.FC<WorkoutActionButtonsProps> = ({
                 color={theme.colors.accentText}
                 style={styles.buttonIcon}
               />
-              <Text style={textStyle}>
-                {success ? successText : text}
-              </Text>
+              <Text style={textStyle}>{success ? successText : text}</Text>
             </>
           )}
         </View>

@@ -36,13 +36,17 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
       // Check if session is active
       const sessionStateStr = await AsyncStorage.getItem(SESSION_STATE_KEY);
       if (!sessionStateStr) {
-        console.log('[SimpleRunTrackerTask] No active session, ignoring locations');
+        console.log(
+          '[SimpleRunTrackerTask] No active session, ignoring locations'
+        );
         return;
       }
 
       const sessionState = JSON.parse(sessionStateStr);
       if (sessionState.isPaused) {
-        console.log('[SimpleRunTrackerTask] Session paused, ignoring locations');
+        console.log(
+          '[SimpleRunTrackerTask] Session paused, ignoring locations'
+        );
         return;
       }
 
@@ -67,7 +71,11 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
 
         // 1. Accuracy check
         if (accuracy > 35) {
-          console.log(`[SimpleRunTrackerTask] Rejected: poor accuracy ${accuracy.toFixed(1)}m`);
+          console.log(
+            `[SimpleRunTrackerTask] Rejected: poor accuracy ${accuracy.toFixed(
+              1
+            )}m`
+          );
           continue;
         }
 
@@ -75,8 +83,13 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
         if (gpsPointCount < 3) {
           gpsPointCount++;
           sessionState.gpsPointCount = gpsPointCount;
-          await AsyncStorage.setItem(SESSION_STATE_KEY, JSON.stringify(sessionState));
-          console.log(`[SimpleRunTrackerTask] GPS warm-up: skipping point ${gpsPointCount}/3`);
+          await AsyncStorage.setItem(
+            SESSION_STATE_KEY,
+            JSON.stringify(sessionState)
+          );
+          console.log(
+            `[SimpleRunTrackerTask] GPS warm-up: skipping point ${gpsPointCount}/3`
+          );
           continue; // Skip this point for distance calculation
         }
 
@@ -99,7 +112,11 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
         // 3. Minimum time interval (reduce noise from too-frequent updates)
         const timeDiff = (loc.timestamp - lastValidLocation.timestamp) / 1000; // seconds
         if (timeDiff < 1.0) {
-          console.log(`[SimpleRunTrackerTask] Rejected: too soon (${timeDiff.toFixed(2)}s < 1.0s)`);
+          console.log(
+            `[SimpleRunTrackerTask] Rejected: too soon (${timeDiff.toFixed(
+              2
+            )}s < 1.0s)`
+          );
           continue;
         }
 
@@ -127,14 +144,22 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
 
         // 6. GPS teleportation filter (reject impossible jumps)
         if (distance > 50) {
-          console.log(`[SimpleRunTrackerTask] Rejected: jump too large (${distance.toFixed(1)}m > 50m)`);
+          console.log(
+            `[SimpleRunTrackerTask] Rejected: jump too large (${distance.toFixed(
+              1
+            )}m > 50m)`
+          );
           continue;
         }
 
         // 7. Speed validation (use GPS-provided speed if available, otherwise calculate)
-        const speed = loc.coords.speed || (distance / timeDiff);
+        const speed = loc.coords.speed || distance / timeDiff;
         if (speed > 15) {
-          console.log(`[SimpleRunTrackerTask] Rejected: unrealistic speed (${speed.toFixed(1)} m/s > 15 m/s)`);
+          console.log(
+            `[SimpleRunTrackerTask] Rejected: unrealistic speed (${speed.toFixed(
+              1
+            )} m/s > 15 m/s)`
+          );
           continue;
         }
 
@@ -144,7 +169,9 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
       }
 
       if (validLocations.length === 0) {
-        console.log('[SimpleRunTrackerTask] No valid locations (all filtered out)');
+        console.log(
+          '[SimpleRunTrackerTask] No valid locations (all filtered out)'
+        );
         return;
       }
 

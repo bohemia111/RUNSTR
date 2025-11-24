@@ -121,16 +121,23 @@ export const StrengthTrackerScreen: React.FC = () => {
         if (userSigner && userPubkey) {
           setSigner(userSigner);
           setUserId(userPubkey);
-          console.log('[StrengthTracker] ✅ User signer and pubkey loaded for posting');
+          console.log(
+            '[StrengthTracker] ✅ User signer and pubkey loaded for posting'
+          );
         }
 
         // Load health profile for calorie estimation
-        const profileData = await AsyncStorage.getItem('@runstr:health_profile');
+        const profileData = await AsyncStorage.getItem(
+          '@runstr:health_profile'
+        );
         if (profileData) {
           const profile: HealthProfile = JSON.parse(profileData);
           if (profile.weight) {
             setUserWeight(profile.weight);
-            console.log('[StrengthTracker] ✅ User weight loaded:', profile.weight);
+            console.log(
+              '[StrengthTracker] ✅ User weight loaded:',
+              profile.weight
+            );
           }
         }
 
@@ -140,7 +147,9 @@ export const StrengthTrackerScreen: React.FC = () => {
           if (nostrProfile) {
             setUserAvatar(nostrProfile.picture);
             setUserName(nostrProfile.display_name || nostrProfile.name);
-            console.log('[StrengthTracker] ✅ User profile loaded for social cards');
+            console.log(
+              '[StrengthTracker] ✅ User profile loaded for social cards'
+            );
           }
         }
       } catch (error) {
@@ -187,9 +196,12 @@ export const StrengthTrackerScreen: React.FC = () => {
   const handleSetComplete = () => {
     setCurrentRepsInput(targetReps.toString());
     // Pre-fill weight with either exerciseWeight (setup value) or last set's weight
-    const defaultWeight = weightsCompleted.length > 0
-      ? weightsCompleted[weightsCompleted.length - 1].toString()
-      : exerciseWeight > 0 ? exerciseWeight.toString() : '0';
+    const defaultWeight =
+      weightsCompleted.length > 0
+        ? weightsCompleted[weightsCompleted.length - 1].toString()
+        : exerciseWeight > 0
+        ? exerciseWeight.toString()
+        : '0';
     setCurrentWeightInput(defaultWeight);
     setShowRepsModal(true);
   };
@@ -240,14 +252,20 @@ export const StrengthTrackerScreen: React.FC = () => {
       const repsBreakdown = completedReps
         .map((r, i) => {
           const weight = completedWeights[i] || 0;
-          return weight > 0 ? `Set ${i + 1}: ${r} @ ${weight} lbs` : `Set ${i + 1}: ${r}`;
+          return weight > 0
+            ? `Set ${i + 1}: ${r} @ ${weight} lbs`
+            : `Set ${i + 1}: ${r}`;
         })
         .join(', ');
 
       // Calculate average weight if weights were tracked
-      const averageWeight = completedWeights.length > 0
-        ? Math.round(completedWeights.reduce((a, b) => a + b, 0) / completedWeights.length)
-        : undefined;
+      const averageWeight =
+        completedWeights.length > 0
+          ? Math.round(
+              completedWeights.reduce((a, b) => a + b, 0) /
+                completedWeights.length
+            )
+          : undefined;
 
       // Estimate calories using CalorieEstimationService
       const calories = CalorieEstimationService.estimateStrengthCalories(
@@ -349,7 +367,9 @@ export const StrengthTrackerScreen: React.FC = () => {
         return;
       }
 
-      console.log(`[StrengthTracker] Posting workout ${workout.id} as kind 1301...`);
+      console.log(
+        `[StrengthTracker] Posting workout ${workout.id} as kind 1301...`
+      );
 
       // Convert LocalWorkout to PublishableWorkout format
       const publishableWorkout = {
@@ -365,10 +385,15 @@ export const StrengthTrackerScreen: React.FC = () => {
       );
 
       if (result.success && result.eventId) {
-        console.log(`[StrengthTracker] ✅ Workout published as kind 1301: ${result.eventId}`);
+        console.log(
+          `[StrengthTracker] ✅ Workout published as kind 1301: ${result.eventId}`
+        );
 
         // Mark workout as synced
-        await LocalWorkoutStorageService.markAsSynced(workout.id, result.eventId);
+        await LocalWorkoutStorageService.markAsSynced(
+          workout.id,
+          result.eventId
+        );
 
         setAlertConfig({
           title: 'Success',
@@ -512,7 +537,9 @@ export const StrengthTrackerScreen: React.FC = () => {
             <View style={styles.numberInput}>
               <TouchableOpacity
                 style={styles.numberButton}
-                onPress={() => setExerciseWeight(Math.max(0, exerciseWeight - 5))}
+                onPress={() =>
+                  setExerciseWeight(Math.max(0, exerciseWeight - 5))
+                }
               >
                 <Ionicons name="remove" size={24} color={theme.colors.text} />
               </TouchableOpacity>
@@ -614,7 +641,9 @@ export const StrengthTrackerScreen: React.FC = () => {
         <Modal visible={showRepsModal} animationType="fade" transparent>
           <View style={styles.modalOverlay}>
             <View style={styles.repsModalContainer}>
-              <Text style={styles.repsModalTitle}>Set {currentSet} Complete</Text>
+              <Text style={styles.repsModalTitle}>
+                Set {currentSet} Complete
+              </Text>
 
               <Text style={styles.inputLabel}>Reps</Text>
               <TextInput
@@ -780,10 +809,7 @@ export const StrengthTrackerScreen: React.FC = () => {
         </View>
 
         {/* Posting Buttons */}
-        <TouchableOpacity
-          style={styles.postButton}
-          onPress={handlePostSocial}
-        >
+        <TouchableOpacity style={styles.postButton} onPress={handlePostSocial}>
           <Ionicons
             name="chatbubble-outline"
             size={20}
@@ -834,7 +860,8 @@ export const StrengthTrackerScreen: React.FC = () => {
             onSuccess={() => {
               setAlertConfig({
                 title: 'Success',
-                message: 'Your workout has been shared to Nostr with a beautiful card!',
+                message:
+                  'Your workout has been shared to Nostr with a beautiful card!',
                 buttons: [
                   {
                     text: 'OK',

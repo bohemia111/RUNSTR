@@ -177,19 +177,24 @@ export class DirectNostrProfileService {
         const { data: hexPubkey } = nip19.decode(storedNpub);
         const unifiedCache = UnifiedNostrCache.getInstance();
         // Fire-and-forget: save in background without blocking profile load
-        unifiedCache.set(
-          CacheKeys.USER_PROFILE(hexPubkey as string),
-          directUser,
-          24 * 60 * 60 * 1000, // 24hr TTL
-          true // persist to AsyncStorage
-        ).then(() => {
-          console.log('✅ DirectNostrProfileService: Persisted to UnifiedCache');
-        }).catch((cacheError) => {
-          console.warn(
-            '⚠️ DirectNostrProfileService: Failed to persist to UnifiedCache:',
-            cacheError
-          );
-        });
+        unifiedCache
+          .set(
+            CacheKeys.USER_PROFILE(hexPubkey as string),
+            directUser,
+            24 * 60 * 60 * 1000, // 24hr TTL
+            true // persist to AsyncStorage
+          )
+          .then(() => {
+            console.log(
+              '✅ DirectNostrProfileService: Persisted to UnifiedCache'
+            );
+          })
+          .catch((cacheError) => {
+            console.warn(
+              '⚠️ DirectNostrProfileService: Failed to persist to UnifiedCache:',
+              cacheError
+            );
+          });
       } catch (cacheError) {
         console.warn(
           '⚠️ DirectNostrProfileService: nip19 decode failed:',

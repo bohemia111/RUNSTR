@@ -54,7 +54,10 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     if (Platform.OS === 'ios') {
       // iOS 16+ required for DataScannerViewController
       const osVersion = Platform.Version;
-      const majorVersion = typeof osVersion === 'string' ? parseInt(osVersion.split('.')[0], 10) : osVersion;
+      const majorVersion =
+        typeof osVersion === 'string'
+          ? parseInt(osVersion.split('.')[0], 10)
+          : osVersion;
       setUseNativeScanner(majorVersion >= 16);
     } else {
       // Web or other platforms - use fallback
@@ -70,7 +73,10 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     try {
       // Set up listener for scan results
       const subscription = CameraView.onModernBarcodeScanned((result) => {
-        console.log('[QRScanner] Native scanner detected barcode:', result.type);
+        console.log(
+          '[QRScanner] Native scanner detected barcode:',
+          result.type
+        );
 
         // Process the scanned data
         handleScanResult(result.data);
@@ -235,27 +241,29 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           <View style={styles.nativeScannerContainer}>
             <Text style={styles.nativeScannerTitle}>Scan QR Code</Text>
             <Text style={styles.nativeScannerText}>
-              Open your device's camera to scan QR codes for challenges, events, or wallet connections
+              Open your device's camera to scan QR codes for challenges, events,
+              or wallet connections
             </Text>
 
             <TouchableOpacity
               style={styles.launchScannerButton}
               onPress={handleLaunchNativeScanner}
             >
-              <Text style={styles.launchScannerButtonText}>Open Camera Scanner</Text>
+              <Text style={styles.launchScannerButtonText}>
+                Open Camera Scanner
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.useFallbackButton}
               onPress={() => setUseNativeScanner(false)}
             >
-              <Text style={styles.useFallbackButtonText}>Use Manual Scanner Instead</Text>
+              <Text style={styles.useFallbackButtonText}>
+                Use Manual Scanner Instead
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onClose}
-            >
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>

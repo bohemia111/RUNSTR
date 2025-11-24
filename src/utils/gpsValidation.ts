@@ -109,9 +109,9 @@ export function filterLocation(
 
   if (location.accuracy && location.accuracy > accuracyThreshold) {
     console.warn(
-      `[GPS] Rejected: poor accuracy (${location.accuracy.toFixed(1)}m > ${accuracyThreshold}m)${
-        isInGracePeriod ? ' [grace period]' : ''
-      }`
+      `[GPS] Rejected: poor accuracy (${location.accuracy.toFixed(
+        1
+      )}m > ${accuracyThreshold}m)${isInGracePeriod ? ' [grace period]' : ''}`
     );
     return false;
   }

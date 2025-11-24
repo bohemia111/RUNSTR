@@ -141,13 +141,20 @@ export const JoinRequestsSection: React.FC<JoinRequestsSectionProps> = ({
       // Clear join request cache to prevent approved requests from reappearing
       try {
         // Access the underlying TeamJoinRequestService through membershipService
-        const joinRequestService = (membershipService as any).joinRequestService;
-        if (joinRequestService && typeof joinRequestService.clearCache === 'function') {
+        const joinRequestService = (membershipService as any)
+          .joinRequestService;
+        if (
+          joinRequestService &&
+          typeof joinRequestService.clearCache === 'function'
+        ) {
           joinRequestService.clearCache();
           console.log('🗑️ Team join request cache cleared after approval');
         }
       } catch (cacheError) {
-        console.warn('⚠️ Failed to clear team join request cache (non-critical):', cacheError);
+        console.warn(
+          '⚠️ Failed to clear team join request cache (non-critical):',
+          cacheError
+        );
       }
 
       console.log(`✅ Approved join request: ${requestId}`);

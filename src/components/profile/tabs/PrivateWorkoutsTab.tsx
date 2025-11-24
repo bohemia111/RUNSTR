@@ -243,11 +243,7 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
                 <Text style={styles.postButtonText}>Posting...</Text>
               ) : (
                 <>
-                  <Ionicons
-                    name="chatbubble-outline"
-                    size={16}
-                    color="#000"
-                  />
+                  <Ionicons name="chatbubble-outline" size={16} color="#000" />
                   <Text style={styles.postButtonText}>Post</Text>
                 </>
               )}
@@ -343,8 +339,8 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
               workout history from Advanced Analytics.
             </Text>
             <Text style={styles.emptyStateHint}>
-              This tab shows all workouts stored on your device, including imported
-              Nostr workouts.
+              This tab shows all workouts stored on your device, including
+              imported Nostr workouts.
             </Text>
           </Card>
         }

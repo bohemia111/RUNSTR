@@ -71,7 +71,9 @@ export class ChallengeNostrService {
       let imageDimensions: { width: number; height: number } | undefined;
 
       if (options.qrImageUri) {
-        console.log('📤 Uploading QR code image to nostr.build with NIP-98 auth...');
+        console.log(
+          '📤 Uploading QR code image to nostr.build with NIP-98 auth...'
+        );
         const uploadResult = await this.imageUploadService.uploadImage(
           options.qrImageUri,
           `runstr-challenge-qr-${Date.now()}.png`,
@@ -80,7 +82,10 @@ export class ChallengeNostrService {
 
         if (uploadResult.success && uploadResult.url) {
           imageUrl = uploadResult.url;
-          imageDimensions = uploadResult.dimensions || { width: 200, height: 200 };
+          imageDimensions = uploadResult.dimensions || {
+            width: 200,
+            height: 200,
+          };
           console.log(`✅ QR image uploaded successfully to: ${imageUrl}`);
         } else {
           console.warn('⚠️ QR image upload failed:', uploadResult.error);
@@ -140,7 +145,9 @@ export class ChallengeNostrService {
     const durationText =
       challengeData.duration === 1 ? '1 Day' : `${challengeData.duration} Days`;
     const wagerText =
-      challengeData.wager > 0 ? `${challengeData.wager.toLocaleString()} sats` : 'No wager';
+      challengeData.wager > 0
+        ? `${challengeData.wager.toLocaleString()} sats`
+        : 'No wager';
 
     // If we have an image, keep it minimal
     if (imageUrl) {

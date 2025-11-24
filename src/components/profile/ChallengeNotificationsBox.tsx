@@ -167,7 +167,10 @@ export const ChallengeNotificationsBox: React.FC = () => {
    */
   const handlePaymentCancelled = () => {
     setShowPaymentModal(false);
-    CustomAlertManager.alert('Payment Cancelled', 'Challenge was not activated.');
+    CustomAlertManager.alert(
+      'Payment Cancelled',
+      'Challenge was not activated.'
+    );
   };
 
   /**

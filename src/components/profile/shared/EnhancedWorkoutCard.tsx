@@ -222,7 +222,9 @@ export const EnhancedWorkoutCard: React.FC<EnhancedWorkoutCardProps> = ({
         {/* Stats - Activity Specific */}
         <View style={styles.stats}>
           {/* Cardio workouts: Distance, Pace, Calories */}
-          {['running', 'walking', 'cycling', 'hiking'].includes(workout.type) && (
+          {['running', 'walking', 'cycling', 'hiking'].includes(
+            workout.type
+          ) && (
             <>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
@@ -241,7 +243,10 @@ export const EnhancedWorkoutCard: React.FC<EnhancedWorkoutCardProps> = ({
               {workout.pace && (
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>
-                    {Math.floor(workout.pace)}:{Math.floor((workout.pace % 1) * 60).toString().padStart(2, '0')}
+                    {Math.floor(workout.pace)}:
+                    {Math.floor((workout.pace % 1) * 60)
+                      .toString()
+                      .padStart(2, '0')}
                   </Text>
                   <Text style={styles.statLabel}>Pace /km</Text>
                 </View>
@@ -297,7 +302,10 @@ export const EnhancedWorkoutCard: React.FC<EnhancedWorkoutCardProps> = ({
               {(workout as any).meditationType && (
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>
-                    {((workout as any).meditationType as string).charAt(0).toUpperCase() + ((workout as any).meditationType as string).slice(1)}
+                    {((workout as any).meditationType as string)
+                      .charAt(0)
+                      .toUpperCase() +
+                      ((workout as any).meditationType as string).slice(1)}
                   </Text>
                   <Text style={styles.statLabel}>Type</Text>
                 </View>
@@ -315,7 +323,10 @@ export const EnhancedWorkoutCard: React.FC<EnhancedWorkoutCardProps> = ({
               {(workout as any).mealType && (
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>
-                    {((workout as any).mealType as string).charAt(0).toUpperCase() + ((workout as any).mealType as string).slice(1)}
+                    {((workout as any).mealType as string)
+                      .charAt(0)
+                      .toUpperCase() +
+                      ((workout as any).mealType as string).slice(1)}
                   </Text>
                   <Text style={styles.statLabel}>Meal</Text>
                 </View>
@@ -323,7 +334,10 @@ export const EnhancedWorkoutCard: React.FC<EnhancedWorkoutCardProps> = ({
               {(workout as any).mealSize && (
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>
-                    {((workout as any).mealSize as string).charAt(0).toUpperCase() + ((workout as any).mealSize as string).slice(1)}
+                    {((workout as any).mealSize as string)
+                      .charAt(0)
+                      .toUpperCase() +
+                      ((workout as any).mealSize as string).slice(1)}
                   </Text>
                   <Text style={styles.statLabel}>Size</Text>
                 </View>
@@ -375,33 +389,43 @@ export const EnhancedWorkoutCard: React.FC<EnhancedWorkoutCardProps> = ({
           )}
 
           {/* Other workouts: Default display */}
-          {!['running', 'walking', 'cycling', 'hiking', 'strength_training', 'gym', 'meditation', 'diet', 'fasting'].includes(workout.type) &&
+          {![
+            'running',
+            'walking',
+            'cycling',
+            'hiking',
+            'strength_training',
+            'gym',
+            'meditation',
+            'diet',
+            'fasting',
+          ].includes(workout.type) &&
             (workout as any).exerciseType !== 'fitness_test' && (
-            <>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {formatDuration(workout.duration)}
-                </Text>
-                <Text style={styles.statLabel}>Duration</Text>
-              </View>
-              {workout.distance && (
+              <>
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>
-                    {formatDistance(workout.distance)}
+                    {formatDuration(workout.duration)}
                   </Text>
-                  <Text style={styles.statLabel}>Distance</Text>
+                  <Text style={styles.statLabel}>Duration</Text>
                 </View>
-              )}
-              {workout.calories !== undefined && (
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {workout.calories.toFixed(0)}
-                  </Text>
-                  <Text style={styles.statLabel}>Calories</Text>
-                </View>
-              )}
-            </>
-          )}
+                {workout.distance && (
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {formatDistance(workout.distance)}
+                    </Text>
+                    <Text style={styles.statLabel}>Distance</Text>
+                  </View>
+                )}
+                {workout.calories !== undefined && (
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {workout.calories.toFixed(0)}
+                    </Text>
+                    <Text style={styles.statLabel}>Calories</Text>
+                  </View>
+                )}
+              </>
+            )}
         </View>
 
         {/* Status Indicators */}

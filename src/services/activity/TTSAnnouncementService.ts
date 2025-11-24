@@ -42,19 +42,21 @@ export class TTSAnnouncementService {
 
       // Set up AppState listener for audio cleanup
       const appStateManager = AppStateManager;
-      this.appStateUnsubscribe = appStateManager.onStateChange(async (isActive) => {
-        if (!isActive) {
-          // App going to background - release audio session
-          console.log('🔊 App backgrounding, releasing audio session...');
-          await this.releaseAudioSession();
-        } else {
-          // App returned to foreground - reinitialize if needed
-          if (this.isSpeaking) {
-            console.log('🔊 App foregrounded, restoring audio session...');
-            await this.setupAudioSession();
+      this.appStateUnsubscribe = appStateManager.onStateChange(
+        async (isActive) => {
+          if (!isActive) {
+            // App going to background - release audio session
+            console.log('🔊 App backgrounding, releasing audio session...');
+            await this.releaseAudioSession();
+          } else {
+            // App returned to foreground - reinitialize if needed
+            if (this.isSpeaking) {
+              console.log('🔊 App foregrounded, restoring audio session...');
+              await this.setupAudioSession();
+            }
           }
         }
-      });
+      );
 
       // Configure audio session for TTS with ducking
       await this.setupAudioSession();

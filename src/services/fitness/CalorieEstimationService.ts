@@ -96,7 +96,10 @@ export class CalorieEstimationService {
    * Calculate BMI from weight and height
    * Formula: weight (kg) / (height (m))^2
    */
-  calculateBMI(weightKg: number, heightCm: number): {
+  calculateBMI(
+    weightKg: number,
+    heightCm: number
+  ): {
     value: number;
     category: string;
   } {
@@ -116,7 +119,10 @@ export class CalorieEstimationService {
    * Estimate VO2 max from running performance
    * Uses Cooper 12-minute test formula
    */
-  estimateVO2Max(distanceMeters: number, durationSeconds: number): {
+  estimateVO2Max(
+    distanceMeters: number,
+    durationSeconds: number
+  ): {
     estimate: number;
     category: string;
   } | null {
@@ -144,11 +150,14 @@ export class CalorieEstimationService {
    * Calculate daily calorie balance from workouts
    * Returns intake (meals) vs output (activity)
    */
-  calculateDailyBalance(workouts: Array<{
-    type: string;
-    calories?: number;
-    startTime: string;
-  }>, date: string): {
+  calculateDailyBalance(
+    workouts: Array<{
+      type: string;
+      calories?: number;
+      startTime: string;
+    }>,
+    date: string
+  ): {
     caloriesIn: number;
     caloriesOut: number;
     netBalance: number;
@@ -188,11 +197,13 @@ export class CalorieEstimationService {
    * Calculate weekly calorie trends
    * Returns 7-day data for graphing
    */
-  calculateWeeklyTrends(workouts: Array<{
-    type: string;
-    calories?: number;
-    startTime: string;
-  }>): Array<{
+  calculateWeeklyTrends(
+    workouts: Array<{
+      type: string;
+      calories?: number;
+      startTime: string;
+    }>
+  ): Array<{
     date: string;
     caloriesIn: number;
     caloriesOut: number;

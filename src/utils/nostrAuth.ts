@@ -107,7 +107,9 @@ export async function storeAuthenticationData(
     //   return false;
     // }
 
-    console.log('[Auth] ✅ Authentication stored successfully (verification skipped)');
+    console.log(
+      '[Auth] ✅ Authentication stored successfully (verification skipped)'
+    );
     console.log('[Auth] Stored for npub:', npub.slice(0, 20) + '...');
 
     return true;

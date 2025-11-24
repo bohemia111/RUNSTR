@@ -37,7 +37,9 @@ interface TeamLeaderboards {
 
 export const CompetitionsListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [teamLeaderboards, setTeamLeaderboards] = useState<TeamLeaderboards[]>([]);
+  const [teamLeaderboards, setTeamLeaderboards] = useState<TeamLeaderboards[]>(
+    []
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -49,16 +51,21 @@ export const CompetitionsListScreen: React.FC = () => {
   const loadAllLeaderboards = async () => {
     try {
       setIsLoading(true);
-      console.log(`[CompetitionsListScreen] 📊 Loading leaderboards for ${userTeams.length} teams`);
+      console.log(
+        `[CompetitionsListScreen] 📊 Loading leaderboards for ${userTeams.length} teams`
+      );
 
       const allTeamLeaderboards: TeamLeaderboards[] = [];
 
       for (const team of userTeams) {
         try {
-          console.log(`[CompetitionsListScreen] 🔍 Fetching leaderboards for team: ${team.name} (${team.id})`);
+          console.log(
+            `[CompetitionsListScreen] 🔍 Fetching leaderboards for team: ${team.name} (${team.id})`
+          );
 
           // Use the EXACT same service method that works on SimpleTeamScreen
-          const dailyLeaderboards = await SimpleLeaderboardService.getTeamDailyLeaderboards(team.id);
+          const dailyLeaderboards =
+            await SimpleLeaderboardService.getTeamDailyLeaderboards(team.id);
 
           allTeamLeaderboards.push({
             teamId: team.id,
@@ -74,18 +81,24 @@ export const CompetitionsListScreen: React.FC = () => {
             {
               '5k': dailyLeaderboards.leaderboard5k.length,
               '10k': dailyLeaderboards.leaderboard10k.length,
-              'half': dailyLeaderboards.leaderboardHalf.length,
-              'marathon': dailyLeaderboards.leaderboardMarathon.length,
+              half: dailyLeaderboards.leaderboardHalf.length,
+              marathon: dailyLeaderboards.leaderboardMarathon.length,
             }
           );
         } catch (error) {
-          console.error(`[CompetitionsListScreen] ❌ Error loading leaderboards for ${team.name}:`, error);
+          console.error(
+            `[CompetitionsListScreen] ❌ Error loading leaderboards for ${team.name}:`,
+            error
+          );
         }
       }
 
       setTeamLeaderboards(allTeamLeaderboards);
     } catch (error) {
-      console.error('[CompetitionsListScreen] ❌ Error loading leaderboards:', error);
+      console.error(
+        '[CompetitionsListScreen] ❌ Error loading leaderboards:',
+        error
+      );
     } finally {
       setIsLoading(false);
     }

@@ -94,7 +94,9 @@ export function parseEventDeepLink(url: string): ParsedEventData {
       teamId: '',
       eventName: '',
       isValid: false,
-      error: `Failed to parse URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to parse URL: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`,
     };
   }
 }

@@ -72,7 +72,9 @@ export const FitnessTestInstructionsModal: React.FC<
                   <Text style={styles.componentNumber}>3.</Text>
                   <View style={styles.componentDetails}>
                     <Text style={styles.componentName}>5K Run</Text>
-                    <Text style={styles.componentDesc}>Complete 5 kilometers</Text>
+                    <Text style={styles.componentDesc}>
+                      Complete 5 kilometers
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -103,8 +105,8 @@ export const FitnessTestInstructionsModal: React.FC<
                 point (max 100)
               </Text>
               <Text style={styles.scoreItem}>
-                <Text style={styles.scoreLabel}>5K Run:</Text> Time-based scoring
-                (0-100 points)
+                <Text style={styles.scoreLabel}>5K Run:</Text> Time-based
+                scoring (0-100 points)
               </Text>
               <Text style={styles.scoreItem}>
                 <Text style={styles.scoreLabel}>Total Score:</Text> Sum of all

@@ -195,7 +195,8 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
             <View style={styles.contextRow}>
               <Text style={styles.contextLabel}>Started</Text>
               <Text style={styles.contextValue}>
-                {formatTime(workout.startTime)} - {getDayOfWeek(workout.startTime)}
+                {formatTime(workout.startTime)} -{' '}
+                {getDayOfWeek(workout.startTime)}
               </Text>
             </View>
             <View style={styles.contextRow}>
@@ -344,8 +345,10 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
     const repsBreakdown = localWorkout.repsBreakdown || [];
     const avgRepsPerSet =
       repsBreakdown.length > 0
-        ? (repsBreakdown.reduce((sum, reps) => sum + reps, 0) /
-            repsBreakdown.length).toFixed(1)
+        ? (
+            repsBreakdown.reduce((sum, reps) => sum + reps, 0) /
+            repsBreakdown.length
+          ).toFixed(1)
         : '0';
 
     // Calculate rep decline (difference between first and last set)
@@ -383,15 +386,24 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
             {repDecline !== 0 && (
               <View style={styles.volumeRow}>
                 <Text style={styles.volumeLabel}>Rep Decline</Text>
-                <Text style={[styles.volumeValue, repDecline > 0 && styles.declineText]}>
-                  {repDecline > 0 ? `-${repDecline}` : `+${Math.abs(repDecline)}`}
+                <Text
+                  style={[
+                    styles.volumeValue,
+                    repDecline > 0 && styles.declineText,
+                  ]}
+                >
+                  {repDecline > 0
+                    ? `-${repDecline}`
+                    : `+${Math.abs(repDecline)}`}
                 </Text>
               </View>
             )}
             {localWorkout.weight && (
               <View style={styles.volumeRow}>
                 <Text style={styles.volumeLabel}>Weight</Text>
-                <Text style={styles.volumeValue}>{localWorkout.weight} lbs</Text>
+                <Text style={styles.volumeValue}>
+                  {localWorkout.weight} lbs
+                </Text>
               </View>
             )}
           </View>

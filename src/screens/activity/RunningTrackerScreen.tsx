@@ -21,7 +21,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../../styles/theme';
 import { CustomAlert } from '../../components/ui/CustomAlert';
 import { simpleRunTracker } from '../../services/activity/SimpleRunTracker';
-import type { RunSession, GPSPoint, Split } from '../../services/activity/SimpleRunTracker';
+import type {
+  RunSession,
+  GPSPoint,
+  Split,
+} from '../../services/activity/SimpleRunTracker';
 import { activityMetricsService } from '../../services/activity/ActivityMetricsService';
 import type { FormattedMetrics } from '../../services/activity/ActivityMetricsService';
 import { BatteryWarning } from '../../components/activity/BatteryWarning';
@@ -32,7 +36,10 @@ import { PermissionRequestModal } from '../../components/permissions/PermissionR
 import { appPermissionService } from '../../services/initialization/AppPermissionService';
 import routeMatchingService from '../../services/routes/RouteMatchingService';
 import routeStorageService from '../../services/routes/RouteStorageService';
-import type { RouteMatch, ProgressComparison } from '../../services/routes/RouteMatchingService';
+import type {
+  RouteMatch,
+  ProgressComparison,
+} from '../../services/routes/RouteMatchingService';
 import { RouteRecognitionBadge } from '../../components/activity/RouteRecognitionBadge';
 import { RoutePRComparison } from '../../components/activity/RoutePRComparison';
 import { RouteSelectionModal } from '../../components/routes/RouteSelectionModal';
@@ -53,8 +60,8 @@ const ROUTE_CHECK_INTERVAL_MS = 30000; // Check for route match every 30 seconds
 const RACE_PRESETS = {
   '5k': { distance: 5000, label: '5K' },
   '10k': { distance: 10000, label: '10K' },
-  'half': { distance: 21097, label: 'Half Marathon' },
-  'marathon': { distance: 42195, label: 'Marathon' },
+  half: { distance: 21097, label: 'Half Marathon' },
+  marathon: { distance: 42195, label: 'Marathon' },
 } as const;
 
 type RacePreset = keyof typeof RACE_PRESETS | null;
@@ -130,7 +137,9 @@ export const RunningTrackerScreen: React.FC = () => {
 
   // Route matching state
   const [matchedRoute, setMatchedRoute] = useState<RouteMatch | null>(null);
-  const [prComparison, setPrComparison] = useState<ProgressComparison | null>(null);
+  const [prComparison, setPrComparison] = useState<ProgressComparison | null>(
+    null
+  );
   const [showRouteSelectionModal, setShowRouteSelectionModal] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<SavedRoute | null>(null);
 
@@ -147,7 +156,11 @@ export const RunningTrackerScreen: React.FC = () => {
 
     const session = simpleRunTracker.getCurrentSession(); // NOW SYNCHRONOUS!
 
-    if (session && session.distance !== undefined && session.duration !== undefined) {
+    if (
+      session &&
+      session.distance !== undefined &&
+      session.duration !== undefined
+    ) {
       const formattedDuration = formatElapsedTime(session.duration);
 
       const currentMetrics = {
@@ -183,7 +196,9 @@ export const RunningTrackerScreen: React.FC = () => {
     // This eliminates 7-second blocking from AsyncStorage reads and GPS point processing
     InteractionManager.runAfterInteractions(() => {
       const restoreActiveSession = async () => {
-        console.log('[RunningTrackerScreen] Checking for active session (deferred for performance)...');
+        console.log(
+          '[RunningTrackerScreen] Checking for active session (deferred for performance)...'
+        );
         const restored = await simpleRunTracker.restoreSession();
 
         if (restored) {
@@ -198,7 +213,10 @@ export const RunningTrackerScreen: React.FC = () => {
           }, METRICS_UPDATE_INTERVAL_MS);
 
           // Start route checking
-          routeCheckRef.current = setInterval(checkForRouteMatch, ROUTE_CHECK_INTERVAL_MS);
+          routeCheckRef.current = setInterval(
+            checkForRouteMatch,
+            ROUTE_CHECK_INTERVAL_MS
+          );
 
           console.log('[RunningTrackerScreen] ✅ Active session restored');
         }
@@ -221,20 +239,26 @@ export const RunningTrackerScreen: React.FC = () => {
       if (!isActive) {
         // FIX iOS 30-min issue: Don't clear timers unless TRULY backgrounded
         // iOS sometimes sends spurious background events while app is still visible
-        console.log('[RunningTrackerScreen] App state change detected - verifying if truly backgrounded...');
+        console.log(
+          '[RunningTrackerScreen] App state change detected - verifying if truly backgrounded...'
+        );
 
         // Give iOS a moment to stabilize before clearing intervals
         setTimeout(() => {
           // Double-check if app is still inactive before clearing
           if (!appStateManager.isActive()) {
-            console.log('[RunningTrackerScreen] Confirmed backgrounded, pausing UI updates...');
+            console.log(
+              '[RunningTrackerScreen] Confirmed backgrounded, pausing UI updates...'
+            );
             // Don't clear intervals, just mark them as paused
             // This prevents losing them due to spurious events
           }
         }, 500);
       } else if (isActive && isTrackingRef.current) {
         // App returned to foreground - restart timers and sync data
-        console.log('[RunningTrackerScreen] App returned to foreground, ensuring timers are running...');
+        console.log(
+          '[RunningTrackerScreen] App returned to foreground, ensuring timers are running...'
+        );
 
         // Restart timers
         if (!metricsUpdateRef.current) {
@@ -243,7 +267,10 @@ export const RunningTrackerScreen: React.FC = () => {
           }, METRICS_UPDATE_INTERVAL_MS);
         }
         if (!routeCheckRef.current) {
-          routeCheckRef.current = setInterval(checkForRouteMatch, ROUTE_CHECK_INTERVAL_MS);
+          routeCheckRef.current = setInterval(
+            checkForRouteMatch,
+            ROUTE_CHECK_INTERVAL_MS
+          );
         }
 
         // Sync GPS points from AsyncStorage to cache
@@ -251,7 +278,11 @@ export const RunningTrackerScreen: React.FC = () => {
 
         // getCurrentSession() is now synchronous!
         const session = simpleRunTracker.getCurrentSession();
-        if (session && session.distance !== undefined && session.duration !== undefined) {
+        if (
+          session &&
+          session.distance !== undefined &&
+          session.duration !== undefined
+        ) {
           const formattedDuration = formatElapsedTime(session.duration);
 
           const currentMetrics = {
@@ -274,8 +305,9 @@ export const RunningTrackerScreen: React.FC = () => {
           setElapsedTime(session.duration);
 
           console.log(
-            `[RunningTrackerScreen] ✅ Synced: ${(session.distance / 1000).toFixed(2)} km, ` +
-            `${session.duration}s`
+            `[RunningTrackerScreen] ✅ Synced: ${(
+              session.distance / 1000
+            ).toFixed(2)} km, ` + `${session.duration}s`
           );
         }
       }
@@ -299,7 +331,9 @@ export const RunningTrackerScreen: React.FC = () => {
     const healthCheckInterval = setInterval(() => {
       // If we're tracking but metrics interval is dead, restart it
       if (isTracking && !metricsUpdateRef.current) {
-        console.log('[RunningTrackerScreen] ⚠️ Metrics interval was dead, restarting...');
+        console.log(
+          '[RunningTrackerScreen] ⚠️ Metrics interval was dead, restarting...'
+        );
         metricsUpdateRef.current = setInterval(() => {
           updateMetrics();
         }, METRICS_UPDATE_INTERVAL_MS);
@@ -307,8 +341,13 @@ export const RunningTrackerScreen: React.FC = () => {
 
       // If we're tracking but route check interval is dead, restart it
       if (isTracking && !routeCheckRef.current) {
-        console.log('[RunningTrackerScreen] ⚠️ Route check interval was dead, restarting...');
-        routeCheckRef.current = setInterval(checkForRouteMatch, ROUTE_CHECK_INTERVAL_MS);
+        console.log(
+          '[RunningTrackerScreen] ⚠️ Route check interval was dead, restarting...'
+        );
+        routeCheckRef.current = setInterval(
+          checkForRouteMatch,
+          ROUTE_CHECK_INTERVAL_MS
+        );
       }
     }, 5000); // Check every 5 seconds
 
@@ -351,7 +390,9 @@ export const RunningTrackerScreen: React.FC = () => {
   const proceedWithTracking = async () => {
     try {
       // Get preset distance if selected
-      const presetDistance = racePreset ? RACE_PRESETS[racePreset].distance : undefined;
+      const presetDistance = racePreset
+        ? RACE_PRESETS[racePreset].distance
+        : undefined;
 
       // Start tracking with SimpleRunTracker
       await simpleRunTracker.startTracking('running', presetDistance);
@@ -397,7 +438,9 @@ export const RunningTrackerScreen: React.FC = () => {
     // Set auto-stop callback if preset distance is selected
     if (racePreset) {
       simpleRunTracker.setAutoStopCallback(() => {
-        console.log('[RunningTrackerScreen] Auto-stop triggered - stopping workout');
+        console.log(
+          '[RunningTrackerScreen] Auto-stop triggered - stopping workout'
+        );
         stopTracking();
       });
     }
@@ -419,7 +462,10 @@ export const RunningTrackerScreen: React.FC = () => {
     }
 
     // Start route checking timer
-    routeCheckRef.current = setInterval(checkForRouteMatch, ROUTE_CHECK_INTERVAL_MS);
+    routeCheckRef.current = setInterval(
+      checkForRouteMatch,
+      ROUTE_CHECK_INTERVAL_MS
+    );
     // Check immediately as well
     setTimeout(checkForRouteMatch, 5000); // Check after 5 seconds to get initial GPS points
 
@@ -470,7 +516,12 @@ export const RunningTrackerScreen: React.FC = () => {
         'running'
       );
 
-      if (match && match.confidence >= 0.7 && session.distance !== undefined && session.duration !== undefined) {
+      if (
+        match &&
+        match.confidence >= 0.7 &&
+        session.distance !== undefined &&
+        session.duration !== undefined
+      ) {
         setMatchedRoute(match);
 
         // Check PR comparison if we have a matched route
@@ -546,7 +597,11 @@ export const RunningTrackerScreen: React.FC = () => {
       }
     }
 
-    if (session && session.distance !== undefined && session.distance > MIN_WORKOUT_DISTANCE_METERS) {
+    if (
+      session &&
+      session.distance !== undefined &&
+      session.distance > MIN_WORKOUT_DISTANCE_METERS
+    ) {
       // Only show summary if moved at least 10 meters
       showWorkoutSummary(session as RunSession);
     } else {
@@ -576,7 +631,7 @@ export const RunningTrackerScreen: React.FC = () => {
     );
 
     // SimpleRunTracker already uses GPSPoint[] format (compatible with GPSCoordinate)
-    const gpsCoordinates = session.gpsPoints.map(point => ({
+    const gpsCoordinates = session.gpsPoints.map((point) => ({
       latitude: point.latitude,
       longitude: point.longitude,
       altitude: point.altitude,
@@ -584,7 +639,9 @@ export const RunningTrackerScreen: React.FC = () => {
     }));
 
     // Convert preset distance (meters) to race key ('5k', '10k', etc.)
-    const getRaceDistanceKey = (distanceMeters?: number): string | undefined => {
+    const getRaceDistanceKey = (
+      distanceMeters?: number
+    ): string | undefined => {
       if (!distanceMeters) return undefined;
       const entry = Object.entries(RACE_PRESETS).find(
         ([_, { distance }]) => distance === distanceMeters
@@ -722,7 +779,11 @@ export const RunningTrackerScreen: React.FC = () => {
                     styles.presetButton,
                     racePreset === key && styles.presetButtonActive,
                   ]}
-                  onPress={() => setRacePreset(racePreset === key ? null : (key as RacePreset))}
+                  onPress={() =>
+                    setRacePreset(
+                      racePreset === key ? null : (key as RacePreset)
+                    )
+                  }
                 >
                   <Text
                     style={[
@@ -747,61 +808,68 @@ export const RunningTrackerScreen: React.FC = () => {
       {/* Fixed Control Buttons */}
       <View style={styles.fixedControlsWrapper}>
         <View style={styles.controlsContainer}>
-        {!isTracking && !countdown ? (
-          <>
-            <TouchableOpacity
-              style={styles.routesButton}
-              onPress={() => setShowRouteSelectionModal(true)}
-            >
-              <Ionicons
-                name={selectedRoute ? "map" : "map-outline"}
-                size={20}
-                color={selectedRoute ? theme.colors.accent : theme.colors.text}
-              />
-              <Text style={[
-                styles.routesButtonText,
-                selectedRoute && { color: theme.colors.accent }
-              ]}>
-                {selectedRoute ? selectedRoute.name : 'Routes'}
-              </Text>
-            </TouchableOpacity>
-            <HoldToStartButton
-              label="Start Run"
-              onHoldComplete={handleHoldComplete}
-              disabled={false}
-              holdDuration={2000}
-            />
-          </>
-        ) : !isTracking && countdown ? (
-          <View style={styles.countdownContainer}>
-            <Text style={styles.countdownText}>{countdown}</Text>
-          </View>
-        ) : (
-          <>
-            {!isPaused ? (
+          {!isTracking && !countdown ? (
+            <>
               <TouchableOpacity
-                style={styles.pauseButton}
-                onPress={pauseTracking}
-              >
-                <Ionicons name="pause" size={30} color={theme.colors.text} />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.resumeButton}
-                onPress={resumeTracking}
+                style={styles.routesButton}
+                onPress={() => setShowRouteSelectionModal(true)}
               >
                 <Ionicons
-                  name="play"
-                  size={30}
-                  color={theme.colors.background}
+                  name={selectedRoute ? 'map' : 'map-outline'}
+                  size={20}
+                  color={
+                    selectedRoute ? theme.colors.accent : theme.colors.text
+                  }
                 />
+                <Text
+                  style={[
+                    styles.routesButtonText,
+                    selectedRoute && { color: theme.colors.accent },
+                  ]}
+                >
+                  {selectedRoute ? selectedRoute.name : 'Routes'}
+                </Text>
               </TouchableOpacity>
-            )}
-            <TouchableOpacity style={styles.stopButton} onPress={stopTracking}>
-              <Ionicons name="stop" size={30} color={theme.colors.text} />
-            </TouchableOpacity>
-          </>
-        )}
+              <HoldToStartButton
+                label="Start Run"
+                onHoldComplete={handleHoldComplete}
+                disabled={false}
+                holdDuration={2000}
+              />
+            </>
+          ) : !isTracking && countdown ? (
+            <View style={styles.countdownContainer}>
+              <Text style={styles.countdownText}>{countdown}</Text>
+            </View>
+          ) : (
+            <>
+              {!isPaused ? (
+                <TouchableOpacity
+                  style={styles.pauseButton}
+                  onPress={pauseTracking}
+                >
+                  <Ionicons name="pause" size={30} color={theme.colors.text} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.resumeButton}
+                  onPress={resumeTracking}
+                >
+                  <Ionicons
+                    name="play"
+                    size={30}
+                    color={theme.colors.background}
+                  />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.stopButton}
+                onPress={stopTracking}
+              >
+                <Ionicons name="stop" size={30} color={theme.colors.text} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
 

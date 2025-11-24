@@ -171,7 +171,7 @@ export class NostrRelayManager {
 
       // ⚠️ FIX: Guard against dead WebSocket references on Android
       // Filter out any connections that might have invalid WebSocket state
-      const safeConnections = connections.filter(conn => {
+      const safeConnections = connections.filter((conn) => {
         try {
           // Just check if we can access the status property
           return conn && conn.status !== undefined;
@@ -183,8 +183,10 @@ export class NostrRelayManager {
 
       return {
         total: safeConnections.length,
-        connected: safeConnections.filter((c) => c.status === 'connected').length,
-        connecting: safeConnections.filter((c) => c.status === 'connecting').length,
+        connected: safeConnections.filter((c) => c.status === 'connected')
+          .length,
+        connecting: safeConnections.filter((c) => c.status === 'connecting')
+          .length,
         disconnected: safeConnections.filter((c) => c.status === 'disconnected')
           .length,
         error: safeConnections.filter((c) => c.status === 'error').length,

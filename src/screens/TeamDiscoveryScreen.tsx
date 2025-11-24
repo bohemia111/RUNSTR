@@ -431,7 +431,6 @@ export const TeamDiscoveryScreen: React.FC<TeamDiscoveryScreenProps> = ({
     return result;
   }, [teams, searchQuery, selectedCategory]);
 
-
   const toggleCategoryExpansion = (category: string) => {
     setExpandedCategories((prev) => {
       const newSet = new Set(prev);
@@ -531,8 +530,7 @@ export const TeamDiscoveryScreen: React.FC<TeamDiscoveryScreenProps> = ({
               <Text
                 style={[
                   styles.filterPillText,
-                  selectedCategory === filter.id &&
-                    styles.filterPillTextActive,
+                  selectedCategory === filter.id && styles.filterPillTextActive,
                 ]}
               >
                 {filter.label}
@@ -671,10 +669,7 @@ export const TeamDiscoveryScreen: React.FC<TeamDiscoveryScreenProps> = ({
                 {/* Create Team Button - Bottom of list after Other category */}
                 {onCreateTeam && (
                   <View style={styles.bottomCreateTeamContainer}>
-                    <PrimaryButton
-                      text="Create Team"
-                      onPress={onCreateTeam}
-                    />
+                    <PrimaryButton text="Create Team" onPress={onCreateTeam} />
                   </View>
                 )}
               </>
@@ -689,9 +684,7 @@ export const TeamDiscoveryScreen: React.FC<TeamDiscoveryScreenProps> = ({
                   style={styles.clearSearchButton}
                   onPress={() => setSearchQuery('')}
                 >
-                  <Text style={styles.clearSearchButtonText}>
-                    Clear Search
-                  </Text>
+                  <Text style={styles.clearSearchButtonText}>Clear Search</Text>
                 </TouchableOpacity>
               </View>
             )}

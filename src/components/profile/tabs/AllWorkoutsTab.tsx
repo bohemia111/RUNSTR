@@ -4,13 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  FlatList,
-  RefreshControl,
-  Text,
-  StyleSheet,
-} from 'react-native';
+import { View, FlatList, RefreshControl, Text, StyleSheet } from 'react-native';
 import { theme } from '../../../styles/theme';
 import { Card } from '../../ui/Card';
 import { CustomAlert } from '../../ui/CustomAlert';

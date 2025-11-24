@@ -90,7 +90,9 @@ export function useCoachRunstr() {
           coachClaude.initialize(storedKey);
           setApiKeyConfigured(true);
           setModelReady(true);
-          console.log('[CoachRunstr] Claude service initialized with stored API key');
+          console.log(
+            '[CoachRunstr] Claude service initialized with stored API key'
+          );
         } else {
           console.log('[CoachRunstr] No API key found in storage');
           setApiKeyConfigured(false);
@@ -139,7 +141,9 @@ export function useCoachRunstr() {
       options?: { useCache?: boolean }
     ): Promise<CoachInsight> => {
       if (!coachClaude.isReady()) {
-        throw new Error('Coach Claude is not configured. Please set your API key first.');
+        throw new Error(
+          'Coach Claude is not configured. Please set your API key first.'
+        );
       }
 
       const useCache = options?.useCache !== false;
@@ -148,7 +152,9 @@ export function useCoachRunstr() {
       if (useCache) {
         const cached = await getCachedInsight(type);
         if (cached) {
-          console.log(`[CoachRunstr] Using cached ${type} insight from AsyncStorage`);
+          console.log(
+            `[CoachRunstr] Using cached ${type} insight from AsyncStorage`
+          );
           return cached;
         }
       }
@@ -157,10 +163,16 @@ export function useCoachRunstr() {
       setError(null);
 
       try {
-        console.log(`[CoachRunstr] Generating ${type} insight via Claude Haiku...`);
+        console.log(
+          `[CoachRunstr] Generating ${type} insight via Claude Haiku...`
+        );
 
         // Call Claude service
-        const insight = await coachClaude.generateInsight(type, workouts, options);
+        const insight = await coachClaude.generateInsight(
+          type,
+          workouts,
+          options
+        );
 
         // Cache to AsyncStorage
         if (useCache) {

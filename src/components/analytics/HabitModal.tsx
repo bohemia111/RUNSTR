@@ -22,20 +22,32 @@ import { HABIT_TEMPLATES } from '../../services/habits/HabitTrackerService';
 interface HabitModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (name: string, type: 'abstinence' | 'positive', icon: string, color: string) => void;
+  onSave: (
+    name: string,
+    type: 'abstinence' | 'positive',
+    icon: string,
+    color: string
+  ) => void;
 }
 
-export const HabitModal: React.FC<HabitModalProps> = ({ visible, onClose, onSave }) => {
+export const HabitModal: React.FC<HabitModalProps> = ({
+  visible,
+  onClose,
+  onSave,
+}) => {
   const [habitName, setHabitName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
-  const [habitType, setHabitType] = useState<'abstinence' | 'positive'>('abstinence');
+  const [habitType, setHabitType] = useState<'abstinence' | 'positive'>(
+    'abstinence'
+  );
 
   const handleSave = () => {
     if (!habitName.trim()) {
       return;
     }
 
-    const template = selectedTemplate !== null ? HABIT_TEMPLATES[selectedTemplate] : null;
+    const template =
+      selectedTemplate !== null ? HABIT_TEMPLATES[selectedTemplate] : null;
     const icon = template?.icon || 'checkmark-circle-outline';
     const color = template?.color || theme.colors.orangeBright;
 
@@ -76,12 +88,18 @@ export const HabitModal: React.FC<HabitModalProps> = ({ visible, onClose, onSave
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Add New Habit</Text>
-            <TouchableOpacity onPress={handleClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={handleClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Ionicons name="close" size={24} color={theme.colors.text} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Habit Type Selector */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Habit Type</Text>
@@ -96,7 +114,11 @@ export const HabitModal: React.FC<HabitModalProps> = ({ visible, onClose, onSave
                   <Ionicons
                     name="ban-outline"
                     size={20}
-                    color={habitType === 'abstinence' ? theme.colors.accentText : theme.colors.textMuted}
+                    color={
+                      habitType === 'abstinence'
+                        ? theme.colors.accentText
+                        : theme.colors.textMuted
+                    }
                   />
                   <Text
                     style={[
@@ -118,7 +140,11 @@ export const HabitModal: React.FC<HabitModalProps> = ({ visible, onClose, onSave
                   <Ionicons
                     name="add-circle-outline"
                     size={20}
-                    color={habitType === 'positive' ? theme.colors.accentText : theme.colors.textMuted}
+                    color={
+                      habitType === 'positive'
+                        ? theme.colors.accentText
+                        : theme.colors.textMuted
+                    }
                   />
                   <Text
                     style={[
@@ -136,33 +162,43 @@ export const HabitModal: React.FC<HabitModalProps> = ({ visible, onClose, onSave
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Quick Templates</Text>
               <View style={styles.templateGrid}>
-                {HABIT_TEMPLATES.filter(t => t.type === habitType).map((template, index) => {
-                  const actualIndex = HABIT_TEMPLATES.findIndex(t => t.name === template.name);
-                  return (
-                    <TouchableOpacity
-                      key={template.name}
-                      style={[
-                        styles.templateButton,
-                        selectedTemplate === actualIndex && styles.templateButtonActive,
-                      ]}
-                      onPress={() => handleSelectTemplate(actualIndex)}
-                    >
-                      <Ionicons
-                        name={template.icon as any}
-                        size={24}
-                        color={selectedTemplate === actualIndex ? theme.colors.orangeBright : theme.colors.textMuted}
-                      />
-                      <Text
+                {HABIT_TEMPLATES.filter((t) => t.type === habitType).map(
+                  (template, index) => {
+                    const actualIndex = HABIT_TEMPLATES.findIndex(
+                      (t) => t.name === template.name
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={template.name}
                         style={[
-                          styles.templateText,
-                          selectedTemplate === actualIndex && styles.templateTextActive,
+                          styles.templateButton,
+                          selectedTemplate === actualIndex &&
+                            styles.templateButtonActive,
                         ]}
+                        onPress={() => handleSelectTemplate(actualIndex)}
                       >
-                        {template.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                        <Ionicons
+                          name={template.icon as any}
+                          size={24}
+                          color={
+                            selectedTemplate === actualIndex
+                              ? theme.colors.orangeBright
+                              : theme.colors.textMuted
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.templateText,
+                            selectedTemplate === actualIndex &&
+                              styles.templateTextActive,
+                          ]}
+                        >
+                          {template.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                )}
               </View>
             </View>
 
@@ -181,7 +217,10 @@ export const HabitModal: React.FC<HabitModalProps> = ({ visible, onClose, onSave
 
             {/* Action Buttons */}
             <View style={styles.actions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleClose}
+              >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 

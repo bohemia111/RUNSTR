@@ -420,8 +420,10 @@ export class CardioPerformanceAnalytics {
       const timeMinutes = fastest10K.duration / 60;
       const velocityMPM = distanceMeters / timeMinutes; // CRITICAL: meters per MINUTE (not per second!)
 
-      const numerator = -4.60 + 0.182258 * velocityMPM + 0.000104 * (velocityMPM * velocityMPM);
-      const denominator = 0.8 +
+      const numerator =
+        -4.6 + 0.182258 * velocityMPM + 0.000104 * (velocityMPM * velocityMPM);
+      const denominator =
+        0.8 +
         0.1894393 * Math.exp(-0.012778 * timeMinutes) +
         0.2989558 * Math.exp(-0.1932605 * timeMinutes);
 
@@ -436,8 +438,10 @@ export class CardioPerformanceAnalytics {
       const timeMinutes = fastest5K.duration / 60;
       const velocityMPM = distanceMeters / timeMinutes; // CRITICAL: meters per MINUTE (not per second!)
 
-      const numerator = -4.60 + 0.182258 * velocityMPM + 0.000104 * (velocityMPM * velocityMPM);
-      const denominator = 0.8 +
+      const numerator =
+        -4.6 + 0.182258 * velocityMPM + 0.000104 * (velocityMPM * velocityMPM);
+      const denominator =
+        0.8 +
         0.1894393 * Math.exp(-0.012778 * timeMinutes) +
         0.2989558 * Math.exp(-0.1932605 * timeMinutes);
 

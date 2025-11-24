@@ -218,7 +218,9 @@ export class Competition1301QueryService {
 
       // ✅ CLIENT-SIDE FILTERING: Filter by activity type AFTER fetching (nuclear pattern)
       if (query.activityType === 'Any') {
-        console.log(`📦 Returning all ${allWorkouts.length} workouts (any activity type)`);
+        console.log(
+          `📦 Returning all ${allWorkouts.length} workouts (any activity type)`
+        );
         return allWorkouts;
       }
 

@@ -385,25 +385,28 @@ export class UnifiedNostrCache {
       const keys = await AsyncStorage.getAllKeys();
 
       // Filter for event-related cache keys (team_events_*, event_participants_*, event_leaderboard_*)
-      const eventCacheKeys = keys.filter((key) =>
-        key.startsWith(STORAGE_PREFIX) &&
-        (key.includes('team_events_') ||
-         key.includes('event_participants_') ||
-         key.includes('event_leaderboard_'))
+      const eventCacheKeys = keys.filter(
+        (key) =>
+          key.startsWith(STORAGE_PREFIX) &&
+          (key.includes('team_events_') ||
+            key.includes('event_participants_') ||
+            key.includes('event_leaderboard_'))
       );
 
       // Also clear from memory cache
       const memoryKeysToDelete: string[] = [];
       this.cache.forEach((_, key) => {
-        if (key.includes('team_events_') ||
-            key.includes('event_participants_') ||
-            key.includes('event_leaderboard_')) {
+        if (
+          key.includes('team_events_') ||
+          key.includes('event_participants_') ||
+          key.includes('event_leaderboard_')
+        ) {
           memoryKeysToDelete.push(key);
         }
       });
 
       // Remove from memory
-      memoryKeysToDelete.forEach(key => this.cache.delete(key));
+      memoryKeysToDelete.forEach((key) => this.cache.delete(key));
 
       // Remove from AsyncStorage
       if (eventCacheKeys.length > 0) {
@@ -500,11 +503,16 @@ export class UnifiedNostrCache {
       .catch((error) => {
         // ✅ FIX: AbortErrors are expected when canceling fetches - don't log as errors
         if (error?.name === 'AbortError' || error?.message?.includes('abort')) {
-          console.log(`[UnifiedCache] Fetch cancelled for: ${key} (user navigated away)`);
+          console.log(
+            `[UnifiedCache] Fetch cancelled for: ${key} (user navigated away)`
+          );
         } else {
           // Use warn instead of error for cache failures (non-critical)
           // Cache failures should not break the app - components should handle undefined gracefully
-          console.warn(`[UnifiedCache] Fetch failed for: ${key}`, error?.message || error);
+          console.warn(
+            `[UnifiedCache] Fetch failed for: ${key}`,
+            error?.message || error
+          );
         }
 
         // Clean up pending fetch

@@ -58,7 +58,9 @@ export const ChallengeQRStep: React.FC<ChallengeQRStepProps> = ({
 
   const handleShare = async () => {
     try {
-      const shareMessage = `Challenge me! ${getChallengeDescription(challengeData)}\n\nScan QR or click: ${deepLink}`;
+      const shareMessage = `Challenge me! ${getChallengeDescription(
+        challengeData
+      )}\n\nScan QR or click: ${deepLink}`;
 
       await Share.share({
         message: shareMessage,
@@ -83,8 +85,11 @@ export const ChallengeQRStep: React.FC<ChallengeQRStepProps> = ({
       }
 
       // Get user's name for the post
-      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-      const userName = await AsyncStorage.getItem('@runstr:user_name') || 'RUNSTR User';
+      const AsyncStorage = (
+        await import('@react-native-async-storage/async-storage')
+      ).default;
+      const userName =
+        (await AsyncStorage.getItem('@runstr:user_name')) || 'RUNSTR User';
 
       // Post challenge to Nostr
       const result = await challengeNostrService.postChallenge(
@@ -111,7 +116,9 @@ export const ChallengeQRStep: React.FC<ChallengeQRStepProps> = ({
       console.error('Failed to post challenge to Nostr:', error);
       Alert.alert(
         'Error',
-        error instanceof Error ? error.message : 'Failed to post challenge. Please try again.'
+        error instanceof Error
+          ? error.message
+          : 'Failed to post challenge. Please try again.'
       );
     } finally {
       setIsPosting(false);

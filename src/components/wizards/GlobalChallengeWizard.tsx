@@ -72,12 +72,11 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
   const [currentStep, setCurrentStep] = useState<ChallengeStep>(
     preselectedOpponent ? 'distance' : 'user_search'
   );
-  const [selectedUser, setSelectedUser] = useState<DiscoveredNostrUser | undefined>(
-    preselectedOpponent
-  );
-  const [selectedDistance, setSelectedDistance] = useState<RunningChallengeDistance | null>(
-    null
-  );
+  const [selectedUser, setSelectedUser] = useState<
+    DiscoveredNostrUser | undefined
+  >(preselectedOpponent);
+  const [selectedDistance, setSelectedDistance] =
+    useState<RunningChallengeDistance | null>(null);
   const [wager, setWager] = useState('');
   const [challengeTime, setChallengeTime] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -144,7 +143,9 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
       }
 
       // Get challenge preset
-      const preset = RUNNING_CHALLENGE_PRESETS.find((p) => p.id === selectedDistance);
+      const preset = RUNNING_CHALLENGE_PRESETS.find(
+        (p) => p.id === selectedDistance
+      );
       if (!preset) {
         throw new Error('Invalid distance selection');
       }
@@ -215,7 +216,10 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
-              style={[styles.headerButton, !canGoBack && styles.headerButtonDisabled]}
+              style={[
+                styles.headerButton,
+                !canGoBack && styles.headerButtonDisabled,
+              ]}
               onPress={handleBack}
               disabled={!canGoBack}
             >
@@ -246,7 +250,9 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
         {currentStep === 'user_search' && (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Find Opponent</Text>
-            <Text style={styles.stepSubtitle}>Search any Nostr user globally</Text>
+            <Text style={styles.stepSubtitle}>
+              Search any Nostr user globally
+            </Text>
             <UserSearchStep
               selectedUser={selectedUser}
               onSelectUser={setSelectedUser}
@@ -267,7 +273,8 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
                   key={preset.id}
                   style={[
                     styles.distanceCard,
-                    selectedDistance === preset.id && styles.distanceCardSelected,
+                    selectedDistance === preset.id &&
+                      styles.distanceCardSelected,
                   ]}
                   onPress={() => setSelectedDistance(preset.id)}
                 >
@@ -303,8 +310,9 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
                 </Text>
                 <Text style={styles.summaryValue}>
                   {
-                    RUNNING_CHALLENGE_PRESETS.find((p) => p.id === selectedDistance)
-                      ?.name
+                    RUNNING_CHALLENGE_PRESETS.find(
+                      (p) => p.id === selectedDistance
+                    )?.name
                   }
                 </Text>
               </View>
@@ -312,7 +320,8 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
 
             <View style={styles.inputSection}>
               <Text style={styles.inputLabel}>
-                Wager Amount (sats) <Text style={styles.optional}>Optional</Text>
+                Wager Amount (sats){' '}
+                <Text style={styles.optional}>Optional</Text>
               </Text>
               <TextInput
                 style={styles.input}
@@ -350,11 +359,14 @@ export const GlobalChallengeWizard: React.FC<GlobalChallengeWizardProps> = ({
             <Text style={styles.successTitle}>Challenge Created! ⚡</Text>
             <Text style={styles.successMessage}>
               Your challenge has been sent to{' '}
-              {selectedUser?.displayName || selectedUser?.name || 'your opponent'}.
+              {selectedUser?.displayName ||
+                selectedUser?.name ||
+                'your opponent'}
+              .
             </Text>
             <Text style={styles.successMessage}>
-              They've been added to the challenge automatically. Both of you have 24
-              hours to complete the run!
+              They've been added to the challenge automatically. Both of you
+              have 24 hours to complete the run!
             </Text>
 
             <TouchableOpacity

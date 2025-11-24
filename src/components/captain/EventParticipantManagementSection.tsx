@@ -66,7 +66,9 @@ export const EventParticipantManagementSection: React.FC<
 
   const handleAddParticipant = async () => {
     if (!newParticipantPubkey.trim()) {
-      CustomAlert.alert('Error', 'Please enter a valid npub or hex pubkey', [{ text: 'OK' }]);
+      CustomAlert.alert('Error', 'Please enter a valid npub or hex pubkey', [
+        { text: 'OK' },
+      ]);
       return;
     }
 
@@ -108,7 +110,9 @@ export const EventParticipantManagementSection: React.FC<
       } else {
         // Check if already a participant
         if (currentList.members.includes(newParticipantPubkey.trim())) {
-          CustomAlert.alert('Info', 'This user is already a participant', [{ text: 'OK' }]);
+          CustomAlert.alert('Info', 'This user is already a participant', [
+            { text: 'OK' },
+          ]);
           setIsAddingParticipant(false);
           return;
         }
@@ -143,11 +147,17 @@ export const EventParticipantManagementSection: React.FC<
 
       setNewParticipantPubkey('');
       setShowAddModal(false);
-      CustomAlert.alert('Success', 'Participant added to event!', [{ text: 'OK' }]);
+      CustomAlert.alert('Success', 'Participant added to event!', [
+        { text: 'OK' },
+      ]);
       onParticipantUpdate?.();
     } catch (error) {
       console.error('Failed to add participant:', error);
-      CustomAlert.alert('Error', 'Failed to add participant. Please try again.', [{ text: 'OK' }]);
+      CustomAlert.alert(
+        'Error',
+        'Failed to add participant. Please try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setIsAddingParticipant(false);
     }
@@ -167,7 +177,9 @@ export const EventParticipantManagementSection: React.FC<
               // Get signer (supports both nsec and Amber)
               const signer = await UnifiedSigningService.getSigner();
               if (!signer) {
-                CustomAlert.alert('Error', 'Authentication required', [{ text: 'OK' }]);
+                CustomAlert.alert('Error', 'Authentication required', [
+                  { text: 'OK' },
+                ]);
                 return;
               }
 
@@ -209,11 +221,15 @@ export const EventParticipantManagementSection: React.FC<
               );
               setParticipants(updatedMembers);
 
-              CustomAlert.alert('Success', 'Participant removed from event', [{ text: 'OK' }]);
+              CustomAlert.alert('Success', 'Participant removed from event', [
+                { text: 'OK' },
+              ]);
               onParticipantUpdate?.();
             } catch (error) {
               console.error('Failed to remove participant:', error);
-              CustomAlert.alert('Error', 'Failed to remove participant', [{ text: 'OK' }]);
+              CustomAlert.alert('Error', 'Failed to remove participant', [
+                { text: 'OK' },
+              ]);
             }
           },
         },

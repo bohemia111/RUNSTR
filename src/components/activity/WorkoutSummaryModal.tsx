@@ -142,7 +142,9 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
           });
 
           // Get updated route to check achievements
-          const updatedRoute = await routeStorageService.getRouteById(matchedRoute.id);
+          const updatedRoute = await routeStorageService.getRouteById(
+            matchedRoute.id
+          );
 
           if (updatedRoute) {
             const achievements: any = {
@@ -151,7 +153,10 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
             };
 
             // Check if this is a new PR
-            if (updatedRoute.bestTime && workout.duration < updatedRoute.bestTime) {
+            if (
+              updatedRoute.bestTime &&
+              workout.duration < updatedRoute.bestTime
+            ) {
               achievements.isNewPR = true;
               achievements.previousBestTime = updatedRoute.bestTime;
             } else if (!updatedRoute.bestTime || updatedRoute.timesUsed === 1) {
@@ -264,7 +269,8 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
         .substr(2, 9)}`;
 
       // ✅ Get competition team for leaderboard participation
-      const competitionTeam = await LocalTeamMembershipService.getCompetitionTeam();
+      const competitionTeam =
+        await LocalTeamMembershipService.getCompetitionTeam();
 
       return {
         id: workoutId,
@@ -560,16 +566,31 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
 
               {routeAchievements.isNewPR && (
                 <View style={styles.achievementBadge}>
-                  <Ionicons name="trophy" size={24} color={theme.colors.orangeBright} />
+                  <Ionicons
+                    name="trophy"
+                    size={24}
+                    color={theme.colors.orangeBright}
+                  />
                   <View style={styles.achievementText}>
-                    <Text style={styles.achievementLabel}>NEW PERSONAL RECORD!</Text>
+                    <Text style={styles.achievementLabel}>
+                      NEW PERSONAL RECORD!
+                    </Text>
                     {routeAchievements.previousBestTime && (
                       <Text style={styles.achievementValue}>
-                        Beat previous best by {Math.floor(
-                          (routeAchievements.previousBestTime - workout.duration) / 60
-                        )}:{String(Math.floor(
-                          (routeAchievements.previousBestTime - workout.duration) % 60
-                        )).padStart(2, '0')}
+                        Beat previous best by{' '}
+                        {Math.floor(
+                          (routeAchievements.previousBestTime -
+                            workout.duration) /
+                            60
+                        )}
+                        :
+                        {String(
+                          Math.floor(
+                            (routeAchievements.previousBestTime -
+                              workout.duration) %
+                              60
+                          )
+                        ).padStart(2, '0')}
                       </Text>
                     )}
                   </View>
@@ -580,7 +601,9 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
                 <View style={styles.achievementBadge}>
                   <Ionicons name="flag" size={24} color={theme.colors.text} />
                   <View style={styles.achievementText}>
-                    <Text style={styles.achievementLabel}>FIRST COMPLETION!</Text>
+                    <Text style={styles.achievementLabel}>
+                      FIRST COMPLETION!
+                    </Text>
                     <Text style={styles.achievementValue}>
                       You've established your baseline time
                     </Text>
@@ -592,7 +615,9 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
                 <View style={styles.achievementBadge}>
                   <Ionicons name="medal" size={24} color={theme.colors.text} />
                   <View style={styles.achievementText}>
-                    <Text style={styles.achievementLabel}>10TH COMPLETION!</Text>
+                    <Text style={styles.achievementLabel}>
+                      10TH COMPLETION!
+                    </Text>
                     <Text style={styles.achievementValue}>
                       Route veteran - keep crushing it!
                     </Text>
@@ -602,9 +627,15 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
 
               {routeAchievements.milestone === 'hundredth' && (
                 <View style={styles.achievementBadge}>
-                  <Ionicons name="ribbon" size={24} color={theme.colors.orangeBright} />
+                  <Ionicons
+                    name="ribbon"
+                    size={24}
+                    color={theme.colors.orangeBright}
+                  />
                   <View style={styles.achievementText}>
-                    <Text style={styles.achievementLabel}>100TH COMPLETION!</Text>
+                    <Text style={styles.achievementLabel}>
+                      100TH COMPLETION!
+                    </Text>
                     <Text style={styles.achievementValue}>
                       Route legend status achieved!
                     </Text>
@@ -613,7 +644,8 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
               )}
 
               <Text style={styles.achievementStats}>
-                Completed {routeAchievements.timesCompleted} time{routeAchievements.timesCompleted !== 1 ? 's' : ''}
+                Completed {routeAchievements.timesCompleted} time
+                {routeAchievements.timesCompleted !== 1 ? 's' : ''}
               </Text>
             </View>
           )}

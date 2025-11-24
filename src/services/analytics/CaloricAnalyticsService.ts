@@ -50,7 +50,12 @@ export class CaloricAnalyticsService {
    */
   static calculateMetrics(
     workouts: LocalWorkout[],
-    healthProfile?: { weight?: number; height?: number; age?: number; biologicalSex?: 'male' | 'female' }
+    healthProfile?: {
+      weight?: number;
+      height?: number;
+      age?: number;
+      biologicalSex?: 'male' | 'female';
+    }
   ): CaloricMetrics | null {
     if (workouts.length === 0) {
       console.log('ℹ️ No workouts - caloric analytics unavailable');
@@ -60,7 +65,9 @@ export class CaloricAnalyticsService {
     // Calculate daily balances for last 30 days
     const last30Days = this.calculateLast30Days(workouts);
     const last7Days = last30Days.slice(-7);
-    const today = last7Days[last7Days.length - 1] || this.getEmptyDayBalance(new Date().toISOString().split('T')[0]);
+    const today =
+      last7Days[last7Days.length - 1] ||
+      this.getEmptyDayBalance(new Date().toISOString().split('T')[0]);
 
     // Calculate weekly trends (last 4 weeks)
     const weeklyTrends = this.calculateWeeklyTrends(workouts, 4);
@@ -69,7 +76,9 @@ export class CaloricAnalyticsService {
     const monthlySummary = this.calculateMonthlySummary(workouts);
 
     // Estimate BMR if health profile available
-    const estimatedBMR = healthProfile ? this.estimateBMR(healthProfile) : undefined;
+    const estimatedBMR = healthProfile
+      ? this.estimateBMR(healthProfile)
+      : undefined;
 
     return {
       today,
@@ -120,7 +129,11 @@ export class CaloricAnalyticsService {
 
     for (const workout of dayWorkouts) {
       // Validate calorie data exists and is a positive number
-      if (!workout.calories || workout.calories < 0 || isNaN(workout.calories)) {
+      if (
+        !workout.calories ||
+        workout.calories < 0 ||
+        isNaN(workout.calories)
+      ) {
         continue;
       }
 
@@ -266,8 +279,7 @@ export class CaloricAnalyticsService {
     // Women: BMR = 10 × weight(kg) + 6.25 × height(cm) - 5 × age - 161
 
     const baseBMR = 10 * weight + 6.25 * height - 5 * age;
-    const bmr =
-      biologicalSex === 'female' ? baseBMR - 161 : baseBMR + 5;
+    const bmr = biologicalSex === 'female' ? baseBMR - 161 : baseBMR + 5;
 
     return Math.round(bmr);
   }
@@ -304,9 +316,12 @@ export class CaloricAnalyticsService {
    * Calculate weekly average (for simple display)
    * Uses same date-based logic as calculateDailyBalance for timezone consistency
    */
-  static calculateWeeklyAverage(
-    workouts: LocalWorkout[]
-  ): { in: number; out: number; net: number; daysWithData: number } {
+  static calculateWeeklyAverage(workouts: LocalWorkout[]): {
+    in: number;
+    out: number;
+    net: number;
+    daysWithData: number;
+  } {
     const now = new Date();
     const last7Days: DailyCalorieBalance[] = [];
 

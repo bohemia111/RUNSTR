@@ -40,7 +40,9 @@ function formatDuration(seconds: number): string {
   const secs = Math.floor(seconds % 60);
 
   if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs
+      .toString()
+      .padStart(2, '0')}`;
   }
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
@@ -48,7 +50,10 @@ function formatDuration(seconds: number): string {
 /**
  * Calculate pace in min/km
  */
-function calculatePace(distanceMeters: number, durationSeconds: number): string {
+function calculatePace(
+  distanceMeters: number,
+  durationSeconds: number
+): string {
   if (distanceMeters < 10 || durationSeconds < 1) {
     return '--:--';
   }
@@ -64,7 +69,10 @@ function calculatePace(distanceMeters: number, durationSeconds: number): string 
 /**
  * Calculate speed in km/h
  */
-function calculateSpeed(distanceMeters: number, durationSeconds: number): string {
+function calculateSpeed(
+  distanceMeters: number,
+  durationSeconds: number
+): string {
   if (distanceMeters < 10 || durationSeconds < 1) {
     return '0.0';
   }
@@ -87,7 +95,9 @@ async function updateLiveNotification(
 ): Promise<void> {
   try {
     // Throttle updates to every 5 seconds
-    const lastUpdateStr = await AsyncStorage.getItem(LAST_NOTIFICATION_UPDATE_KEY);
+    const lastUpdateStr = await AsyncStorage.getItem(
+      LAST_NOTIFICATION_UPDATE_KEY
+    );
     const lastUpdate = lastUpdateStr ? parseInt(lastUpdateStr, 10) : 0;
     const now = Date.now();
 
@@ -125,7 +135,9 @@ async function updateLiveNotification(
     // Schedule/update the notification with MAX priority and ongoing flag
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: `RUNSTR - ${activityType.charAt(0).toUpperCase() + activityType.slice(1)} Tracking`,
+        title: `RUNSTR - ${
+          activityType.charAt(0).toUpperCase() + activityType.slice(1)
+        } Tracking`,
         body: statsText,
         color: '#FF6B35',
         priority: Notifications.AndroidNotificationPriority.MAX, // ✅ MAX priority prevents service kill
@@ -193,7 +205,9 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       }
 
       // Get or initialize distance state
-      const distanceStateStr = await AsyncStorage.getItem(BACKGROUND_DISTANCE_STATE);
+      const distanceStateStr = await AsyncStorage.getItem(
+        BACKGROUND_DISTANCE_STATE
+      );
       let distanceState: BackgroundDistanceState;
 
       if (distanceStateStr) {
@@ -273,13 +287,17 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
 
       // Log the real-time distance update (visible in Metro console)
       console.log(
-        `[Background] Distance: ${(distanceState.totalDistance / 1000).toFixed(2)} km, ` +
-        `Added: ${distanceAdded.toFixed(1)}m, ` +
-        `Locations: ${distanceState.locationCount}`
+        `[Background] Distance: ${(distanceState.totalDistance / 1000).toFixed(
+          2
+        )} km, ` +
+          `Added: ${distanceAdded.toFixed(1)}m, ` +
+          `Locations: ${distanceState.locationCount}`
       );
 
       // Update live notification with current stats
-      const elapsedSeconds = Math.floor((Date.now() - sessionState.startTime) / 1000);
+      const elapsedSeconds = Math.floor(
+        (Date.now() - sessionState.startTime) / 1000
+      );
       await updateLiveNotification(
         sessionState.activityType,
         distanceState.totalDistance,
@@ -318,9 +336,15 @@ export async function startBackgroundLocationTracking(
 
     // Android-specific: Log battery optimization warnings
     if (Platform.OS === 'android') {
-      console.log('[ANDROID] ⚠️ CRITICAL: Ensure battery optimization is disabled for RUNSTR');
-      console.log('[ANDROID] Settings → Apps → RUNSTR → Battery → Unrestricted');
-      console.log('[ANDROID] Without this, GPS will stop after a few minutes in background');
+      console.log(
+        '[ANDROID] ⚠️ CRITICAL: Ensure battery optimization is disabled for RUNSTR'
+      );
+      console.log(
+        '[ANDROID] Settings → Apps → RUNSTR → Battery → Unrestricted'
+      );
+      console.log(
+        '[ANDROID] Without this, GPS will stop after a few minutes in background'
+      );
     }
 
     // Store session state for background task
@@ -346,8 +370,12 @@ export async function startBackgroundLocationTracking(
     console.log(
       `[BackgroundLocationTask] ✅ Started background tracking for ${activityType} on ${Platform.OS}`
     );
-    console.log(`[BackgroundLocationTask] Time interval: ${locationOptions.timeInterval}ms`);
-    console.log(`[BackgroundLocationTask] Distance interval: ${locationOptions.distanceInterval}m`);
+    console.log(
+      `[BackgroundLocationTask] Time interval: ${locationOptions.timeInterval}ms`
+    );
+    console.log(
+      `[BackgroundLocationTask] Distance interval: ${locationOptions.distanceInterval}m`
+    );
     return true;
   } catch (error) {
     console.error(
@@ -361,7 +389,9 @@ export async function startBackgroundLocationTracking(
     // Android-specific error guidance
     if (Platform.OS === 'android') {
       console.error('[ANDROID] Common causes:');
-      console.error('  1. Battery optimization not disabled (Settings → Apps → RUNSTR → Battery → Unrestricted)');
+      console.error(
+        '  1. Battery optimization not disabled (Settings → Apps → RUNSTR → Battery → Unrestricted)'
+      );
       console.error('  2. Location permission not set to "Allow all the time"');
       console.error('  3. Notification permission denied (Android 13+)');
       console.error('  4. Background location permission denied');
@@ -471,7 +501,9 @@ export async function getAndClearBackgroundDistance(): Promise<{
   locationCount: number;
 } | null> {
   try {
-    const distanceStateStr = await AsyncStorage.getItem(BACKGROUND_DISTANCE_STATE);
+    const distanceStateStr = await AsyncStorage.getItem(
+      BACKGROUND_DISTANCE_STATE
+    );
     if (!distanceStateStr) {
       return null;
     }

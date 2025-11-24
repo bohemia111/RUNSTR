@@ -776,8 +776,8 @@ export class HealthKitService {
       );
 
       const testQuery = {
-        from: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Last 24 hours
-        to: new Date().toISOString(),
+        from: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours (Date object)
+        to: new Date(), // Current date (Date object)
         limit: 1, // Just test with 1 workout
       };
 

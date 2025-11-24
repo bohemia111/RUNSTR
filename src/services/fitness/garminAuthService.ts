@@ -58,17 +58,22 @@ export class GarminAuthService {
    * Load OAuth configuration from environment variables
    */
   private loadConfig() {
-    const clientId = Constants.expoConfig?.extra?.garminClientId ||
-                     process.env.EXPO_PUBLIC_GARMIN_CLIENT_ID;
-    const clientSecret = Constants.expoConfig?.extra?.garminClientSecret ||
-                        process.env.EXPO_PUBLIC_GARMIN_CLIENT_SECRET;
-    const redirectUri = Constants.expoConfig?.extra?.garminRedirectUri ||
-                       process.env.EXPO_PUBLIC_GARMIN_REDIRECT_URI ||
-                       'https://www.runstr.club/oauth-garmin-callback.html';
+    const clientId =
+      Constants.expoConfig?.extra?.garminClientId ||
+      process.env.EXPO_PUBLIC_GARMIN_CLIENT_ID;
+    const clientSecret =
+      Constants.expoConfig?.extra?.garminClientSecret ||
+      process.env.EXPO_PUBLIC_GARMIN_CLIENT_SECRET;
+    const redirectUri =
+      Constants.expoConfig?.extra?.garminRedirectUri ||
+      process.env.EXPO_PUBLIC_GARMIN_REDIRECT_URI ||
+      'https://www.runstr.club/oauth-garmin-callback.html';
 
     if (!clientId || !clientSecret) {
       console.error('❌ Garmin OAuth credentials not configured');
-      console.error('Please set EXPO_PUBLIC_GARMIN_CLIENT_ID and EXPO_PUBLIC_GARMIN_CLIENT_SECRET');
+      console.error(
+        'Please set EXPO_PUBLIC_GARMIN_CLIENT_ID and EXPO_PUBLIC_GARMIN_CLIENT_SECRET'
+      );
       return;
     }
 
@@ -90,7 +95,9 @@ export class GarminAuthService {
   private async loadAuthStatus() {
     try {
       const accessToken = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const expiresAt = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN_EXPIRES_AT);
+      const expiresAt = await AsyncStorage.getItem(
+        STORAGE_KEYS.TOKEN_EXPIRES_AT
+      );
 
       if (accessToken && expiresAt) {
         const expiryTime = parseInt(expiresAt, 10);
@@ -100,7 +107,9 @@ export class GarminAuthService {
           this.isAuthenticated = true;
           console.log('✅ Garmin: Loaded persisted authentication');
         } else {
-          console.log('⚠️ Garmin: Access token expired, will refresh on next API call');
+          console.log(
+            '⚠️ Garmin: Access token expired, will refresh on next API call'
+          );
           // We have tokens, even if expired - can refresh
           this.isAuthenticated = true;
         }
@@ -115,7 +124,8 @@ export class GarminAuthService {
    * Characters: A-Z, a-z, 0-9, hyphen, period, underscore, tilde
    */
   private generateCodeVerifier(): string {
-    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    const charset =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
     const length = 128; // Maximum length for best security
     let verifier = '';
 
@@ -154,7 +164,7 @@ export class GarminAuthService {
   private generateState(): string {
     const randomBytes = Crypto.getRandomBytes(32);
     return Array.from(randomBytes)
-      .map(byte => byte.toString(16).padStart(2, '0'))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
       .join('');
   }
 
@@ -165,7 +175,8 @@ export class GarminAuthService {
     if (!this.config) {
       return {
         success: false,
-        error: 'Garmin OAuth not configured. Please check environment variables.',
+        error:
+          'Garmin OAuth not configured. Please check environment variables.',
       };
     }
 
@@ -192,7 +203,10 @@ export class GarminAuthService {
       console.log('📱 Opening browser to Garmin authorization...');
 
       // Open browser for authorization
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, this.config.redirectUri);
+      const result = await WebBrowser.openAuthSessionAsync(
+        authUrl,
+        this.config.redirectUri
+      );
 
       if (result.type === 'success') {
         // This won't actually happen since Garmin redirects to website
@@ -202,19 +216,30 @@ export class GarminAuthService {
       } else if (result.type === 'cancel') {
         console.log('❌ User cancelled OAuth flow');
         // Clean up stored PKCE parameters
-        await AsyncStorage.multiRemove([STORAGE_KEYS.CODE_VERIFIER, STORAGE_KEYS.STATE]);
+        await AsyncStorage.multiRemove([
+          STORAGE_KEYS.CODE_VERIFIER,
+          STORAGE_KEYS.STATE,
+        ]);
         return { success: false, error: 'Authorization cancelled' };
       } else {
         console.log('❌ OAuth flow failed:', result.type);
-        await AsyncStorage.multiRemove([STORAGE_KEYS.CODE_VERIFIER, STORAGE_KEYS.STATE]);
+        await AsyncStorage.multiRemove([
+          STORAGE_KEYS.CODE_VERIFIER,
+          STORAGE_KEYS.STATE,
+        ]);
         return { success: false, error: 'Authorization failed' };
       }
     } catch (error) {
       console.error('❌ Failed to start OAuth flow:', error);
-      await AsyncStorage.multiRemove([STORAGE_KEYS.CODE_VERIFIER, STORAGE_KEYS.STATE]);
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.CODE_VERIFIER,
+        STORAGE_KEYS.STATE,
+      ]);
       return {
         success: false,
-        error: `Failed to open authorization page: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: `Failed to open authorization page: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
       };
     }
   }
@@ -238,7 +263,10 @@ export class GarminAuthService {
     });
 
     const authUrl = `${OAUTH_ENDPOINTS.AUTHORIZE}?${params.toString()}`;
-    console.log('🔐 Garmin Auth URL:', authUrl.replace(this.config.clientId, 'CLIENT_ID_HIDDEN'));
+    console.log(
+      '🔐 Garmin Auth URL:',
+      authUrl.replace(this.config.clientId, 'CLIENT_ID_HIDDEN')
+    );
 
     return authUrl;
   }
@@ -247,7 +275,10 @@ export class GarminAuthService {
    * Handle OAuth callback with authorization code
    * Called by deep link handler after user authorizes on Garmin website
    */
-  async handleOAuthCallback(code: string, returnedState?: string): Promise<{ success: boolean; error?: string }> {
+  async handleOAuthCallback(
+    code: string,
+    returnedState?: string
+  ): Promise<{ success: boolean; error?: string }> {
     if (!this.config) {
       return {
         success: false,
@@ -258,17 +289,24 @@ export class GarminAuthService {
     try {
       console.log('🔄 Handling OAuth callback...');
       console.log('   Received code:', code.substring(0, 20) + '...');
-      console.log('   Received state:', returnedState?.substring(0, 20) + '...');
+      console.log(
+        '   Received state:',
+        returnedState?.substring(0, 20) + '...'
+      );
 
       // Verify state parameter (CSRF protection) - MANDATORY
       const storedState = await AsyncStorage.getItem(STORAGE_KEYS.STATE);
 
       if (!returnedState) {
-        throw new Error('State parameter missing from callback - security check failed');
+        throw new Error(
+          'State parameter missing from callback - security check failed'
+        );
       }
 
       if (!storedState) {
-        throw new Error('Stored state not found - please restart the authorization flow');
+        throw new Error(
+          'Stored state not found - please restart the authorization flow'
+        );
       }
 
       if (returnedState !== storedState) {
@@ -278,9 +316,13 @@ export class GarminAuthService {
       console.log('✅ State verification passed');
 
       // Retrieve code_verifier from storage
-      const codeVerifier = await AsyncStorage.getItem(STORAGE_KEYS.CODE_VERIFIER);
+      const codeVerifier = await AsyncStorage.getItem(
+        STORAGE_KEYS.CODE_VERIFIER
+      );
       if (!codeVerifier) {
-        throw new Error('Code verifier not found. Please restart the authorization flow.');
+        throw new Error(
+          'Code verifier not found. Please restart the authorization flow.'
+        );
       }
 
       console.log('✅ Retrieved code_verifier from storage');
@@ -297,7 +339,10 @@ export class GarminAuthService {
       await this.storeTokens(tokens);
 
       // Clean up PKCE parameters
-      await AsyncStorage.multiRemove([STORAGE_KEYS.CODE_VERIFIER, STORAGE_KEYS.STATE]);
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.CODE_VERIFIER,
+        STORAGE_KEYS.STATE,
+      ]);
 
       this.isAuthenticated = true;
       console.log('✅ Garmin authentication successful!');
@@ -306,10 +351,15 @@ export class GarminAuthService {
     } catch (error) {
       console.error('❌ Failed to handle OAuth callback:', error);
       // Clean up on error
-      await AsyncStorage.multiRemove([STORAGE_KEYS.CODE_VERIFIER, STORAGE_KEYS.STATE]);
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.CODE_VERIFIER,
+        STORAGE_KEYS.STATE,
+      ]);
       return {
         success: false,
-        error: `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: `Authentication failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
       };
     }
   }
@@ -317,7 +367,10 @@ export class GarminAuthService {
   /**
    * Exchange authorization code for access and refresh tokens (PKCE flow)
    */
-  private async exchangeCodeForTokens(code: string, codeVerifier: string): Promise<GarminAuthTokens | null> {
+  private async exchangeCodeForTokens(
+    code: string,
+    codeVerifier: string
+  ): Promise<GarminAuthTokens | null> {
     if (!this.config) {
       throw new Error('OAuth config not loaded');
     }
@@ -338,7 +391,10 @@ export class GarminAuthService {
         redirect_uri: this.config.redirectUri,
       });
 
-      console.log('   Request body keys:', Array.from(requestBody.keys()).join(', '));
+      console.log(
+        '   Request body keys:',
+        Array.from(requestBody.keys()).join(', ')
+      );
 
       const response = await fetch(OAUTH_ENDPOINTS.TOKEN, {
         method: 'POST',
@@ -357,16 +413,23 @@ export class GarminAuthService {
         console.error('   Response body:', errorText);
         console.error('   Possible causes:');
         console.error('     - Invalid client credentials');
-        console.error('     - Authorization code expired (codes expire quickly)');
+        console.error(
+          '     - Authorization code expired (codes expire quickly)'
+        );
         console.error('     - Code verifier mismatch');
         console.error('     - Redirect URI mismatch');
-        throw new Error(`Token exchange failed: ${response.status} ${errorText}`);
+        throw new Error(
+          `Token exchange failed: ${response.status} ${errorText}`
+        );
       }
 
       const tokens: GarminAuthTokens = await response.json();
       console.log('✅ Received tokens from Garmin');
       console.log('   Access token expires in:', tokens.expires_in, 'seconds');
-      console.log('   Refresh token type:', tokens.refresh_token ? 'present' : 'missing');
+      console.log(
+        '   Refresh token type:',
+        tokens.refresh_token ? 'present' : 'missing'
+      );
 
       return tokens;
     } catch (error) {
@@ -439,7 +502,10 @@ export class GarminAuthService {
 
     try {
       console.log('🔄 Refreshing access token...');
-      console.log('   Using refresh token (first 20 chars):', refreshToken.substring(0, 20) + '...');
+      console.log(
+        '   Using refresh token (first 20 chars):',
+        refreshToken.substring(0, 20) + '...'
+      );
 
       const response = await fetch(OAUTH_ENDPOINTS.TOKEN, {
         method: 'POST',
@@ -461,15 +527,23 @@ export class GarminAuthService {
         console.error('❌ Token refresh failed:');
         console.error('   Status:', response.status, response.statusText);
         console.error('   Response:', errorText);
-        console.error('   This usually means the refresh token expired or was revoked');
-        throw new Error(`Token refresh failed: ${response.status} ${errorText}`);
+        console.error(
+          '   This usually means the refresh token expired or was revoked'
+        );
+        throw new Error(
+          `Token refresh failed: ${response.status} ${errorText}`
+        );
       }
 
       const tokens: GarminAuthTokens = await response.json();
       await this.storeTokens(tokens);
 
       console.log('✅ Access token refreshed successfully');
-      console.log('   New access token expires in:', tokens.expires_in, 'seconds');
+      console.log(
+        '   New access token expires in:',
+        tokens.expires_in,
+        'seconds'
+      );
     } catch (error) {
       console.error('❌ Failed to refresh access token:', error);
       // Clear tokens on refresh failure
@@ -484,7 +558,9 @@ export class GarminAuthService {
   async checkAuthentication(): Promise<boolean> {
     try {
       const accessToken = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+      const refreshToken = await AsyncStorage.getItem(
+        STORAGE_KEYS.REFRESH_TOKEN
+      );
 
       this.isAuthenticated = !!(accessToken && refreshToken);
       return this.isAuthenticated;

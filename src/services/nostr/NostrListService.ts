@@ -111,7 +111,9 @@ export class NostrListService {
   async getList(authorPubkey: string, dTag: string): Promise<NostrList | null> {
     // ✅ CRITICAL: Validate authorPubkey is not empty
     if (!authorPubkey || authorPubkey.trim() === '') {
-      console.error(`❌ Cannot fetch list with empty authorPubkey. dTag: ${dTag}`);
+      console.error(
+        `❌ Cannot fetch list with empty authorPubkey. dTag: ${dTag}`
+      );
       return null;
     }
 

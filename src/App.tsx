@@ -162,7 +162,10 @@ import {
   CustomAlertProvider,
   CustomAlertManager,
 } from './components/ui/CustomAlert';
-import { parseEventDeepLink, type ParsedEventData } from './utils/eventDeepLink';
+import {
+  parseEventDeepLink,
+  type ParsedEventData,
+} from './utils/eventDeepLink';
 
 // Types for authenticated app navigation
 type AuthenticatedStackParamList = {
@@ -179,8 +182,8 @@ type AuthenticatedStackParamList = {
   EventDetail: {
     eventId: string;
     eventData?: any;
-    teamId?: string;  // ✅ NEW: Team context for fallback
-    captainPubkey?: string;  // ✅ NEW: Captain context for fallback
+    teamId?: string; // ✅ NEW: Team context for fallback
+    captainPubkey?: string; // ✅ NEW: Captain context for fallback
   };
   LeagueDetail: { leagueId: string; leagueData?: any };
   CaptainDashboard: {
@@ -219,7 +222,9 @@ const AppContent: React.FC = () => {
 
   // Initialize AppStateManager as early as possible
   React.useEffect(() => {
-    console.log('[App] 🎯 Initializing AppStateManager - Single source of truth');
+    console.log(
+      '[App] 🎯 Initializing AppStateManager - Single source of truth'
+    );
     AppStateManager.initialize();
   }, []);
 
@@ -227,7 +232,8 @@ const AppContent: React.FC = () => {
   const [showPermissionModal, setShowPermissionModal] = React.useState(false);
 
   // Event deep link state
-  const [pendingEventNavigation, setPendingEventNavigation] = React.useState<ParsedEventData | null>(null);
+  const [pendingEventNavigation, setPendingEventNavigation] =
+    React.useState<ParsedEventData | null>(null);
   const navigationRef = React.useRef<any>(null);
 
   // Start background data initialization and check for first launch
@@ -236,7 +242,9 @@ const AppContent: React.FC = () => {
       // ✅ PERFORMANCE FIX: Defer initialization by 5 seconds to let app become interactive first
       // This eliminates 15-18s blocking from NostrPrefetchService network calls
       // Increased from 2s to 5s to prevent freeze after permissions on first launch
-      console.log('🚀 App: Scheduling background initialization (deferred 5s for performance)...');
+      console.log(
+        '🚀 App: Scheduling background initialization (deferred 5s for performance)...'
+      );
 
       setTimeout(() => {
         console.log('🚀 App: Starting background initialization NOW...');
@@ -277,8 +285,16 @@ const AppContent: React.FC = () => {
 
   // Handle pending event navigation when navigation is ready
   React.useEffect(() => {
-    if (pendingEventNavigation && navigationRef.current && isAuthenticated && currentUser) {
-      console.log('🎯 Navigating to event from deep link:', pendingEventNavigation.eventId);
+    if (
+      pendingEventNavigation &&
+      navigationRef.current &&
+      isAuthenticated &&
+      currentUser
+    ) {
+      console.log(
+        '🎯 Navigating to event from deep link:',
+        pendingEventNavigation.eventId
+      );
 
       // Small delay to ensure navigation stack is ready
       setTimeout(() => {
@@ -402,9 +418,13 @@ const AppContent: React.FC = () => {
       const initializeData = async () => {
         try {
           // ✅ PERFORMANCE: Check if initialization already completed (prevents duplicate runs)
-          const initCompleted = await AsyncStorage.getItem('@runstr:app_init_completed');
+          const initCompleted = await AsyncStorage.getItem(
+            '@runstr:app_init_completed'
+          );
           if (initCompleted === 'true') {
-            console.log('[App] ℹ️  App already initialized, skipping duplicate initialization');
+            console.log(
+              '[App] ℹ️  App already initialized, skipping duplicate initialization'
+            );
             return;
           }
 
@@ -438,22 +458,32 @@ const AppContent: React.FC = () => {
               console.log(`🧹 Cleaned up ${removed} expired event snapshots`);
             }
           } catch (error) {
-            console.warn('⚠️ Event snapshot cleanup failed (non-critical):', error);
+            console.warn(
+              '⚠️ Event snapshot cleanup failed (non-critical):',
+              error
+            );
           }
 
           // ❌ CASHU WALLET DISABLED: Removed in favor of NWC (v0.2.4+)
           // This initialization triggered Amber signing prompts for Cashu wallet encryption
           // NWC wallet services now handle all Lightning payments independently
-          console.log('[App] 💰 Cashu wallet initialization skipped (using NWC for Lightning payments)');
+          console.log(
+            '[App] 💰 Cashu wallet initialization skipped (using NWC for Lightning payments)'
+          );
 
           // ✅ NWC WALLET: Initialize NWC wallet connection if configured
           try {
             console.log('[App] 💳 Initializing NWC wallet connection...');
-            const { NWCWalletService } = await import('./services/wallet/NWCWalletService');
+            const { NWCWalletService } = await import(
+              './services/wallet/NWCWalletService'
+            );
             await NWCWalletService.initialize();
             console.log('[App] ✅ NWC wallet initialization attempted');
           } catch (nwcError) {
-            console.error('[App] ⚠️ NWC wallet initialization failed (non-critical):', nwcError);
+            console.error(
+              '[App] ⚠️ NWC wallet initialization failed (non-critical):',
+              nwcError
+            );
             // Don't block app - NWC wallet is optional
           }
 
@@ -469,7 +499,9 @@ const AppContent: React.FC = () => {
           // ❌ REMOVED: ChallengeCompletionService background monitoring
           // This was causing Android crashes due to background Nostr queries
           // Challenges now expire on-demand when users view them
-          console.log('[App] ⚠️  Background challenge monitoring DISABLED for Android stability');
+          console.log(
+            '[App] ⚠️  Background challenge monitoring DISABLED for Android stability'
+          );
 
           // ✅ PERFORMANCE: Mark initialization as complete
           await AsyncStorage.setItem('@runstr:app_init_completed', 'true');
@@ -603,93 +635,96 @@ const AppContent: React.FC = () => {
                         backgroundColor: theme.colors.background,
                       }}
                     >
-                      <ActivityIndicator size="large" color={theme.colors.text} />
+                      <ActivityIndicator
+                        size="large"
+                        color={theme.colors.text}
+                      />
                     </View>
                   }
                 >
                   <SimpleTeamScreen
-                  data={{
-                    team: team,
-                    leaderboard: [],
-                    events: [],
-                  }}
-                  onBack={() => navigation.goBack()}
-                  onCaptainDashboard={() => {
-                    console.log('Captain dashboard from EnhancedTeamScreen');
-                    console.log(
-                      'Navigating to CaptainDashboard with team:',
-                      team?.id
-                    );
-                    console.log(
-                      'Team object has captainId field:',
-                      'captainId' in (team || {})
-                    );
-                    console.log('Team captainId value:', team?.captainId);
-                    console.log(
-                      'Team captainId length:',
-                      team?.captainId?.length
-                    );
-                    console.log(
-                      'Team captainId format:',
-                      team?.captainId?.startsWith('npub')
-                        ? 'npub'
-                        : team?.captainId?.length === 64
-                        ? 'hex'
-                        : 'other'
-                    );
-                    console.log(
-                      'Passing userNpub:',
-                      currentUserNpub?.slice(0, 20) + '...'
-                    );
+                    data={{
+                      team: team,
+                      leaderboard: [],
+                      events: [],
+                    }}
+                    onBack={() => navigation.goBack()}
+                    onCaptainDashboard={() => {
+                      console.log('Captain dashboard from EnhancedTeamScreen');
+                      console.log(
+                        'Navigating to CaptainDashboard with team:',
+                        team?.id
+                      );
+                      console.log(
+                        'Team object has captainId field:',
+                        'captainId' in (team || {})
+                      );
+                      console.log('Team captainId value:', team?.captainId);
+                      console.log(
+                        'Team captainId length:',
+                        team?.captainId?.length
+                      );
+                      console.log(
+                        'Team captainId format:',
+                        team?.captainId?.startsWith('npub')
+                          ? 'npub'
+                          : team?.captainId?.length === 64
+                          ? 'hex'
+                          : 'other'
+                      );
+                      console.log(
+                        'Passing userNpub:',
+                        currentUserNpub?.slice(0, 20) + '...'
+                      );
 
-                    // Ensure we pass the captain ID in hex format
-                    const teamCaptainIdToPass = team?.captainId || '';
-                    console.log(
-                      'Final teamCaptainId being passed:',
-                      teamCaptainIdToPass?.slice(0, 20) + '...'
-                    );
+                      // Ensure we pass the captain ID in hex format
+                      const teamCaptainIdToPass = team?.captainId || '';
+                      console.log(
+                        'Final teamCaptainId being passed:',
+                        teamCaptainIdToPass?.slice(0, 20) + '...'
+                      );
 
-                    navigation.navigate('CaptainDashboard', {
-                      teamId: team?.id,
-                      teamName: team?.name,
-                      teamCaptainId: teamCaptainIdToPass, // Pass the team's captain ID
-                      isCaptain: true,
-                      userNpub: currentUserNpub,
-                    });
-                  }}
-                  onEventPress={(eventId, eventData) => {
-                    console.log('📍 Navigation: Team → Event Detail');
-                    console.log('  eventId:', eventId);
-                    console.log(
-                      '  eventData:',
-                      eventData ? 'provided' : 'not provided'
-                    );
-                    console.log('  team context:', {
-                      teamId: team?.id,
-                      captainId: team?.captainId?.slice(0, 20) + '...'
-                    });
-                    // ✅ FIX: Pass team context explicitly to prevent missing teamId/captainPubkey crash
-                    navigation.navigate('EventDetail', {
-                      eventId,
-                      eventData,
-                      teamId: team?.id,  // Explicit team context
-                      captainPubkey: team?.captainId,  // Explicit captain context
-                    });
-                  }}
-                  onLeaguePress={(leagueId, leagueData) => {
-                    console.log('📍 Navigation: Team → League Detail');
-                    console.log('  leagueId:', leagueId);
-                    navigation.navigate('LeagueDetail', {
-                      leagueId,
-                      leagueData,
-                    });
-                  }}
-                  showJoinButton={!userIsMember}
-                  userIsMemberProp={userIsMember}
-                  currentUserNpub={currentUserNpub}
-                  userIsCaptain={userIsCaptain}
-                />
-              </React.Suspense>
+                      navigation.navigate('CaptainDashboard', {
+                        teamId: team?.id,
+                        teamName: team?.name,
+                        teamCaptainId: teamCaptainIdToPass, // Pass the team's captain ID
+                        isCaptain: true,
+                        userNpub: currentUserNpub,
+                      });
+                    }}
+                    onEventPress={(eventId, eventData) => {
+                      console.log('📍 Navigation: Team → Event Detail');
+                      console.log('  eventId:', eventId);
+                      console.log(
+                        '  eventData:',
+                        eventData ? 'provided' : 'not provided'
+                      );
+                      console.log('  team context:', {
+                        teamId: team?.id,
+                        captainId: team?.captainId?.slice(0, 20) + '...',
+                      });
+                      // ✅ FIX: Pass team context explicitly to prevent missing teamId/captainPubkey crash
+                      navigation.navigate('EventDetail', {
+                        eventId,
+                        eventData,
+                        teamId: team?.id, // Explicit team context
+                        captainPubkey: team?.captainId, // Explicit captain context
+                      });
+                    }}
+                    onLeaguePress={(leagueId, leagueData) => {
+                      console.log('📍 Navigation: Team → League Detail');
+                      console.log('  leagueId:', leagueId);
+                      navigation.navigate('LeagueDetail', {
+                        leagueId,
+                        leagueData,
+                      });
+                    }}
+                    showJoinButton={!userIsMember}
+                    userIsMemberProp={userIsMember}
+                    currentUserNpub={currentUserNpub}
+                    userIsCaptain={userIsCaptain}
+                  />
+                </React.Suspense>
               </ScreenErrorBoundary>
             );
           }}
@@ -980,11 +1015,18 @@ export default function App() {
         // Enable WebSocket debugging in development mode for NWC troubleshooting
         if (__DEV__) {
           try {
-            const { enableWebSocketDebugging } = await import('./utils/webSocketDebugger');
+            const { enableWebSocketDebugging } = await import(
+              './utils/webSocketDebugger'
+            );
             enableWebSocketDebugging();
-            console.log('[App] 🔍 WebSocket debugger enabled for NWC troubleshooting');
+            console.log(
+              '[App] 🔍 WebSocket debugger enabled for NWC troubleshooting'
+            );
           } catch (debugError) {
-            console.warn('[App] Failed to enable WebSocket debugger:', debugError);
+            console.warn(
+              '[App] Failed to enable WebSocket debugger:',
+              debugError
+            );
             // Non-critical - app continues without debugger
           }
         }

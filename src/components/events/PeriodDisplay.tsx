@@ -10,7 +10,7 @@ import type { NostrEventDefinition } from '../../types/nostrCompetition';
 import {
   getCurrentPeriod,
   formatPeriodRange,
-  getNextPeriodStart
+  getNextPeriodStart,
 } from '../../utils/eventRecurrence';
 
 interface PeriodDisplayProps {
@@ -52,11 +52,12 @@ export const PeriodDisplay: React.FC<PeriodDisplayProps> = ({
       <Text style={styles.periodText}>{periodRangeText}</Text>
       {showNextReset && nextReset && (
         <Text style={styles.nextResetText}>
-          Resets {nextReset.toLocaleDateString('en-US', {
+          Resets{' '}
+          {nextReset.toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
             hour: 'numeric',
-            minute: '2-digit'
+            minute: '2-digit',
           })}
         </Text>
       )}

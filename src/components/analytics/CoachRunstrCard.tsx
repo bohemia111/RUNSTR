@@ -47,7 +47,12 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
   const [insight, setInsight] = useState<CoachInsight | null>(null);
 
   // Use the CoachRunstr hook
-  const { generateInsight, loading, error: hookError, apiKeyConfigured } = useCoachRunstr();
+  const {
+    generateInsight,
+    loading,
+    error: hookError,
+    apiKeyConfigured,
+  } = useCoachRunstr();
   const [error, setError] = useState<string | null>(null);
 
   const handlePromptPress = async (type: PromptType) => {
@@ -60,8 +65,7 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
     } catch (err) {
       console.error('[CoachRunstrCard] Failed to generate insight:', err);
       setError(
-        hookError ||
-          'Failed to generate insight. Make sure the model is ready.'
+        hookError || 'Failed to generate insight. Make sure the model is ready.'
       );
       setInsight(null);
     }
@@ -82,9 +86,7 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
           <Ionicons
             name={prompt.icon}
             size={16}
-            color={
-              selectedPrompt === prompt.type ? '#000' : theme.colors.text
-            }
+            color={selectedPrompt === prompt.type ? '#000' : theme.colors.text}
           />
           <Text
             style={[
@@ -110,7 +112,10 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
     }
 
     if (error) {
-      const isApiKeyError = error.includes('API key') || error.includes('401') || error.includes('403');
+      const isApiKeyError =
+        error.includes('API key') ||
+        error.includes('401') ||
+        error.includes('403');
       return (
         <View style={styles.resultContainer}>
           <Text style={styles.errorText}>{error}</Text>
@@ -153,7 +158,12 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
     if (!apiKeyConfigured) {
       return (
         <View style={styles.resultContainer}>
-          <Ionicons name="key-outline" size={32} color="#FF9D42" style={{ marginBottom: 12 }} />
+          <Ionicons
+            name="key-outline"
+            size={32}
+            color="#FF9D42"
+            style={{ marginBottom: 12 }}
+          />
           <Text style={styles.setupText}>
             Configure your PPQ.AI API key in Settings to unlock AI-powered
             workout insights
@@ -162,7 +172,12 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
             style={styles.settingsButton}
             onPress={() => navigation.navigate('Settings' as never)}
           >
-            <Ionicons name="settings-outline" size={16} color="#000" style={{ marginRight: 6 }} />
+            <Ionicons
+              name="settings-outline"
+              size={16}
+              color="#000"
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.settingsButtonText}>Go to Settings</Text>
           </TouchableOpacity>
         </View>

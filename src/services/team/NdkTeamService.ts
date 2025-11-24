@@ -237,7 +237,9 @@ export class NdkTeamService {
         // Extract metadata from raw event tags
         const tags = hardcodedTeam.rawEvent.tags || [];
         const charityTag = tags.find((t: any[]) => t[0] === 'charity');
-        const bannerTag = tags.find((t: any[]) => t[0] === 'banner' || t[0] === 'image');
+        const bannerTag = tags.find(
+          (t: any[]) => t[0] === 'banner' || t[0] === 'image'
+        );
         const shopTag = tags.find((t: any[]) => t[0] === 'shop');
         const flashTag = tags.find((t: any[]) => t[0] === 'flash');
         const aboutTag = tags.find((t: any[]) => t[0] === 'about');
@@ -287,10 +289,12 @@ export class NdkTeamService {
       let localTeams: NostrTeam[] = [];
 
       if (currentUserNpub) {
-        const localTeamData = await LocalTeamStorageService.getTeamsByCaptain(currentUserNpub);
+        const localTeamData = await LocalTeamStorageService.getTeamsByCaptain(
+          currentUserNpub
+        );
 
         // Convert LocalTeam to NostrTeam format
-        localTeams = localTeamData.map(localTeam => ({
+        localTeams = localTeamData.map((localTeam) => ({
           id: localTeam.id,
           name: localTeam.name,
           description: localTeam.description,
@@ -311,14 +315,18 @@ export class NdkTeamService {
           memberListId: undefined,
         }));
 
-        console.log(`📱 Loaded ${localTeams.length} locally-created teams for captain`);
+        console.log(
+          `📱 Loaded ${localTeams.length} locally-created teams for captain`
+        );
       }
 
       // Merge hardcoded and local teams (local teams first for captain visibility)
       const allTeams = [...localTeams, ...teams];
 
       const queryTime = Date.now() - startTime;
-      console.log(`✅ Loaded ${teams.length} hardcoded + ${localTeams.length} local teams in ${queryTime}ms (was 4-6 seconds with Nostr query)`);
+      console.log(
+        `✅ Loaded ${teams.length} hardcoded + ${localTeams.length} local teams in ${queryTime}ms (was 4-6 seconds with Nostr query)`
+      );
 
       // Sort by creation date (newest first)
       return allTeams.sort((a, b) => b.createdAt - a.createdAt);

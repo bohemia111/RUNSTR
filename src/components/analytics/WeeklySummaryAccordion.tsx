@@ -34,10 +34,21 @@ export const WeeklySummaryAccordion: React.FC<WeeklySummaryAccordionProps> = ({
       icon: 'restaurant-outline',
       color: '#FF9D42', // Orange theme
       stats: [
-        { label: 'Total Calories In', value: `${weeklyStats.diet.caloriesIn.toLocaleString()} cal` },
-        { label: 'Total Calories Out', value: `${weeklyStats.caloriesOut.toLocaleString()} cal` },
+        {
+          label: 'Total Calories In',
+          value: `${weeklyStats.diet.caloriesIn.toLocaleString()} cal`,
+        },
+        {
+          label: 'Total Calories Out',
+          value: `${weeklyStats.caloriesOut.toLocaleString()} cal`,
+        },
         { label: 'Meals Logged', value: `${weeklyStats.diet.mealCount} meals` },
-        { label: 'Avg Calories/Day', value: `${Math.round(weeklyStats.diet.caloriesIn / 7).toLocaleString()} cal` },
+        {
+          label: 'Avg Calories/Day',
+          value: `${Math.round(
+            weeklyStats.diet.caloriesIn / 7
+          ).toLocaleString()} cal`,
+        },
       ],
     },
     {
@@ -46,9 +57,21 @@ export const WeeklySummaryAccordion: React.FC<WeeklySummaryAccordionProps> = ({
       color: '#FF9D42', // Orange theme
       stats: [
         { label: 'Total Workouts', value: weeklyStats.strength.topExercise },
-        { label: 'Total Volume', value: `${weeklyStats.strength.totalVolume.toLocaleString()} reps` },
-        { label: 'Avg Volume/Session', value: `${weeklyStats.strength.avgVolume} reps` },
-        { label: 'Avg Sets×Reps', value: weeklyStats.strength.avgVolume > 0 ? `${Math.round(weeklyStats.strength.avgVolume / 3)}×3` : 'N/A' },
+        {
+          label: 'Total Volume',
+          value: `${weeklyStats.strength.totalVolume.toLocaleString()} reps`,
+        },
+        {
+          label: 'Avg Volume/Session',
+          value: `${weeklyStats.strength.avgVolume} reps`,
+        },
+        {
+          label: 'Avg Sets×Reps',
+          value:
+            weeklyStats.strength.avgVolume > 0
+              ? `${Math.round(weeklyStats.strength.avgVolume / 3)}×3`
+              : 'N/A',
+        },
       ],
     },
     {
@@ -56,10 +79,19 @@ export const WeeklySummaryAccordion: React.FC<WeeklySummaryAccordionProps> = ({
       icon: 'walk-outline',
       color: '#FF9D42', // Orange theme
       stats: [
-        { label: 'Total Distance', value: `${(weeklyStats.cardio.totalDistance / 1000).toFixed(1)} km` },
-        { label: 'Total Time', value: formatDuration(weeklyStats.cardio.totalDuration) },
+        {
+          label: 'Total Distance',
+          value: `${(weeklyStats.cardio.totalDistance / 1000).toFixed(1)} km`,
+        },
+        {
+          label: 'Total Time',
+          value: formatDuration(weeklyStats.cardio.totalDuration),
+        },
         { label: 'Avg Pace', value: weeklyStats.cardio.avgPace },
-        { label: 'Most Frequent Activity', value: weeklyStats.cardio.topActivity },
+        {
+          label: 'Most Frequent Activity',
+          value: weeklyStats.cardio.topActivity,
+        },
       ],
     },
     {
@@ -67,9 +99,18 @@ export const WeeklySummaryAccordion: React.FC<WeeklySummaryAccordionProps> = ({
       icon: 'flower-outline',
       color: '#FF9D42', // Orange theme
       stats: [
-        { label: 'Meditation Sessions', value: `${weeklyStats.wellness.meditationCount} sessions` },
-        { label: 'Total Minutes', value: `${Math.round(weeklyStats.wellness.totalMinutes)} min` },
-        { label: 'Avg Session Length', value: `${weeklyStats.wellness.avgSessionLength} min` },
+        {
+          label: 'Meditation Sessions',
+          value: `${weeklyStats.wellness.meditationCount} sessions`,
+        },
+        {
+          label: 'Total Minutes',
+          value: `${Math.round(weeklyStats.wellness.totalMinutes)} min`,
+        },
+        {
+          label: 'Avg Session Length',
+          value: `${weeklyStats.wellness.avgSessionLength} min`,
+        },
         { label: 'Consistency', value: `${weeklyStats.wellness.consistency}%` },
       ],
     },
@@ -90,11 +131,19 @@ export const WeeklySummaryAccordion: React.FC<WeeklySummaryAccordionProps> = ({
             activeOpacity={0.7}
           >
             <View style={styles.headerLeft}>
-              <Ionicons name={section.icon as any} size={24} color={section.color} />
+              <Ionicons
+                name={section.icon as any}
+                size={24}
+                color={section.color}
+              />
               <Text style={styles.sectionTitle}>{section.title}</Text>
             </View>
             <Ionicons
-              name={expandedSection === section.title ? 'chevron-up' : 'chevron-down'}
+              name={
+                expandedSection === section.title
+                  ? 'chevron-up'
+                  : 'chevron-down'
+              }
               size={20}
               color={theme.colors.textMuted}
             />
@@ -132,7 +181,10 @@ function calculateWeeklyStats(workouts: LocalWorkout[]) {
 
   // Diet stats
   const dietWorkouts = weekWorkouts.filter((w) => w.type === 'diet');
-  const caloriesIn = dietWorkouts.reduce((sum, w) => sum + (w.calories || 0), 0);
+  const caloriesIn = dietWorkouts.reduce(
+    (sum, w) => sum + (w.calories || 0),
+    0
+  );
   const mealCount = dietWorkouts.length;
 
   // Calculate total calories out from ALL workout types (not just diet)
@@ -148,41 +200,72 @@ function calculateWeeklyStats(workouts: LocalWorkout[]) {
   const totalVolume = strengthWorkouts.reduce((sum, w) => {
     const reps = w.reps || 0;
     const sets = w.sets || 1;
-    return sum + (reps * sets);
+    return sum + reps * sets;
   }, 0);
-  const avgVolume = strengthWorkouts.length > 0 ? Math.round(totalVolume / strengthWorkouts.length) : 0;
+  const avgVolume =
+    strengthWorkouts.length > 0
+      ? Math.round(totalVolume / strengthWorkouts.length)
+      : 0;
 
   // For exercise tracking, use notes if available, otherwise just count total sessions
-  const topExercise = strengthWorkouts.length > 0
-    ? `${strengthWorkouts.length} session${strengthWorkouts.length > 1 ? 's' : ''}`
-    : 'N/A';
+  const topExercise =
+    strengthWorkouts.length > 0
+      ? `${strengthWorkouts.length} session${
+          strengthWorkouts.length > 1 ? 's' : ''
+        }`
+      : 'N/A';
 
   // Cardio stats
-  const cardioTypes = ['running', 'walking', 'cycling', 'hiking', 'swimming', 'rowing'];
-  const cardioWorkouts = weekWorkouts.filter((w) => cardioTypes.includes(w.type));
-  const totalDistance = cardioWorkouts.reduce((sum, w) => sum + (w.distance || 0), 0);
-  const totalDuration = cardioWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0);
-  const avgPace = totalDistance > 0 && totalDuration > 0
-    ? `${((totalDuration / 60) / (totalDistance / 1000)).toFixed(1)} min/km`
-    : 'N/A';
+  const cardioTypes = [
+    'running',
+    'walking',
+    'cycling',
+    'hiking',
+    'swimming',
+    'rowing',
+  ];
+  const cardioWorkouts = weekWorkouts.filter((w) =>
+    cardioTypes.includes(w.type)
+  );
+  const totalDistance = cardioWorkouts.reduce(
+    (sum, w) => sum + (w.distance || 0),
+    0
+  );
+  const totalDuration = cardioWorkouts.reduce(
+    (sum, w) => sum + (w.duration || 0),
+    0
+  );
+  const avgPace =
+    totalDistance > 0 && totalDuration > 0
+      ? `${(totalDuration / 60 / (totalDistance / 1000)).toFixed(1)} min/km`
+      : 'N/A';
   const cardioTypeCounts: Record<string, number> = {};
   cardioWorkouts.forEach((w) => {
     cardioTypeCounts[w.type] = (cardioTypeCounts[w.type] || 0) + 1;
   });
-  const topActivity = Object.keys(cardioTypeCounts).length > 0
-    ? Object.entries(cardioTypeCounts).sort(([, a], [, b]) => b - a)[0][0]
-    : 'N/A';
+  const topActivity =
+    Object.keys(cardioTypeCounts).length > 0
+      ? Object.entries(cardioTypeCounts).sort(([, a], [, b]) => b - a)[0][0]
+      : 'N/A';
 
   // Wellness stats
-  const meditationWorkouts = weekWorkouts.filter((w) => w.type === 'meditation');
-  const totalMinutes = meditationWorkouts.reduce((sum, w) => sum + ((w.duration || 0) / 60), 0);
-  const avgSessionLength = meditationWorkouts.length > 0
-    ? Math.round(totalMinutes / meditationWorkouts.length)
-    : 0;
+  const meditationWorkouts = weekWorkouts.filter(
+    (w) => w.type === 'meditation'
+  );
+  const totalMinutes = meditationWorkouts.reduce(
+    (sum, w) => sum + (w.duration || 0) / 60,
+    0
+  );
+  const avgSessionLength =
+    meditationWorkouts.length > 0
+      ? Math.round(totalMinutes / meditationWorkouts.length)
+      : 0;
 
   // Calculate consistency (% of days with meditation)
   const uniqueDays = new Set(
-    meditationWorkouts.map((w) => new Date(w.startTime).toLocaleDateString('en-CA'))
+    meditationWorkouts.map((w) =>
+      new Date(w.startTime).toLocaleDateString('en-CA')
+    )
   );
   const consistency = Math.round((uniqueDays.size / 7) * 100);
 

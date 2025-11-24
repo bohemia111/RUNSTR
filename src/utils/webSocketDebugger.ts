@@ -40,13 +40,19 @@ export function enableWebSocketDebugging(): void {
       // Track connection lifecycle
       this.addEventListener('open', (event) => {
         const connectionTime = Date.now() - this.startTime;
-        console.log(`[WS-Debug] ✅ Connected to ${this.url} (took ${connectionTime}ms)`);
+        console.log(
+          `[WS-Debug] ✅ Connected to ${this.url} (took ${connectionTime}ms)`
+        );
       });
 
       this.addEventListener('close', (event: CloseEvent) => {
         const connectionDuration = Date.now() - this.startTime;
         console.log(`[WS-Debug] ❌ Closed ${this.url}`);
-        console.log(`[WS-Debug] Close code: ${event.code}, reason: ${event.reason || 'none'}`);
+        console.log(
+          `[WS-Debug] Close code: ${event.code}, reason: ${
+            event.reason || 'none'
+          }`
+        );
         console.log(`[WS-Debug] Connection duration: ${connectionDuration}ms`);
 
         // Common close codes
@@ -55,10 +61,14 @@ export function enableWebSocketDebugging(): void {
             console.log('[WS-Debug] Normal closure');
             break;
           case 1001:
-            console.log('[WS-Debug] Endpoint going away (page navigation or server shutdown)');
+            console.log(
+              '[WS-Debug] Endpoint going away (page navigation or server shutdown)'
+            );
             break;
           case 1006:
-            console.log('[WS-Debug] Abnormal closure (network error or server unreachable)');
+            console.log(
+              '[WS-Debug] Abnormal closure (network error or server unreachable)'
+            );
             break;
           case 1015:
             console.log('[WS-Debug] TLS handshake failure');
@@ -84,10 +94,16 @@ export function enableWebSocketDebugging(): void {
                 console.log(`[WS-Debug] ← EVENT received (sub: ${rest[0]})`);
                 break;
               case 'EOSE':
-                console.log(`[WS-Debug] ← EOSE (End of stored events) for sub: ${rest[0]}`);
+                console.log(
+                  `[WS-Debug] ← EOSE (End of stored events) for sub: ${rest[0]}`
+                );
                 break;
               case 'OK':
-                console.log(`[WS-Debug] ← OK response: ${rest[1] ? 'success' : 'failed'} - ${rest[2] || ''}`);
+                console.log(
+                  `[WS-Debug] ← OK response: ${
+                    rest[1] ? 'success' : 'failed'
+                  } - ${rest[2] || ''}`
+                );
                 break;
               case 'NOTICE':
                 console.log(`[WS-Debug] ← NOTICE from relay: ${rest[0]}`);
@@ -106,14 +122,18 @@ export function enableWebSocketDebugging(): void {
           if (event.data.length < 200) {
             console.log(`[WS-Debug] ← Raw message: ${event.data}`);
           } else {
-            console.log(`[WS-Debug] ← Large message (${event.data.length} bytes)`);
+            console.log(
+              `[WS-Debug] ← Large message (${event.data.length} bytes)`
+            );
           }
         }
       });
 
       // Override send to track outgoing messages
       const originalSend = this.send.bind(this);
-      this.send = (data: string | ArrayBufferLike | Blob | ArrayBufferView): void => {
+      this.send = (
+        data: string | ArrayBufferLike | Blob | ArrayBufferView
+      ): void => {
         try {
           if (typeof data === 'string') {
             const parsed = JSON.parse(data);
@@ -142,11 +162,17 @@ export function enableWebSocketDebugging(): void {
               console.log('[WS-Debug] → Non-array message sent');
             }
           } else {
-            console.log(`[WS-Debug] → Binary message (${(data as any).byteLength || 0} bytes)`);
+            console.log(
+              `[WS-Debug] → Binary message (${
+                (data as any).byteLength || 0
+              } bytes)`
+            );
           }
         } catch (error) {
           // Not JSON, log type
-          console.log(`[WS-Debug] → Non-JSON message sent (type: ${typeof data})`);
+          console.log(
+            `[WS-Debug] → Non-JSON message sent (type: ${typeof data})`
+          );
         }
 
         return originalSend(data);

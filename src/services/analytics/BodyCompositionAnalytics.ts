@@ -43,13 +43,8 @@ export class BodyCompositionAnalytics {
       return null;
     }
 
-    const bmi = this.calculateBMI(
-      healthProfile.weight,
-      healthProfile.height
-    );
-    const healthyWeightRange = this.getHealthyWeightRange(
-      healthProfile.height
-    );
+    const bmi = this.calculateBMI(healthProfile.weight, healthProfile.height);
+    const healthyWeightRange = this.getHealthyWeightRange(healthProfile.height);
 
     // VO2 Max requires cardio workouts
     const vo2MaxData = this.estimateVO2Max(workouts, healthProfile);
@@ -157,10 +152,7 @@ export class BodyCompositionAnalytics {
 
     if (fiveKWorkouts.length === 0) {
       // No 5K workouts, try to estimate from average pace
-      return this.estimateVO2MaxFromAveragePace(
-        runningWorkouts,
-        healthProfile
-      );
+      return this.estimateVO2MaxFromAveragePace(runningWorkouts, healthProfile);
     }
 
     // Get fastest 5K
@@ -328,13 +320,31 @@ export class BodyCompositionAnalytics {
     // Calculate VO2 Max Age using age-specific norms (general population, not elite athletes)
     // Based on ACSM standards for "fair to good" fitness levels
     const menNorms: Record<number, number> = {
-      20: 42, 25: 41, 30: 40, 35: 38, 40: 37, 45: 36, 50: 35,
-      55: 34, 60: 33, 65: 32, 70: 31
+      20: 42,
+      25: 41,
+      30: 40,
+      35: 38,
+      40: 37,
+      45: 36,
+      50: 35,
+      55: 34,
+      60: 33,
+      65: 32,
+      70: 31,
     };
 
     const womenNorms: Record<number, number> = {
-      20: 38, 25: 37, 30: 36, 35: 35, 40: 34, 45: 33, 50: 32,
-      55: 31, 60: 30, 65: 29, 70: 28
+      20: 38,
+      25: 37,
+      30: 36,
+      35: 35,
+      40: 34,
+      45: 33,
+      50: 32,
+      55: 31,
+      60: 30,
+      65: 29,
+      70: 28,
     };
 
     const norms = sex === 'female' ? womenNorms : menNorms;
@@ -366,7 +376,7 @@ export class BodyCompositionAnalytics {
     // If BMI provided, calculate 2-metric fitness age (75% VO2 + 25% BMI)
     if (bmi !== undefined) {
       const bmiAge = this.calculateBMIAge(bmi, chronologicalAge);
-      const weightedFitnessAge = (vo2Age * 0.75) + (bmiAge * 0.25);
+      const weightedFitnessAge = vo2Age * 0.75 + bmiAge * 0.25;
       return Math.round(weightedFitnessAge);
     }
 

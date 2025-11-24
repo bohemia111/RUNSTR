@@ -20,7 +20,11 @@ interface TimerEntry {
 
 class PerformanceLoggerClass {
   private timers: Map<string, TimerEntry> = new Map();
-  private completedTimings: Array<{ label: string; duration: number; indent: number }> = [];
+  private completedTimings: Array<{
+    label: string;
+    duration: number;
+    indent: number;
+  }> = [];
   private enabled: boolean = true;
 
   /**
@@ -75,7 +79,7 @@ class PerformanceLoggerClass {
     if (!this.enabled || this.completedTimings.length === 0) return;
 
     const totalDuration = this.completedTimings
-      .filter(t => t.indent === 0) // Only count top-level operations
+      .filter((t) => t.indent === 0) // Only count top-level operations
       .reduce((sum, t) => sum + t.duration, 0);
 
     const totalSeconds = (totalDuration / 1000).toFixed(2);
@@ -110,7 +114,11 @@ class PerformanceLoggerClass {
   /**
    * Async wrapper for timing async operations
    */
-  async measure<T>(label: string, operation: () => Promise<T>, indent: number = 0): Promise<T> {
+  async measure<T>(
+    label: string,
+    operation: () => Promise<T>,
+    indent: number = 0
+  ): Promise<T> {
     this.start(label, indent);
     try {
       const result = await operation();

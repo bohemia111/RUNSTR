@@ -41,7 +41,9 @@ export class GPSHealthMonitor {
     }
 
     // Calculate average accuracy from recent readings
-    const avgAccuracy = this.recentAccuracies.reduce((a, b) => a + b, 0) / this.recentAccuracies.length;
+    const avgAccuracy =
+      this.recentAccuracies.reduce((a, b) => a + b, 0) /
+      this.recentAccuracies.length;
 
     // Update last good signal time if accuracy is acceptable
     if (avgAccuracy <= 20) {

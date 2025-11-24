@@ -163,7 +163,10 @@ export const PPQAPIKeyModal: React.FC<PPQAPIKeyModalProps> = ({
 
           {/* Save Button */}
           <TouchableOpacity
-            style={[styles.saveButton, (!apiKey.trim() || isSaving) && styles.saveButtonDisabled]}
+            style={[
+              styles.saveButton,
+              (!apiKey.trim() || isSaving) && styles.saveButtonDisabled,
+            ]}
             onPress={handleSave}
             disabled={!apiKey.trim() || isSaving}
           >

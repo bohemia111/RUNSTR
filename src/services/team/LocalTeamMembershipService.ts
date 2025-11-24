@@ -80,12 +80,18 @@ export class LocalTeamMembershipService {
       }
 
       const updated = [...followed, teamId];
-      await AsyncStorage.setItem(this.FOLLOWED_TEAMS_KEY, JSON.stringify(updated));
+      await AsyncStorage.setItem(
+        this.FOLLOWED_TEAMS_KEY,
+        JSON.stringify(updated)
+      );
 
       // Record join date
       const joinDates = await this.getJoinDates();
       joinDates[teamId] = Date.now();
-      await AsyncStorage.setItem(this.JOIN_DATES_KEY, JSON.stringify(joinDates));
+      await AsyncStorage.setItem(
+        this.JOIN_DATES_KEY,
+        JSON.stringify(joinDates)
+      );
 
       console.log(`✅ Following team: ${teamId}`);
     } catch (error) {
@@ -101,7 +107,10 @@ export class LocalTeamMembershipService {
     try {
       const followed = await this.getFollowedTeams();
       const updated = followed.filter((id) => id !== teamId);
-      await AsyncStorage.setItem(this.FOLLOWED_TEAMS_KEY, JSON.stringify(updated));
+      await AsyncStorage.setItem(
+        this.FOLLOWED_TEAMS_KEY,
+        JSON.stringify(updated)
+      );
 
       // Clear competition team if unfollowing current competition team
       const competitionTeam = await this.getCompetitionTeam();
@@ -112,7 +121,10 @@ export class LocalTeamMembershipService {
       // Remove join date
       const joinDates = await this.getJoinDates();
       delete joinDates[teamId];
-      await AsyncStorage.setItem(this.JOIN_DATES_KEY, JSON.stringify(joinDates));
+      await AsyncStorage.setItem(
+        this.JOIN_DATES_KEY,
+        JSON.stringify(joinDates)
+      );
 
       console.log(`✅ Unfollowed team: ${teamId}`);
     } catch (error) {

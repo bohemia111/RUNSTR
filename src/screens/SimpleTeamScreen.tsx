@@ -116,7 +116,8 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
         }
 
         // Check if this is user's competition team
-        const competitionTeam = await LocalTeamMembershipService.getCompetitionTeam();
+        const competitionTeam =
+          await LocalTeamMembershipService.getCompetitionTeam();
         setIsCompetitionTeam(competitionTeam === team.id);
 
         // Fetch daily leaderboards
@@ -126,17 +127,15 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
         );
 
         try {
-          const dailyLeaderboards = await SimpleLeaderboardService.getTeamDailyLeaderboards(team.id);
+          const dailyLeaderboards =
+            await SimpleLeaderboardService.getTeamDailyLeaderboards(team.id);
 
-          console.log(
-            '[SimpleTeamScreen] ✅ Leaderboards loaded:',
-            {
-              '5k': dailyLeaderboards.leaderboard5k.length,
-              '10k': dailyLeaderboards.leaderboard10k.length,
-              'half': dailyLeaderboards.leaderboardHalf.length,
-              'marathon': dailyLeaderboards.leaderboardMarathon.length,
-            }
-          );
+          console.log('[SimpleTeamScreen] ✅ Leaderboards loaded:', {
+            '5k': dailyLeaderboards.leaderboard5k.length,
+            '10k': dailyLeaderboards.leaderboard10k.length,
+            half: dailyLeaderboards.leaderboardHalf.length,
+            marathon: dailyLeaderboards.leaderboardMarathon.length,
+          });
 
           setLeaderboards(dailyLeaderboards);
           setLoadingLeaderboards(false);
@@ -193,7 +192,10 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
       setIsCompetitionTeam(true);
 
       // 3. ✅ Optimistic ProfileData Update - Instantly add to My Teams
-      if (navigationData.profileData?.teams && !navigationData.profileData.teams.some(t => t.id === team.id)) {
+      if (
+        navigationData.profileData?.teams &&
+        !navigationData.profileData.teams.some((t) => t.id === team.id)
+      ) {
         const optimisticTeam = {
           id: team.id,
           name: team.name,
@@ -212,7 +214,9 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
         const currentTeams = profileDataRef.teams || [];
         profileDataRef.teams = [...currentTeams, optimisticTeam];
 
-        console.log(`⚡ Optimistically added ${team.name} to profileData (instant My Teams update)`);
+        console.log(
+          `⚡ Optimistically added ${team.name} to profileData (instant My Teams update)`
+        );
       }
 
       // 4. ✅ Success Alert - Inform user
@@ -233,7 +237,9 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
           );
 
           if (result.success) {
-            console.log(`📤 Join request published for ${team.name} (event: ${result.eventId})`);
+            console.log(
+              `📤 Join request published for ${team.name} (event: ${result.eventId})`
+            );
           } else {
             console.warn(`⚠️ Failed to publish join request: ${result.error}`);
             // Don't show error to user - they're already "joined" locally
@@ -259,10 +265,12 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
         }
       };
       refreshCache(); // Don't await - let it run in background
-
     } catch (error) {
       console.error('Failed to join team:', error);
-      CustomAlertManager.alert('Error', 'Failed to join team. Please try again.');
+      CustomAlertManager.alert(
+        'Error',
+        'Failed to join team. Please try again.'
+      );
       setIsMember(false);
     } finally {
       setIsJoining(false);
@@ -279,10 +287,9 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
         '[SimpleTeamScreen] 🔄 Pull-to-refresh: Fetching leaderboards for team:',
         team.id
       );
-      const dailyLeaderboards = await SimpleLeaderboardService.getTeamDailyLeaderboards(team.id);
-      console.log(
-        '[SimpleTeamScreen] ✅ Pull-to-refresh: Leaderboards loaded'
-      );
+      const dailyLeaderboards =
+        await SimpleLeaderboardService.getTeamDailyLeaderboards(team.id);
+      console.log('[SimpleTeamScreen] ✅ Pull-to-refresh: Leaderboards loaded');
       setLeaderboards(dailyLeaderboards);
     } catch (error) {
       console.error('[SimpleTeamScreen] ❌ Pull-to-refresh error:', error);
@@ -345,20 +352,16 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
 
           {/* Only show About section if description exists, is not empty, and is not the team name */}
           {team.description &&
-           team.description.trim() !== '' &&
-           team.description !== team.name && (
-            <View style={styles.descriptionCard}>
-              <Text style={styles.sectionLabel}>About</Text>
-              <Text style={styles.description}>{team.description}</Text>
-            </View>
-          )}
+            team.description.trim() !== '' &&
+            team.description !== team.name && (
+              <View style={styles.descriptionCard}>
+                <Text style={styles.sectionLabel}>About</Text>
+                <Text style={styles.description}>{team.description}</Text>
+              </View>
+            )}
 
           {/* Charity Section - Display team's supported charity */}
-          {team.charityId && (
-            <CharitySection
-              charityId={team.charityId}
-            />
-          )}
+          {team.charityId && <CharitySection charityId={team.charityId} />}
 
           {/* REMOVED: Team Stats - teams are bookmarks, no membership count or status needed */}
 
@@ -378,15 +381,23 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
             {/* Competition Team Button */}
             {showJoinButton && !isCompetitionTeam && (
               <TouchableOpacity
-                style={[styles.joinButton, isJoining && styles.joinButtonDisabled]}
+                style={[
+                  styles.joinButton,
+                  isJoining && styles.joinButtonDisabled,
+                ]}
                 activeOpacity={0.8}
                 onPress={handleJoinTeam}
                 disabled={isJoining}
               >
                 {isJoining ? (
-                  <ActivityIndicator color={theme.colors.background} size="small" />
+                  <ActivityIndicator
+                    color={theme.colors.background}
+                    size="small"
+                  />
                 ) : (
-                  <Text style={styles.joinButtonText}>Compete on This Team</Text>
+                  <Text style={styles.joinButtonText}>
+                    Compete on This Team
+                  </Text>
                 )}
               </TouchableOpacity>
             )}
@@ -399,7 +410,9 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                   size={20}
                   color={theme.colors.success}
                 />
-                <Text style={styles.memberBadgeText}>Your Competition Team</Text>
+                <Text style={styles.memberBadgeText}>
+                  Your Competition Team
+                </Text>
               </View>
             )}
           </View>
@@ -427,12 +440,11 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                 </View>
               ))}
             </View>
-          ) : !leaderboards || (
-            leaderboards.leaderboard5k.length === 0 &&
-            leaderboards.leaderboard10k.length === 0 &&
-            leaderboards.leaderboardHalf.length === 0 &&
-            leaderboards.leaderboardMarathon.length === 0
-          ) ? (
+          ) : !leaderboards ||
+            (leaderboards.leaderboard5k.length === 0 &&
+              leaderboards.leaderboard10k.length === 0 &&
+              leaderboards.leaderboardHalf.length === 0 &&
+              leaderboards.leaderboardMarathon.length === 0) ? (
             <View style={styles.emptyContainer}>
               <Ionicons
                 name="trophy-outline"

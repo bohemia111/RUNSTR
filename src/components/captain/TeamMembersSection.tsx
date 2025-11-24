@@ -65,9 +65,11 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
       return;
     }
 
-    const enriched: EnrichedMember[] = members.map(pubkey => ({
+    const enriched: EnrichedMember[] = members.map((pubkey) => ({
       pubkey,
-      name: profiles.get(pubkey)?.name || `${pubkey.slice(0, 8)}...${pubkey.slice(-8)}`,
+      name:
+        profiles.get(pubkey)?.name ||
+        `${pubkey.slice(0, 8)}...${pubkey.slice(-8)}`,
       picture: profiles.get(pubkey)?.picture,
     }));
 

@@ -53,7 +53,10 @@ import { PPQAPIKeyModal } from '../components/ai/PPQAPIKeyModal';
 import { useCoachRunstr } from '../services/ai/useCoachRunstr';
 import { ModelManager, type AIModel } from '../services/ai/ModelManager';
 import { LocalTeamMembershipService } from '../services/team/LocalTeamMembershipService';
-import { TeamMembershipService, type LocalMembership } from '../services/team/teamMembershipService';
+import {
+  TeamMembershipService,
+  type LocalMembership,
+} from '../services/team/teamMembershipService';
 import { TeamSelectionModal } from '../components/team/TeamSelectionModal';
 import { useNavigationData } from '../contexts/NavigationDataContext';
 
@@ -120,7 +123,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     includeSplits: false,
     announceLiveSplits: false,
   });
-  const [backgroundTrackingEnabled, setBackgroundTrackingEnabled] = useState(false);
+  const [backgroundTrackingEnabled, setBackgroundTrackingEnabled] =
+    useState(false);
 
   // Competition Team state
   const [competitionTeam, setCompetitionTeam] = useState<string | null>(null);
@@ -134,7 +138,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   // Coach RUNSTR AI state
   const [showPPQModal, setShowPPQModal] = useState(false);
   const { apiKeyConfigured } = useCoachRunstr();
-  const [selectedAIModel, setSelectedAIModel] = useState<string>('claude-haiku-4.5');
+  const [selectedAIModel, setSelectedAIModel] =
+    useState<string>('claude-haiku-4.5');
   const [showModelPicker, setShowModelPicker] = useState(false);
 
   // NWC Wallet state
@@ -176,15 +181,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   useEffect(() => {
     if (profileData?.teams && Array.isArray(profileData.teams)) {
       const navigationTeams = profileData.teams;
-      const localMemberships: LocalMembership[] = navigationTeams.map((team: any) => ({
-        teamId: team.id,
-        teamName: team.name,
-        captainPubkey: team.captainPubkey || team.captain || '',
-        joinedAt: team.joinedAt || Date.now(),
-        status: team.role === 'captain' ? 'official' : (team.status || 'local'),
-      }));
+      const localMemberships: LocalMembership[] = navigationTeams.map(
+        (team: any) => ({
+          teamId: team.id,
+          teamName: team.name,
+          captainPubkey: team.captainPubkey || team.captain || '',
+          joinedAt: team.joinedAt || Date.now(),
+          status: team.role === 'captain' ? 'official' : team.status || 'local',
+        })
+      );
 
-      console.log(`[SettingsScreen] Loaded ${localMemberships.length} teams from NavigationDataContext (including captain teams)`);
+      console.log(
+        `[SettingsScreen] Loaded ${localMemberships.length} teams from NavigationDataContext (including captain teams)`
+      );
       setFollowedTeams(localMemberships);
     } else {
       console.log('[SettingsScreen] No teams found in NavigationDataContext');
@@ -226,7 +235,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       // Check if background step tracking is available and enabled
       const available = await dailyStepCounterService.isAvailable();
       if (available) {
-        const permissionStatus = await dailyStepCounterService.checkPermissionStatus();
+        const permissionStatus =
+          await dailyStepCounterService.checkPermissionStatus();
         setBackgroundTrackingEnabled(permissionStatus === 'granted');
       }
 
@@ -235,7 +245,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       setSelectedCharity(charity);
 
       // Load competition team
-      const currentCompetitionTeam = await LocalTeamMembershipService.getCompetitionTeam();
+      const currentCompetitionTeam =
+        await LocalTeamMembershipService.getCompetitionTeam();
       setCompetitionTeam(currentCompetitionTeam);
 
       // Load selected AI model
@@ -254,7 +265,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       if (result.balance !== undefined) {
         setWalletBalance(result.balance);
       } else if (result.error) {
-        console.error('[Settings] Failed to load wallet balance:', result.error);
+        console.error(
+          '[Settings] Failed to load wallet balance:',
+          result.error
+        );
       }
     } catch (error) {
       console.error('[Settings] Error loading wallet balance:', error);
@@ -307,14 +321,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         setAlertTitle('Permission Required');
         setAlertMessage(
           'Background step tracking requires motion permission to automatically count steps throughout the day.\n\n' +
-          'You can enable this permission in your device settings.'
+            'You can enable this permission in your device settings.'
         );
         setAlertButtons([
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Open Settings',
-            onPress: () => dailyStepCounterService.openSettings()
-          }
+            onPress: () => dailyStepCounterService.openSettings(),
+          },
         ]);
         setAlertVisible(true);
       }
@@ -500,7 +514,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       // Only handle NWC QR codes in Settings
       if (qrData.type === 'nwc') {
         // Validate NWC data before setting state
-        if (!qrData.connectionString || typeof qrData.connectionString !== 'string') {
+        if (
+          !qrData.connectionString ||
+          typeof qrData.connectionString !== 'string'
+        ) {
           throw new Error('Invalid NWC connection string');
         }
         setScannedNWCString(qrData.connectionString);
@@ -604,7 +621,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setAlertMessage(
       teamId
         ? `Your workouts will appear on ${
-            followedTeams.find((t) => t.teamId === teamId)?.teamName || 'this team'
+            followedTeams.find((t) => t.teamId === teamId)?.teamName ||
+            'this team'
           }'s leaderboards`
         : 'Your workouts will not appear on any team leaderboards'
     );
@@ -624,7 +642,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             console.error('Error changing competition team:', error);
             setTimeout(() => {
               setAlertTitle('Error');
-              setAlertMessage('Failed to change competition team. Please try again.');
+              setAlertMessage(
+                'Failed to change competition team. Please try again.'
+              );
               setAlertButtons([{ text: 'OK' }]);
               setAlertVisible(true);
             }, 100);
@@ -745,7 +765,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               {/* Background Step Tracking */}
               <View style={styles.settingItem}>
                 <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Background Step Tracking</Text>
+                  <Text style={styles.settingTitle}>
+                    Background Step Tracking
+                  </Text>
                   <Text style={styles.settingSubtitle}>
                     Automatically count steps throughout the day
                   </Text>
@@ -753,7 +775,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <Switch
                   value={backgroundTrackingEnabled}
                   onValueChange={handleBackgroundTrackingToggle}
-                  trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                  trackColor={{
+                    false: theme.colors.warning,
+                    true: theme.colors.accent,
+                  }}
                   thumbColor={theme.colors.orangeBright}
                 />
               </View>
@@ -770,7 +795,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
         {/* Competition Settings Accordion */}
         <View style={styles.section}>
-          <SettingsAccordion title="COMPETITION SETTINGS" defaultExpanded={false}>
+          <SettingsAccordion
+            title="COMPETITION SETTINGS"
+            defaultExpanded={false}
+          >
             <Card style={styles.accordionCard}>
               {/* Competition Team */}
               <TouchableOpacity
@@ -844,9 +872,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 rightElement={
                   <View style={styles.securityIcon}>
                     <Ionicons
-                      name={apiKeyConfigured ? 'checkmark-circle' : 'add-circle-outline'}
+                      name={
+                        apiKeyConfigured
+                          ? 'checkmark-circle'
+                          : 'add-circle-outline'
+                      }
                       size={20}
-                      color={apiKeyConfigured ? '#FF9D42' : theme.colors.textMuted}
+                      color={
+                        apiKeyConfigured ? '#FF9D42' : theme.colors.textMuted
+                      }
                     />
                   </View>
                 }
@@ -887,7 +921,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     onValueChange={(value) =>
                       handleTTSSettingChange('enabled', value)
                     }
-                    trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                    trackColor={{
+                      false: theme.colors.warning,
+                      true: theme.colors.accent,
+                    }}
                     thumbColor={theme.colors.orangeBright}
                   />
                 </View>
@@ -905,7 +942,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     onValueChange={(value) =>
                       handleTTSSettingChange('announceOnSummary', value)
                     }
-                    trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                    trackColor={{
+                      false: theme.colors.warning,
+                      true: theme.colors.accent,
+                    }}
                     thumbColor={theme.colors.orangeBright}
                     disabled={!ttsSettings.enabled}
                   />
@@ -914,7 +954,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 {/* Include Splits */}
                 <View style={styles.settingItem}>
                   <View style={styles.settingInfo}>
-                    <Text style={styles.settingTitle}>Include Split Details</Text>
+                    <Text style={styles.settingTitle}>
+                      Include Split Details
+                    </Text>
                     <Text style={styles.settingSubtitle}>
                       Announce kilometer splits in summary
                     </Text>
@@ -924,7 +966,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     onValueChange={(value) =>
                       handleTTSSettingChange('includeSplits', value)
                     }
-                    trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                    trackColor={{
+                      false: theme.colors.warning,
+                      true: theme.colors.accent,
+                    }}
                     thumbColor={theme.colors.orangeBright}
                     disabled={!ttsSettings.enabled}
                   />
@@ -945,7 +990,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     onValueChange={(value) =>
                       handleTTSSettingChange('announceLiveSplits', value)
                     }
-                    trackColor={{ false: theme.colors.warning, true: theme.colors.accent }}
+                    trackColor={{
+                      false: theme.colors.warning,
+                      true: theme.colors.accent,
+                    }}
                     thumbColor={theme.colors.orangeBright}
                     disabled={!ttsSettings.enabled}
                   />
@@ -1129,7 +1177,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                       Connect Your Wallet
                     </Text>
                     <Text style={styles.connectWalletDescription}>
-                      Connect a Lightning wallet via Nostr Wallet Connect (NWC) to send and receive Bitcoin payments
+                      Connect a Lightning wallet via Nostr Wallet Connect (NWC)
+                      to send and receive Bitcoin payments
                     </Text>
 
                     {/* Two connection options */}
@@ -1151,7 +1200,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
                     <TouchableOpacity
                       key="manual-entry-button"
-                      style={[styles.connectWalletButton, styles.connectWalletButtonSecondary]}
+                      style={[
+                        styles.connectWalletButton,
+                        styles.connectWalletButtonSecondary,
+                      ]}
                       onPress={() => setShowWalletConfig(true)}
                     >
                       <Ionicons
@@ -1160,7 +1212,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         color={theme.colors.text}
                         style={{ marginRight: 8 }}
                       />
-                      <Text style={[styles.connectWalletButtonText, styles.connectWalletButtonTextSecondary]}>
+                      <Text
+                        style={[
+                          styles.connectWalletButtonText,
+                          styles.connectWalletButtonTextSecondary,
+                        ]}
+                      >
                         Enter Manually
                       </Text>
                     </TouchableOpacity>
@@ -1226,9 +1283,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 </Text>
               </View>
             ) : (
-              <Text style={styles.deleteAccountButtonText}>
-                Delete Account
-              </Text>
+              <Text style={styles.deleteAccountButtonText}>Delete Account</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -1287,14 +1342,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   key={model.id}
                   style={[
                     styles.modelItem,
-                    selectedAIModel === model.id && styles.modelItemSelected
+                    selectedAIModel === model.id && styles.modelItemSelected,
                   ]}
                   onPress={() => handleModelSelect(model.id)}
                 >
-                  <Text style={[
-                    styles.modelName,
-                    selectedAIModel === model.id && styles.modelNameSelected
-                  ]}>
+                  <Text
+                    style={[
+                      styles.modelName,
+                      selectedAIModel === model.id && styles.modelNameSelected,
+                    ]}
+                  >
                     {model.name}
                   </Text>
                   {selectedAIModel === model.id && (

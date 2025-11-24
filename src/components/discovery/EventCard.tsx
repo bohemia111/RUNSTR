@@ -191,9 +191,7 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
           entryFeesSats={event.entryFeesSats}
           participantCount={event.maxParticipants || 0}
           paymentDestination={
-            'paymentDestination' in event
-              ? event.paymentDestination
-              : undefined
+            'paymentDestination' in event ? event.paymentDestination : undefined
           }
           paymentRecipientName={
             'paymentRecipientName' in event

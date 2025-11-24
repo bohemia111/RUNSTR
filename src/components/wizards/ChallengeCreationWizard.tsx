@@ -26,7 +26,10 @@ import {
   DURATION_OPTIONS,
   getChallengeName,
 } from '../../constants/simpleChallengePresets';
-import { ChallengeTargetStep, type ChallengeTarget } from './steps/ChallengeTargetStep';
+import {
+  ChallengeTargetStep,
+  type ChallengeTarget,
+} from './steps/ChallengeTargetStep';
 import { ChooseOpponentStep } from './steps/ChooseOpponentStep';
 import { ChallengeQRStep } from './steps/ChallengeQRStep';
 import type { TeammateInfo, ChallengeCreationData } from '../../types';
@@ -53,7 +56,9 @@ interface ChallengeFormData {
   challengeId?: string;
 }
 
-export const ChallengeCreationWizard: React.FC<ChallengeCreationWizardProps> = ({
+export const ChallengeCreationWizard: React.FC<
+  ChallengeCreationWizardProps
+> = ({
   onComplete,
   onCancel,
   teammates: providedTeammates,
@@ -113,7 +118,9 @@ export const ChallengeCreationWizard: React.FC<ChallengeCreationWizardProps> = (
           setCurrentStep('opponent');
         } else {
           // QR flow - generate challenge ID and show QR
-          const challengeId = `challenge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const challengeId = `challenge-${Date.now()}-${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
           setFormData((prev) => ({ ...prev, challengeId }));
           setCurrentStep('qr');
         }
@@ -163,12 +170,9 @@ export const ChallengeCreationWizard: React.FC<ChallengeCreationWizardProps> = (
     }
   };
 
-  const updateFormData = useCallback(
-    (updates: Partial<ChallengeFormData>) => {
-      setFormData((prev) => ({ ...prev, ...updates }));
-    },
-    []
-  );
+  const updateFormData = useCallback((updates: Partial<ChallengeFormData>) => {
+    setFormData((prev) => ({ ...prev, ...updates }));
+  }, []);
 
   // Prepare QR challenge data
   const getQRChallengeData = (): ChallengeDeepLinkData | null => {
@@ -360,7 +364,10 @@ export const ChallengeCreationWizard: React.FC<ChallengeCreationWizardProps> = (
     }
   };
 
-  const canGoBack = currentStep !== 'type_config' && currentStep !== 'success' && currentStep !== 'qr';
+  const canGoBack =
+    currentStep !== 'type_config' &&
+    currentStep !== 'success' &&
+    currentStep !== 'qr';
   const showNextButton = currentStep !== 'qr' && currentStep !== 'success';
 
   return (

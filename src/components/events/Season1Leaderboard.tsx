@@ -40,7 +40,10 @@ export const Season1LeaderboardComponent: React.FC<Season1LeaderboardProps> = ({
     null
   );
   const [charityModalVisible, setCharityModalVisible] = useState(false);
-  const [selectedCharity, setSelectedCharity] = useState<{ name: string; address: string } | null>(null);
+  const [selectedCharity, setSelectedCharity] = useState<{
+    name: string;
+    address: string;
+  } | null>(null);
 
   // Get current user's pubkey
   useEffect(() => {

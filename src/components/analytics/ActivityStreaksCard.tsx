@@ -21,7 +21,11 @@ export const ActivityStreaksCard: React.FC<ActivityStreaksCardProps> = ({
   if (streaks.length === 0) {
     return (
       <View style={styles.emptyCard}>
-        <Ionicons name="flame-outline" size={48} color={theme.colors.textMuted} />
+        <Ionicons
+          name="flame-outline"
+          size={48}
+          color={theme.colors.textMuted}
+        />
         <Text style={styles.emptyText}>
           Start working out to build streaks!
         </Text>
@@ -49,7 +53,8 @@ export const ActivityStreaksCard: React.FC<ActivityStreaksCardProps> = ({
                 )}
               </Text>
               <Text style={styles.totalWorkouts}>
-                {streak.totalWorkouts} workout{streak.totalWorkouts !== 1 ? 's' : ''}
+                {streak.totalWorkouts} workout
+                {streak.totalWorkouts !== 1 ? 's' : ''}
               </Text>
             </View>
 

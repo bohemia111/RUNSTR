@@ -76,7 +76,12 @@ export const EventAnnouncementPreview: React.FC<
 
   // Generate card when modal becomes visible
   useEffect(() => {
-    console.log('🟣 [EventModal] useEffect triggered - visible:', visible, 'eventData:', !!eventData);
+    console.log(
+      '🟣 [EventModal] useEffect triggered - visible:',
+      visible,
+      'eventData:',
+      !!eventData
+    );
     if (visible && eventData) {
       generateCard();
     }
@@ -91,7 +96,10 @@ export const EventAnnouncementPreview: React.FC<
       console.log('📋 Event data received:', eventData);
 
       // ✅ FIX: The default export is already an instance, not the class
-      const cardData = await EventAnnouncementCardGenerator.generateAnnouncementCard(eventData);
+      const cardData =
+        await EventAnnouncementCardGenerator.generateAnnouncementCard(
+          eventData
+        );
 
       setSvgContent(cardData.svgContent);
       setDeepLink(cardData.deepLink);
@@ -139,7 +147,9 @@ export const EventAnnouncementPreview: React.FC<
       const signer = await signingService.getSigner();
 
       if (!signer) {
-        throw new Error('No signer available. Please ensure you are logged in.');
+        throw new Error(
+          'No signer available. Please ensure you are logged in.'
+        );
       }
 
       const userPubkey = await signingService.getUserPubkey();
@@ -156,8 +166,16 @@ export const EventAnnouncementPreview: React.FC<
         day: 'numeric',
       })}
 ${eventData.activityType ? `${eventData.activityType}` : ''}
-${eventData.entryFee ? `💰 Entry: ${eventData.entryFee.toLocaleString()} sats` : '🆓 Free event'}
-${eventData.prizePool ? `🏆 Prize: ${eventData.prizePool.toLocaleString()} sats` : ''}
+${
+  eventData.entryFee
+    ? `💰 Entry: ${eventData.entryFee.toLocaleString()} sats`
+    : '🆓 Free event'
+}
+${
+  eventData.prizePool
+    ? `🏆 Prize: ${eventData.prizePool.toLocaleString()} sats`
+    : ''
+}
 
 Join here: ${deepLink}
 
@@ -203,7 +221,9 @@ Join here: ${deepLink}
       );
       Alert.alert(
         'Error',
-        `Failed to publish announcement: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Failed to publish announcement: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
         [{ text: 'OK' }]
       );
     } finally {
@@ -217,7 +237,9 @@ Join here: ${deepLink}
   };
 
   const handlePublishEvent = async () => {
-    console.log('🚀 [Modal] USER CLICKED "PUBLISH EVENT" BUTTON - NOW publishing to Nostr...');
+    console.log(
+      '🚀 [Modal] USER CLICKED "PUBLISH EVENT" BUTTON - NOW publishing to Nostr...'
+    );
     try {
       // Validate required data
       if (!eventCreationData || !signer || !captainPubkey || !teamId) {
@@ -287,7 +309,9 @@ Join here: ${deepLink}
       );
       Alert.alert(
         'Error',
-        `Failed to publish event: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Failed to publish event: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
         [{ text: 'OK' }]
       );
     } finally {
@@ -378,7 +402,11 @@ Join here: ${deepLink}
                 ) : (
                   <>
                     <Ionicons
-                      name={eventPublished ? 'checkmark-circle' : 'cloud-upload-outline'}
+                      name={
+                        eventPublished
+                          ? 'checkmark-circle'
+                          : 'cloud-upload-outline'
+                      }
                       size={20}
                       color="#000000"
                       style={styles.buttonIcon}
@@ -406,7 +434,9 @@ Join here: ${deepLink}
                 ) : (
                   <>
                     <Ionicons
-                      name={socialShared ? 'checkmark-circle' : 'chatbubble-outline'}
+                      name={
+                        socialShared ? 'checkmark-circle' : 'chatbubble-outline'
+                      }
                       size={20}
                       color="#000000"
                       style={styles.buttonIcon}
@@ -422,10 +452,12 @@ Join here: ${deepLink}
             {/* Helper Text */}
             <View style={styles.helperTextContainer}>
               <Text style={styles.helperText}>
-                <Text style={styles.helperTextBold}>Publish Event:</Text> Make event live and enable signups
+                <Text style={styles.helperTextBold}>Publish Event:</Text> Make
+                event live and enable signups
               </Text>
               <Text style={styles.helperText}>
-                <Text style={styles.helperTextBold}>Share to Nostr:</Text> Announce on social (optional)
+                <Text style={styles.helperTextBold}>Share to Nostr:</Text>{' '}
+                Announce on social (optional)
               </Text>
             </View>
 

@@ -61,7 +61,9 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
   const recipientHex = React.useMemo(() => {
     // If it's a Lightning address, don't try to convert it
     if (recipientNpub && recipientNpub.includes('@')) {
-      console.log('[EnhancedZapModal] Lightning address detected, skipping npub conversion');
+      console.log(
+        '[EnhancedZapModal] Lightning address detected, skipping npub conversion'
+      );
       return recipientNpub;
     }
 
@@ -158,7 +160,10 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
       // Check if recipientNpub is actually a Lightning address (contains @)
       if (recipientNpub && recipientNpub.includes('@')) {
         // It's a Lightning address - send directly via NWC wallet
-        console.log('[ZapModal] Direct Lightning address payment:', recipientNpub);
+        console.log(
+          '[ZapModal] Direct Lightning address payment:',
+          recipientNpub
+        );
 
         try {
           // Get invoice from Lightning address
@@ -183,8 +188,10 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
           }
         } catch (error) {
           console.error('[ZapModal] Direct Lightning payment failed:', error);
-          Alert.alert('Payment Failed',
-            error instanceof Error ? error.message : 'Failed to send payment');
+          Alert.alert(
+            'Payment Failed',
+            error instanceof Error ? error.message : 'Failed to send payment'
+          );
         }
       } else {
         // It's a Nostr pubkey - use normal flow
@@ -290,9 +297,10 @@ export const EnhancedZapModal: React.FC<EnhancedZapModalProps> = ({
               <Text style={styles.recipientLabel}>Sending to:</Text>
               <Text style={styles.recipientName}>{recipientName}</Text>
               <Text style={styles.recipientPubkey}>
-                {displayNpub.includes('@')
-                  ? displayNpub  // Show full Lightning address
-                  : `${displayNpub.slice(0, 16)}...`  // Truncate npub/hex
+                {
+                  displayNpub.includes('@')
+                    ? displayNpub // Show full Lightning address
+                    : `${displayNpub.slice(0, 16)}...` // Truncate npub/hex
                 }
               </Text>
             </View>

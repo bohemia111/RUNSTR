@@ -131,7 +131,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
           // ❌ DISABLED: Background notification subscriptions causing Android crashes
           // All notification handlers now query on-demand instead of persistent subscriptions
-          console.log('[ProfileScreen] ⚠️  Background notification subscriptions DISABLED for stability');
+          console.log(
+            '[ProfileScreen] ⚠️  Background notification subscriptions DISABLED for stability'
+          );
 
           /* COMMENTED OUT FOR ANDROID STABILITY:
           challengeNotificationHandler.startListening().catch((err) => {

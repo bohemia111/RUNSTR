@@ -26,11 +26,7 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
   onPress,
 }) => {
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.iconContainer}>
@@ -50,12 +46,10 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
       {/* Stats Row */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <Ionicons
-            name="people"
-            size={16}
-            color={theme.colors.textMuted}
-          />
-          <Text style={styles.statText}>{participants} {participants === 1 ? 'runner' : 'runners'}</Text>
+          <Ionicons name="people" size={16} color={theme.colors.textMuted} />
+          <Text style={styles.statText}>
+            {participants} {participants === 1 ? 'runner' : 'runners'}
+          </Text>
         </View>
       </View>
 

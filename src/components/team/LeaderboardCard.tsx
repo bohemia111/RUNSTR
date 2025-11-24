@@ -19,7 +19,10 @@ export const LeaderboardCard: React.FC<LeaderboardCardProps> = ({
   title = 'League',
 }) => {
   const [charityModalVisible, setCharityModalVisible] = useState(false);
-  const [selectedCharity, setSelectedCharity] = useState<{ name: string; address: string } | null>(null);
+  const [selectedCharity, setSelectedCharity] = useState<{
+    name: string;
+    address: string;
+  } | null>(null);
 
   const handleCharityZap = async () => {
     try {

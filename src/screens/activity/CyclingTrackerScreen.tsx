@@ -83,7 +83,9 @@ export const CyclingTrackerScreen: React.FC = () => {
     const unsubscribe = appStateManager.onStateChange((isActive) => {
       if (!isActive) {
         // App going to background - clear timers to prevent crashes
-        console.log('[CyclingTrackerScreen] App backgrounding, clearing timers...');
+        console.log(
+          '[CyclingTrackerScreen] App backgrounding, clearing timers...'
+        );
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
@@ -94,7 +96,9 @@ export const CyclingTrackerScreen: React.FC = () => {
         }
       } else if (isActive && isTrackingRef.current) {
         // App returned to foreground while tracking - restart timers and sync
-        console.log('[CyclingTrackerScreen] App returned to foreground, restarting timers and syncing...');
+        console.log(
+          '[CyclingTrackerScreen] App returned to foreground, restarting timers and syncing...'
+        );
 
         // Restart timers
         if (!timerRef.current) {
@@ -129,14 +133,20 @@ export const CyclingTrackerScreen: React.FC = () => {
             distance: activityMetricsService.formatDistance(session.distance),
             duration: activityMetricsService.formatDuration(currentElapsed),
             speed: activityMetricsService.formatSpeed(speed),
-            elevation: activityMetricsService.formatElevation(session.elevationGain),
+            elevation: activityMetricsService.formatElevation(
+              session.elevationGain
+            ),
           });
           setElapsedTime(currentElapsed);
           setCurrentSpeed(speed);
 
           console.log(
-            `[CyclingTrackerScreen] ✅ Synced: ${(session.distance / 1000).toFixed(2)} km, ` +
-            `${currentElapsed}s, ${speed.toFixed(1)} km/h, tracking continued in background`
+            `[CyclingTrackerScreen] ✅ Synced: ${(
+              session.distance / 1000
+            ).toFixed(2)} km, ` +
+              `${currentElapsed}s, ${speed.toFixed(
+                1
+              )} km/h, tracking continued in background`
           );
         }
       }
@@ -208,7 +218,9 @@ export const CyclingTrackerScreen: React.FC = () => {
     // Initialize route matching if a route is selected
     if (selectedRoute) {
       routeMatchingService.startMatching(selectedRoute);
-      console.log(`[CyclingTrackerScreen] Started route matching for: ${selectedRoute.name}`);
+      console.log(
+        `[CyclingTrackerScreen] Started route matching for: ${selectedRoute.name}`
+      );
     }
 
     timerRef.current = setInterval(() => {
@@ -309,7 +321,7 @@ export const CyclingTrackerScreen: React.FC = () => {
     );
 
     // Convert LocationPoint[] to GPSCoordinate[] for route saving
-    const gpsCoordinates = session.positions.map(point => ({
+    const gpsCoordinates = session.positions.map((point) => ({
       latitude: point.latitude,
       longitude: point.longitude,
       altitude: point.altitude,

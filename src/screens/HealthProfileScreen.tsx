@@ -122,7 +122,11 @@ export const HealthProfileScreen: React.FC = () => {
         {/* Privacy Notice */}
         <View style={styles.privacyCard}>
           <View style={styles.privacyHeader}>
-            <Ionicons name="lock-closed" size={24} color={theme.colors.orangeBright} />
+            <Ionicons
+              name="lock-closed"
+              size={24}
+              color={theme.colors.orangeBright}
+            />
             <Text style={styles.privacyTitle}>Your Data Stays Private</Text>
           </View>
           <Text style={styles.privacyText}>

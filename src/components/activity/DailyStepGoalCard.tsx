@@ -4,7 +4,13 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import type { StepGoalProgress } from '../../services/activity/DailyStepGoalService';
@@ -50,7 +56,11 @@ export const DailyStepGoalCard: React.FC<DailyStepGoalCardProps> = ({
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Today's Steps</Text>
-        <ActivityIndicator size="large" color={theme.colors.accent} style={{ marginVertical: 20 }} />
+        <ActivityIndicator
+          size="large"
+          color={theme.colors.accent}
+          style={{ marginVertical: 20 }}
+        />
         <Text style={styles.loadingText}>Loading step count...</Text>
       </View>
     );
@@ -81,7 +91,12 @@ export const DailyStepGoalCard: React.FC<DailyStepGoalCardProps> = ({
         <View style={styles.textContent}>
           <View style={styles.stepCountRow}>
             {displayProgress.achieved && (
-              <Ionicons name="checkmark-circle" size={14} color={theme.colors.accent} style={styles.checkmarkInline} />
+              <Ionicons
+                name="checkmark-circle"
+                size={14}
+                color={theme.colors.accent}
+                style={styles.checkmarkInline}
+              />
             )}
             <Text style={styles.stepCount}>{formatSteps(displaySteps)}</Text>
             <Text style={styles.stepLabel}> steps</Text>
@@ -110,7 +125,11 @@ export const DailyStepGoalCard: React.FC<DailyStepGoalCardProps> = ({
               onPress={onSetGoal}
               activeOpacity={0.7}
             >
-              <Ionicons name="trophy-outline" size={14} color={theme.colors.accent} />
+              <Ionicons
+                name="trophy-outline"
+                size={14}
+                color={theme.colors.accent}
+              />
               <Text style={styles.goalButtonText}>Set Goal</Text>
             </TouchableOpacity>
           )}
@@ -129,14 +148,23 @@ export const DailyStepGoalCard: React.FC<DailyStepGoalCardProps> = ({
               ) : (
                 <>
                   <Ionicons
-                    name={postingState === 'posted' ? 'checkmark-circle' : 'chatbubble-outline'}
+                    name={
+                      postingState === 'posted'
+                        ? 'checkmark-circle'
+                        : 'chatbubble-outline'
+                    }
                     size={14}
-                    color={postingState === 'posted' ? theme.colors.textMuted : theme.colors.text}
+                    color={
+                      postingState === 'posted'
+                        ? theme.colors.textMuted
+                        : theme.colors.text
+                    }
                   />
                   <Text
                     style={[
                       styles.goalButtonText,
-                      postingState === 'posted' && styles.postButtonTextDisabled,
+                      postingState === 'posted' &&
+                        styles.postButtonTextDisabled,
                     ]}
                   >
                     {postingState === 'posted' ? 'Posted' : 'Post'}
@@ -151,7 +179,11 @@ export const DailyStepGoalCard: React.FC<DailyStepGoalCardProps> = ({
       {/* Background Active Badge */}
       {isBackgroundActive && (
         <View style={styles.backgroundActiveBadge}>
-          <Ionicons name="refresh-circle" size={16} color={theme.colors.accent} />
+          <Ionicons
+            name="refresh-circle"
+            size={16}
+            color={theme.colors.accent}
+          />
           <Text style={styles.backgroundActiveText}>Auto-counting enabled</Text>
         </View>
       )}
@@ -180,9 +212,7 @@ export const DailyStepGoalCard: React.FC<DailyStepGoalCardProps> = ({
 
       {/* Error hint (non-blocking) */}
       {error && !isBackgroundActive && (
-        <Text style={styles.errorHint}>
-          {error}
-        </Text>
+        <Text style={styles.errorHint}>{error}</Text>
       )}
     </View>
   );

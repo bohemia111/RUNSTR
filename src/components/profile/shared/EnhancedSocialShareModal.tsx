@@ -50,8 +50,7 @@ export const EnhancedSocialShareModal: React.FC<
   onSuccess,
 }) => {
   const [loading, setLoading] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] =
-    useState<Template>('elegant');
+  const [selectedTemplate, setSelectedTemplate] = useState<Template>('elegant');
   const [cardSvg, setCardSvg] = useState<string>('');
   const [cardDimensions, setCardDimensions] = useState({
     width: 800,
@@ -75,7 +74,9 @@ export const EnhancedSocialShareModal: React.FC<
     try {
       const userSigner = await UnifiedSigningService.getInstance().getSigner();
       setSigner(userSigner);
-      console.log('✅ Signer loaded for social share (supports both nsec and Amber)');
+      console.log(
+        '✅ Signer loaded for social share (supports both nsec and Amber)'
+      );
     } catch (error) {
       console.error('Failed to load signer:', error);
       // Signer will be null - we'll fall back to nsec in handleShare
@@ -142,13 +143,17 @@ export const EnhancedSocialShareModal: React.FC<
         // Fall back to nsec (required for iOS since Amber not supported)
         const nsec = await getNsecFromStorage(userId);
         if (!nsec) {
-          console.error('❌ Authentication required - no signer or nsec available');
+          console.error(
+            '❌ Authentication required - no signer or nsec available'
+          );
           // Error handling delegated to parent component
           setLoading(false);
           return;
         }
         signerOrNsec = nsec;
-        console.log('📝 Using nsec for social post (iOS or Amber not available)');
+        console.log(
+          '📝 Using nsec for social post (iOS or Amber not available)'
+        );
       } else {
         console.log('📝 Using Amber signer for social post (Android)');
       }
@@ -197,7 +202,11 @@ export const EnhancedSocialShareModal: React.FC<
         userId,
         {
           includeCard: true,
-          cardTemplate: selectedTemplate as 'achievement' | 'progress' | 'minimal' | 'stats',
+          cardTemplate: selectedTemplate as
+            | 'achievement'
+            | 'progress'
+            | 'minimal'
+            | 'stats',
           includeStats: true,
           includeMotivation: true,
           userAvatar,
@@ -250,7 +259,11 @@ export const EnhancedSocialShareModal: React.FC<
 
     // Get emoji
     const activityEmoji =
-      workout.type === 'meditation' ? '🧘‍♂️' : workout.type === 'running' ? '🏃‍♂️' : '💪';
+      workout.type === 'meditation'
+        ? '🧘‍♂️'
+        : workout.type === 'running'
+        ? '🏃‍♂️'
+        : '💪';
 
     // Format duration
     const duration = formatDurationForDisplay(workout.duration);
@@ -364,10 +377,7 @@ export const EnhancedSocialShareModal: React.FC<
                     },
                   ]}
                 >
-                  <ActivityIndicator
-                    size="large"
-                    color={theme.colors.accent}
-                  />
+                  <ActivityIndicator size="large" color={theme.colors.accent} />
                   <Text style={styles.cardPlaceholderText}>
                     Generating card...
                   </Text>

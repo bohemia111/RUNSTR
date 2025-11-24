@@ -137,7 +137,8 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
             {workout.meditationType && (
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
-                  {workout.meditationType.charAt(0).toUpperCase() + workout.meditationType.slice(1).replace('_', ' ')}
+                  {workout.meditationType.charAt(0).toUpperCase() +
+                    workout.meditationType.slice(1).replace('_', ' ')}
                 </Text>
                 <Text style={styles.statLabel}>Type</Text>
               </View>
@@ -157,7 +158,8 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
             {workout.mealType && (
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
-                  {workout.mealType.charAt(0).toUpperCase() + workout.mealType.slice(1)}
+                  {workout.mealType.charAt(0).toUpperCase() +
+                    workout.mealType.slice(1)}
                 </Text>
                 <Text style={styles.statLabel}>Meal</Text>
               </View>
@@ -165,14 +167,17 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
             {workout.mealSize && (
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
-                  {workout.mealSize.charAt(0).toUpperCase() + workout.mealSize.slice(1)}
+                  {workout.mealSize.charAt(0).toUpperCase() +
+                    workout.mealSize.slice(1)}
                 </Text>
                 <Text style={styles.statLabel}>Size</Text>
               </View>
             )}
             {workout.calories && (
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{workout.calories.toFixed(0)}</Text>
+                <Text style={styles.statValue}>
+                  {workout.calories.toFixed(0)}
+                </Text>
                 <Text style={styles.statLabel}>Calories</Text>
               </View>
             )}
@@ -180,7 +185,9 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
         )}
 
         {/* Cardio (Running, Cycling, Walking): Show duration, distance, calories (default behavior) */}
-        {!['strength_training', 'gym', 'meditation', 'diet'].includes(workout.type) && (
+        {!['strength_training', 'gym', 'meditation', 'diet'].includes(
+          workout.type
+        ) && (
           <>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
@@ -198,7 +205,9 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
             )}
             {workout.calories && (
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{workout.calories.toFixed(0)}</Text>
+                <Text style={styles.statValue}>
+                  {workout.calories.toFixed(0)}
+                </Text>
                 <Text style={styles.statLabel}>Calories</Text>
               </View>
             )}

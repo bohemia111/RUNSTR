@@ -178,20 +178,20 @@ export const MyTeamsScreen: React.FC = () => {
 
       {/* Content - Teams Only */}
       <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.colors.text}
-              colors={[theme.colors.text]}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Show loading state only on initial load */}
-          {isInitialLoad && teams.length === 0 ? (
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.text}
+            colors={[theme.colors.text]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Show loading state only on initial load */}
+        {isInitialLoad && teams.length === 0 ? (
           <View style={styles.loadingState}>
             <ActivityIndicator size="large" color={theme.colors.text} />
             <Text style={styles.loadingText}>Loading your teams...</Text>

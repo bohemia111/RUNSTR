@@ -54,11 +54,7 @@ export const SettingsAccordion: React.FC<SettingsAccordionProps> = ({
         />
       </TouchableOpacity>
 
-      {isExpanded && (
-        <View style={styles.content}>
-          {children}
-        </View>
-      )}
+      {isExpanded && <View style={styles.content}>{children}</View>}
     </View>
   );
 };

@@ -6,7 +6,13 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
 import { theme } from '../../styles/theme';
 import { PublicWorkoutsTab } from './tabs/PublicWorkoutsTab';
 import { PrivateWorkoutsTab } from './tabs/PrivateWorkoutsTab';
@@ -122,13 +128,15 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
 
       {/* Tab Content */}
       <View style={styles.tabContent}>
-        {activeTab === 'public' ? (
+        {/* Only mount the active tab to prevent unnecessary component initialization */}
+        {activeTab === 'public' && (
           <PublicWorkoutsTab
             userId={userId}
             pubkey={pubkey}
             onRefresh={onRefresh}
           />
-        ) : activeTab === 'private' ? (
+        )}
+        {activeTab === 'private' && (
           <PrivateWorkoutsTab
             userId={userId}
             pubkey={pubkey}
@@ -137,13 +145,15 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
             onPostToSocial={onPostToSocial}
             onNavigateToAnalytics={onNavigateToAnalytics}
           />
-        ) : activeTab === 'apple' ? (
+        )}
+        {activeTab === 'apple' && (
           <AppleHealthTab
             userId={userId}
             onCompete={onCompeteHealthKit}
             onSocialShare={onSocialShareHealthKit}
           />
-        ) : (
+        )}
+        {activeTab === 'garmin' && (
           <GarminHealthTab
             userId={userId}
             onCompete={onCompeteGarmin}

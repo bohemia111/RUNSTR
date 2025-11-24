@@ -14,7 +14,10 @@ import { RunstrContextGenerator } from './RunstrContextGenerator';
 import { ModelManager } from './ModelManager';
 
 // In-memory cache for recent analyses
-const ANALYSIS_CACHE = new Map<string, { analysis: string; timestamp: number }>();
+const ANALYSIS_CACHE = new Map<
+  string,
+  { analysis: string; timestamp: number }
+>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export type PromptType = 'weekly' | 'trends' | 'tips';
@@ -38,8 +41,12 @@ function formatWorkoutsForContext(workouts: LocalWorkout[]): string {
     .slice(0, 20);
 
   const formatted = sortedWorkouts.map((w) => {
-    const distance = w.distance ? `${(w.distance / 1000).toFixed(2)}km` : undefined;
-    const duration = w.duration ? `${Math.round(w.duration / 60)}min` : undefined;
+    const distance = w.distance
+      ? `${(w.distance / 1000).toFixed(2)}km`
+      : undefined;
+    const duration = w.duration
+      ? `${Math.round(w.duration / 60)}min`
+      : undefined;
     const pace = w.pace ? `${formatPace(w.pace)}/km` : undefined;
 
     return {
@@ -173,7 +180,9 @@ class CoachClaudeService {
     options?: { useCache?: boolean }
   ): Promise<CoachInsight> {
     if (!this.apiKey) {
-      throw new Error('CoachClaude not initialized. Call initialize() with API key first.');
+      throw new Error(
+        'CoachClaude not initialized. Call initialize() with API key first.'
+      );
     }
 
     const useCache = options?.useCache !== false;
@@ -210,7 +219,7 @@ class CoachClaudeService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
           model: selectedModel,
@@ -277,11 +286,15 @@ class CoachClaudeService {
       if (error instanceof Error) {
         // Handle specific PPQ.AI API errors
         if (error.message.includes('401') || error.message.includes('403')) {
-          throw new Error('Invalid API key. Please check your PPQ.AI API key in Settings.');
+          throw new Error(
+            'Invalid API key. Please check your PPQ.AI API key in Settings.'
+          );
         } else if (error.message.includes('429')) {
           throw new Error('Rate limit exceeded. Please try again in a moment.');
         } else if (error.message.includes('402')) {
-          throw new Error('Insufficient credits. Please add more Bitcoin to your PPQ.AI account.');
+          throw new Error(
+            'Insufficient credits. Please add more Bitcoin to your PPQ.AI account.'
+          );
         }
       }
 

@@ -81,9 +81,14 @@ export const CompetitionParticipantsSection: React.FC<
 
     try {
       // Get private key hex (supports both nsec and Amber)
-      const privateKeyHex = await UnifiedSigningService.getLegacyPrivateKeyHex();
+      const privateKeyHex =
+        await UnifiedSigningService.getLegacyPrivateKeyHex();
       if (!privateKeyHex) {
-        CustomAlertManager.alert('Error', 'Authentication required. Please log in again.', [{ text: 'OK' }]);
+        CustomAlertManager.alert(
+          'Error',
+          'Authentication required. Please log in again.',
+          [{ text: 'OK' }]
+        );
         return;
       }
 
@@ -107,7 +112,11 @@ export const CompetitionParticipantsSection: React.FC<
         throw new Error(result.error || 'Failed to approve participant');
       }
     } catch (error) {
-      CustomAlertManager.alert('Error', 'Failed to approve participant. Please try again.', [{ text: 'OK' }]);
+      CustomAlertManager.alert(
+        'Error',
+        'Failed to approve participant. Please try again.',
+        [{ text: 'OK' }]
+      );
       console.error('Error approving participant:', error);
     } finally {
       setIsProcessing(null);
@@ -119,9 +128,14 @@ export const CompetitionParticipantsSection: React.FC<
 
     try {
       // Get private key hex (supports both nsec and Amber)
-      const privateKeyHex = await UnifiedSigningService.getLegacyPrivateKeyHex();
+      const privateKeyHex =
+        await UnifiedSigningService.getLegacyPrivateKeyHex();
       if (!privateKeyHex) {
-        CustomAlertManager.alert('Error', 'Authentication required. Please log in again.', [{ text: 'OK' }]);
+        CustomAlertManager.alert(
+          'Error',
+          'Authentication required. Please log in again.',
+          [{ text: 'OK' }]
+        );
         return;
       }
 
@@ -145,7 +159,11 @@ export const CompetitionParticipantsSection: React.FC<
         throw new Error(result.error || 'Failed to reject participant');
       }
     } catch (error) {
-      CustomAlertManager.alert('Error', 'Failed to reject participant. Please try again.', [{ text: 'OK' }]);
+      CustomAlertManager.alert(
+        'Error',
+        'Failed to reject participant. Please try again.',
+        [{ text: 'OK' }]
+      );
       console.error('Error rejecting participant:', error);
     } finally {
       setIsProcessing(null);
@@ -171,7 +189,8 @@ export const CompetitionParticipantsSection: React.FC<
 
             try {
               // Get private key hex (supports both nsec and Amber)
-              const privateKeyHex = await UnifiedSigningService.getLegacyPrivateKeyHex();
+              const privateKeyHex =
+                await UnifiedSigningService.getLegacyPrivateKeyHex();
               if (!privateKeyHex) {
                 CustomAlertManager.alert(
                   'Error',

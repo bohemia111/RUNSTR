@@ -30,18 +30,36 @@ export const HealthSnapshotCard: React.FC<HealthSnapshotCardProps> = ({
   // If no data, show prompt
   if (!bodyComposition && !vo2MaxData) {
     return (
-      <TouchableOpacity style={styles.emptyCard} onPress={handlePress} activeOpacity={0.7}>
-        <Ionicons name="person-outline" size={32} color={theme.colors.orangeBright} style={{ marginBottom: 8 }} />
+      <TouchableOpacity
+        style={styles.emptyCard}
+        onPress={handlePress}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name="person-outline"
+          size={32}
+          color={theme.colors.orangeBright}
+          style={{ marginBottom: 8 }}
+        />
         <Text style={styles.emptyText}>
           Tap to add weight & height for BMI and fitness age estimates
         </Text>
-        <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} style={{ marginTop: 4 }} />
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={theme.colors.textMuted}
+          style={{ marginTop: 4 }}
+        />
       </TouchableOpacity>
     );
   }
 
   return (
-    <TouchableOpacity style={styles.container} onPress={handlePress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={handlePress}
+      activeOpacity={0.7}
+    >
       {/* BMI Column */}
       <View style={styles.column}>
         <Text style={styles.label}>BMI</Text>
@@ -95,7 +113,11 @@ export const HealthSnapshotCard: React.FC<HealthSnapshotCardProps> = ({
 
       {/* Edit Indicator */}
       <View style={styles.editIndicator}>
-        <Ionicons name="create-outline" size={16} color={theme.colors.textMuted} />
+        <Ionicons
+          name="create-outline"
+          size={16}
+          color={theme.colors.textMuted}
+        />
       </View>
     </TouchableOpacity>
   );

@@ -16,7 +16,14 @@ export interface ChallengeAnnouncementData {
   distance: number; // km
   opponentName: string;
   isRecurring?: boolean;
-  recurrenceDay?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+  recurrenceDay?:
+    | 'monday'
+    | 'tuesday'
+    | 'wednesday'
+    | 'thursday'
+    | 'friday'
+    | 'saturday'
+    | 'sunday';
   description?: string;
 }
 
@@ -60,7 +67,11 @@ export class ChallengeAnnouncementCardGenerator {
       const deepLink = `runstr://challenge/${challenge.challengeId}`;
 
       // Generate SVG content
-      const svgContent = this.createAnnouncementSVG(challenge, deepLink, dimensions);
+      const svgContent = this.createAnnouncementSVG(
+        challenge,
+        deepLink,
+        dimensions
+      );
 
       return {
         svgContent,
@@ -102,12 +113,18 @@ export class ChallengeAnnouncementCardGenerator {
     const [hours, minutes] = challenge.challengeTime.split(':').map(Number);
     const period = hours >= 12 ? 'PM' : 'AM';
     const displayHours = hours % 12 || 12;
-    const timeText = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    const timeText = `${displayHours}:${minutes
+      .toString()
+      .padStart(2, '0')} ${period}`;
 
     // Recurring text
-    const recurringText = challenge.isRecurring && challenge.recurrenceDay
-      ? `Every ${challenge.recurrenceDay.charAt(0).toUpperCase() + challenge.recurrenceDay.slice(1)}`
-      : '';
+    const recurringText =
+      challenge.isRecurring && challenge.recurrenceDay
+        ? `Every ${
+            challenge.recurrenceDay.charAt(0).toUpperCase() +
+            challenge.recurrenceDay.slice(1)
+          }`
+        : '';
 
     // Format opponent info
     const opponentText = challenge.opponentName;
@@ -217,7 +234,9 @@ export class ChallengeAnnouncementCardGenerator {
         }
 
         <!-- Opponent info (centered card) -->
-        <g transform="translate(${centerX - 150}, ${recurringText ? 385 : 360})">
+        <g transform="translate(${centerX - 150}, ${
+      recurringText ? 385 : 360
+    })">
           <rect x="0" y="0" width="300" height="70" fill="${accentColor}20" rx="12" stroke="${accentColor}" stroke-width="2"/>
           <text
             x="150"

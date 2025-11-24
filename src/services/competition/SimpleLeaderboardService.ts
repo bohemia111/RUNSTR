@@ -140,7 +140,9 @@ export class SimpleLeaderboardService {
   ): Promise<LeaderboardEntry[]> {
     console.log(`🏆 Calculating leaderboard for event: ${event.name}`);
     console.log(`   Scoring type: ${event.scoringType || event.metric}`);
-    console.log(`   📊 DEBUG: Starting leaderboard calculation for ${teamMembers.length} members`);
+    console.log(
+      `   📊 DEBUG: Starting leaderboard calculation for ${teamMembers.length} members`
+    );
 
     // ⚠️ TEMPORARY: Commented out for testing - this fetch can hang indefinitely
     // ✅ NEW: Fetch join requests to get participation types
@@ -176,9 +178,13 @@ export class SimpleLeaderboardService {
     eventEnd.setHours(23, 59, 59, 999);
 
     // Get workouts for event day
-    console.log(`   🔍 DEBUG: Starting workout fetch for ${teamMembers.length} members...`);
+    console.log(
+      `   🔍 DEBUG: Starting workout fetch for ${teamMembers.length} members...`
+    );
     console.log(`   🔍 DEBUG: Activity type: ${event.activityType}`);
-    console.log(`   🔍 DEBUG: Date range: ${eventStart.toISOString()} to ${eventEnd.toISOString()}`);
+    console.log(
+      `   🔍 DEBUG: Date range: ${eventStart.toISOString()} to ${eventEnd.toISOString()}`
+    );
 
     const workouts = await this.getWorkouts(
       teamMembers,
@@ -208,9 +214,16 @@ export class SimpleLeaderboardService {
         );
 
         // Log split data usage for transparency
-        if (workout.splits && workout.splits.size > 0 && targetTime !== workout.duration) {
+        if (
+          workout.splits &&
+          workout.splits.size > 0 &&
+          targetTime !== workout.duration
+        ) {
           console.log(
-            `   ✅ Using split data for ${workout.npub.slice(0, 8)}: ${targetTime}s (was ${workout.duration}s)`
+            `   ✅ Using split data for ${workout.npub.slice(
+              0,
+              8
+            )}: ${targetTime}s (was ${workout.duration}s)`
           );
         }
 
@@ -314,7 +327,9 @@ export class SimpleLeaderboardService {
     // Handle short duration events
     if (event.durationMinutes) {
       eventStart = eventDate;
-      eventEnd = new Date(eventDate.getTime() + event.durationMinutes * 60 * 1000);
+      eventEnd = new Date(
+        eventDate.getTime() + event.durationMinutes * 60 * 1000
+      );
     } else {
       // Full day event
       eventStart = new Date(eventDate);
@@ -366,7 +381,9 @@ export class SimpleLeaderboardService {
     const formattedGoal = this.formatTeamGoalValue(goal, metric, unit);
 
     console.log(
-      `✅ Team progress: ${formattedCurrent} / ${formattedGoal} (${percentage.toFixed(1)}%)`
+      `✅ Team progress: ${formattedCurrent} / ${formattedGoal} (${percentage.toFixed(
+        1
+      )}%)`
     );
 
     return {
@@ -477,7 +494,11 @@ export class SimpleLeaderboardService {
           try {
             const decoded = ndk.nip19.decode(pubkey);
             hexPubkeys.push(decoded.data as string);
-            console.log(`🔄 Converted npub to hex: ${pubkey.slice(0, 12)}... → ${(decoded.data as string).slice(0, 12)}...`);
+            console.log(
+              `🔄 Converted npub to hex: ${pubkey.slice(0, 12)}... → ${(
+                decoded.data as string
+              ).slice(0, 12)}...`
+            );
           } catch (decodeError) {
             console.error(`❌ Failed to decode npub: ${pubkey}`, decodeError);
             // Skip invalid npubs
@@ -486,16 +507,22 @@ export class SimpleLeaderboardService {
           // Already hex format
           hexPubkeys.push(pubkey);
         } else {
-          console.error(`❌ Invalid pubkey format (not npub or hex): ${pubkey}`);
+          console.error(
+            `❌ Invalid pubkey format (not npub or hex): ${pubkey}`
+          );
         }
       }
 
       if (hexPubkeys.length === 0) {
-        console.error('❌ No valid pubkeys after format validation - cannot query workouts');
+        console.error(
+          '❌ No valid pubkeys after format validation - cannot query workouts'
+        );
         return [];
       }
 
-      console.log(`✅ Validated ${hexPubkeys.length}/${memberNpubs.length} pubkeys for NDK query`);
+      console.log(
+        `✅ Validated ${hexPubkeys.length}/${memberNpubs.length} pubkeys for NDK query`
+      );
 
       const filter: NDKFilter = {
         kinds: [1301],
@@ -518,12 +545,16 @@ export class SimpleLeaderboardService {
       });
 
       subscription.on('event', (event: any) => {
-        console.log(`📥 NUCLEAR: Received kind 1301 event ${eventsArray.length + 1}`);
+        console.log(
+          `📥 NUCLEAR: Received kind 1301 event ${eventsArray.length + 1}`
+        );
         eventsArray.push(event);
       });
 
       subscription.on('eose', () => {
-        console.log('📨 NUCLEAR: EOSE received - continuing to wait for timeout...');
+        console.log(
+          '📨 NUCLEAR: EOSE received - continuing to wait for timeout...'
+        );
       });
 
       // ✅ GUARANTEED TIMEOUT: Always fires after 5 seconds
@@ -651,7 +682,10 @@ export class SimpleLeaderboardService {
       try {
         npubFormat = nip19.npubEncode(event.pubkey);
       } catch (error) {
-        console.warn(`Failed to encode npub for ${event.pubkey.slice(0, 8)}, using hex:`, error);
+        console.warn(
+          `Failed to encode npub for ${event.pubkey.slice(0, 8)}, using hex:`,
+          error
+        );
         npubFormat = event.pubkey; // Fallback to hex if encoding fails
       }
 
@@ -860,7 +894,10 @@ export class SimpleLeaderboardService {
    * ✅ NEW: Fully open teams with auto-activating leaderboards
    * @param userHexPubkey - Optional: Filter to only show leaderboards where this user participated
    */
-  async getTeamDailyLeaderboards(teamId: string, userHexPubkey?: string): Promise<{
+  async getTeamDailyLeaderboards(
+    teamId: string,
+    userHexPubkey?: string
+  ): Promise<{
     teamId: string;
     date: string;
     leaderboard5k: LeaderboardEntry[];
@@ -872,8 +909,12 @@ export class SimpleLeaderboardService {
     const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
     console.log(`📊 Loading daily leaderboards for team: ${teamId}`);
-    console.log(`   🕐 Query range: ${new Date(todayMidnight * 1000).toISOString()} → now`);
-    console.log(`   🕐 Local midnight: ${new Date(todayMidnight * 1000).toLocaleString()}`);
+    console.log(
+      `   🕐 Query range: ${new Date(todayMidnight * 1000).toISOString()} → now`
+    );
+    console.log(
+      `   🕐 Local midnight: ${new Date(todayMidnight * 1000).toLocaleString()}`
+    );
 
     // Check cache first (5-minute TTL)
     const cacheKey = `team:${teamId}:daily:${todayDate}`;
@@ -889,34 +930,47 @@ export class SimpleLeaderboardService {
     const filter: NDKFilter = {
       kinds: [1301],
       since: todayMidnight,
-      limit: 100,  // Reasonable limit to prevent excessive data
+      limit: 100, // Reasonable limit to prevent excessive data
     };
 
-    console.log(`   🔍 Query filter (no #team to avoid NDK hang):`, JSON.stringify(filter, null, 2));
+    console.log(
+      `   🔍 Query filter (no #team to avoid NDK hang):`,
+      JSON.stringify(filter, null, 2)
+    );
 
     // Query with 5s timeout for more reliable relay responses
     const timeoutPromise = new Promise<Set<NDKEvent>>((resolve) => {
       setTimeout(() => {
-        console.log(`   ⚠️ Query timed out after 5s, returning partial results`);
+        console.log(
+          `   ⚠️ Query timed out after 5s, returning partial results`
+        );
         resolve(new Set<NDKEvent>());
       }, 5000); // Increased from 1500ms to 5000ms
     });
 
     const allEvents = await Promise.race([
       ndk.fetchEvents(filter),
-      timeoutPromise
+      timeoutPromise,
     ]);
     console.log(`   ✅ Found ${allEvents.size} total kind 1301 events today`);
 
     // Filter client-side for matching team tag (avoids broken NDK #team filter)
-    const teamEvents = Array.from(allEvents).filter(event => {
-      const teamTag = event.tags.find(t => t[0] === 'team');
+    const teamEvents = Array.from(allEvents).filter((event) => {
+      const teamTag = event.tags.find((t) => t[0] === 'team');
       return teamTag && teamTag[1] === teamId;
     });
 
-    console.log(`   🎯 Filtered to ${teamEvents.length} workouts with team tag: ${teamId}`);
+    console.log(
+      `   🎯 Filtered to ${teamEvents.length} workouts with team tag: ${teamId}`
+    );
     if (teamEvents.length > 0) {
-      console.log(`   📋 Event IDs:`, teamEvents.slice(0, 5).map(e => e.id).join(', '));
+      console.log(
+        `   📋 Event IDs:`,
+        teamEvents
+          .slice(0, 5)
+          .map((e) => e.id)
+          .join(', ')
+      );
     }
 
     // Parse workouts and extract split data (reuse existing parseWorkout)
@@ -930,16 +984,26 @@ export class SimpleLeaderboardService {
 
     console.log(`   📝 Parsed ${workouts.length} workouts with split data`);
     workouts.forEach((w, i) => {
-      console.log(`      Workout ${i + 1}: ${w.splits?.size || 0} splits, distance: ${w.distance}km`);
+      console.log(
+        `      Workout ${i + 1}: ${w.splits?.size || 0} splits, distance: ${
+          w.distance
+        }km`
+      );
     });
 
     // Filter by split count (5K needs ≥5 splits, 10K needs ≥10, etc.)
     const eligible5k = workouts.filter((w) => w.splits && w.splits.size >= 5);
     const eligible10k = workouts.filter((w) => w.splits && w.splits.size >= 10);
-    const eligibleHalf = workouts.filter((w) => w.splits && w.splits.size >= 21);
-    const eligibleMarathon = workouts.filter((w) => w.splits && w.splits.size >= 42);
+    const eligibleHalf = workouts.filter(
+      (w) => w.splits && w.splits.size >= 21
+    );
+    const eligibleMarathon = workouts.filter(
+      (w) => w.splits && w.splits.size >= 42
+    );
 
-    console.log(`   🏆 Eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}`);
+    console.log(
+      `   🏆 Eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}`
+    );
 
     // Calculate leaderboards using split-based time extraction
     const leaderboards = {
@@ -951,25 +1015,46 @@ export class SimpleLeaderboardService {
 
     // Filter leaderboards to only show categories where user participated
     if (userHexPubkey) {
-      console.log(`   🔍 Filtering leaderboards for user: ${userHexPubkey.substring(0, 8)}...`);
+      console.log(
+        `   🔍 Filtering leaderboards for user: ${userHexPubkey.substring(
+          0,
+          8
+        )}...`
+      );
 
       const hasUserEntry = (leaderboard: LeaderboardEntry[]) => {
-        const found = leaderboard.some(entry => {
+        const found = leaderboard.some((entry) => {
           // LeaderboardEntry uses npub, need to convert to hex for comparison
-          const entryHex = entry.npub.startsWith('npub') ? nip19.decode(entry.npub).data as string : entry.npub;
+          const entryHex = entry.npub.startsWith('npub')
+            ? (nip19.decode(entry.npub).data as string)
+            : entry.npub;
           return entryHex === userHexPubkey;
         });
         return found;
       };
 
       const filtered = {
-        leaderboard5k: hasUserEntry(leaderboards.leaderboard5k) ? leaderboards.leaderboard5k : [],
-        leaderboard10k: hasUserEntry(leaderboards.leaderboard10k) ? leaderboards.leaderboard10k : [],
-        leaderboardHalf: hasUserEntry(leaderboards.leaderboardHalf) ? leaderboards.leaderboardHalf : [],
-        leaderboardMarathon: hasUserEntry(leaderboards.leaderboardMarathon) ? leaderboards.leaderboardMarathon : [],
+        leaderboard5k: hasUserEntry(leaderboards.leaderboard5k)
+          ? leaderboards.leaderboard5k
+          : [],
+        leaderboard10k: hasUserEntry(leaderboards.leaderboard10k)
+          ? leaderboards.leaderboard10k
+          : [],
+        leaderboardHalf: hasUserEntry(leaderboards.leaderboardHalf)
+          ? leaderboards.leaderboardHalf
+          : [],
+        leaderboardMarathon: hasUserEntry(leaderboards.leaderboardMarathon)
+          ? leaderboards.leaderboardMarathon
+          : [],
       };
 
-      console.log(`   ✅ Filtered: 5K=${filtered.leaderboard5k.length > 0 ? '✓' : '✗'}, 10K=${filtered.leaderboard10k.length > 0 ? '✓' : '✗'}, Half=${filtered.leaderboardHalf.length > 0 ? '✓' : '✗'}, Marathon=${filtered.leaderboardMarathon.length > 0 ? '✓' : '✗'}`);
+      console.log(
+        `   ✅ Filtered: 5K=${
+          filtered.leaderboard5k.length > 0 ? '✓' : '✗'
+        }, 10K=${filtered.leaderboard10k.length > 0 ? '✓' : '✗'}, Half=${
+          filtered.leaderboardHalf.length > 0 ? '✓' : '✗'
+        }, Marathon=${filtered.leaderboardMarathon.length > 0 ? '✓' : '✗'}`
+      );
 
       const result = {
         teamId,
@@ -980,7 +1065,13 @@ export class SimpleLeaderboardService {
       // Cache with smart TTL (5min for today, 24hr for historical)
       const ttl = this.getSmartTTL(todayDate);
       await this.cacheService.setWithCustomTTL(cacheKey, result, ttl);
-      console.log(`   💾 Cached with ${ttl === 300 ? '5min' : '24hr'} TTL (${todayDate === new Date().toISOString().split('T')[0] ? 'active' : 'historical'})`);
+      console.log(
+        `   💾 Cached with ${ttl === 300 ? '5min' : '24hr'} TTL (${
+          todayDate === new Date().toISOString().split('T')[0]
+            ? 'active'
+            : 'historical'
+        })`
+      );
 
       return result;
     }
@@ -995,7 +1086,13 @@ export class SimpleLeaderboardService {
     // Cache with smart TTL (5min for today, 24hr for historical)
     const ttl = this.getSmartTTL(todayDate);
     await this.cacheService.setWithCustomTTL(cacheKey, result, ttl);
-    console.log(`   💾 Cached with ${ttl === 300 ? '5min' : '24hr'} TTL (${todayDate === new Date().toISOString().split('T')[0] ? 'active' : 'historical'})`);
+    console.log(
+      `   💾 Cached with ${ttl === 300 ? '5min' : '24hr'} TTL (${
+        todayDate === new Date().toISOString().split('T')[0]
+          ? 'active'
+          : 'historical'
+      })`
+    );
 
     return result;
   }
@@ -1035,14 +1132,16 @@ export class SimpleLeaderboardService {
     // Query with 2s timeout for global query (slightly longer than team query)
     const timeoutPromise = new Promise<Set<NDKEvent>>((resolve) => {
       setTimeout(() => {
-        console.log(`   ⚠️ Global query timed out after 2s, returning empty results`);
+        console.log(
+          `   ⚠️ Global query timed out after 2s, returning empty results`
+        );
         resolve(new Set<NDKEvent>());
       }, 2000);
     });
 
     const events = await Promise.race([
       ndk.fetchEvents(filter),
-      timeoutPromise
+      timeoutPromise,
     ]);
     console.log(`   Found ${events.size} workouts globally today`);
 
@@ -1058,10 +1157,16 @@ export class SimpleLeaderboardService {
     // Filter by split count (5K needs ≥5 splits, 10K needs ≥10, etc.)
     const eligible5k = workouts.filter((w) => w.splits && w.splits.size >= 5);
     const eligible10k = workouts.filter((w) => w.splits && w.splits.size >= 10);
-    const eligibleHalf = workouts.filter((w) => w.splits && w.splits.size >= 21);
-    const eligibleMarathon = workouts.filter((w) => w.splits && w.splits.size >= 42);
+    const eligibleHalf = workouts.filter(
+      (w) => w.splits && w.splits.size >= 21
+    );
+    const eligibleMarathon = workouts.filter(
+      (w) => w.splits && w.splits.size >= 42
+    );
 
-    console.log(`   Global eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}`);
+    console.log(
+      `   Global eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}`
+    );
 
     // Calculate global leaderboards
     const result = {
@@ -1083,9 +1188,15 @@ export class SimpleLeaderboardService {
    * Uses split data to extract time at target distance
    * Deduplicates by user - keeps only best time per user
    */
-  private buildLeaderboard(workouts: Workout[], targetKm: number): LeaderboardEntry[] {
+  private buildLeaderboard(
+    workouts: Workout[],
+    targetKm: number
+  ): LeaderboardEntry[] {
     // Step 1: Group workouts by user and keep only their best time
-    const bestTimesByUser = new Map<string, { time: number; workout: Workout }>();
+    const bestTimesByUser = new Map<
+      string,
+      { time: number; workout: Workout }
+    >();
 
     for (const workout of workouts) {
       const time = this.extractTargetDistanceTime(workout, targetKm);
@@ -1136,7 +1247,14 @@ export class SimpleLeaderboardService {
    */
   private getTodayMidnightLocal(): number {
     const now = new Date();
-    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const midnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      0,
+      0,
+      0
+    );
     return Math.floor(midnight.getTime() / 1000);
   }
 
@@ -1149,7 +1267,9 @@ export class SimpleLeaderboardService {
     const secs = Math.floor(seconds % 60);
 
     if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs
+        .toString()
+        .padStart(2, '0')}`;
     }
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }

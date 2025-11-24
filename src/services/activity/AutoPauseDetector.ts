@@ -53,9 +53,14 @@ export class AutoPauseDetector {
       this.stationaryTime++;
 
       // Trigger auto-pause after threshold
-      if (!this.isStationary && this.stationaryTime >= this.AUTO_PAUSE_THRESHOLD_SECONDS) {
+      if (
+        !this.isStationary &&
+        this.stationaryTime >= this.AUTO_PAUSE_THRESHOLD_SECONDS
+      ) {
         this.isStationary = true;
-        console.log(`[AutoPauseDetector] 🛑 Auto-pause triggered (stationary for ${this.stationaryTime}s)`);
+        console.log(
+          `[AutoPauseDetector] 🛑 Auto-pause triggered (stationary for ${this.stationaryTime}s)`
+        );
         return 'pause';
       }
     } else if (speed > this.AUTO_RESUME_SPEED_MPS) {
@@ -63,7 +68,9 @@ export class AutoPauseDetector {
       if (this.isStationary) {
         this.isStationary = false;
         this.stationaryTime = 0;
-        console.log('[AutoPauseDetector] ▶️ Auto-resume triggered (movement detected)');
+        console.log(
+          '[AutoPauseDetector] ▶️ Auto-resume triggered (movement detected)'
+        );
         return 'resume';
       }
       // Reset stationary counter

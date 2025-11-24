@@ -25,10 +25,7 @@ import unifiedCache from '../services/cache/UnifiedNostrCache';
 import { CacheKeys, CacheTTL } from '../constants/cacheTTL';
 import { Nuclear1301Service } from '../services/fitness/Nuclear1301Service';
 import type { NostrWorkout } from '../types/nostrWorkout';
-import type {
-  AnalyticsSummary,
-  HealthProfile,
-} from '../types/analytics';
+import type { AnalyticsSummary, HealthProfile } from '../types/analytics';
 import { CardioPerformanceAnalytics } from '../services/analytics/CardioPerformanceAnalytics';
 import { BodyCompositionAnalytics } from '../services/analytics/BodyCompositionAnalytics';
 import { CaloricAnalyticsService } from '../services/analytics/CaloricAnalyticsService';
@@ -39,8 +36,11 @@ import { CalorieBalanceCard } from '../components/analytics/CalorieBalanceCard';
 import { WeeklySummaryAccordion } from '../components/analytics/WeeklySummaryAccordion';
 import { CoachRunstrCard } from '../components/analytics/CoachRunstrCard';
 import { GoalsHabitsCard } from '../components/analytics/GoalsHabitsCard';
+import { AchievementsCard } from '../components/analytics/AchievementsCard';
 import { FitnessTestInstructionsModal } from '../components/fitness/FitnessTestInstructionsModal';
 import FitnessTestService from '../services/fitness/FitnessTestService';
+import { PersonalRecordsService } from '../services/analytics/PersonalRecordsService';
+import type { AllPersonalRecords } from '../services/analytics/PersonalRecordsService';
 
 const PRIVACY_NOTICE_KEY = '@runstr:analytics_privacy_accepted';
 const HEALTH_PROFILE_KEY = '@runstr:health_profile';
@@ -52,7 +52,9 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [workouts, setWorkouts] = useState<LocalWorkout[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
-  const [healthProfile, setHealthProfile] = useState<HealthProfile | null>(null);
+  const [healthProfile, setHealthProfile] = useState<HealthProfile | null>(
+    null
+  );
   const [hasImported, setHasImported] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importStats, setImportStats] = useState<{
@@ -60,6 +62,8 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
     importedAt: string;
   } | null>(null);
   const [caloricMetrics, setCaloricMetrics] = useState<any>(null);
+  const [personalRecords, setPersonalRecords] =
+    useState<AllPersonalRecords | null>(null);
 
   // Fitness Test state
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
@@ -162,6 +166,9 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
         profile || undefined
       );
 
+      // 3. Personal Records (for Achievements Card)
+      const prs = PersonalRecordsService.getAllPRs(allWorkouts);
+
       // Store simplified analytics
       const summary: AnalyticsSummary = {
         cardio: cardioMetrics || undefined,
@@ -171,6 +178,7 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
 
       setAnalytics(summary);
       setCaloricMetrics(caloricMetrics);
+      setPersonalRecords(prs);
       setLoading(false);
       console.log('[AdvancedAnalytics] ✅ Analytics calculation complete');
     } catch (error) {
@@ -372,17 +380,23 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
           vo2MaxData={analytics?.cardio?.vo2MaxEstimate}
         />
 
-        {/* Section 2: Weekly Summary Breakdown */}
+        {/* Section 2: Achievements (Personal Records) */}
+        {personalRecords && (
+          <>
+            <Text style={styles.sectionTitle}>Achievements</Text>
+            <AchievementsCard personalRecords={personalRecords} />
+          </>
+        )}
+
+        {/* Section 3: Weekly Summary Breakdown */}
         <WeeklySummaryAccordion workouts={workouts} />
 
-        {/* Section 3: Goals & Habits */}
+        {/* Section 4: Goals & Habits */}
         <GoalsHabitsCard />
 
         {/* Today's Caloric Balance */}
         {caloricMetrics && (
-          <CalorieBalanceCard
-            dailyBalance={caloricMetrics.today}
-          />
+          <CalorieBalanceCard dailyBalance={caloricMetrics.today} />
         )}
 
         {/* RUNSTR Fitness Test Card */}
@@ -402,7 +416,9 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
                 style={styles.startTestButton}
                 onPress={handleStartFitnessTest}
               >
-                <Text style={styles.startTestButtonText}>Start RUNSTR Test</Text>
+                <Text style={styles.startTestButtonText}>
+                  Start RUNSTR Test
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -416,7 +432,9 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
                   <View
                     style={[
                       styles.progressBarFill,
-                      { width: `${(elapsedSeconds / MAX_TEST_DURATION) * 100}%` },
+                      {
+                        width: `${(elapsedSeconds / MAX_TEST_DURATION) * 100}%`,
+                      },
                     ]}
                   />
                 </View>

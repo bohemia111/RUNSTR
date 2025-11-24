@@ -54,7 +54,11 @@ class NWCManualServiceClass {
   /**
    * NIP-04 encryption implementation
    */
-  private async nip04Encrypt(privkey: string, pubkey: string, text: string): Promise<string> {
+  private async nip04Encrypt(
+    privkey: string,
+    pubkey: string,
+    text: string
+  ): Promise<string> {
     const key = secp256k1.getSharedSecret(privkey, '02' + pubkey, true);
     const normalizedKey = key.slice(1, 33);
 
@@ -76,17 +80,17 @@ class NWCManualServiceClass {
       new TextEncoder().encode(text)
     );
 
-    return (
-      bytesToHex(new Uint8Array(encrypted)) +
-      '?iv=' +
-      bytesToHex(iv)
-    );
+    return bytesToHex(new Uint8Array(encrypted)) + '?iv=' + bytesToHex(iv);
   }
 
   /**
    * NIP-04 decryption implementation
    */
-  private async nip04Decrypt(privkey: string, pubkey: string, data: string): Promise<string> {
+  private async nip04Decrypt(
+    privkey: string,
+    pubkey: string,
+    data: string
+  ): Promise<string> {
     const [ciphertext, ivStr] = data.split('?iv=');
     const key = secp256k1.getSharedSecret(privkey, '02' + pubkey, true);
     const normalizedKey = key.slice(1, 33);
@@ -233,7 +237,10 @@ class NWCManualServiceClass {
 
       this.ws.onerror = (event: any) => {
         clearTimeout(connectionTimeout);
-        console.error('[NWC-Manual] WebSocket error:', event.message || 'Unknown error');
+        console.error(
+          '[NWC-Manual] WebSocket error:',
+          event.message || 'Unknown error'
+        );
         this.isConnecting = false;
         resolve(false);
       };
@@ -282,7 +289,7 @@ class NWCManualServiceClass {
         kinds: [23195], // NWC response kind
         authors: [this.walletPubkey!], // From wallet
         '#p': [user.pubkey], // To us
-        since: Math.floor(Date.now() / 1000) - 10 // Last 10 seconds
+        since: Math.floor(Date.now() / 1000) - 10, // Last 10 seconds
       };
 
       const subMessage = JSON.stringify(['REQ', this.subscriptionId, filter]);
@@ -347,7 +354,11 @@ class NWCManualServiceClass {
       }
 
       // Decrypt the response using our NIP-04 implementation
-      const decrypted = await this.nip04Decrypt(this.secret!, this.walletPubkey!, event.content);
+      const decrypted = await this.nip04Decrypt(
+        this.secret!,
+        this.walletPubkey!,
+        event.content
+      );
       const response: NWCResponse = JSON.parse(decrypted);
 
       console.log('[NWC-Manual] Received response:', response);
@@ -377,7 +388,9 @@ class NWCManualServiceClass {
   async sendRequest(method: string, params?: any): Promise<any> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       // Try to reconnect
-      console.log('[NWC-Manual] WebSocket not open, attempting to reconnect...');
+      console.log(
+        '[NWC-Manual] WebSocket not open, attempting to reconnect...'
+      );
       const connected = await this.reconnect();
       if (!connected) {
         throw new Error('Not connected to wallet');
@@ -394,23 +407,27 @@ class NWCManualServiceClass {
       // Create NWC request
       const request: NWCRequest = {
         method,
-        params: params || {}
+        params: params || {},
       };
 
       console.log('[NWC-Manual] Sending request:', request);
 
       // Encrypt request using our NIP-04 implementation
-      const encrypted = await this.nip04Encrypt(this.secret!, this.walletPubkey, JSON.stringify(request));
+      const encrypted = await this.nip04Encrypt(
+        this.secret!,
+        this.walletPubkey,
+        JSON.stringify(request)
+      );
 
       // Create Nostr event (kind 23194 - NWC request)
       const event: any = {
         kind: 23194,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
-          ['p', this.walletPubkey] // To wallet
+          ['p', this.walletPubkey], // To wallet
         ],
         content: encrypted,
-        pubkey: user.pubkey
+        pubkey: user.pubkey,
       };
 
       // Calculate event ID
@@ -445,7 +462,7 @@ class NWCManualServiceClass {
         resolve,
         reject,
         timeout,
-        method
+        method,
       });
     });
   }
@@ -471,7 +488,7 @@ class NWCManualServiceClass {
   async makeInvoice(amountSats: number, description?: string): Promise<any> {
     return await this.sendRequest('make_invoice', {
       amount: amountSats * 1000, // Convert to millisats
-      description: description || 'RUNSTR payment'
+      description: description || 'RUNSTR payment',
     });
   }
 
@@ -502,7 +519,10 @@ class NWCManualServiceClass {
   private async storeConnection(): Promise<void> {
     try {
       if (this.connectionString) {
-        await AsyncStorage.setItem('nwc_manual_connection', this.connectionString);
+        await AsyncStorage.setItem(
+          'nwc_manual_connection',
+          this.connectionString
+        );
         console.log('[NWC-Manual] Connection stored');
       }
     } catch (error) {

@@ -108,7 +108,10 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
         data.charities.push(charity.id);
       }
 
-      await AsyncStorage.setItem('@runstr:zapped_charities', JSON.stringify(data));
+      await AsyncStorage.setItem(
+        '@runstr:zapped_charities',
+        JSON.stringify(data)
+      );
       setIsZapped(true);
     } catch (error) {
       console.error('[CharitySection] Error saving zapped state:', error);
@@ -134,7 +137,9 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
   // SINGLE TAP: Open ExternalZapModal with QR code (universal, works for everyone)
   const handleZapPress = () => {
     animatePress();
-    console.log('[CharitySection] Tap detected - opening external wallet modal');
+    console.log(
+      '[CharitySection] Tap detected - opening external wallet modal'
+    );
 
     setSelectedAmount(DEFAULT_ZAP_AMOUNT);
     setSelectedMemo(`Donation to ${charity.name}`);
@@ -168,7 +173,9 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
     // Quick zap with default amount
     setIsZapping(true);
     try {
-      console.log(`[CharitySection] Long press NWC zap to ${charity.name} with ${DEFAULT_ZAP_AMOUNT} sats`);
+      console.log(
+        `[CharitySection] Long press NWC zap to ${charity.name} with ${DEFAULT_ZAP_AMOUNT} sats`
+      );
 
       // Get invoice from charity's Lightning address
       const { invoice } = await getInvoiceFromLightningAddress(
@@ -189,13 +196,22 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
       if (paymentResult.success) {
         await markAsZapped();
         await refreshBalance(); // Update the balance after payment
-        Alert.alert('Success', `Donated ${DEFAULT_ZAP_AMOUNT} sats to ${charity.name}!`);
+        Alert.alert(
+          'Success',
+          `Donated ${DEFAULT_ZAP_AMOUNT} sats to ${charity.name}!`
+        );
       } else {
-        Alert.alert('Error', paymentResult.error || 'Failed to process donation. Please try again.');
+        Alert.alert(
+          'Error',
+          paymentResult.error || 'Failed to process donation. Please try again.'
+        );
       }
     } catch (error) {
       console.error('[CharitySection] Long press NWC zap error:', error);
-      Alert.alert('Error', 'Failed to process donation. Tap to use an external wallet.');
+      Alert.alert(
+        'Error',
+        'Failed to process donation. Tap to use an external wallet.'
+      );
     } finally {
       setIsZapping(false);
     }
@@ -259,21 +275,23 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
             style={[
               styles.zapButton,
               isZapped && styles.zappedButton,
-              isZapping && styles.zappingButton
+              isZapping && styles.zappingButton,
             ]}
             activeOpacity={0.7}
-            delayLongPress={500}  // 500ms long press delay
+            delayLongPress={500} // 500ms long press delay
             disabled={isZapping}
           >
             <Ionicons
               name="flash"
               size={20}
-              color={isZapped ? "#FFD700" : "#000000"}
+              color={isZapped ? '#FFD700' : '#000000'}
             />
-            <Text style={[
-              styles.zapButtonText,
-              isZapped && styles.zappedButtonText
-            ]}>
+            <Text
+              style={[
+                styles.zapButtonText,
+                isZapped && styles.zappedButtonText,
+              ]}
+            >
               {isZapping ? 'Sending...' : isZapped ? 'Zapped' : 'Zap'}
             </Text>
           </TouchableOpacity>
@@ -284,7 +302,7 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
       <ExternalZapModal
         visible={showExternalModal}
         onClose={() => setShowExternalModal(false)}
-        recipientNpub={charity.lightningAddress}  // Pass Lightning address directly
+        recipientNpub={charity.lightningAddress} // Pass Lightning address directly
         recipientName={charity.name}
         amount={selectedAmount}
         memo={selectedMemo}

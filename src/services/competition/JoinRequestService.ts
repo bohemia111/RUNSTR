@@ -175,7 +175,10 @@ export class JoinRequestService {
       request.requesterPubkey,
       request.competitionId
     ).catch((err) => {
-      console.warn('[JoinRequestService] Cache invalidation failed (non-blocking):', err);
+      console.warn(
+        '[JoinRequestService] Cache invalidation failed (non-blocking):',
+        err
+      );
     });
   }
 
@@ -205,9 +208,14 @@ export class JoinRequestService {
     );
 
     // ✅ CRITICAL: Invalidate join requests cache so rejected request disappears
-    await unifiedCache.invalidate(CacheKeys.JOIN_REQUESTS(request.competitionId)).catch((err) => {
-      console.warn('[JoinRequestService] Cache invalidation failed (non-blocking):', err);
-    });
+    await unifiedCache
+      .invalidate(CacheKeys.JOIN_REQUESTS(request.competitionId))
+      .catch((err) => {
+        console.warn(
+          '[JoinRequestService] Cache invalidation failed (non-blocking):',
+          err
+        );
+      });
   }
 
   /**

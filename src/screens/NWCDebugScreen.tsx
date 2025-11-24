@@ -30,7 +30,7 @@ export function NWCDebugScreen() {
   const addLog = (message: string, isError = false) => {
     const timestamp = new Date().toISOString().split('T')[1].slice(0, 12);
     const prefix = isError ? '❌' : '✅';
-    setLogs(prev => [...prev, `${timestamp} ${prefix} ${message}`]);
+    setLogs((prev) => [...prev, `${timestamp} ${prefix} ${message}`]);
     console.log(`[NWCDebug] ${message}`);
   };
 
@@ -54,7 +54,9 @@ export function NWCDebugScreen() {
 
       // Check connection status
       const status = await NWCStorageService.getStatus();
-      addLog(`Connection status: ${status.connected ? 'Connected' : 'Disconnected'}`);
+      addLog(
+        `Connection status: ${status.connected ? 'Connected' : 'Disconnected'}`
+      );
       setIsConnected(status.connected);
 
       if (status.lastBalance) {
@@ -84,7 +86,10 @@ export function NWCDebugScreen() {
         };
 
         testWs.onerror = (event: any) => {
-          addLog(`Test WebSocket error: ${event.message || 'Unknown error'}`, true);
+          addLog(
+            `Test WebSocket error: ${event.message || 'Unknown error'}`,
+            true
+          );
         };
 
         testWs.onclose = () => {
@@ -163,7 +168,6 @@ export function NWCDebugScreen() {
       } else {
         addLog(`Balance error: ${balanceResult.error}`, true);
       }
-
     } catch (error: any) {
       addLog(`Connection test failed: ${error.message}`, true);
     } finally {
@@ -186,17 +190,26 @@ export function NWCDebugScreen() {
       <View style={[styles.card, { marginHorizontal: 20, marginTop: 10 }]}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <Text style={styles.label}>Connection Status:</Text>
-          <Text style={[styles.text, { color: isConnected ? '#00ff00' : '#ff0000' }]}>
+          <Text
+            style={[
+              styles.text,
+              { color: isConnected ? '#00ff00' : '#ff0000' },
+            ]}
+          >
             {isConnected ? 'Connected' : 'Disconnected'}
           </Text>
         </View>
 
         {balance !== null && (
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginTop: 10,
+            }}
+          >
             <Text style={styles.label}>Balance:</Text>
-            <Text style={styles.text}>
-              {balance.toLocaleString()} sats
-            </Text>
+            <Text style={styles.text}>{balance.toLocaleString()} sats</Text>
           </View>
         )}
       </View>
@@ -220,7 +233,10 @@ export function NWCDebugScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.button, { marginBottom: 10, backgroundColor: '#4CAF50' }]}
+          style={[
+            styles.button,
+            { marginBottom: 10, backgroundColor: '#4CAF50' },
+          ]}
           onPress={testNWCConnection}
           disabled={isLoading}
         >
@@ -242,10 +258,15 @@ export function NWCDebugScreen() {
 
       {/* Logs Display */}
       <ScrollView
-        style={[styles.card, { flex: 1, marginHorizontal: 20, marginBottom: 20, padding: 15 }]}
+        style={[
+          styles.card,
+          { flex: 1, marginHorizontal: 20, marginBottom: 20, padding: 15 },
+        ]}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
-        <Text style={[styles.label, { marginBottom: 10 }]}>Console Output:</Text>
+        <Text style={[styles.label, { marginBottom: 10 }]}>
+          Console Output:
+        </Text>
         {logs.map((log, i) => (
           <Text
             key={i}

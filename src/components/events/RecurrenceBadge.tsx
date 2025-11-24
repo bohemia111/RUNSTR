@@ -6,7 +6,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../styles/theme';
-import type { RecurrenceFrequency, RecurrenceDay } from '../../types/nostrCompetition';
+import type {
+  RecurrenceFrequency,
+  RecurrenceDay,
+} from '../../types/nostrCompetition';
 import { formatRecurrenceDisplay } from '../../utils/eventRecurrence';
 
 interface RecurrenceBadgeProps {
@@ -28,7 +31,9 @@ export const RecurrenceBadge: React.FC<RecurrenceBadgeProps> = ({
 
   return (
     <View style={[styles.badge, size === 'medium' && styles.badgeMedium]}>
-      <Text style={[styles.badgeText, size === 'medium' && styles.badgeTextMedium]}>
+      <Text
+        style={[styles.badgeText, size === 'medium' && styles.badgeTextMedium]}
+      >
         {displayText}
       </Text>
     </View>

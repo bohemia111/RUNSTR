@@ -92,7 +92,9 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
         setAlertVisible(true);
       } else {
         setAlertTitle('Connection Failed');
-        setAlertMessage(result.error || 'Please check your NWC string and try again.');
+        setAlertMessage(
+          result.error || 'Please check your NWC string and try again.'
+        );
         setAlertButtons([{ text: 'OK', style: 'default' }]);
         setAlertVisible(true);
       }
@@ -109,7 +111,9 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
 
   const handleSkip = () => {
     setAlertTitle('Skip Wallet Setup?');
-    setAlertMessage('You can still use the app to track workouts and join free events. Bitcoin features will be disabled.');
+    setAlertMessage(
+      'You can still use the app to track workouts and join free events. Bitcoin features will be disabled.'
+    );
     setAlertButtons([
       { text: 'Cancel', style: 'cancel' },
       {
@@ -125,7 +129,9 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
     Keyboard.dismiss();
     if (isValidating) {
       setAlertTitle('Cancel Validation?');
-      setAlertMessage('Connection test is in progress. Are you sure you want to cancel?');
+      setAlertMessage(
+        'Connection test is in progress. Are you sure you want to cancel?'
+      );
       setAlertButtons([
         { text: 'Continue Testing', style: 'cancel' },
         {
@@ -145,7 +151,9 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
 
   const handleHelp = () => {
     setAlertTitle('What is NWC?');
-    setAlertMessage('Nostr Wallet Connect lets you connect your Lightning wallet to RUNSTR. You can get an NWC connection string from:\n\n• Alby (getalby.com)\n• Mutiny Wallet\n• Other NWC-compatible wallets');
+    setAlertMessage(
+      'Nostr Wallet Connect lets you connect your Lightning wallet to RUNSTR. You can get an NWC connection string from:\n\n• Alby (getalby.com)\n• Mutiny Wallet\n• Other NWC-compatible wallets'
+    );
     setAlertButtons([
       {
         text: 'Open Alby',

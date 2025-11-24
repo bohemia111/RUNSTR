@@ -97,6 +97,18 @@ export class WorkoutCardGenerator {
   }
 
   /**
+   * Detect if this is a step counter post (daily steps) vs GPS-tracked walk
+   * Step counter posts have distance = 0 and steps in metadata
+   */
+  private static isStepCounterPost(workout: PublishableWorkout): boolean {
+    return (
+      workout.type === 'walking' &&
+      workout.distance === 0 &&
+      workout.metadata?.steps !== undefined
+    );
+  }
+
+  /**
    * Generate workout card as SVG
    */
   async generateWorkoutCard(
@@ -132,7 +144,11 @@ export class WorkoutCardGenerator {
 
       // Return fallback minimal card instead of throwing
       const fallbackDimensions = { width: 800, height: 600 };
-      const fallbackSvg = this.getFallbackSVG(workout, fallbackDimensions.width, fallbackDimensions.height);
+      const fallbackSvg = this.getFallbackSVG(
+        workout,
+        fallbackDimensions.width,
+        fallbackDimensions.height
+      );
 
       return {
         svgContent: fallbackSvg,
@@ -203,18 +219,20 @@ export class WorkoutCardGenerator {
       : '';
 
     // Only show achievement badge if we have one and template supports it
-    const achievement = 'showMotivation' in config && config.showMotivation
-      ? this.createAchievementBadge(workout, 320, accentColor)
-      : '';
+    const achievement =
+      'showMotivation' in config && config.showMotivation
+        ? this.createAchievementBadge(workout, 320, accentColor)
+        : '';
 
     // Only show motivational message if template config allows it
-    const motivation = 'showMotivation' in config && config.showMotivation
-      ? this.createMotivationalMessage(workout, 420, accentColor)
-      : '';
+    const motivation =
+      'showMotivation' in config && config.showMotivation
+        ? this.createMotivationalMessage(workout, 420, accentColor)
+        : '';
 
     // Branding can be disabled via options or template
     const branding =
-      (options.showBranding !== false && config.showBranding)
+      options.showBranding !== false && config.showBranding
         ? this.createBranding(workout, height - 60, accentColor)
         : '';
 
@@ -350,19 +368,20 @@ export class WorkoutCardGenerator {
     sansFont: string
   ): string {
     const padding = 40;
-    const contentWidth = width - (padding * 2);
+    const contentWidth = width - padding * 2;
 
     // Calculate base Y offset for stats based on header content
     const hasUserName = !!options.userName;
     const hasTeamName = !!options.teamName;
-    const baseYOffset = (hasUserName && hasTeamName) ? 20 : (hasUserName || hasTeamName) ? 0 : -20;
+    const baseYOffset =
+      hasUserName && hasTeamName ? 20 : hasUserName || hasTeamName ? 0 : -20;
 
     // Workout type and date
     const workoutType = this.getWorkoutTypeName(workout);
     const date = new Date(workout.startTime).toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     });
 
     // Key stats with null safety and validation
@@ -374,13 +393,16 @@ export class WorkoutCardGenerator {
     }
 
     // For strength training, show all sets; for other workouts, show primary + secondary stat
-    const isStrengthTraining = ['strength_training', 'gym'].includes(workout.type);
+    const isStrengthTraining = ['strength_training', 'gym'].includes(
+      workout.type
+    );
 
     const primaryStat = stats[0] || {
       value: this.formatDurationDetailed(workout.duration),
-      label: 'Duration'
+      label: 'Duration',
     };
     const secondaryStat = stats[1]; // Keep optional (handled with conditional rendering)
+    const tertiaryStat = stats[2]; // Optional third stat (for GPS walks with distance + duration + steps)
 
     // Motivational quote (optional) - wrap text ONCE and cache result
     const quote = options.customMessage || this.getMotivationalMessage(workout);
@@ -389,15 +411,21 @@ export class WorkoutCardGenerator {
     // Build quote tspans safely
     let quoteTspans = '';
     if (wrappedLines.length > 0) {
-      quoteTspans = `<tspan x="${padding}" dy="0">"${this.escapeXml(wrappedLines[0])}"</tspan>`;
+      quoteTspans = `<tspan x="${padding}" dy="0">"${this.escapeXml(
+        wrappedLines[0]
+      )}"</tspan>`;
       for (let i = 1; i < wrappedLines.length; i++) {
-        quoteTspans += `<tspan x="${padding}" dy="18">${this.escapeXml(wrappedLines[i])}</tspan>`;
+        quoteTspans += `<tspan x="${padding}" dy="18">${this.escapeXml(
+          wrappedLines[i]
+        )}</tspan>`;
       }
     }
 
     return `
       <!-- User name (if available) -->
-      ${options.userName ? `
+      ${
+        options.userName
+          ? `
         <text
           x="${padding}"
           y="40"
@@ -408,10 +436,14 @@ export class WorkoutCardGenerator {
           opacity="0.6"
           letter-spacing="0.5"
         >${this.escapeXml(options.userName).toUpperCase()}</text>
-      ` : ''}
+      `
+          : ''
+      }
 
       <!-- Team name (if available) -->
-      ${options.teamName ? `
+      ${
+        options.teamName
+          ? `
         <text
           x="${padding}"
           y="${options.userName ? 60 : 40}"
@@ -421,12 +453,20 @@ export class WorkoutCardGenerator {
           fill="#FF6B35"
           letter-spacing="0.5"
         >${this.escapeXml(options.teamName)}</text>
-      ` : ''}
+      `
+          : ''
+      }
 
       <!-- Workout type -->
       <text
         x="${padding}"
-        y="${(options.userName && options.teamName) ? 100 : (options.userName || options.teamName) ? 80 : 60}"
+        y="${
+          options.userName && options.teamName
+            ? 100
+            : options.userName || options.teamName
+            ? 80
+            : 60
+        }"
         font-family="${serifFont}"
         font-size="32"
         font-weight="400"
@@ -437,7 +477,13 @@ export class WorkoutCardGenerator {
       <!-- Date -->
       <text
         x="${padding}"
-        y="${(options.userName && options.teamName) ? 130 : (options.userName || options.teamName) ? 110 : 90}"
+        y="${
+          options.userName && options.teamName
+            ? 130
+            : options.userName || options.teamName
+            ? 110
+            : 90
+        }"
         font-family="${sansFont}"
         font-size="14"
         font-weight="400"
@@ -445,13 +491,15 @@ export class WorkoutCardGenerator {
         opacity="0.5"
       >${date}</text>
 
-      ${isStrengthTraining ? `
+      ${
+        isStrengthTraining
+          ? `
         <!-- Strength training: Show all sets -->
         ${stats
           .filter((stat) => stat && stat.value && stat.label) // Filter out invalid stats
           .map((stat, index) => {
             const yOffset = 160 + baseYOffset;
-            const statY = yOffset + (index * 70); // 70px spacing between sets
+            const statY = yOffset + index * 70; // 70px spacing between sets
             return `
               <text
                 x="${padding}"
@@ -473,8 +521,10 @@ export class WorkoutCardGenerator {
                 letter-spacing="1"
               >${this.escapeXml(String(stat.label).toUpperCase())}</text>
             `;
-          }).join('')}
-      ` : `
+          })
+          .join('')}
+      `
+          : `
         <!-- Primary stat (duration) -->
         <text
           x="${padding}"
@@ -498,7 +548,9 @@ export class WorkoutCardGenerator {
         >${primaryStat.label.toUpperCase()}</text>
 
         <!-- Secondary stat (distance, calories, etc.) -->
-        ${secondaryStat ? `
+        ${
+          secondaryStat
+            ? `
           <text
             x="${padding}"
             y="${270 + baseYOffset}"
@@ -518,11 +570,43 @@ export class WorkoutCardGenerator {
             opacity="0.5"
             letter-spacing="1"
           >${secondaryStat.label.toUpperCase()}</text>
-        ` : ''}
-      `}
+        `
+            : ''
+        }
+
+        <!-- Tertiary stat (steps for GPS walks) -->
+        ${
+          tertiaryStat
+            ? `
+          <text
+            x="${padding}"
+            y="${360 + baseYOffset}"
+            font-family="${serifFont}"
+            font-size="24"
+            font-weight="300"
+            fill="#FFFFFF"
+          >${tertiaryStat.value}</text>
+
+          <text
+            x="${padding}"
+            y="${380 + baseYOffset}"
+            font-family="${sansFont}"
+            font-size="10"
+            font-weight="500"
+            fill="#FFFFFF"
+            opacity="0.5"
+            letter-spacing="1"
+          >${tertiaryStat.label.toUpperCase()}</text>
+        `
+            : ''
+        }
+      `
+      }
 
       <!-- Motivational quote -->
-      ${quoteTspans ? `
+      ${
+        quoteTspans
+          ? `
         <text
           x="${padding}"
           y="${height - 100}"
@@ -533,7 +617,9 @@ export class WorkoutCardGenerator {
           fill="#FFFFFF"
           opacity="0.7"
         >${quoteTspans}</text>
-      ` : ''}
+      `
+          : ''
+      }
 
       <!-- RUNSTR branding -->
       <text
@@ -565,12 +651,20 @@ export class WorkoutCardGenerator {
     // Get activity name (e.g., "MEDITATION", "RUNNING")
     const activityName = this.getWorkoutTypeName(workout).toUpperCase();
 
-    // Format duration as MM:SS
+    // Check if this is a step counter post (daily steps, not GPS walk)
+    const isStepCounter = WorkoutCardGenerator.isStepCounterPost(workout);
+
+    // Format duration as MM:SS (unless step counter post)
     const duration = this.formatDurationDetailed(workout.duration);
 
     // Get distance if available
     const distance = workout.distance
       ? `${formatDistanceValue(workout.distance)} km`
+      : null;
+
+    // Get steps for step counter posts (primary stat) or GPS walks (secondary stat)
+    const steps = workout.metadata?.steps
+      ? Math.round(workout.metadata.steps).toLocaleString()
       : null;
 
     return `
@@ -587,7 +681,9 @@ export class WorkoutCardGenerator {
         <rect width="${width}" height="${height}" fill="url(#minimalGradient)"/>
 
         <!-- Team name (if available) -->
-        ${options.teamName ? `
+        ${
+          options.teamName
+            ? `
         <text
           x="${centerX}"
           y="60"
@@ -598,7 +694,9 @@ export class WorkoutCardGenerator {
           fill="${config.accentColor}"
           letter-spacing="0.5"
         >${this.escapeXml(options.teamName)}</text>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- RUNSTR Ostrich Logo (centered, 120x120) -->
         <image
@@ -634,7 +732,7 @@ export class WorkoutCardGenerator {
           letter-spacing="2"
         >COMPLETED</text>
 
-        <!-- Duration label -->
+        <!-- Primary stat label (DURATION for workouts, STEPS for step counter) -->
         <text
           x="${centerX}"
           y="${options.teamName ? '380' : '370'}"
@@ -645,9 +743,9 @@ export class WorkoutCardGenerator {
           fill="#FFFFFF"
           opacity="0.6"
           letter-spacing="1"
-        >DURATION</text>
+        >${isStepCounter ? 'STEPS' : 'DURATION'}</text>
 
-        <!-- Duration value (large, bold, orange) -->
+        <!-- Primary stat value (large, bold, orange) -->
         <text
           x="${centerX}"
           y="${options.teamName ? '440' : '430'}"
@@ -657,7 +755,7 @@ export class WorkoutCardGenerator {
           text-anchor="middle"
           fill="${config.accentColor}"
           letter-spacing="-2"
-        >${duration}</text>
+        >${isStepCounter ? steps : duration}</text>
 
         ${
           distance
@@ -678,8 +776,30 @@ export class WorkoutCardGenerator {
         }
 
         ${
+          // Show steps for GPS walks only (not step counter posts, since they show steps as primary stat)
+          workout.type === 'walking' &&
+          workout.metadata?.steps &&
+          !isStepCounter
+            ? `
+        <!-- Steps (for GPS walks) -->
+        <text
+          x="${centerX}"
+          y="${distance ? '520' : '480'}"
+          font-family="${sansFont}"
+          font-size="20"
+          font-weight="500"
+          text-anchor="middle"
+          fill="#FFFFFF"
+          opacity="0.8"
+        >${steps} STEPS</text>
+        `
+            : ''
+        }
+
+        ${
           // Show reps and sets for strength training
-          ['strength_training', 'gym'].includes(workout.type) && (workout.reps || workout.sets)
+          ['strength_training', 'gym'].includes(workout.type) &&
+          (workout.reps || workout.sets)
             ? `
         <!-- Reps and Sets (for strength training) -->
         <text
@@ -735,15 +855,23 @@ export class WorkoutCardGenerator {
    */
   private getWorkoutTypeName(workout: PublishableWorkout): string {
     // For strength training, show specific exercise if available
-    if ((workout.type === 'strength_training' || workout.type === 'gym') && workout.exerciseType) {
+    if (
+      (workout.type === 'strength_training' || workout.type === 'gym') &&
+      workout.exerciseType
+    ) {
       // Capitalize exercise type: "bench" → "Bench", "pushups" → "Pushups"
-      return workout.exerciseType.charAt(0).toUpperCase() + workout.exerciseType.slice(1);
+      return (
+        workout.exerciseType.charAt(0).toUpperCase() +
+        workout.exerciseType.slice(1)
+      );
     }
 
     // For diet, show specific meal type if available
     if (workout.type === 'diet' && workout.mealType) {
       // Capitalize meal type: "breakfast" → "Breakfast", "lunch" → "Lunch"
-      return workout.mealType.charAt(0).toUpperCase() + workout.mealType.slice(1);
+      return (
+        workout.mealType.charAt(0).toUpperCase() + workout.mealType.slice(1)
+      );
     }
 
     // For meditation, show specific meditation type if available
@@ -751,7 +879,7 @@ export class WorkoutCardGenerator {
       // Format meditation type: "body_scan" → "Body Scan", "guided" → "Guided"
       return workout.meditationType
         .split('_')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
     }
 
@@ -779,12 +907,23 @@ export class WorkoutCardGenerator {
     if (!exerciseType) return false;
 
     const bodyweightExercises = [
-      'pushups', 'pullups', 'chinups', 'situps', 'crunches',
-      'plank', 'burpees', 'jumping jacks', 'mountain climbers',
-      'dips', 'handstand', 'muscle ups', 'lunges', 'squats' // bodyweight squats
+      'pushups',
+      'pullups',
+      'chinups',
+      'situps',
+      'crunches',
+      'plank',
+      'burpees',
+      'jumping jacks',
+      'mountain climbers',
+      'dips',
+      'handstand',
+      'muscle ups',
+      'lunges',
+      'squats', // bodyweight squats
     ];
 
-    return bodyweightExercises.some(ex =>
+    return bodyweightExercises.some((ex) =>
       exerciseType.toLowerCase().includes(ex)
     );
   }
@@ -1124,6 +1263,19 @@ export class WorkoutCardGenerator {
   ): Array<{ value: string; label: string }> {
     const stats = [];
 
+    // Special handling for step counter posts (daily steps tracking)
+    // Show only steps, no duration/calories/distance
+    if (WorkoutCardGenerator.isStepCounterPost(workout)) {
+      if (workout.metadata?.steps) {
+        const steps = Math.round(workout.metadata.steps);
+        stats.push({
+          value: steps.toLocaleString(),
+          label: 'Steps',
+        });
+      }
+      return stats;
+    }
+
     // Duration (skip for diet and strength training)
     // Strength training primary stats are reps/sets, not duration
     if (!['diet', 'strength_training', 'gym'].includes(workout.type)) {
@@ -1137,8 +1289,20 @@ export class WorkoutCardGenerator {
       stats.push({ value: distance, label: 'Distance' });
     }
 
+    // Walking: Show steps from metadata (before calories for GPS walks)
+    if (workout.type === 'walking' && workout.metadata?.steps) {
+      const steps = Math.round(workout.metadata.steps);
+      stats.push({
+        value: steps.toLocaleString(),
+        label: 'Steps',
+      });
+    }
+
     // Calories (skip for meditation and strength training - not meaningful)
-    if (workout.calories && !['meditation', 'strength_training', 'gym'].includes(workout.type)) {
+    if (
+      workout.calories &&
+      !['meditation', 'strength_training', 'gym'].includes(workout.type)
+    ) {
       stats.push({
         value: Math.round(workout.calories).toString(),
         label: 'Calories',
@@ -1157,7 +1321,7 @@ export class WorkoutCardGenerator {
 
     // Cycling: Show speed (km/h) instead of pace
     if (workout.type === 'cycling' && workout.distance && workout.duration) {
-      const speedKmh = (workout.distance / 1000) / (workout.duration / 3600);
+      const speedKmh = workout.distance / 1000 / (workout.duration / 3600);
       stats.push({
         value: `${speedKmh.toFixed(1)} km/h`,
         label: 'Speed',
@@ -1165,11 +1329,7 @@ export class WorkoutCardGenerator {
     }
 
     // Pace (for running only - cycling shows speed instead)
-    if (
-      workout.type === 'running' &&
-      workout.pace &&
-      workout.distance
-    ) {
+    if (workout.type === 'running' && workout.pace && workout.distance) {
       const paceMin = Math.floor(workout.pace / 60);
       const paceSec = workout.pace % 60;
       stats.push({
@@ -1230,15 +1390,6 @@ export class WorkoutCardGenerator {
       }
     }
 
-    // Walking: Show steps from metadata
-    if (workout.type === 'walking' && workout.metadata?.steps) {
-      const steps = Math.round(workout.metadata.steps);
-      stats.push({
-        value: steps.toLocaleString(),
-        label: 'Steps',
-      });
-    }
-
     // Diet: Show meal description, portion size, and calories
     // NOTE: Don't show meal type here - it's already the card title
     if (workout.type === 'diet') {
@@ -1246,9 +1397,10 @@ export class WorkoutCardGenerator {
       if (workout.notes && !workout.notes.includes('at ')) {
         // Skip auto-generated notes like "Breakfast at 8:30 AM"
         // Show user-provided food descriptions (truncate to 30 chars for card)
-        const description = workout.notes.length > 30
-          ? workout.notes.substring(0, 27) + '...'
-          : workout.notes;
+        const description =
+          workout.notes.length > 30
+            ? workout.notes.substring(0, 27) + '...'
+            : workout.notes;
         stats.push({
           value: description,
           label: 'Food',
@@ -1256,7 +1408,8 @@ export class WorkoutCardGenerator {
       }
       if (workout.mealSize) {
         // Capitalize first letter
-        const mealSizeFormatted = workout.mealSize.charAt(0).toUpperCase() + workout.mealSize.slice(1);
+        const mealSizeFormatted =
+          workout.mealSize.charAt(0).toUpperCase() + workout.mealSize.slice(1);
         stats.push({
           value: mealSizeFormatted,
           label: 'Portion',
@@ -1277,7 +1430,7 @@ export class WorkoutCardGenerator {
         // Format meditation type nicely (e.g., "body_scan" → "Body Scan")
         const typeFormatted = workout.meditationType
           .split('_')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ');
         stats.push({
           value: typeFormatted,
@@ -1322,7 +1475,10 @@ export class WorkoutCardGenerator {
    */
   private getMotivationalMessage(workout: PublishableWorkout): string {
     // Exercise-specific messages for strength training
-    if ((workout.type === 'strength_training' || workout.type === 'gym') && workout.exerciseType) {
+    if (
+      (workout.type === 'strength_training' || workout.type === 'gym') &&
+      workout.exerciseType
+    ) {
       const exerciseType = workout.exerciseType.toLowerCase();
 
       const exerciseMessages: Record<string, string[]> = {
@@ -1333,13 +1489,13 @@ export class WorkoutCardGenerator {
         ],
         pullups: [
           'Pull yourself up, one rep at a time. Your goals are within reach.',
-          'The bar is waiting. Show it who\'s boss.',
+          "The bar is waiting. Show it who's boss.",
           'Every pullup is proof that you can rise above.',
         ],
         bench: [
           'Press through the pain. The bar is your friend, not your enemy.',
           'Your chest, your power. Push it to new limits.',
-          'Strength isn\'t built in comfort zones. Lift heavy, grow stronger.',
+          "Strength isn't built in comfort zones. Lift heavy, grow stronger.",
         ],
         squats: [
           'Squat low, rise high. Your legs are your foundation.',
@@ -1347,8 +1503,8 @@ export class WorkoutCardGenerator {
           'Build your throne, one squat at a time.',
         ],
         deadlifts: [
-          'Pick it up. Put it down. Repeat. That\'s how legends are made.',
-          'The deadlift doesn\'t lie. It shows exactly what you\'re made of.',
+          "Pick it up. Put it down. Repeat. That's how legends are made.",
+          "The deadlift doesn't lie. It shows exactly what you're made of.",
           'Lift from the ground up. Your power comes from within.',
         ],
         curls: [
@@ -1359,12 +1515,12 @@ export class WorkoutCardGenerator {
         situps: [
           'Core strength starts with discipline, not with motivation.',
           'Your core is your center. Strengthen it, strengthen everything.',
-          'Every situp is a victory over yesterday\'s limits.',
+          "Every situp is a victory over yesterday's limits.",
         ],
         plank: [
           'Hold steady. Your core is stronger than you think.',
           'Time stands still when your body is on fire. Keep holding.',
-          'The plank reveals your true strength. Don\'t give up.',
+          "The plank reveals your true strength. Don't give up.",
         ],
       };
 
@@ -1474,7 +1630,9 @@ export class WorkoutCardGenerator {
     const s = Math.floor(seconds % 60);
 
     if (h > 0) {
-      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      return `${h}:${m.toString().padStart(2, '0')}:${s
+        .toString()
+        .padStart(2, '0')}`;
     }
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
@@ -1650,7 +1808,12 @@ export class WorkoutCardGenerator {
       const width = 800;
       const height = 800;
 
-      const svgContent = this.createFitnessTestSVG(testData, width, height, options);
+      const svgContent = this.createFitnessTestSVG(
+        testData,
+        width,
+        height,
+        options
+      );
 
       if (!svgContent || svgContent.trim().length === 0) {
         throw new Error('Generated fitness test SVG content is empty');
@@ -1691,7 +1854,9 @@ export class WorkoutCardGenerator {
     options: WorkoutCardOptions
   ): string {
     const duration = this.formatDuration(testData.duration);
-    const scorePercentage = Math.round((testData.score / testData.maxScore) * 100);
+    const scorePercentage = Math.round(
+      (testData.score / testData.maxScore) * 100
+    );
 
     return `
       <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
@@ -1791,7 +1956,9 @@ export class WorkoutCardGenerator {
         >COMPONENT BREAKDOWN</text>
 
         <!-- Pushups -->
-        ${testData.components.pushups ? `
+        ${
+          testData.components.pushups
+            ? `
         <g>
           <text
             x="140"
@@ -1818,10 +1985,14 @@ export class WorkoutCardGenerator {
             text-anchor="end"
           >${testData.components.pushups.score} pts</text>
         </g>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- Situps -->
-        ${testData.components.situps ? `
+        ${
+          testData.components.situps
+            ? `
         <g>
           <text
             x="140"
@@ -1848,10 +2019,14 @@ export class WorkoutCardGenerator {
             text-anchor="end"
           >${testData.components.situps.score} pts</text>
         </g>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- 5K Run -->
-        ${testData.components.run5k ? `
+        ${
+          testData.components.run5k
+            ? `
         <g>
           <text
             x="140"
@@ -1878,7 +2053,9 @@ export class WorkoutCardGenerator {
             text-anchor="end"
           >${testData.components.run5k.score} pts</text>
         </g>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- Footer -->
         <text

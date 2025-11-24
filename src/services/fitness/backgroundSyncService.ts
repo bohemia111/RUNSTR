@@ -2,6 +2,11 @@
  * Background Sync Service
  * Orchestrates workout sync, notifications, and background processing
  * Handles invisible-first operation with push notifications as primary UI
+ *
+ * ⚠️ DEPRECATED: This service is currently disabled due to conflicts with active tracking.
+ * The 30-minute periodic sync was causing "Sync already in progress" errors during workouts.
+ * DO NOT re-enable without implementing proper tracking state checks to prevent conflicts.
+ * See AuthContext.tsx lines 629-650 for where this was disabled.
  */
 
 import { AppState, Platform } from 'react-native';

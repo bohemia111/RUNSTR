@@ -46,7 +46,9 @@ export class KalmanFilter {
       this.variance = 20; // Much lower initial variance (more confident)
       this.lastSpeed = 2.5; // Average jogging speed ~6 min/km pace
       this.speedVariance = 0.5; // Lower uncertainty for speed
-      console.log('[KalmanFilter] Warm start enabled - faster convergence expected');
+      console.log(
+        '[KalmanFilter] Warm start enabled - faster convergence expected'
+      );
     }
   }
 

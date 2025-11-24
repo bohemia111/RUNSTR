@@ -41,8 +41,14 @@ export function applyGlobalPolyfills(): void {
 
   // Log successful polyfill initialization
   console.log('[Polyfills] Applied global polyfills for React Native');
-  console.log('[Polyfills] TextEncoder:', typeof global.TextEncoder !== 'undefined');
-  console.log('[Polyfills] TextDecoder:', typeof global.TextDecoder !== 'undefined');
+  console.log(
+    '[Polyfills] TextEncoder:',
+    typeof global.TextEncoder !== 'undefined'
+  );
+  console.log(
+    '[Polyfills] TextDecoder:',
+    typeof global.TextDecoder !== 'undefined'
+  );
   console.log('[Polyfills] crypto:', typeof global.crypto !== 'undefined');
   console.log('[Polyfills] WebSocket:', typeof WebSocket !== 'undefined');
 }

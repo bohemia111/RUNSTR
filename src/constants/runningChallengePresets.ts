@@ -4,7 +4,11 @@
  * Always running activity, always fastest_time scoring, always 1-day duration
  */
 
-export type RunningChallengeDistance = '5k' | '10k' | 'half-marathon' | 'marathon';
+export type RunningChallengeDistance =
+  | '5k'
+  | '10k'
+  | 'half-marathon'
+  | 'marathon';
 
 export interface RunningChallengePreset {
   id: RunningChallengeDistance;
@@ -91,7 +95,9 @@ export function getChallengeName(distance: RunningChallengeDistance): string {
 /**
  * Get distance value in kilometers
  */
-export function getChallengeDistance(distance: RunningChallengeDistance): number {
+export function getChallengeDistance(
+  distance: RunningChallengeDistance
+): number {
   const preset = getRunningChallengePreset(distance);
   return preset?.distance || 0;
 }

@@ -144,7 +144,8 @@ export class SimpleLocationTrackingService {
   private setupAppStateListener(): void {
     // Use centralized AppStateManager to prevent conflicts
     const appStateManager = AppStateManager;
-    this.appStateUnsubscribe = appStateManager.onStateChange(async (isActive) => {
+    this.appStateUnsubscribe = appStateManager.onStateChange(
+      async (isActive) => {
         if (!isActive) {
           // App went to background
           console.log(
@@ -156,7 +157,9 @@ export class SimpleLocationTrackingService {
           if (this.locationSubscription) {
             this.locationSubscription.remove();
             this.locationSubscription = null;
-            console.log('[SimpleLocationTrackingService] ✅ Foreground subscription removed');
+            console.log(
+              '[SimpleLocationTrackingService] ✅ Foreground subscription removed'
+            );
           }
 
           // Stop JavaScript polling timer (saves battery)
@@ -167,9 +170,14 @@ export class SimpleLocationTrackingService {
           // CRITICAL: Deactivate KeepAwake when backgrounding
           try {
             deactivateKeepAwake('activity-tracking');
-            console.log('[SimpleLocationTrackingService] ✅ KeepAwake deactivated on background');
+            console.log(
+              '[SimpleLocationTrackingService] ✅ KeepAwake deactivated on background'
+            );
           } catch (error) {
-            console.warn('[SimpleLocationTrackingService] Failed to deactivate KeepAwake on background:', error);
+            console.warn(
+              '[SimpleLocationTrackingService] Failed to deactivate KeepAwake on background:',
+              error
+            );
           }
         } else {
           // App returned to foreground
@@ -181,7 +189,9 @@ export class SimpleLocationTrackingService {
             // Step 1: Immediately sync background data BEFORE resuming
             const synced = await this.syncFromBackground();
             if (synced) {
-              console.log('[SimpleLocationTrackingService] ✅ Background data synced on foreground');
+              console.log(
+                '[SimpleLocationTrackingService] ✅ Background data synced on foreground'
+              );
             }
 
             // Step 2: Restart foreground location subscription for real-time UI updates
@@ -199,9 +209,14 @@ export class SimpleLocationTrackingService {
                 },
                 (location) => this.handleLocationUpdate(location)
               );
-              console.log('[SimpleLocationTrackingService] ✅ Foreground subscription restarted');
+              console.log(
+                '[SimpleLocationTrackingService] ✅ Foreground subscription restarted'
+              );
             } catch (error) {
-              console.error('[SimpleLocationTrackingService] Failed to restart foreground subscription:', error);
+              console.error(
+                '[SimpleLocationTrackingService] Failed to restart foreground subscription:',
+                error
+              );
             }
 
             // Step 3: Resume polling for ongoing background sync
@@ -212,9 +227,14 @@ export class SimpleLocationTrackingService {
             // Step 4: Reactivate KeepAwake if still tracking
             try {
               await activateKeepAwakeAsync('activity-tracking');
-              console.log('[SimpleLocationTrackingService] ✅ KeepAwake reactivated on foreground');
+              console.log(
+                '[SimpleLocationTrackingService] ✅ KeepAwake reactivated on foreground'
+              );
             } catch (error) {
-              console.warn('[SimpleLocationTrackingService] Failed to reactivate KeepAwake on foreground:', error);
+              console.warn(
+                '[SimpleLocationTrackingService] Failed to reactivate KeepAwake on foreground:',
+                error
+              );
             }
           }
         }
@@ -281,7 +301,7 @@ export class SimpleLocationTrackingService {
 
       // Reset tracking data
       this.distance = 0;
-      this.duration = 0;  // Reset GPS-timestamp-based duration
+      this.duration = 0; // Reset GPS-timestamp-based duration
       this.positions = [];
       this.elevationGain = 0;
       this.elevationLoss = 0;
@@ -471,7 +491,8 @@ export class SimpleLocationTrackingService {
     // Reference: runstr-github RunTracker.js line 221
     if (!this.isPaused) {
       this.duration = Math.floor(
-        (processedPoint.timestamp - this.startTime - this.totalPausedTime) / 1000
+        (processedPoint.timestamp - this.startTime - this.totalPausedTime) /
+          1000
       );
       // Duration will be read by getCurrentSession() for UI updates
     }
@@ -565,8 +586,9 @@ export class SimpleLocationTrackingService {
         if (distanceToAdd > 0) {
           this.distance = backgroundDistance.totalDistance;
           console.log(
-            `[SimpleLocationTrackingService] Synced background distance: +${distanceToAdd.toFixed(1)}m, ` +
-            `total=${this.distance.toFixed(1)}m`
+            `[SimpleLocationTrackingService] Synced background distance: +${distanceToAdd.toFixed(
+              1
+            )}m, ` + `total=${this.distance.toFixed(1)}m`
           );
 
           // Check for split milestones after distance update
@@ -590,7 +612,10 @@ export class SimpleLocationTrackingService {
 
       return dataSynced;
     } catch (error) {
-      console.warn('[SimpleLocationTrackingService] Error syncing background data:', error);
+      console.warn(
+        '[SimpleLocationTrackingService] Error syncing background data:',
+        error
+      );
       return false;
     }
   }
@@ -610,7 +635,9 @@ export class SimpleLocationTrackingService {
       }
     }, SYNC_INTERVAL_MS);
 
-    console.log('[SimpleLocationTrackingService] Background sync polling started');
+    console.log(
+      '[SimpleLocationTrackingService] Background sync polling started'
+    );
   }
 
   /**
@@ -620,7 +647,9 @@ export class SimpleLocationTrackingService {
     if (this.backgroundSyncTimer) {
       clearInterval(this.backgroundSyncTimer);
       this.backgroundSyncTimer = null;
-      console.log('[SimpleLocationTrackingService] Background sync polling stopped');
+      console.log(
+        '[SimpleLocationTrackingService] Background sync polling stopped'
+      );
     }
   }
 
@@ -798,9 +827,9 @@ export class SimpleLocationTrackingService {
       // Use the background-calculated distance if it's greater
       if (finalBackgroundDistance.totalDistance > this.distance) {
         console.log(
-          `[${Platform.OS.toUpperCase()}] Using background distance: ${
-            (finalBackgroundDistance.totalDistance / 1000).toFixed(2)
-          } km (was ${(this.distance / 1000).toFixed(2)} km)`
+          `[${Platform.OS.toUpperCase()}] Using background distance: ${(
+            finalBackgroundDistance.totalDistance / 1000
+          ).toFixed(2)} km (was ${(this.distance / 1000).toFixed(2)} km)`
         );
         this.distance = finalBackgroundDistance.totalDistance;
       }
@@ -883,7 +912,8 @@ export class SimpleLocationTrackingService {
 
     // Use GPS-timestamp-based duration (updated in handleLocationUpdate)
     // Falls back to calculation if no GPS updates yet
-    const currentDuration = this.duration > 0 ? this.duration : this.getElapsedTime();
+    const currentDuration =
+      this.duration > 0 ? this.duration : this.getElapsedTime();
 
     return {
       id: this.sessionId || `session_${Date.now()}`,

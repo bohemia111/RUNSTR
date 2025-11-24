@@ -184,7 +184,9 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
     try {
       const events = await CaptainEventStore.getTeamEvents(teamId);
       setCaptainEvents(events);
-      console.log(`📋 Loaded ${events.length} captain-created events for team ${teamId}`);
+      console.log(
+        `📋 Loaded ${events.length} captain-created events for team ${teamId}`
+      );
     } catch (error) {
       console.error('Error loading captain events:', error);
     }
@@ -206,7 +208,10 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
               console.log(`🗑️ Deleted event: ${eventName}`);
             } catch (error) {
               console.error('Failed to delete event:', error);
-              CustomAlertManager.alert('Error', 'Failed to delete event. Please try again.');
+              CustomAlertManager.alert(
+                'Error',
+                'Failed to delete event. Please try again.'
+              );
             }
           },
         },
@@ -564,14 +569,20 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const signer = await signingService.getSigner();
 
       if (!signer) {
-        CustomAlertManager.alert('Error', 'Unable to sign event. Please ensure you are logged in.');
+        CustomAlertManager.alert(
+          'Error',
+          'Unable to sign event. Please ensure you are logged in.'
+        );
         return;
       }
 
       // Get user's hex pubkey for captain tag
       const userHexPubkey = await signingService.getUserPubkey();
       if (!userHexPubkey) {
-        CustomAlertManager.alert('Error', 'Unable to get user pubkey. Please try logging in again.');
+        CustomAlertManager.alert(
+          'Error',
+          'Unable to get user pubkey. Please try logging in again.'
+        );
         return;
       }
 
@@ -671,7 +682,8 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
             await LocalTeamStorageService.updateCreatedTeam(teamId, {
               name: editedTeamName.trim(),
               description: editedTeamDescription.trim(),
-              bannerImage: editedBannerUrl.trim() || currentTeamData?.bannerImage,
+              bannerImage:
+                editedBannerUrl.trim() || currentTeamData?.bannerImage,
               charityId: editedCharityId,
             });
             console.log('✅ Local team updated in AsyncStorage');
@@ -694,40 +706,44 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
           console.log('✅ Team data reloaded with fresh cache');
         }, 3000);
 
-        CustomAlertManager.alert('Success', 'Team information updated successfully!', [
-          {
-            text: 'View Team',
-            onPress: async () => {
-              // Reload team data
-              await loadTeamCharity();
+        CustomAlertManager.alert(
+          'Success',
+          'Team information updated successfully!',
+          [
+            {
+              text: 'View Team',
+              onPress: async () => {
+                // Reload team data
+                await loadTeamCharity();
 
-              // Navigate to the team page with updated data
-              if (currentTeamData && navigation) {
-                // Ensure we have the latest banner URL
-                const updatedBannerUrl = editedBannerUrl.trim();
-                console.log(
-                  '🎯 Navigating with banner URL:',
-                  updatedBannerUrl || 'none'
-                );
+                // Navigate to the team page with updated data
+                if (currentTeamData && navigation) {
+                  // Ensure we have the latest banner URL
+                  const updatedBannerUrl = editedBannerUrl.trim();
+                  console.log(
+                    '🎯 Navigating with banner URL:',
+                    updatedBannerUrl || 'none'
+                  );
 
-                navigation.navigate('EnhancedTeamScreen', {
-                  team: {
-                    ...currentTeamData,
-                    name: editedTeamName.trim(),
-                    description: editedTeamDescription.trim(),
-                    location: editedTeamLocation.trim(),
-                    bannerImage: updatedBannerUrl,
-                    // Include nostrEvent for fallback banner extraction
-                    nostrEvent: currentTeamData.nostrEvent,
-                  },
-                  userIsMember: true,
-                  userIsCaptain: true,
-                  currentUserNpub: userNpub,
-                });
-              }
+                  navigation.navigate('EnhancedTeamScreen', {
+                    team: {
+                      ...currentTeamData,
+                      name: editedTeamName.trim(),
+                      description: editedTeamDescription.trim(),
+                      location: editedTeamLocation.trim(),
+                      bannerImage: updatedBannerUrl,
+                      // Include nostrEvent for fallback banner extraction
+                      nostrEvent: currentTeamData.nostrEvent,
+                    },
+                    userIsMember: true,
+                    userIsCaptain: true,
+                    currentUserNpub: userNpub,
+                  });
+                }
+              },
             },
-          },
-        ]);
+          ]
+        );
 
         // Also reload team data in background
         setTimeout(() => {
@@ -757,14 +773,20 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const signer = await signingService.getSigner();
 
       if (!signer) {
-        CustomAlertManager.alert('Error', 'Unable to sign event. Please ensure you are logged in.');
+        CustomAlertManager.alert(
+          'Error',
+          'Unable to sign event. Please ensure you are logged in.'
+        );
         return;
       }
 
       // Get user's hex pubkey for captain tag
       const userHexPubkey = await signingService.getUserPubkey();
       if (!userHexPubkey) {
-        CustomAlertManager.alert('Error', 'Unable to get user pubkey. Please try logging in again.');
+        CustomAlertManager.alert(
+          'Error',
+          'Unable to get user pubkey. Please try logging in again.'
+        );
         return;
       }
 
@@ -974,7 +996,10 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
         console.error('[Captain] User is not the captain of this team!');
         console.error(`  User hex: ${authData.hexPubkey}`);
         console.error(`  Captain hex: ${captainId}`);
-        CustomAlertManager.alert('Error', 'You are not the captain of this team');
+        CustomAlertManager.alert(
+          'Error',
+          'You are not the captain of this team'
+        );
         setIsCreatingList(false);
         return;
       }
@@ -1010,11 +1035,17 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
           'Team member list created! You can now run competitions and manage members.'
         );
       } else {
-        CustomAlertManager.alert('Error', result.error || 'Failed to create member list');
+        CustomAlertManager.alert(
+          'Error',
+          result.error || 'Failed to create member list'
+        );
       }
     } catch (error) {
       console.error('Error creating member list:', error);
-      CustomAlertManager.alert('Error', 'Failed to create member list. Please try again.');
+      CustomAlertManager.alert(
+        'Error',
+        'Failed to create member list. Please try again.'
+      );
     } finally {
       setIsCreatingList(false);
     }
@@ -1109,7 +1140,10 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
               const memberCache = TeamMemberCache.getInstance();
               memberCache.invalidateTeam(teamId, captainId);
 
-              CustomAlertManager.alert('Success', 'Member has been removed from the team');
+              CustomAlertManager.alert(
+                'Success',
+                'Member has been removed from the team'
+              );
             } catch (error) {
               console.error('Failed to remove member:', error);
               CustomAlertManager.alert(
@@ -1126,7 +1160,10 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
   // Add member to team
   const handleAddMember = async () => {
     if (!newMemberNpub.trim()) {
-      CustomAlertManager.alert('Error', 'Please enter a member npub or hex pubkey');
+      CustomAlertManager.alert(
+        'Error',
+        'Please enter a member npub or hex pubkey'
+      );
       return;
     }
 
@@ -1156,7 +1193,10 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
 
       // Check if member already exists
       if (currentList.members.includes(newMemberNpub)) {
-        CustomAlertManager.alert('Info', 'This member is already part of the team');
+        CustomAlertManager.alert(
+          'Info',
+          'This member is already part of the team'
+        );
         return;
       }
 
@@ -1202,10 +1242,16 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
       const memberCache = TeamMemberCache.getInstance();
       memberCache.invalidateTeam(teamId, captainId);
 
-      CustomAlertManager.alert('Success', 'Member added to the team successfully');
+      CustomAlertManager.alert(
+        'Success',
+        'Member added to the team successfully'
+      );
     } catch (error) {
       console.error('Failed to add member:', error);
-      CustomAlertManager.alert('Error', 'Failed to add member. Please try again.');
+      CustomAlertManager.alert(
+        'Error',
+        'Failed to add member. Please try again.'
+      );
     }
   };
 
@@ -1244,7 +1290,11 @@ export const CaptainDashboardScreen: React.FC<CaptainDashboardScreenProps> = ({
             onPress={() => setShowEditTeamModal(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="create-outline" size={20} color={theme.colors.text} />
+            <Ionicons
+              name="create-outline"
+              size={20}
+              color={theme.colors.text}
+            />
             <Text style={styles.editTeamButtonText}>Edit Team</Text>
           </TouchableOpacity>
         </View>

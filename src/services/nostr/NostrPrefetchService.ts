@@ -174,7 +174,9 @@ export class NostrPrefetchService {
 
           // 1. Get teams where user is captain
           const captainTeams = await CaptainCache.getCaptainTeams();
-          console.log(`[Prefetch] Found ${captainTeams.length} captain teams in cache`);
+          console.log(
+            `[Prefetch] Found ${captainTeams.length} captain teams in cache`
+          );
 
           for (const teamId of captainTeams) {
             const team = discoveredTeams.get(teamId);
@@ -196,7 +198,9 @@ export class NostrPrefetchService {
           }
 
           // 2. Get all local memberships and enrich with discovered team data
-          console.log(`[Prefetch] Found ${memberships.length} local memberships`);
+          console.log(
+            `[Prefetch] Found ${memberships.length} local memberships`
+          );
 
           for (const membership of memberships) {
             // Skip if already added as captain
@@ -208,7 +212,8 @@ export class NostrPrefetchService {
 
             if (team) {
               // Enrich with discovered team data
-              const isCaptain = team.captainId === hexPubkey || team.captainId === userNpub;
+              const isCaptain =
+                team.captainId === hexPubkey || team.captainId === userNpub;
               userTeams.push({
                 id: team.id,
                 name: team.name,
@@ -236,7 +241,9 @@ export class NostrPrefetchService {
             }
           }
 
-          console.log(`[Prefetch] ✅ Built ${userTeams.length} enriched teams for user`);
+          console.log(
+            `[Prefetch] ✅ Built ${userTeams.length} enriched teams for user`
+          );
           return userTeams;
         },
         { ttl: CacheTTL.USER_TEAMS }

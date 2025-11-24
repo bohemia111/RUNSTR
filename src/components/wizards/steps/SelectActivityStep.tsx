@@ -34,7 +34,8 @@ export const SelectActivityStep: React.FC<SelectActivityStepProps> = ({
             key={activity.value}
             style={[
               styles.activityOption,
-              selectedActivity === activity.value && styles.activityOptionSelected,
+              selectedActivity === activity.value &&
+                styles.activityOptionSelected,
             ]}
             onPress={() => onSelectActivity(activity.value)}
             activeOpacity={0.7}
@@ -42,7 +43,8 @@ export const SelectActivityStep: React.FC<SelectActivityStepProps> = ({
             <Text
               style={[
                 styles.activityLabel,
-                selectedActivity === activity.value && styles.activityLabelSelected,
+                selectedActivity === activity.value &&
+                  styles.activityLabelSelected,
               ]}
             >
               {activity.label}

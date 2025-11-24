@@ -251,9 +251,7 @@ export const ActivityTrackerScreen: React.FC = () => {
         />
         <TabButton
           label="More"
-          isActive={['strength', 'diet', 'meditation'].includes(
-            activeTab
-          )}
+          isActive={['strength', 'diet', 'meditation'].includes(activeTab)}
           onPress={() => setShowMoreMenu(true)}
           icon="ellipsis-horizontal"
         />

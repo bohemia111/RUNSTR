@@ -140,9 +140,7 @@ export const RouteSelectionModal: React.FC<RouteSelectionModalProps> = ({
       {route.bestTime && (
         <View style={styles.prBadge}>
           <Ionicons name="trophy" size={14} color={theme.colors.accent} />
-          <Text style={styles.prText}>
-            PR: {formatTime(route.bestTime)}
-          </Text>
+          <Text style={styles.prText}>PR: {formatTime(route.bestTime)}</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -153,7 +151,8 @@ export const RouteSelectionModal: React.FC<RouteSelectionModalProps> = ({
       <Ionicons name="map-outline" size={64} color={theme.colors.textMuted} />
       <Text style={styles.emptyStateTitle}>No Routes Yet</Text>
       <Text style={styles.emptyStateText}>
-        Complete your first {activityType} workout and save it as a route to race against your PR!
+        Complete your first {activityType} workout and save it as a route to
+        race against your PR!
       </Text>
     </View>
   );
@@ -183,7 +182,10 @@ export const RouteSelectionModal: React.FC<RouteSelectionModalProps> = ({
           </View>
 
           {/* Track Freely Option */}
-          <TouchableOpacity style={styles.trackFreelyCard} onPress={onTrackFreely}>
+          <TouchableOpacity
+            style={styles.trackFreelyCard}
+            onPress={onTrackFreely}
+          >
             <View style={styles.trackFreelyContent}>
               <Ionicons name="compass" size={24} color={theme.colors.text} />
               <View style={styles.trackFreelyText}>

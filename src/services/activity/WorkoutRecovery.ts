@@ -109,10 +109,15 @@ export class WorkoutRecovery {
         return null;
       }
 
-      console.log(`[WorkoutRecovery] Found recoverable workout: ${checkpoint.sessionId}`);
+      console.log(
+        `[WorkoutRecovery] Found recoverable workout: ${checkpoint.sessionId}`
+      );
       return checkpoint;
     } catch (error) {
-      console.error('[WorkoutRecovery] Error checking for recoverable workout:', error);
+      console.error(
+        '[WorkoutRecovery] Error checking for recoverable workout:',
+        error
+      );
       return null;
     }
   }
@@ -157,7 +162,10 @@ export class WorkoutRecovery {
       await AsyncStorage.setItem(CHECKPOINT_KEY, JSON.stringify(checkpoint));
       console.log('[WorkoutRecovery] Final checkpoint saved');
     } catch (error) {
-      console.error('[WorkoutRecovery] Failed to save final checkpoint:', error);
+      console.error(
+        '[WorkoutRecovery] Failed to save final checkpoint:',
+        error
+      );
     }
   }
 }

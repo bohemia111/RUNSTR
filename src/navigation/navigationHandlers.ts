@@ -101,7 +101,10 @@ export const createNavigationHandlers = (): NavigationHandlers => {
         const nostrTeam = cachedTeams.find((t) => t.id === team.id);
 
         if (!nostrTeam) {
-          CustomAlertManager.alert('Error', 'Team not found. Please refresh and try again.');
+          CustomAlertManager.alert(
+            'Error',
+            'Team not found. Please refresh and try again.'
+          );
           return;
         }
 
@@ -304,7 +307,10 @@ export const createNavigationHandlers = (): NavigationHandlers => {
         );
       } catch (error) {
         console.error('NavigationHandlers: Error in handleLeaveTeam:', error);
-        CustomAlertManager.alert('Error', 'Unable to process team leave request');
+        CustomAlertManager.alert(
+          'Error',
+          'Unable to process team leave request'
+        );
       }
     },
 
@@ -576,7 +582,10 @@ export const createNavigationHandlers = (): NavigationHandlers => {
 
     handleEditLeague: () => {
       console.log('Edit league pressed');
-      CustomAlertManager.alert('Edit League', 'League settings management coming soon!');
+      CustomAlertManager.alert(
+        'Edit League',
+        'League settings management coming soon!'
+      );
     },
 
     handleDistributeRewards: (distributions: RewardDistribution[]) => {
@@ -614,13 +623,19 @@ export const createNavigationHandlers = (): NavigationHandlers => {
 
     handleViewAllActivity: () => {
       console.log('View all activity pressed');
-      CustomAlertManager.alert('Activity Feed', 'Full activity feed view coming soon!');
+      CustomAlertManager.alert(
+        'Activity Feed',
+        'Full activity feed view coming soon!'
+      );
     },
 
     // Profile Screen Handlers
     handleEditProfile: () => {
       console.log('Edit profile pressed');
-      CustomAlertManager.alert('Edit Profile', 'Profile editing functionality coming soon!');
+      CustomAlertManager.alert(
+        'Edit Profile',
+        'Profile editing functionality coming soon!'
+      );
     },
 
     handleProfileSend: () => {
@@ -731,33 +746,40 @@ export const createNavigationHandlers = (): NavigationHandlers => {
 
     handleSignOut: (navigation: any) => {
       console.log('Sign out pressed');
-      CustomAlertManager.alert('Sign Out', 'Are you sure you want to sign out?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Use AuthService to properly clear all auth state
-              await AuthService.signOut();
-              console.log('User signed out successfully');
+      CustomAlertManager.alert(
+        'Sign Out',
+        'Are you sure you want to sign out?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Sign Out',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                // Use AuthService to properly clear all auth state
+                await AuthService.signOut();
+                console.log('User signed out successfully');
 
-              // Don't manually navigate - the App.tsx will detect auth state change
-              // and automatically show the Login screen
-              // If we're in a nested navigator, navigate to a root screen first
-              if (navigation.getParent()) {
-                navigation.getParent().reset({
-                  index: 0,
-                  routes: [{ name: 'Login' }],
-                });
+                // Don't manually navigate - the App.tsx will detect auth state change
+                // and automatically show the Login screen
+                // If we're in a nested navigator, navigate to a root screen first
+                if (navigation.getParent()) {
+                  navigation.getParent().reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                  });
+                }
+              } catch (error) {
+                console.error('Error during sign out:', error);
+                CustomAlertManager.alert(
+                  'Error',
+                  'Failed to sign out. Please try again.'
+                );
               }
-            } catch (error) {
-              console.error('Error during sign out:', error);
-              CustomAlertManager.alert('Error', 'Failed to sign out. Please try again.');
-            }
+            },
           },
-        },
-      ]);
+        ]
+      );
     },
   };
 };

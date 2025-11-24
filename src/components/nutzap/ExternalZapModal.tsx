@@ -38,10 +38,10 @@ import {
 
 interface ExternalZapModalProps {
   visible: boolean;
-  recipientNpub: string;  // Can be npub OR Lightning address
+  recipientNpub: string; // Can be npub OR Lightning address
   recipientName: string;
   amount: number;
-  memo?: string;  // Optional - will default to "Donation to {recipientName}"
+  memo?: string; // Optional - will default to "Donation to {recipientName}"
   onClose: () => void;
   onSuccess?: () => void;
 }
@@ -66,7 +66,9 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
   const recipientHex = React.useMemo(() => {
     // If it's a Lightning address, don't try to convert it
     if (recipientNpub && recipientNpub.includes('@')) {
-      console.log('[ExternalZapModal] Lightning address detected, skipping npub conversion');
+      console.log(
+        '[ExternalZapModal] Lightning address detected, skipping npub conversion'
+      );
       return recipientNpub;
     }
 
@@ -83,7 +85,11 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
   }, [recipientNpub]);
 
   useEffect(() => {
-    console.log('[ExternalZapModal] Modal state changed:', { visible, amount, recipientNpub });
+    console.log('[ExternalZapModal] Modal state changed:', {
+      visible,
+      amount,
+      recipientNpub,
+    });
 
     if (visible) {
       // Always generate invoice when modal opens, even if amount is 0 (show error)
@@ -145,7 +151,7 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
       recipientNpub,
       recipientName,
       amount,
-      memo
+      memo,
     });
 
     setIsLoading(true);
@@ -181,7 +187,10 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
           const user = ndk.getUser({ pubkey: recipientHex });
           await user.fetchProfile();
           lightningAddress = user.profile?.lud16 || user.profile?.lud06 || null;
-          console.log('[ExternalZapModal] Profile Lightning address:', lightningAddress);
+          console.log(
+            '[ExternalZapModal] Profile Lightning address:',
+            lightningAddress
+          );
         } catch (profileError) {
           console.error(
             '[ExternalZapModal] Error fetching profile:',
@@ -202,19 +211,26 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
       );
 
       // Get invoice from Lightning address (NIP-57 zap request will be handled internally)
-      console.log('[ExternalZapModal] 🔄 Requesting invoice for', amount, 'sats');
-      console.log('[ExternalZapModal] Memo:', memo || `Donation to ${recipientName}`);
+      console.log(
+        '[ExternalZapModal] 🔄 Requesting invoice for',
+        amount,
+        'sats'
+      );
+      console.log(
+        '[ExternalZapModal] Memo:',
+        memo || `Donation to ${recipientName}`
+      );
 
       const invoiceResult = await getInvoiceFromLightningAddress(
         lightningAddress,
         amount,
-        memo || `Donation to ${recipientName}`  // Default memo if not provided
+        memo || `Donation to ${recipientName}` // Default memo if not provided
       );
 
       console.log('[ExternalZapModal] Invoice result:', {
         hasInvoice: !!invoiceResult?.invoice,
         invoiceLength: invoiceResult?.invoice?.length,
-        successMessage: invoiceResult?.successMessage
+        successMessage: invoiceResult?.successMessage,
       });
 
       if (invoiceResult && invoiceResult.invoice) {
@@ -234,7 +250,8 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
         setInvoice(invoiceResult.invoice);
         console.log(
           '[ExternalZapModal] ✅ Invoice generated and validated successfully!',
-          'Invoice starts with:', invoiceResult.invoice.substring(0, 20) + '...'
+          'Invoice starts with:',
+          invoiceResult.invoice.substring(0, 20) + '...'
         );
       } else {
         const errorMsg = 'Failed to generate invoice - no invoice returned';
@@ -247,10 +264,18 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
       // Provide more specific error messages
       let errorMessage = 'Failed to generate invoice';
       if (err instanceof Error) {
-        if (err.message.includes('timeout') || err.message.includes('Timeout')) {
-          errorMessage = 'Request timed out. The Lightning service may be temporarily unavailable. Please try again.';
-        } else if (err.message.includes('network') || err.message.includes('Network')) {
-          errorMessage = 'Network error. Please check your connection and try again.';
+        if (
+          err.message.includes('timeout') ||
+          err.message.includes('Timeout')
+        ) {
+          errorMessage =
+            'Request timed out. The Lightning service may be temporarily unavailable. Please try again.';
+        } else if (
+          err.message.includes('network') ||
+          err.message.includes('Network')
+        ) {
+          errorMessage =
+            'Network error. Please check your connection and try again.';
         } else if (err.message.includes('Lightning address')) {
           errorMessage = err.message;
         } else {
@@ -434,9 +459,7 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
 
                   {/* Wallet Selection Buttons */}
                   <View style={styles.walletButtonsSection}>
-                    <Text style={styles.walletSectionTitle}>
-                      Select Wallet
-                    </Text>
+                    <Text style={styles.walletSectionTitle}>Select Wallet</Text>
 
                     {/* Cash App */}
                     <TouchableOpacity
@@ -529,7 +552,9 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={theme.colors.text} />
                   <Text style={styles.loadingText}>
-                    {isLoading ? 'Generating invoice...' : 'Preparing payment...'}
+                    {isLoading
+                      ? 'Generating invoice...'
+                      : 'Preparing payment...'}
                   </Text>
                 </View>
               )}
@@ -570,7 +595,7 @@ const styles = StyleSheet.create({
   modal: {
     width: '100%',
     maxWidth: 400,
-    height: '85%',  // Fixed height to establish flex context for ScrollView
+    height: '85%', // Fixed height to establish flex context for ScrollView
     backgroundColor: theme.colors.background,
     borderRadius: theme.borderRadius.large,
     borderWidth: 1,

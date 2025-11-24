@@ -119,10 +119,12 @@ class NWCWalletServiceClass {
 
       // If app was backgrounded for more than 30 seconds, check connection
       if (timeSinceBackground > 30000 && this.nwcClient) {
-        console.log('[NWC] App became active after background, checking connection...');
+        console.log(
+          '[NWC] App became active after background, checking connection...'
+        );
 
         // Wait for iOS to restore network connectivity
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
 
         // Try a quick operation to test connection
         try {
@@ -146,11 +148,18 @@ class NWCWalletServiceClass {
    * Validate NWC connection string format and components
    * Ensures string has all required parts
    */
-  private validateConnectionString(str: string): { isValid: boolean; error?: string; components?: any } {
+  private validateConnectionString(str: string): {
+    isValid: boolean;
+    error?: string;
+    components?: any;
+  } {
     try {
       // NWC format: nostr+walletconnect://pubkey?relay=wss://...&secret=...
       if (!str || !str.startsWith('nostr+walletconnect://')) {
-        return { isValid: false, error: 'Invalid protocol, must start with nostr+walletconnect://' };
+        return {
+          isValid: false,
+          error: 'Invalid protocol, must start with nostr+walletconnect://',
+        };
       }
 
       // Parse URL components
@@ -168,7 +177,10 @@ class NWCWalletServiceClass {
       }
 
       if (!relay.startsWith('wss://') && !relay.startsWith('ws://')) {
-        return { isValid: false, error: 'Invalid relay URL, must be ws:// or wss://' };
+        return {
+          isValid: false,
+          error: 'Invalid relay URL, must be ws:// or wss://',
+        };
       }
 
       if (!secret || secret.length < 32) {
@@ -177,11 +189,13 @@ class NWCWalletServiceClass {
 
       // Check for Alby relay specifically
       const isAlbyRelay = relay.includes('relay.getalby.com');
-      console.log(`[NWC] Using ${isAlbyRelay ? 'Alby' : 'custom'} relay: ${relay}`);
+      console.log(
+        `[NWC] Using ${isAlbyRelay ? 'Alby' : 'custom'} relay: ${relay}`
+      );
 
       return {
         isValid: true,
-        components: { pubkey, relay, secret, isAlbyRelay }
+        components: { pubkey, relay, secret, isAlbyRelay },
       };
     } catch (error) {
       return { isValid: false, error: `Parse error: ${error.message}` };
@@ -257,7 +271,9 @@ class NWCWalletServiceClass {
 
       // Check if NWCClient is available from SDK
       if (!NWCClient) {
-        throw new Error('NWCClient not found in @getalby/sdk - check SDK installation');
+        throw new Error(
+          'NWCClient not found in @getalby/sdk - check SDK installation'
+        );
       }
 
       // CRITICAL: Pass React Native's WebSocket to the SDK
@@ -268,7 +284,9 @@ class NWCWalletServiceClass {
         websocketImplementation: WebSocket, // React Native's built-in WebSocket
       });
 
-      console.log('[NWC] NWCClient instance created with React Native WebSocket');
+      console.log(
+        '[NWC] NWCClient instance created with React Native WebSocket'
+      );
 
       // Don't manipulate relay, just test the connection
       console.log('[NWC] Testing SDK connection...');
@@ -291,14 +309,19 @@ class NWCWalletServiceClass {
             methods: info.methods?.slice(0, 3) || [],
           });
           return; // Success - exit initialization
-
         } catch (error) {
-          lastError = error instanceof Error ? error : new Error('Unknown error');
-          console.log(`[NWC] Attempt ${attempt + 1} failed:`, lastError.message);
+          lastError =
+            error instanceof Error ? error : new Error('Unknown error');
+          console.log(
+            `[NWC] Attempt ${attempt + 1} failed:`,
+            lastError.message
+          );
 
           if (attempt < delays.length) {
             console.log(`[NWC] Retrying in ${delays[attempt]}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+            await new Promise((resolve) =>
+              setTimeout(resolve, delays[attempt])
+            );
           }
         }
       }
@@ -306,17 +329,29 @@ class NWCWalletServiceClass {
       // If we get here, all attempts failed
       throw lastError || new Error('Failed to connect after all retries');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[NWC] ❌ User wallet initialization failed:', errorMessage);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      console.error(
+        '[NWC] ❌ User wallet initialization failed:',
+        errorMessage
+      );
 
       // Provide more specific error guidance
       if (errorMessage.includes('publish timed out')) {
-        console.error('[NWC] WebSocket connection issue - relay cannot publish events');
-        console.error('[NWC] This usually means the WebSocket connection is not fully established');
+        console.error(
+          '[NWC] WebSocket connection issue - relay cannot publish events'
+        );
+        console.error(
+          '[NWC] This usually means the WebSocket connection is not fully established'
+        );
       } else if (errorMessage.includes('timeout')) {
-        console.error('[NWC] Connection timeout - wallet service may be unreachable');
+        console.error(
+          '[NWC] Connection timeout - wallet service may be unreachable'
+        );
       } else if (errorMessage.includes('NWCClient not found')) {
-        console.error('[NWC] SDK import issue - check @getalby/sdk installation');
+        console.error(
+          '[NWC] SDK import issue - check @getalby/sdk installation'
+        );
       }
 
       // Clean up on failure
@@ -325,7 +360,9 @@ class NWCWalletServiceClass {
 
       // Don't throw for initialization failures - return gracefully
       // This prevents app crashes when wallet is not configured
-      console.log('[NWC] Wallet will remain disconnected - operations will fail gracefully');
+      console.log(
+        '[NWC] Wallet will remain disconnected - operations will fail gracefully'
+      );
     }
   }
 

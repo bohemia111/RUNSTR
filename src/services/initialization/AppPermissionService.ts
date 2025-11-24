@@ -44,10 +44,11 @@ export class AppPermissionService {
 
     // iOS: Foreground-only is acceptable (background is optional)
     // Android: Both foreground and background required for full tracking
-    const locationGranted = Platform.OS === 'ios'
-      ? locationStatus.foreground === 'granted'
-      : locationStatus.foreground === 'granted' &&
-        locationStatus.background === 'granted';
+    const locationGranted =
+      Platform.OS === 'ios'
+        ? locationStatus.foreground === 'granted'
+        : locationStatus.foreground === 'granted' &&
+          locationStatus.background === 'granted';
 
     // Check notification permission (Android 13+ only)
     let notificationGranted = true;

@@ -64,7 +64,10 @@ export const StepGoalPickerModal: React.FC<StepGoalPickerModalProps> = ({
           </View>
 
           {/* Goal Options */}
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+          >
             {GOAL_OPTIONS.map((option) => {
               const isSelected = option.value === currentGoal;
               return (
@@ -81,7 +84,11 @@ export const StepGoalPickerModal: React.FC<StepGoalPickerModalProps> = ({
                     <Ionicons
                       name="trophy"
                       size={20}
-                      color={isSelected ? theme.colors.accent : theme.colors.textMuted}
+                      color={
+                        isSelected
+                          ? theme.colors.accent
+                          : theme.colors.textMuted
+                      }
                     />
                     <Text
                       style={[

@@ -52,7 +52,9 @@ export const SelectWagerStep: React.FC<SelectWagerStepProps> = ({
             key={preset}
             style={[
               styles.wagerOption,
-              wagerAmount === preset && !showCustom && styles.wagerOptionSelected,
+              wagerAmount === preset &&
+                !showCustom &&
+                styles.wagerOptionSelected,
             ]}
             onPress={() => handlePresetSelect(preset)}
             activeOpacity={0.7}
@@ -60,7 +62,9 @@ export const SelectWagerStep: React.FC<SelectWagerStepProps> = ({
             <Text
               style={[
                 styles.wagerLabel,
-                wagerAmount === preset && !showCustom && styles.wagerLabelSelected,
+                wagerAmount === preset &&
+                  !showCustom &&
+                  styles.wagerLabelSelected,
               ]}
             >
               {preset === 0 ? 'Free' : `${preset.toLocaleString()} sats`}
@@ -81,7 +85,9 @@ export const SelectWagerStep: React.FC<SelectWagerStepProps> = ({
               (showCustom || isCustomSelected) && styles.wagerLabelSelected,
             ]}
           >
-            {isCustomSelected ? `${wagerAmount.toLocaleString()} sats` : 'Custom'}
+            {isCustomSelected
+              ? `${wagerAmount.toLocaleString()} sats`
+              : 'Custom'}
           </Text>
         </TouchableOpacity>
       </View>
