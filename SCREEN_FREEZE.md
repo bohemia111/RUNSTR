@@ -163,9 +163,9 @@ NavigationDataContext was initializing heavy operations DURING the permission mo
 - **The callback never fired properly**: onPermissionComplete wasn't reliably called on real devices
 - **Result**: App became completely unusable on real devices
 
-## ✅ FIXED! Attempt #12: Fix Infinite Loop in NavigationDataContext (Nov 27, 2025)
+## ❌ FAILED Attempt #12: Fix Infinite Loop in NavigationDataContext (Nov 27, 2025)
 
-### The Real Problem
+### What We Thought
 NavigationDataContext had an infinite loop in its useEffect dependency array. The effect was setting `profileData` state while also depending on it, causing rapid re-renders that iOS couldn't handle but Android could tolerate due to threading differences.
 
 ### The Bug Found
@@ -199,11 +199,11 @@ const INIT_DELAY = Platform.OS === 'ios' ? 2000 : 500;
 - **Android Modal**: Runs on RenderThread independently (~300ms)
 - **Result**: iOS couldn't complete modal unmount during infinite loop, Android could
 
-### Why This Finally Works
-- No more infinite loop overwhelming iOS main thread
-- Modal has enough time (2000ms) to fully unmount on iOS
-- NavigationDataContext initializes cleanly without rapid re-renders
-- Both platforms now work identically
+### Why It Failed
+- **The freeze still happens** - This wasn't the root cause
+- The dependency array change was valid but didn't solve the freeze
+- The 2000ms delay didn't help either
+- **Result**: ❌ App still freezes on iOS first launch
 
 ## Previous Fix Attempt #11: Remove deferInit Mechanism Entirely (Nov 27, 2025)
 
@@ -269,9 +269,9 @@ The deferInit mechanism we added in attempt #10 was preventing NavigationDataCon
 **Theory**: ProfileScreen had blocking operations or infinite loops
 **Reality**: ProfileScreen renders fine, shows "APP IS INTERACTIVE" with only 0.11s blocking time
 
-## Current Status: SOLVED (Attempt #12)
+## Current Status: STILL UNSOLVED (12 Failed Attempts)
 
-After 11 failed attempts, we finally found and fixed the root cause: an infinite loop in NavigationDataContext that iOS couldn't handle but Android could tolerate due to platform threading differences.
+After 12 different attempted fixes, the iOS first launch freeze persists. The app continues to freeze permanently after the permission modal closes on first launch, but works perfectly on subsequent launches.
 
 ## The Persistent Mystery
 
@@ -300,6 +300,61 @@ Since the freeze only happens on first launch after permission modal:
 - Second launch always works
 - Not ideal but allows app usage until root cause is found
 
+## New Investigation Paths (After 12 Failed Attempts)
+
+### Fresh Theories to Explore:
+
+#### 1. **React Navigation Tab Bar Rendering Issue**
+- The BottomTabNavigator might be trying to render while permission modal is still animating
+- iOS might have stricter requirements for tab bar initialization
+- Could be a conflict between modal dismissal and tab bar mounting
+
+#### 2. **AsyncStorage Race Condition**
+- Multiple simultaneous writes to AsyncStorage on first launch
+- iOS might handle concurrent storage operations differently than Android
+- Check for: `@runstr:first_launch`, permission states, user data all being written at once
+
+#### 3. **WebSocket Initialization Blocking**
+- Nostr WebSocket connections being established during modal animation
+- iOS WebSocket implementation might block main thread differently
+- The WebSocket polyfill might behave differently on iOS
+
+#### 4. **React Native's LayoutAnimation on iOS**
+- Permission modal might be using LayoutAnimation internally
+- iOS requires `UIManager.setLayoutAnimationEnabledExperimental(true)`
+- Animation conflicts between modal and tab navigation
+
+#### 5. **Memory Pressure on First Launch**
+- iOS might have lower memory threshold for JavaScript heap
+- First launch loads everything fresh (no cached modules)
+- Could be hitting memory limit during initialization
+
+#### 6. **StatusBar Component Conflict**
+- Custom StatusBar rendering during modal transition
+- iOS StatusBar updates might block during modal animation
+- Check StatusBarManager interactions
+
+#### 7. **Expo Modules Initialization**
+- Expo modules might initialize differently on iOS first launch
+- Location services, notifications, or other Expo modules could be blocking
+- Check Expo.AppLoading or SplashScreen conflicts
+
+### Diagnostic Steps to Try:
+
+1. **Add Console Timestamps**: Log exact millisecond when freeze occurs
+2. **Remove Components One by One**: Start with minimal app, add back gradually
+3. **Check Native Logs**: Use Xcode to see iOS system logs during freeze
+4. **Profile Memory**: Monitor memory usage during first launch
+5. **Disable All Animations**: Set `animationType="none"` on all modals
+6. **Test Without Permissions**: Skip permission modal entirely on first launch
+7. **Add Loading Overlay**: Show loading screen immediately after modal closes
+
+### The Key Question:
+**What is FUNDAMENTALLY different about iOS first launch that doesn't exist on:**
+- iOS subsequent launches (cached modules? initialized native modules?)
+- Android first launch (threading model? animation system?)
+- Simulator first launch (if it works there)
+
 ## Summary
 
-**8 attempted fixes, 0 successes.** The iOS-only first-launch freeze after permission modal remains unsolved. All conventional debugging approaches have failed to identify or fix the root cause.
+**12 attempted fixes, 0 successes.** The iOS-only first-launch freeze after permission modal remains unsolved. We need to think beyond conventional React Native issues and consider iOS-specific system interactions.
