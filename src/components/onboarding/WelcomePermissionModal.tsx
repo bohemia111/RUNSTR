@@ -21,7 +21,7 @@ export const WelcomePermissionModal: React.FC<WelcomePermissionModalProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="fade"
+      animationType="none"
       transparent={true}
       onRequestClose={onComplete}
     >

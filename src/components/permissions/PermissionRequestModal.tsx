@@ -147,7 +147,7 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
     <Modal
       visible={visible}
       transparent={true}
-      animationType="fade"
+      animationType="none"
       statusBarTranslucent={true}
       onRequestClose={() => {}} // Prevent dismissal on Android back button
     >
