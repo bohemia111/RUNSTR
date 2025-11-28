@@ -130,18 +130,20 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
             </View>
 
             {/* Charity button below name */}
-            {!hideActionsForCurrentUser && showChallengeButton && charityName && (
-              <TouchableOpacity
-                style={styles.charityButton}
-                onPress={handleCharityZap}
-                disabled={disabled}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.charityButtonText} numberOfLines={1}>
-                  {charityName}
-                </Text>
-              </TouchableOpacity>
-            )}
+            {!hideActionsForCurrentUser &&
+              showChallengeButton &&
+              charityName && (
+                <TouchableOpacity
+                  style={styles.charityButton}
+                  onPress={handleCharityZap}
+                  disabled={disabled}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.charityButtonText} numberOfLines={1}>
+                    {charityName}
+                  </Text>
+                </TouchableOpacity>
+              )}
           </View>
         </View>
 

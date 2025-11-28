@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2025-01-26
+
+**Achievement**: Event auto-creation, iOS permission fix, and expanded charities
+
+### ✨ Features
+- Event auto-creation when users publish kind 1301 workout events to Nostr (removed wizard)
+- Expanded charity selection to 10 total organizations:
+  - Original: OpenSats, Human Rights Foundation
+  - NEW: Bitcoin Beach (El Salvador), Bitcoin Bay (Bay Area), Bitcoin Ekasi (South Africa), Bitcoin Isla (Philippines), Bitcoin Valley (Guatemala), Bitcoin District (Washington DC), Bitcoin Yucatan (Mexico), Bitcoin Veterans
+
+### 🐛 Bug Fixes
+- Fixed iOS permission modal freezing bug
+
+### 📱 Platform Updates
+- iOS: Version 0.9.3 (Build 79)
+- Android: Version 0.9.3 (Build 79)
+
 ## [0.9.2] - 2025-01-26
 
 **Achievement**: Simplified navigation focused on anonymous health/fitness for Nostr

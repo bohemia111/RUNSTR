@@ -172,6 +172,9 @@ import {
   type ParsedEventData,
 } from './utils/eventDeepLink';
 
+// ✅ FIX #18: Permission modal removed from startup to prevent iOS freeze
+// Permissions are now requested at point of use (when starting exercise tracking)
+
 // Types for authenticated app navigation
 type AuthenticatedStackParamList = {
   Auth: undefined;
@@ -238,7 +241,6 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
   }, []);
 
   const [showWelcomeModal, setShowWelcomeModal] = React.useState(false);
-  const [showPermissionModal, setShowPermissionModal] = React.useState(false);
   const [hasInitialized, setHasInitialized] = React.useState(false);
 
   // Event deep link state
@@ -246,7 +248,6 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
     React.useState<ParsedEventData | null>(null);
   const navigationRef = React.useRef<any>(null);
 
-  // Start background data initialization and check for first launch
   // Check for first launch when authenticated
   React.useEffect(() => {
     if (isAuthenticated && currentUser) {
@@ -262,19 +263,12 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
     }
   }, [isAuthenticated, currentUser]);
 
-  // Initialize AFTER modal closes to prevent freeze
+  // Initialize app after authentication
   React.useEffect(() => {
-    if (
-      isAuthenticated &&
-      currentUser &&
-      !showPermissionModal &&
-      !hasInitialized
-    ) {
-      console.log(
-        '✅ App: Permission modal closed, scheduling initialization...'
-      );
+    if (isAuthenticated && currentUser && !hasInitialized) {
+      console.log('✅ App: Starting background initialization...');
 
-      // Now that animations are removed, both platforms can use the same delay
+      // Small delay to let UI settle
       const INIT_DELAY = 500;
       console.log(
         `⏱️ Using ${Platform.OS} initialization delay: ${INIT_DELAY}ms`
@@ -297,25 +291,7 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
 
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, currentUser, showPermissionModal, hasInitialized]);
-
-  // Check permissions when user becomes authenticated (both iOS and Android)
-  React.useEffect(() => {
-    const checkPermissions = async () => {
-      if (isAuthenticated) {
-        console.log('[App] 🔐 Checking permissions...');
-        const status = await appPermissionService.checkAllPermissions();
-
-        if (!status.allGranted) {
-          console.log('[App] ⚠️ Missing permissions, showing modal');
-          setShowPermissionModal(true);
-        } else {
-          console.log('[App] ✅ All permissions granted');
-        }
-      }
-    };
-    checkPermissions();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentUser, hasInitialized]);
 
   // Handle pending event navigation when navigation is ready
   React.useEffect(() => {
@@ -1025,25 +1001,14 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
         })()}
       </NavigationContainer>
 
-      {/* Welcome Permission Modal - Shows on first app launch */}
+      {/* Welcome Modal - Shows on first app launch */}
       <WelcomePermissionModal
         visible={showWelcomeModal}
-        onComplete={() => setShowWelcomeModal(false)}
+        onComplete={() => {
+          setShowWelcomeModal(false);
+          console.log('✅ Welcome modal closed');
+        }}
       />
-
-      {/* Permission Request Modal - Shows when Android permissions are missing */}
-      {showPermissionModal && (
-        <PermissionRequestModal
-          visible={showPermissionModal}
-          onComplete={() => {
-            setShowPermissionModal(false);
-            // Notify parent that permissions are complete (enables NavigationDataContext init)
-            if (onPermissionComplete) {
-              onPermissionComplete();
-            }
-          }}
-        />
-      )}
     </SafeAreaProvider>
   );
 };

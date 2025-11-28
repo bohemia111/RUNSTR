@@ -19,6 +19,8 @@ import { RouteSelectionModal } from '../../components/routes/RouteSelectionModal
 import routeMatchingService from '../../services/routes/RouteMatchingService';
 import type { SavedRoute } from '../../services/routes/RouteStorageService';
 import { theme } from '../../styles/theme';
+import { appPermissionService } from '../../services/initialization/AppPermissionService';
+import { PermissionRequestModal } from '../../components/permissions/PermissionRequestModal';
 
 export const CyclingTrackerScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -35,6 +37,7 @@ export const CyclingTrackerScreen: React.FC = () => {
   const [selectedRoute, setSelectedRoute] = useState<SavedRoute | null>(null);
   const [routeSelectionVisible, setRouteSelectionVisible] = useState(false);
   const [summaryModalVisible, setSummaryModalVisible] = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [workoutData, setWorkoutData] = useState<{
     type: 'running' | 'walking' | 'cycling';
     distance: number;
@@ -166,6 +169,17 @@ export const CyclingTrackerScreen: React.FC = () => {
 
   const startTracking = async () => {
     console.log('[CyclingTrackerScreen] Starting tracking...');
+
+    // Check permissions first
+    const permissionStatus = await appPermissionService.checkAllPermissions();
+
+    if (!permissionStatus.location) {
+      console.log(
+        '[CyclingTrackerScreen] Missing location permission, showing modal'
+      );
+      setShowPermissionModal(true);
+      return;
+    }
 
     try {
       // Simple permission and start flow
@@ -462,6 +476,16 @@ export const CyclingTrackerScreen: React.FC = () => {
           setRouteSelectionVisible(false);
         }}
         onClose={() => setRouteSelectionVisible(false)}
+      />
+
+      {/* Permission Request Modal */}
+      <PermissionRequestModal
+        visible={showPermissionModal}
+        onComplete={() => {
+          setShowPermissionModal(false);
+          // Try starting tracking again after permissions are granted
+          startTracking();
+        }}
       />
     </SafeAreaView>
   );

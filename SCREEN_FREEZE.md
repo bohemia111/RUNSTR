@@ -407,6 +407,133 @@ User noticed in logs:
 - No more competing async operations 3 seconds after modal closes
 - Simplifies initialization since app doesn't use notifications
 
+## ❌ FAILED Attempt #15: Remove Duplicate NavigationDataContext Initialization (Nov 27, 2025)
+
+### What We Thought
+NavigationDataContext had a massive useEffect (lines 860-1028) that was duplicating all the work already done by AppInitializationService. Both were running concurrently after the modal closed, causing:
+- Double WebSocket connections (8 total)
+- Concurrent AsyncStorage operations
+- Double profile fetching
+- iOS main thread overwhelmed
+
+### What We Did
+**Commented out the entire NavigationDataContext initialization useEffect:**
+1. **NavigationDataContext.tsx lines 860-1028** - Commented out the massive init useEffect
+2. **Replaced with simple loading setter** - Just sets isLoading to false immediately
+3. **Relied on AppInitializationService** - Let it handle all data loading in background
+4. **Kept cache subscriptions** - NavigationDataContext still reacts to cache updates
+
+### The Theory
+- ONE initialization system instead of TWO
+- Sequential operations instead of concurrent
+- No race conditions or AsyncStorage conflicts
+- Simpler, cleaner architecture
+
+### Why It Failed
+- **App still freezes on iOS first launch**
+- Despite removing 168 lines of duplicate initialization code
+- Even with simplified initialization, the freeze persists
+- **Result**: ❌ iOS freeze continues
+
+### What We Learned
+- The concurrent initialization was a real issue, but not THE issue
+- Removing complexity doesn't always solve the problem
+- The freeze might be deeper in React Native/iOS interaction
+- Need to look at even lower-level causes
+
+## Attempt #16 - Modal Bypass Testing (DISCOVERED ROOT CAUSE)
+
+**Date:** January 2025
+**Changes:**
+- Added DISABLE_MODALS_FOR_TESTING flag to bypass all modals
+- Testing to determine if modals themselves cause the freeze
+
+**Result:** ✅ NO FREEZE! The app works perfectly without modals!
+
+## Attempt #17 - Modal Delay Fix
+
+**Date:** January 2025
+**Changes:**
+- Added 500ms delay between welcome and permission modal
+- Used hasShownWelcomeRef to coordinate modal sequence
+- Created checkPermissionsAfterWelcome function
+
+**Result:** ❌ FAILED - Still freezes. Delay didn't solve the sequential modal issue.
+
+## Attempt #18 - Move Permissions to Exercise Start (SUCCESSFUL FIX) ✅
+
+**Date:** January 2025
+**Root Cause Identified:** React Native Modal component has a known iOS bug with sequential modals
+**Solution:** Move permission requests to point of use (when starting exercise)
+
+**Changes:**
+1. Removed permission modal from App.tsx startup flow entirely
+2. Added permission checking to CyclingTrackerScreen (was missing)
+3. RunningTrackerScreen and WalkingTrackerScreen already had permission checks
+4. Cleaned up all test flags and temporary code
+5. Removed commented duplicate initialization from NavigationDataContext
+
+**Why This Works:**
+- Only one modal (welcome) shows during onboarding - no sequential modals
+- Permissions requested in context when user starts exercise - better UX
+- Follows iOS best practices - request permissions at point of use
+- Eliminates the React Native Modal iOS bug completely
+
+**Result:** ✅ **SUCCESS! NO MORE FREEZE!**
+- Fresh iOS install: Welcome modal shows → No freeze
+- Navigate to Activity tab → Start exercise → Permission modal appears
+- Grant permissions → Tracking starts normally
+- Subsequent launches: No modals → No freeze
+
 ## Summary
 
-**14 attempted fixes, 13 failures, 1 pending test.** The iOS-only first-launch freeze appears to be caused by unnecessary notification system initialization performing AsyncStorage operations during critical modal transition timing.
+**18 attempted fixes, 1 SUCCESS!** The iOS-only first-launch freeze was caused by React Native's Modal component bug with sequential modals. Moving permissions to the exercise start (point of use) completely eliminates the freeze while providing better UX.
+
+## Next Investigation Areas After 15 Failed Attempts
+
+### Deeper System-Level Issues to Explore:
+
+1. **React Navigation Mounting Issue**
+   - The navigation structure itself might be the problem
+   - Modal + Tab Navigator combination on iOS
+   - Check if navigation is trying to render before ready
+
+2. **Expo/React Native Version Bug**
+   - Could be a known issue in current Expo SDK version
+   - Check Expo GitHub issues for similar freezes
+   - Consider testing with different Expo SDK version
+
+3. **iOS Bridge Communication**
+   - Low-level React Native bridge issue
+   - Native module conflict during first launch
+   - iOS-specific timing with native module initialization
+
+4. **Hidden State Update Loop**
+   - State update happening during render
+   - React 18 concurrent features conflict
+   - Invisible re-render loop overwhelming iOS
+
+5. **Memory/Resource Issue**
+   - iOS memory limit hit during first launch
+   - Too many components mounting simultaneously
+   - JavaScript heap exhaustion
+
+### Radical Approaches to Consider:
+
+1. **Bypass Permission Modal Entirely**
+   - Skip modal on first launch, show later
+   - Test if freeze happens without modal
+
+2. **Minimal App Test**
+   - Strip app to absolute minimum
+   - Add components back one by one
+   - Identify exact component causing freeze
+
+3. **Different Navigation Library**
+   - Try React Navigation 5 instead of 6
+   - Or test with Expo Router
+
+4. **Native iOS Debugging**
+   - Use Xcode Instruments to profile
+   - Check for deadlocks in native code
+   - Monitor thread states during freeze

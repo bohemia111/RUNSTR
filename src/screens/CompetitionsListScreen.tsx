@@ -35,7 +35,8 @@ interface GlobalLeaderboards {
 
 export const CompetitionsListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [globalLeaderboards, setGlobalLeaderboards] = useState<GlobalLeaderboards | null>(null);
+  const [globalLeaderboards, setGlobalLeaderboards] =
+    useState<GlobalLeaderboards | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -48,18 +49,16 @@ export const CompetitionsListScreen: React.FC = () => {
       );
 
       // Fetch global daily leaderboards (queries ALL kind 1301 events from today)
-      const leaderboards = await SimpleLeaderboardService.getGlobalDailyLeaderboards();
+      const leaderboards =
+        await SimpleLeaderboardService.getGlobalDailyLeaderboards();
 
-      console.log(
-        '[CompetitionsListScreen] ✅ Global leaderboards loaded:',
-        {
-          date: leaderboards.date,
-          '5k': leaderboards.leaderboard5k.length,
-          '10k': leaderboards.leaderboard10k.length,
-          half: leaderboards.leaderboardHalf.length,
-          marathon: leaderboards.leaderboardMarathon.length,
-        }
-      );
+      console.log('[CompetitionsListScreen] ✅ Global leaderboards loaded:', {
+        date: leaderboards.date,
+        '5k': leaderboards.leaderboard5k.length,
+        '10k': leaderboards.leaderboard10k.length,
+        half: leaderboards.leaderboardHalf.length,
+        marathon: leaderboards.leaderboardMarathon.length,
+      });
 
       setGlobalLeaderboards(leaderboards);
     } catch (error) {
@@ -85,12 +84,12 @@ export const CompetitionsListScreen: React.FC = () => {
   };
 
   // Calculate if there are any active leaderboards
-  const hasAnyLeaderboards = globalLeaderboards && (
-    globalLeaderboards.leaderboard5k.length > 0 ||
-    globalLeaderboards.leaderboard10k.length > 0 ||
-    globalLeaderboards.leaderboardHalf.length > 0 ||
-    globalLeaderboards.leaderboardMarathon.length > 0
-  );
+  const hasAnyLeaderboards =
+    globalLeaderboards &&
+    (globalLeaderboards.leaderboard5k.length > 0 ||
+      globalLeaderboards.leaderboard10k.length > 0 ||
+      globalLeaderboards.leaderboardHalf.length > 0 ||
+      globalLeaderboards.leaderboardMarathon.length > 0);
 
   // Loading state
   if (isLoading && !globalLeaderboards) {
@@ -196,53 +195,57 @@ export const CompetitionsListScreen: React.FC = () => {
 
           {/* Global leaderboard cards */}
           <View style={styles.leaderboardsContainer}>
-            {globalLeaderboards?.leaderboard5k && globalLeaderboards.leaderboard5k.length > 0 && (
-              <DailyLeaderboardCard
-                title="RUNSTR 5K"
-                distance="5km"
-                participants={globalLeaderboards.leaderboard5k.length}
-                entries={globalLeaderboards.leaderboard5k}
-                onPress={() => {
-                  console.log('Navigate to RUNSTR 5K leaderboard');
-                }}
-              />
-            )}
+            {globalLeaderboards?.leaderboard5k &&
+              globalLeaderboards.leaderboard5k.length > 0 && (
+                <DailyLeaderboardCard
+                  title="RUNSTR 5K"
+                  distance="5km"
+                  participants={globalLeaderboards.leaderboard5k.length}
+                  entries={globalLeaderboards.leaderboard5k}
+                  onPress={() => {
+                    console.log('Navigate to RUNSTR 5K leaderboard');
+                  }}
+                />
+              )}
 
-            {globalLeaderboards?.leaderboard10k && globalLeaderboards.leaderboard10k.length > 0 && (
-              <DailyLeaderboardCard
-                title="RUNSTR 10K"
-                distance="10km"
-                participants={globalLeaderboards.leaderboard10k.length}
-                entries={globalLeaderboards.leaderboard10k}
-                onPress={() => {
-                  console.log('Navigate to RUNSTR 10K leaderboard');
-                }}
-              />
-            )}
+            {globalLeaderboards?.leaderboard10k &&
+              globalLeaderboards.leaderboard10k.length > 0 && (
+                <DailyLeaderboardCard
+                  title="RUNSTR 10K"
+                  distance="10km"
+                  participants={globalLeaderboards.leaderboard10k.length}
+                  entries={globalLeaderboards.leaderboard10k}
+                  onPress={() => {
+                    console.log('Navigate to RUNSTR 10K leaderboard');
+                  }}
+                />
+              )}
 
-            {globalLeaderboards?.leaderboardHalf && globalLeaderboards.leaderboardHalf.length > 0 && (
-              <DailyLeaderboardCard
-                title="RUNSTR Half Marathon"
-                distance="21.1km"
-                participants={globalLeaderboards.leaderboardHalf.length}
-                entries={globalLeaderboards.leaderboardHalf}
-                onPress={() => {
-                  console.log('Navigate to RUNSTR Half Marathon leaderboard');
-                }}
-              />
-            )}
+            {globalLeaderboards?.leaderboardHalf &&
+              globalLeaderboards.leaderboardHalf.length > 0 && (
+                <DailyLeaderboardCard
+                  title="RUNSTR Half Marathon"
+                  distance="21.1km"
+                  participants={globalLeaderboards.leaderboardHalf.length}
+                  entries={globalLeaderboards.leaderboardHalf}
+                  onPress={() => {
+                    console.log('Navigate to RUNSTR Half Marathon leaderboard');
+                  }}
+                />
+              )}
 
-            {globalLeaderboards?.leaderboardMarathon && globalLeaderboards.leaderboardMarathon.length > 0 && (
-              <DailyLeaderboardCard
-                title="RUNSTR Marathon"
-                distance="42.2km"
-                participants={globalLeaderboards.leaderboardMarathon.length}
-                entries={globalLeaderboards.leaderboardMarathon}
-                onPress={() => {
-                  console.log('Navigate to RUNSTR Marathon leaderboard');
-                }}
-              />
-            )}
+            {globalLeaderboards?.leaderboardMarathon &&
+              globalLeaderboards.leaderboardMarathon.length > 0 && (
+                <DailyLeaderboardCard
+                  title="RUNSTR Marathon"
+                  distance="42.2km"
+                  participants={globalLeaderboards.leaderboardMarathon.length}
+                  entries={globalLeaderboards.leaderboardMarathon}
+                  onPress={() => {
+                    console.log('Navigate to RUNSTR Marathon leaderboard');
+                  }}
+                />
+              )}
           </View>
         </View>
       </ScrollView>
