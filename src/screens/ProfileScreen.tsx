@@ -103,8 +103,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   // Wallet features moved to Settings screen
 
-  // ✅ PERFORMANCE: Defer notification initialization by 3 seconds
-  // Notifications are not critical for initial app load, delay them for better UX
+  // ❌ DISABLED: Notification system initialization to fix iOS freeze (Attempt #14)
+  // The app doesn't use notifications, and this was causing AsyncStorage operations
+  // during modal transitions, leading to iOS freezes on first launch.
+  // The 3-second delay coincided with permission modal cleanup, causing a race condition.
+  /* COMMENTED OUT TO FIX iOS FREEZE:
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -135,31 +138,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             '[ProfileScreen] ⚠️  Background notification subscriptions DISABLED for stability'
           );
 
-          /* COMMENTED OUT FOR ANDROID STABILITY:
-          challengeNotificationHandler.startListening().catch((err) => {
-            console.warn('[ProfileScreen] Challenge notification handler failed:', err);
-          });
-
-          challengeResponseHandler.startListening().catch((err) => {
-            console.warn('[ProfileScreen] Challenge response handler failed:', err);
-          });
-
-          eventJoinNotificationHandler.startListening().catch((err) => {
-            console.warn('[ProfileScreen] Event join notification handler failed:', err);
-          });
-
-          teamJoinNotificationHandler.startListening().catch((err) => {
-            console.warn('[ProfileScreen] Team join notification handler failed:', err);
-          });
-
-          const { startCompetitionEventMonitoring } = await import(
-            '../services/notifications/NotificationService'
-          );
-          startCompetitionEventMonitoring(userIdentifiers.hexPubkey).catch((err) => {
-            console.warn('[ProfileScreen] Competition event monitoring failed:', err);
-          });
-          */
-
           console.log(
             '[ProfileScreen] ✅ Notification system initialization started (background)'
           );
@@ -180,6 +158,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       // ✅ FIX: Don't stop handlers that were never started (commented out above)
       // This prevents unnecessary cleanup calls that could cause issues
       // Handlers are currently disabled for stability (see lines 131-154)
+    };
+  }, []);
+  */
+
+  // Simple cleanup for mount tracking
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
     };
   }, []);
 

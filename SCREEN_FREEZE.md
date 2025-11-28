@@ -355,6 +355,58 @@ Since the freeze only happens on first launch after permission modal:
 - Android first launch (threading model? animation system?)
 - Simulator first launch (if it works there)
 
+## ❌ FAILED Attempt #13: Remove All Modal Animations (Nov 27, 2025)
+
+### What We Tried
+Removed all modal animations since user reported none were visible anyway:
+- Changed `animationType="fade"` to `animationType="none"` in PermissionRequestModal
+- Changed `animationType="fade"` to `animationType="none"` in WelcomePermissionModal
+- Reduced iOS delay from 2000ms to 500ms (same as Android)
+
+### Theory
+iOS might be waiting indefinitely for phantom animations that never render visually.
+
+### Result
+❌ **App still freezes** - Removing animations didn't solve the issue
+
+## Attempt #14: Remove Unnecessary Notification System (Nov 27, 2025 - PENDING TEST)
+
+### Discovery
+User noticed in logs:
+- `[ProfileScreen] ⚡ Background notification initialization (3s delay)...`
+- App doesn't actually use notifications
+- Android asks for notification permissions, iOS doesn't
+
+### Investigation Found
+1. **ProfileScreen has 3-second delayed notification initialization**
+   - Uses setTimeout(3000) to defer notification setup
+   - Performs AsyncStorage operations: `getUserNostrIdentifiers()` + `unifiedNotificationStore.initialize()`
+
+2. **Race condition with modal lifecycle**
+   - ProfileScreen mounts while permission modal is closing
+   - 3 seconds later (during iOS modal cleanup), notification system starts
+   - Multiple AsyncStorage operations block the JavaScript thread
+   - iOS can't complete modal dismissal → permanent freeze
+
+3. **iOS vs Android behavior**
+   - iOS AsyncStorage is more sensitive to concurrent operations
+   - Android's threading model handles this better
+
+### The Fix
+1. **Commented out entire notification initialization in ProfileScreen**
+   - Removed the setTimeout block (lines 108-184)
+   - Eliminated AsyncStorage operations during modal transitions
+
+2. **Disabled UnifiedNotificationStore initialization**
+   - Added early return to prevent any storage operations
+   - App doesn't use notifications anyway
+
+### Why This Should Work
+- Eliminates AsyncStorage blocking during modal transitions
+- Removes race condition between ProfileScreen's delayed operations and modal lifecycle
+- No more competing async operations 3 seconds after modal closes
+- Simplifies initialization since app doesn't use notifications
+
 ## Summary
 
-**12 attempted fixes, 0 successes.** The iOS-only first-launch freeze after permission modal remains unsolved. We need to think beyond conventional React Native issues and consider iOS-specific system interactions.
+**14 attempted fixes, 13 failures, 1 pending test.** The iOS-only first-launch freeze appears to be caused by unnecessary notification system initialization performing AsyncStorage operations during critical modal transition timing.

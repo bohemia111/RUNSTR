@@ -40,6 +40,15 @@ export class UnifiedNotificationStore {
    * Initialize the store with user context
    */
   async initialize(userPubkey: string): Promise<void> {
+    // ❌ DISABLED: Notification store initialization to fix iOS freeze (Attempt #14)
+    // App doesn't use notifications, and AsyncStorage operations during modal
+    // transitions were causing iOS freezes. Early return to prevent any operations.
+    console.log(
+      '[UnifiedNotificationStore] Initialization DISABLED to fix iOS freeze'
+    );
+    return;
+
+    /* ORIGINAL CODE DISABLED FOR iOS FREEZE FIX:
     if (this.isInitialized && this.userPubkey === userPubkey) {
       console.log(
         '[UnifiedNotificationStore] Already initialized for this user'
@@ -61,6 +70,7 @@ export class UnifiedNotificationStore {
       console.error('[UnifiedNotificationStore] Failed to initialize:', error);
       throw error;
     }
+    */
   }
 
   /**
