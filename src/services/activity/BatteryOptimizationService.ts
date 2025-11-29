@@ -5,6 +5,8 @@
 
 import * as Battery from 'expo-battery';
 import * as Location from 'expo-location';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as Application from 'expo-application';
 import { Platform, Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -379,24 +381,48 @@ export class BatteryOptimizationService {
                   'true'
                 );
 
-                // Open Android battery optimization settings
-                // Note: This opens the battery optimization settings screen
-                // User needs to find RUNSTR and select "Unrestricted"
-                const url =
-                  'android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS';
-                const canOpen = await Linking.canOpenURL(url);
+                // Open Android battery optimization settings for this specific app
+                // Uses the proper intent action with package data
+                const packageName =
+                  Application.applicationId || 'com.anonymous.runstr.project';
 
-                if (canOpen) {
-                  await Linking.openSettings();
-                  console.log('✅ Opened battery optimization settings');
-                  resolve(true);
-                } else {
-                  // Fallback to general settings
-                  await Linking.openSettings();
+                try {
+                  // Try the direct REQUEST_IGNORE_BATTERY_OPTIMIZATIONS intent first
+                  // This opens a simple dialog asking to allow unrestricted battery
+                  await IntentLauncher.startActivityAsync(
+                    IntentLauncher.ActivityAction.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    {
+                      data: `package:${packageName}`,
+                    }
+                  );
                   console.log(
-                    '⚠️ Opened general settings (specific battery optimization not available)'
+                    '✅ Opened battery optimization exemption dialog'
                   );
                   resolve(true);
+                } catch (intentError) {
+                  // Fallback: Open the app's battery settings page
+                  console.warn(
+                    '⚠️ Direct battery intent failed, trying app settings:',
+                    intentError
+                  );
+                  try {
+                    await IntentLauncher.startActivityAsync(
+                      IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+                      {
+                        data: `package:${packageName}`,
+                      }
+                    );
+                    console.log('✅ Opened app settings page');
+                    resolve(true);
+                  } catch (appSettingsError) {
+                    // Last fallback: general settings
+                    console.warn(
+                      '⚠️ App settings failed, opening general settings:',
+                      appSettingsError
+                    );
+                    await Linking.openSettings();
+                    resolve(true);
+                  }
                 }
               } catch (error) {
                 console.error('Failed to open settings:', error);
@@ -423,16 +449,35 @@ export class BatteryOptimizationService {
     Alert.alert(
       'Background Tracking Issue Detected',
       'RUNSTR may have been paused by Android battery optimization.\n\n' +
-        'To fix this:\n' +
-        '1. Open Settings > Apps > RUNSTR\n' +
-        '2. Tap Battery\n' +
-        '3. Select "Unrestricted"\n\n' +
-        'This ensures tracking continues while using other apps.',
+        'Tap "Fix Now" to enable unrestricted battery mode for RUNSTR.',
       [
         { text: 'Dismiss', style: 'cancel' },
         {
-          text: 'Open Settings',
-          onPress: () => Linking.openSettings(),
+          text: 'Fix Now',
+          onPress: async () => {
+            const packageName =
+              Application.applicationId || 'com.anonymous.runstr.project';
+            try {
+              await IntentLauncher.startActivityAsync(
+                IntentLauncher.ActivityAction.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                {
+                  data: `package:${packageName}`,
+                }
+              );
+            } catch {
+              // Fallback to app settings
+              try {
+                await IntentLauncher.startActivityAsync(
+                  IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
+                  {
+                    data: `package:${packageName}`,
+                  }
+                );
+              } catch {
+                await Linking.openSettings();
+              }
+            }
+          },
         },
       ]
     );

@@ -119,6 +119,8 @@ export class AppPermissionService {
       }
 
       // Step 2: Request notification permission (Android 13+ only)
+      // Note: We continue even if denied - tracking works without notification,
+      // just won't show persistent notification in status bar
       if (Platform.OS === 'android') {
         const apiLevel = Device.platformApiLevel || 0;
 
@@ -129,10 +131,11 @@ export class AppPermissionService {
           const { status } = await Notifications.requestPermissionsAsync();
 
           if (status !== 'granted') {
-            console.error(
-              '[AppPermissionService] Notification permission denied'
+            console.warn(
+              '[AppPermissionService] Notification permission denied - tracking will work but no status bar notification'
             );
-            return false;
+            // Continue anyway - don't block tracking just because notification is denied
+            // The foreground service still works, just won't show a visible notification
           }
         }
       }
