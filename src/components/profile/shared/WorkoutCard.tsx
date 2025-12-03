@@ -54,14 +54,29 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
   };
 
   const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const diffDays = Math.floor(
-      (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)
+    const workoutDate = new Date(dateString);
+    const today = new Date();
+
+    // Normalize both dates to midnight (start of day) in local timezone
+    const workoutDay = new Date(
+      workoutDate.getFullYear(),
+      workoutDate.getMonth(),
+      workoutDate.getDate()
+    );
+    const todayDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+
+    // Calculate difference in calendar days
+    const diffDays = Math.round(
+      (todayDay.getTime() - workoutDay.getTime()) / (1000 * 60 * 60 * 24)
     );
 
     // Format time as 12-hour with AM/PM
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
+    const hours = workoutDate.getHours();
+    const minutes = workoutDate.getMinutes();
     const ampm = hours >= 12 ? 'PM' : 'AM';
     const displayHours = hours % 12 || 12;
     const displayMinutes = minutes.toString().padStart(2, '0');
@@ -74,7 +89,7 @@ export const WorkoutCard: React.FC<WorkoutCardProps> = ({
         ? 'Yesterday'
         : diffDays < 7
         ? `${diffDays} days ago`
-        : date.toLocaleDateString();
+        : workoutDate.toLocaleDateString();
 
     return `${dayStr} at ${timeStr}`;
   };

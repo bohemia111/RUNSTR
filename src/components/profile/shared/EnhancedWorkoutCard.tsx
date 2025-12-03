@@ -99,16 +99,33 @@ export const EnhancedWorkoutCard: React.FC<EnhancedWorkoutCardProps> = ({
   };
 
   const formatDate = (dateString: string): string => {
-    const diffDays = Math.floor(
-      (Date.now() - new Date(dateString).getTime()) / (1000 * 60 * 60 * 24)
+    const workoutDate = new Date(dateString);
+    const today = new Date();
+
+    // Normalize both dates to midnight (start of day) in local timezone
+    const workoutDay = new Date(
+      workoutDate.getFullYear(),
+      workoutDate.getMonth(),
+      workoutDate.getDate()
     );
+    const todayDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+
+    // Calculate difference in calendar days
+    const diffDays = Math.round(
+      (todayDay.getTime() - workoutDay.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
     return diffDays === 0
       ? 'Today'
       : diffDays === 1
       ? 'Yesterday'
       : diffDays < 7
       ? `${diffDays} days ago`
-      : new Date(dateString).toLocaleDateString();
+      : workoutDate.toLocaleDateString();
   };
 
   // Get enhanced activity type display name

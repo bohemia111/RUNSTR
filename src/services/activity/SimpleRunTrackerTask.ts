@@ -19,6 +19,31 @@ import type { GPSPoint } from './SimpleRunTracker';
 const SESSION_STATE_KEY = '@runstr:session_state';
 const GPS_POINTS_KEY = '@runstr:gps_points';
 
+// Activity-specific GPS filtering thresholds
+// Tuned based on typical movement patterns for each activity type
+const ACTIVITY_THRESHOLDS = {
+  running: {
+    maxAccuracy: 20, // meters (tighter for accuracy)
+    maxSpeed: 12, // m/s (~43 km/h - sprint speed)
+    maxTeleport: 40, // meters
+    minDistance: 1.0, // meters
+  },
+  walking: {
+    maxAccuracy: 25, // meters
+    maxSpeed: 4, // m/s (~14 km/h - fast walk)
+    maxTeleport: 30, // meters
+    minDistance: 0.5, // meters (more sensitive for short steps)
+  },
+  cycling: {
+    maxAccuracy: 30, // meters (can be looser when moving fast)
+    maxSpeed: 20, // m/s (~72 km/h - fast downhill)
+    maxTeleport: 80, // meters (larger gaps ok at speed)
+    minDistance: 2.0, // meters
+  },
+} as const;
+
+type ActivityType = keyof typeof ACTIVITY_THRESHOLDS;
+
 /**
  * Define the background task
  * This runs even when app is minimized or screen is locked
@@ -50,6 +75,10 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
         return;
       }
 
+      // Get activity-specific thresholds
+      const activityType = (sessionState.activityType || 'running') as ActivityType;
+      const thresholds = ACTIVITY_THRESHOLDS[activityType] || ACTIVITY_THRESHOLDS.running;
+
       // Get last valid GPS point for distance calculations
       let lastValidLocation: GPSPoint | null = null;
       const storedPointsStr = await AsyncStorage.getItem(GPS_POINTS_KEY);
@@ -69,12 +98,12 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
       for (const loc of locations) {
         const accuracy = loc.coords.accuracy || 999;
 
-        // 1. Accuracy check
-        if (accuracy > 35) {
+        // 1. Accuracy check (activity-specific threshold)
+        if (accuracy > thresholds.maxAccuracy) {
           console.log(
             `[SimpleRunTrackerTask] Rejected: poor accuracy ${accuracy.toFixed(
               1
-            )}m`
+            )}m > ${thresholds.maxAccuracy}m`
           );
           continue;
         }
@@ -136,29 +165,29 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
           }
         );
 
-        // 5. GPS jitter filter (ignore tiny movements when stationary)
-        if (distance < 1.5) {
+        // 5. GPS jitter filter (activity-specific minimum distance)
+        if (distance < thresholds.minDistance) {
           // Don't log - this is normal when stationary
           continue;
         }
 
-        // 6. GPS teleportation filter (reject impossible jumps)
-        if (distance > 50) {
+        // 6. GPS teleportation filter (activity-specific threshold)
+        if (distance > thresholds.maxTeleport) {
           console.log(
             `[SimpleRunTrackerTask] Rejected: jump too large (${distance.toFixed(
               1
-            )}m > 50m)`
+            )}m > ${thresholds.maxTeleport}m)`
           );
           continue;
         }
 
-        // 7. Speed validation (use GPS-provided speed if available, otherwise calculate)
+        // 7. Speed validation (activity-specific threshold)
         const speed = loc.coords.speed || distance / timeDiff;
-        if (speed > 15) {
+        if (speed > thresholds.maxSpeed) {
           console.log(
             `[SimpleRunTrackerTask] Rejected: unrealistic speed (${speed.toFixed(
               1
-            )} m/s > 15 m/s)`
+            )} m/s > ${thresholds.maxSpeed} m/s)`
           );
           continue;
         }

@@ -6,6 +6,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.7] - 2025-12-02
+
+**Achievement**: Bug fixes and stability improvements
+
+### 🐛 Bug Fixes
+
+**Post Workout Modal UI**
+- Fixed UI display issues in post-workout summary modal
+
+**Activity Tracker Elevation**
+- Improved elevation tracking during workouts
+
+**Activity Tracker GPS Accuracy**
+- Enhanced GPS accuracy for distance and route tracking
+
+**Health Connect Fix**
+- Fixed Health Connect integration issues on Android
+
+### 📱 Platform Updates
+- iOS: Version 0.9.7 (Build 83)
+- Android: Version 0.9.7 (Build 83)
+
 ## [0.9.6] - 2025-12-02
 
 **Achievement**: Android Health Connect integration and stability improvements

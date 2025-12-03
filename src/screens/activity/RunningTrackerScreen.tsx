@@ -618,7 +618,7 @@ export const RunningTrackerScreen: React.FC = () => {
         distance: session.distance,
         duration: session.duration,
         calories,
-        elevation: 0, // TODO: SimpleRunTracker doesn't calculate elevation yet
+        elevation: session.elevationGain || 0,
         pace,
         splits: session.splits, // ✅ Pass splits from SimpleRunTracker
         // Pass GPS coordinates for weather lookup
@@ -633,7 +633,7 @@ export const RunningTrackerScreen: React.FC = () => {
         distance: session.distance,
         duration: session.duration,
         calories,
-        elevation: 0, // TODO: Add elevation tracking to SimpleRunTracker
+        elevation: session.elevationGain || 0,
         pace,
         splits: session.splits, // ✅ Pass splits from SimpleRunTracker
         localWorkoutId: workoutId, // Pass to modal for sync tracking
@@ -648,7 +648,7 @@ export const RunningTrackerScreen: React.FC = () => {
         distance: session.distance,
         duration: session.duration,
         calories,
-        elevation: 0,
+        elevation: session.elevationGain || 0,
         pace,
         splits: session.splits, // ✅ Pass splits even if save failed
         gpsCoordinates, // Pass GPS data even if local save failed

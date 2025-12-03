@@ -21,6 +21,7 @@ import {
   stopNativeWorkoutSession,
 } from './WorkoutSessionBridge';
 import TTSAnnouncementService from './TTSAnnouncementService';
+import { BatteryOptimizationService } from './BatteryOptimizationService';
 
 // Storage keys
 const GPS_POINTS_KEY = '@runstr:gps_points';
@@ -52,6 +53,7 @@ export interface RunSession {
   gpsPoints: GPSPoint[];
   presetDistance?: number; // Optional race preset distance in meters
   splits?: Split[]; // Kilometer splits for running activities
+  elevationGain?: number; // Total elevation gain in meters
 }
 
 interface SessionState {
@@ -284,6 +286,20 @@ export class SimpleRunTracker {
     try {
       console.log(`[SimpleRunTracker] Initializing GPS for ${activityType}...`);
 
+      // Android: Request battery optimization exemption FIRST (CRITICAL!)
+      // Without this, Android will kill the background location service after ~30 seconds
+      // when user switches to another app (like Spotify)
+      if (Platform.OS === 'android') {
+        try {
+          const batteryService = BatteryOptimizationService.getInstance();
+          await batteryService.requestBatteryOptimizationExemption();
+          console.log('[SimpleRunTracker] Battery optimization exemption requested');
+        } catch (e) {
+          console.warn('[SimpleRunTracker] Battery optimization request failed:', e);
+          // Continue anyway - tracking may work if user already exempted app
+        }
+      }
+
       // iOS: Start native HKWorkoutSession FIRST (signals active workout to iOS)
       // This grants unlimited background location tracking privileges
       // Android: No-op (background tracking already works)
@@ -422,8 +438,9 @@ export class SimpleRunTracker {
       `[SimpleRunTracker] Retrieved ${this.cachedGpsPoints.length} GPS points`
     );
 
-    // Calculate distance from GPS points (post-processing)
+    // Calculate distance and elevation from GPS points (post-processing)
     const distance = this.calculateTotalDistance(this.cachedGpsPoints);
+    const elevationGain = this.calculateElevationGain(this.cachedGpsPoints);
 
     // Get splits for running activities
     const splits =
@@ -444,6 +461,7 @@ export class SimpleRunTracker {
       gpsPoints: this.cachedGpsPoints,
       presetDistance: this.presetDistance || undefined,
       splits,
+      elevationGain,
     };
 
     console.log(
@@ -481,6 +499,7 @@ export class SimpleRunTracker {
 
     // Use cached GPS points (no async read needed!)
     const distance = this.calculateTotalDistance(this.cachedGpsPoints);
+    const elevationGain = this.calculateElevationGain(this.cachedGpsPoints);
 
     // Get splits for running activities
     const splits =
@@ -499,6 +518,7 @@ export class SimpleRunTracker {
       gpsPoints: this.cachedGpsPoints.slice(-100), // Last 100 points for route display
       presetDistance: this.presetDistance || undefined,
       splits,
+      elevationGain,
     };
   }
 
@@ -820,6 +840,32 @@ export class SimpleRunTracker {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c; // Distance in meters
+  }
+
+  /**
+   * Calculate total elevation gain from GPS points
+   * Only counts positive changes > 2m to filter altimeter noise
+   */
+  private calculateElevationGain(points: GPSPoint[]): number {
+    if (points.length < 2) return 0;
+
+    let totalGain = 0;
+    let lastAltitude: number | null = null;
+
+    for (const point of points) {
+      if (point.altitude === undefined || point.altitude === null) continue;
+
+      if (lastAltitude !== null) {
+        const delta = point.altitude - lastAltitude;
+        // Only count gains > 2m to filter GPS altitude noise
+        if (delta > 2) {
+          totalGain += delta;
+        }
+      }
+      lastAltitude = point.altitude;
+    }
+
+    return Math.round(totalGain);
   }
 
   /**

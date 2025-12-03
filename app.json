@@ -2,7 +2,7 @@
   "expo": {
     "name": "RUNSTR",
     "slug": "runstr.project",
-    "version": "0.9.6",
+    "version": "0.9.7",
     "orientation": "portrait",
     "icon": "./assets/images/adaptive-icon.png",
     "scheme": "runstr",
@@ -52,7 +52,7 @@
       "appleTeamId": "SF8967F5M9"
     },
     "android": {
-      "versionCode": 82,
+      "versionCode": 83,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
@@ -173,7 +173,8 @@
           "defaultChannel": "default"
         }
       ],
-      ["expo-health-connect", { "requestPermissionsOnLaunch": false }]
+      ["expo-health-connect", { "requestPermissionsOnLaunch": false }],
+      "./plugins/withHealthConnect"
     ],
     "main": "index.js"
   }
