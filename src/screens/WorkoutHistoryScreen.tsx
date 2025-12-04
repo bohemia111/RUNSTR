@@ -197,11 +197,23 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
 
   /**
    * Handle posting a HealthKit workout to social feeds as kind 1
+   * Opens the EnhancedSocialShareModal for template selection
    */
   const handleSocialShareHealthKit = async (workout: any) => {
+    console.log(
+      `[WorkoutHistory] Opening social share modal for HealthKit workout ${workout.id}...`
+    );
+    setSelectedWorkout(workout);
+    setShowSocialModal(true);
+  };
+
+  /**
+   * Handle posting a Health Connect workout to Nostr as kind 1301 competition entry
+   */
+  const handleCompeteHealthConnect = async (workout: any) => {
     try {
       console.log(
-        `[WorkoutHistory] Sharing HealthKit workout ${workout.id} to social feeds...`
+        `[WorkoutHistory] Entering Health Connect workout ${workout.id} into competition...`
       );
 
       if (!signer) {
@@ -212,25 +224,25 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
         return;
       }
 
-      // Convert HealthKit workout to PublishableWorkout format
+      // Convert Health Connect workout to PublishableWorkout format
       const publishableWorkout = {
         id: workout.id,
         userId: userId,
-        source: 'healthkit' as const,
+        source: 'health_connect' as const,
         type: workout.type || 'other',
-        duration: workout.duration, // Already in seconds from HealthKit
+        duration: workout.duration, // Already in seconds from Health Connect
         distance: workout.distance || 0,
         calories: workout.calories || 0,
         startTime: workout.startTime,
         endTime: workout.endTime,
         syncedAt: new Date().toISOString(),
         metadata: {
-          sourceApp: 'Apple Health',
+          sourceApp: workout.metadata?.sourceApp || 'Health Connect',
         },
       };
 
-      // Publish to Nostr as kind 1 social event
-      const result = await publishingService.postWorkoutToSocial(
+      // Publish to Nostr as kind 1301 competition entry
+      const result = await publishingService.saveWorkoutToNostr(
         publishableWorkout,
         signer,
         userId
@@ -238,26 +250,53 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
 
       if (result.success && result.eventId) {
         console.log(
-          `[WorkoutHistory] ✅ HealthKit workout shared as kind 1: ${result.eventId}`
+          `[WorkoutHistory] ✅ Health Connect workout entered as kind 1301: ${result.eventId}`
         );
-        CustomAlertManager.alert('Success', 'Workout shared to social feeds!');
+
+        // Show reward earned notification if applicable
+        if (result.rewardEarned && result.rewardAmount) {
+          CustomAlertManager.alert(
+            '🎉 Reward Earned!',
+            `You earned ${result.rewardAmount} sats for today's workout!`
+          );
+        } else {
+          CustomAlertManager.alert(
+            'Success',
+            'Workout entered into competition!'
+          );
+        }
       } else {
         throw new Error(result.error || 'Failed to publish workout');
       }
     } catch (error) {
-      console.error('[WorkoutHistory] ❌ Social share failed:', error);
+      console.error(
+        '[WorkoutHistory] ❌ Health Connect competition entry failed:',
+        error
+      );
       CustomAlertManager.alert(
         'Error',
-        'Failed to share workout. Please try again.'
+        'Failed to enter workout into competition. Please try again.'
       );
     }
+  };
+
+  /**
+   * Handle posting a Health Connect workout to social feeds as kind 1
+   * Opens the enhanced social share modal
+   */
+  const handleSocialShareHealthConnect = async (workout: any) => {
+    console.log(
+      `[WorkoutHistory] Opening social share modal for Health Connect workout ${workout.id}...`
+    );
+    setSelectedWorkout(workout);
+    setShowSocialModal(true);
   };
 
   /**
    * Handle posting a local workout to Nostr as kind 1 social event
    * Opens enhanced social share modal with image generation
    */
-  const handlePostToSocial = (workout: LocalWorkout) => {
+  const handlePostToSocial = async (workout: LocalWorkout) => {
     console.log(
       `[WorkoutHistory] Opening social share modal for workout ${workout.id}...`
     );
@@ -387,6 +426,8 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
         onPostToSocial={handlePostToSocial}
         onCompeteHealthKit={handleCompeteHealthKit}
         onSocialShareHealthKit={handleSocialShareHealthKit}
+        onCompeteHealthConnect={handleCompeteHealthConnect}
+        onSocialShareHealthConnect={handleSocialShareHealthConnect}
         onNavigateToAnalytics={handleNavigateToAnalytics}
       />
 

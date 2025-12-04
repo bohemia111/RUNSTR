@@ -16,6 +16,7 @@ interface DailyLeaderboardCardProps {
   participants: number; // 7
   entries: LeaderboardEntry[]; // All leaderboard entries (not just top runner)
   onPress: () => void;
+  onShare?: () => void; // Callback to open share modal
 }
 
 export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
@@ -24,7 +25,12 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
   participants,
   entries,
   onPress,
+  onShare,
 }) => {
+  const handleShare = (e: any) => {
+    e.stopPropagation(); // Prevent triggering onPress
+    onShare?.();
+  };
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       {/* Header */}
@@ -36,6 +42,15 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.distance}>{distance}</Text>
         </View>
+        {onShare && (
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={handleShare}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="share-outline" size={20} color={theme.colors.accent} />
+          </TouchableOpacity>
+        )}
         <Ionicons
           name="chevron-forward"
           size={20}
@@ -100,6 +115,10 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     flex: 1,
+  },
+  shareButton: {
+    padding: 8,
+    marginRight: 8,
   },
   title: {
     fontSize: 17,

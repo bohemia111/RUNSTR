@@ -20,13 +20,14 @@ import * as TaskManager from 'expo-task-manager';
 import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../../styles/theme';
+const WEEKLY_DISTANCE_UPDATE_KEY = '@runstr:weekly_distance_last_updated_running';
 import { CustomAlert } from '../../components/ui/CustomAlert';
 import { simpleRunTracker } from '../../services/activity/SimpleRunTracker';
 import type {
   RunSession,
   GPSPoint,
-  Split,
 } from '../../services/activity/SimpleRunTracker';
+import type { Split } from '../../services/activity/SplitTrackingService';
 import { activityMetricsService } from '../../services/activity/ActivityMetricsService';
 import type { FormattedMetrics } from '../../services/activity/ActivityMetricsService';
 import { BatteryWarning } from '../../components/activity/BatteryWarning';
@@ -46,6 +47,28 @@ import { RouteSelectionModal } from '../../components/routes/RouteSelectionModal
 import type { SavedRoute } from '../../services/routes/RouteStorageService';
 import { HoldToStartButton } from '../../components/activity/HoldToStartButton';
 import { AppStateManager } from '../../services/core/AppStateManager';
+// Weekly distance goal components
+import {
+  WeeklyDistanceGoalCard,
+  type PostingState,
+} from '../../components/activity/WeeklyDistanceGoalCard';
+import { DistanceGoalPickerModal } from '../../components/activity/DistanceGoalPickerModal';
+import { weeklyDistanceGoalService } from '../../services/activity/WeeklyDistanceGoalService';
+import type { DistanceGoalProgress } from '../../services/activity/WeeklyDistanceGoalService';
+import { EnhancedSocialShareModal } from '../../components/profile/shared/EnhancedSocialShareModal';
+import { nostrProfileService } from '../../services/nostr/NostrProfileService';
+import type { NostrProfile } from '../../services/nostr/NostrProfileService';
+import type { PublishableWorkout } from '../../services/nostr/workoutPublishingService';
+// New redesigned components
+import { HeroMetric } from '../../components/activity/HeroMetric';
+import {
+  SecondaryMetricRow,
+  type SecondaryMetric,
+} from '../../components/activity/SecondaryMetricRow';
+import { SplitsBar } from '../../components/activity/SplitsBar';
+import { PRComparisonBar } from '../../components/activity/PRComparisonBar';
+import { CountdownOverlay } from '../../components/activity/CountdownOverlay';
+import { LastActivityCard } from '../../components/activity/LastActivityCard';
 
 // Constants
 const TIMER_INTERVAL_MS = 1000; // Update timer every second
@@ -133,6 +156,21 @@ export const RunningTrackerScreen: React.FC = () => {
   const [showRouteSelectionModal, setShowRouteSelectionModal] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<SavedRoute | null>(null);
 
+  // Weekly distance goal state
+  const [weeklyDistance, setWeeklyDistance] = useState<number | null>(null);
+  const [distanceGoal, setDistanceGoal] = useState<number>(20);
+  const [distanceProgress, setDistanceProgress] =
+    useState<DistanceGoalProgress | null>(null);
+  const [distanceLoading, setDistanceLoading] = useState(true);
+  const [distancePostingState, setDistancePostingState] =
+    useState<PostingState>('idle');
+  const [goalPickerVisible, setGoalPickerVisible] = useState(false);
+  const [showSocialModal, setShowSocialModal] = useState(false);
+  const [userProfile, setUserProfile] = useState<NostrProfile | null>(null);
+  const [userId, setUserId] = useState<string>('');
+  const [preparedWorkout, setPreparedWorkout] =
+    useState<PublishableWorkout | null>(null);
+
   const metricsUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const routeCheckRef = useRef<NodeJS.Timeout | null>(null); // For route matching interval
   const isTrackingRef = useRef<boolean>(false); // Track isTracking without re-subscribing
@@ -214,6 +252,71 @@ export const RunningTrackerScreen: React.FC = () => {
       if (metricsUpdateRef.current) clearInterval(metricsUpdateRef.current);
       if (routeCheckRef.current) clearInterval(routeCheckRef.current);
     };
+  }, []);
+
+  // Load user profile for social sharing
+  useEffect(() => {
+    const loadProfileAndId = async () => {
+      try {
+        const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+        const npub = await AsyncStorage.getItem('@runstr:npub');
+        const activeUserId = npub || pubkey || '';
+        setUserId(activeUserId);
+
+        if (pubkey) {
+          const profile = await nostrProfileService.getProfile(pubkey);
+          setUserProfile(profile);
+        }
+      } catch (error) {
+        console.error(
+          '[RunningTrackerScreen] Failed to load user profile:',
+          error
+        );
+      }
+    };
+
+    loadProfileAndId();
+  }, []);
+
+  // Load weekly distance data on mount
+  useEffect(() => {
+    const loadWeeklyDistance = async () => {
+      try {
+        setDistanceLoading(true);
+
+        // Get goal
+        const goal = await weeklyDistanceGoalService.getGoal('running');
+        setDistanceGoal(goal);
+
+        // Get weekly distance
+        const distance =
+          await weeklyDistanceGoalService.getWeeklyDistance('running');
+        setWeeklyDistance(distance);
+
+        // Calculate progress
+        const progress = weeklyDistanceGoalService.calculateProgress(
+          distance,
+          goal
+        );
+        setDistanceProgress(progress);
+
+        console.log(
+          `[RunningTrackerScreen] Weekly distance: ${distance.toFixed(
+            2
+          )}km, goal: ${goal}km`
+        );
+
+        setDistanceLoading(false);
+      } catch (error) {
+        console.error(
+          '[RunningTrackerScreen] Error loading weekly distance:',
+          error
+        );
+        setDistanceLoading(false);
+      }
+    };
+
+    loadWeeklyDistance();
   }, []);
 
   // AppState listener for background/foreground transitions - using AppStateManager
@@ -666,99 +769,230 @@ export const RunningTrackerScreen: React.FC = () => {
     setElapsedTime(0);
   };
 
+  // Handle posting weekly distance to Nostr
+  const handlePostWeeklyDistance = async () => {
+    if (!weeklyDistance || weeklyDistance === 0) {
+      console.warn('[RunningTrackerScreen] Cannot post - no distance available');
+      return;
+    }
+
+    if (distancePostingState === 'posted') {
+      console.warn('[RunningTrackerScreen] Weekly distance already posted');
+      return;
+    }
+
+    try {
+      setDistancePostingState('posting');
+      console.log(
+        `[RunningTrackerScreen] Preparing to post ${weeklyDistance.toFixed(2)}km weekly distance`
+      );
+
+      const weekBounds = weeklyDistanceGoalService.getWeekBounds();
+      const weekNumber = weeklyDistanceGoalService.getWeekNumber();
+
+      // Create PublishableWorkout for social sharing
+      const publishableWorkout: PublishableWorkout = {
+        id: `weekly_running_${weekNumber}_${Date.now()}`,
+        userId: userId || 'unknown',
+        type: 'running',
+        startTime: weekBounds.start.toISOString(),
+        endTime: weekBounds.end.toISOString(),
+        duration: 0, // Weekly summary - no specific duration
+        distance: weeklyDistance * 1000, // Convert km to meters
+        calories: Math.round(weeklyDistance * 60), // Rough estimate
+        source: 'manual',
+        syncedAt: new Date().toISOString(),
+        sourceApp: 'RUNSTR',
+        unitSystem: 'metric',
+        canSyncToNostr: true,
+        metadata: {
+          title: `Week ${weekNumber} Running`,
+          sourceApp: 'RUNSTR',
+          notes: `Weekly running: ${weeklyDistance.toFixed(2)}km / ${distanceGoal}km goal (${distanceProgress?.percentage || 0}%)`,
+          weeklyGoal: distanceGoal,
+          weeklyProgress: distanceProgress?.percentage || 0,
+        },
+      };
+
+      // Open social share modal
+      setPreparedWorkout(publishableWorkout);
+      setShowSocialModal(true);
+      setDistancePostingState('idle');
+
+      console.log(
+        `[RunningTrackerScreen] ✅ Opening social share modal for weekly distance`
+      );
+    } catch (error) {
+      console.error(
+        '[RunningTrackerScreen] ❌ Failed to post weekly distance:',
+        error
+      );
+      setDistancePostingState('idle');
+
+      setAlertConfig({
+        title: 'Failed to Post',
+        message: 'Could not share weekly distance. Please try again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
+    }
+  };
+
+  // Handle setting distance goal
+  const handleSetGoal = () => {
+    console.log('[RunningTrackerScreen] Opening goal selection modal...');
+    setGoalPickerVisible(true);
+  };
+
+  // Handle goal selected from picker
+  const handleGoalSelected = async (newGoal: number) => {
+    try {
+      await weeklyDistanceGoalService.setGoal('running', newGoal);
+      setDistanceGoal(newGoal);
+
+      // Recalculate progress
+      if (weeklyDistance !== null) {
+        const progress = weeklyDistanceGoalService.calculateProgress(
+          weeklyDistance,
+          newGoal
+        );
+        setDistanceProgress(progress);
+      }
+
+      console.log(`[RunningTrackerScreen] ✅ Goal updated to ${newGoal}km`);
+    } catch (error) {
+      console.error('[RunningTrackerScreen] ❌ Failed to update goal:', error);
+    }
+  };
+
+  // Prepare splits for SplitsBar
+  const formattedSplits =
+    simpleRunTracker.getCurrentSession()?.splits?.map((split: Split) => ({
+      km: split.number, // Split number (1, 2, 3, etc.)
+      time: activityMetricsService.formatDuration(Math.round(split.splitTime)),
+    })) || [];
+
+  // Prepare secondary metrics
+  const secondaryMetrics: SecondaryMetric[] = [
+    {
+      value: metrics.pace ?? '--:--',
+      label: 'Pace',
+      icon: 'speedometer',
+    },
+    {
+      value: metrics.elevation ?? '0 m',
+      label: 'Elevation',
+      icon: 'trending-up',
+    },
+  ];
+
+  // Parse distance value for HeroMetric (remove "km" suffix)
+  const distanceValue = metrics.distance.replace(' km', '');
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView
-        style={styles.scrollableContent}
-        contentContainerStyle={styles.scrollContentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Battery Warning */}
-        {isTracking && <BatteryWarning />}
+      {/* IDLE STATE - Show when not tracking and no countdown */}
+      {!isTracking && !countdown && (
+        <ScrollView
+          style={styles.scrollableContent}
+          contentContainerStyle={styles.idleScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Weekly Distance Goal Card */}
+          <WeeklyDistanceGoalCard
+            activityType="running"
+            distance={weeklyDistance}
+            progress={distanceProgress}
+            loading={distanceLoading}
+            onPost={handlePostWeeklyDistance}
+            onSetGoal={handleSetGoal}
+            postingState={distancePostingState}
+          />
 
-        {/* Route Recognition Badge */}
-        <RouteRecognitionBadge
-          routeName={matchedRoute?.routeName || ''}
-          confidence={matchedRoute?.confidence || 0}
-          isVisible={isTracking && matchedRoute !== null}
-        />
+          {/* Route Picker */}
+          <TouchableOpacity
+            style={styles.routePickerButton}
+            onPress={() => setShowRouteSelectionModal(true)}
+          >
+            <Ionicons
+              name={selectedRoute ? 'map' : 'map-outline'}
+              size={20}
+              color={selectedRoute ? theme.colors.accent : theme.colors.text}
+            />
+            <Text
+              style={[
+                styles.routePickerText,
+                selectedRoute && { color: theme.colors.accent },
+              ]}
+            >
+              {selectedRoute ? selectedRoute.name : 'Select Route'}
+            </Text>
+            <Ionicons
+              name="chevron-down"
+              size={18}
+              color={theme.colors.textMuted}
+            />
+          </TouchableOpacity>
 
-        {/* PR Comparison */}
-        <RoutePRComparison
-          isAheadOfPR={prComparison?.isAheadOfPR || false}
-          timeDifference={prComparison?.timeDifference || 0}
-          percentComplete={prComparison?.percentComplete || 0}
-          estimatedFinishTime={prComparison?.estimatedFinishTime || 0}
-          prFinishTime={prComparison?.prFinishTime || 0}
-          isVisible={isTracking && prComparison !== null}
-        />
+          {/* Last Activity Stats */}
+          <LastActivityCard activityType="running" />
+        </ScrollView>
+      )}
 
-        {/* Metrics Display */}
-        <View style={styles.metricsContainer}>
-          <View style={styles.metricsRow}>
-            <MetricCard
-              label="Distance"
-              value={metrics.distance}
-              icon="navigate"
-            />
-            <MetricCard
-              label="Duration"
-              value={formatElapsedTime(elapsedTime)}
-              icon="time"
-            />
-          </View>
-          <View style={styles.metricsRow}>
-            <MetricCard
-              label="Pace"
-              value={metrics.pace ?? '--:--'}
-              icon="speedometer"
-            />
-            <MetricCard
-              label="Elevation"
-              value={metrics.elevation ?? '0 m'}
-              icon="trending-up"
-            />
-          </View>
-        </View>
-      </ScrollView>
+      {/* ACTIVE TRACKING STATE */}
+      {isTracking && (
+        <ScrollView
+          style={styles.scrollableContent}
+          contentContainerStyle={styles.trackingScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Battery Warning */}
+          <BatteryWarning />
+
+          {/* Route Recognition Badge */}
+          <RouteRecognitionBadge
+            routeName={matchedRoute?.routeName || ''}
+            confidence={matchedRoute?.confidence || 0}
+            isVisible={matchedRoute !== null}
+          />
+
+          {/* PR Comparison Bar (new design) */}
+          <PRComparisonBar
+            isAhead={prComparison?.isAheadOfPR || false}
+            timeDifference={prComparison?.timeDifference || 0}
+            percentComplete={prComparison?.percentComplete || 0}
+            isVisible={prComparison !== null}
+          />
+
+          {/* Hero Metrics - Distance + Duration (stacked, large) */}
+          <HeroMetric
+            primaryValue={distanceValue}
+            primaryUnit="km"
+            secondaryValue={formatElapsedTime(elapsedTime)}
+          />
+
+          {/* Secondary Metrics - Pace + Elevation */}
+          <SecondaryMetricRow metrics={secondaryMetrics} />
+
+          {/* Splits Bar */}
+          <SplitsBar splits={formattedSplits} isVisible={formattedSplits.length > 0} />
+        </ScrollView>
+      )}
+
+      {/* Countdown Overlay */}
+      <CountdownOverlay countdown={countdown} />
 
       {/* Fixed Control Buttons */}
       <View style={styles.fixedControlsWrapper}>
         <View style={styles.controlsContainer}>
           {!isTracking && !countdown ? (
-            <>
-              <TouchableOpacity
-                style={styles.routesButton}
-                onPress={() => setShowRouteSelectionModal(true)}
-              >
-                <Ionicons
-                  name={selectedRoute ? 'map' : 'map-outline'}
-                  size={20}
-                  color={
-                    selectedRoute ? theme.colors.accent : theme.colors.text
-                  }
-                />
-                <Text
-                  style={[
-                    styles.routesButtonText,
-                    selectedRoute && { color: theme.colors.accent },
-                  ]}
-                >
-                  {selectedRoute ? selectedRoute.name : 'Routes'}
-                </Text>
-              </TouchableOpacity>
-              <HoldToStartButton
-                label="Start Run"
-                onHoldComplete={handleHoldComplete}
-                disabled={false}
-                holdDuration={2000}
-              />
-            </>
-          ) : !isTracking && countdown ? (
-            <View style={styles.countdownContainer}>
-              <Text style={styles.countdownText}>{countdown}</Text>
-            </View>
-          ) : (
+            <HoldToStartButton
+              label="Start Run"
+              onHoldComplete={handleHoldComplete}
+              disabled={false}
+              holdDuration={2000}
+            />
+          ) : isTracking ? (
             <>
               {!isPaused ? (
                 <TouchableOpacity
@@ -786,7 +1020,7 @@ export const RunningTrackerScreen: React.FC = () => {
                 <Ionicons name="stop" size={30} color={theme.colors.text} />
               </TouchableOpacity>
             </>
-          )}
+          ) : null}
         </View>
       </View>
 
@@ -835,6 +1069,36 @@ export const RunningTrackerScreen: React.FC = () => {
         }}
         onClose={() => setShowRouteSelectionModal(false)}
       />
+
+      {/* Distance Goal Picker Modal */}
+      <DistanceGoalPickerModal
+        visible={goalPickerVisible}
+        activityType="running"
+        currentGoal={distanceGoal}
+        onSelectGoal={handleGoalSelected}
+        onClose={() => setGoalPickerVisible(false)}
+      />
+
+      {/* Enhanced Social Share Modal */}
+      <EnhancedSocialShareModal
+        visible={showSocialModal}
+        workout={preparedWorkout}
+        userId={userId}
+        userAvatar={userProfile?.picture}
+        userName={userProfile?.name || userProfile?.display_name}
+        onClose={() => {
+          setShowSocialModal(false);
+          setPreparedWorkout(null);
+        }}
+        onSuccess={() => {
+          setShowSocialModal(false);
+          setPreparedWorkout(null);
+          setDistancePostingState('posted');
+          console.log(
+            '[RunningTrackerScreen] ✅ Weekly distance posted successfully'
+          );
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -846,10 +1110,50 @@ const styles = StyleSheet.create({
   },
   scrollableContent: {
     flex: 1,
-    padding: 20,
   },
-  scrollContentContainer: {
-    paddingBottom: 120, // Space for fixed buttons (70px button + 50px padding)
+  idleScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 180, // Space for fixed controls
+  },
+  trackingScrollContent: {
+    paddingTop: 12,
+    paddingBottom: 180,
+  },
+  // Activity Header (idle state)
+  activityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 24,
+  },
+  activityTitle: {
+    fontSize: 20,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text,
+    letterSpacing: 2,
+  },
+  // Route Picker Button (idle state)
+  routePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 10,
+  },
+  routePickerText: {
+    fontSize: 16,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text,
+    flex: 1,
+    textAlign: 'center',
   },
   fixedControlsWrapper: {
     position: 'absolute',

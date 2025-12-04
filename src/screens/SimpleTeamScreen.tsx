@@ -25,7 +25,9 @@ import unifiedCache from '../services/cache/UnifiedNostrCache';
 import { CacheKeys } from '../constants/cacheTTL';
 import { CharitySection } from '../components/team/CharitySection';
 import { DailyLeaderboardCard } from '../components/team/DailyLeaderboardCard';
+import { LeaderboardShareModal } from '../components/team/LeaderboardShareModal';
 import { TeamMembershipService } from '../services/team/teamMembershipService';
+import type { LeaderboardEntry } from '../services/competition/SimpleLeaderboardService';
 import { publishJoinRequest } from '../utils/joinRequestPublisher';
 import { useNavigationData } from '../contexts/NavigationDataContext';
 import { CustomAlertManager } from '../components/ui/CustomAlert';
@@ -69,6 +71,14 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
   const [isJoining, setIsJoining] = useState(false);
   const [isMember, setIsMember] = useState(userIsMemberProp);
   const [isCompetitionTeam, setIsCompetitionTeam] = useState(false);
+
+  // Leaderboard share modal state
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [shareModalData, setShareModalData] = useState<{
+    title: string;
+    distance: string;
+    entries: LeaderboardEntry[];
+  } | null>(null);
 
   // Navigation data context for optimistic updates
   const navigationData = useNavigationData();
@@ -166,6 +176,21 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
       };
     }, [team?.id, data, team])
   );
+
+  // Open leaderboard share modal
+  const openShareModal = useCallback(
+    (title: string, distance: string, entries: LeaderboardEntry[]) => {
+      setShareModalData({ title, distance, entries });
+      setShareModalVisible(true);
+    },
+    []
+  );
+
+  // Close leaderboard share modal
+  const closeShareModal = useCallback(() => {
+    setShareModalVisible(false);
+    setShareModalData(null);
+  }, []);
 
   // ✅ Join Team Handler - Set as competition team for leaderboard participation
   const handleJoinTeam = useCallback(async () => {
@@ -474,6 +499,13 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                     // TODO: Navigate to full leaderboard screen
                     console.log('Navigate to 5K leaderboard');
                   }}
+                  onShare={() =>
+                    openShareModal(
+                      `${team.name} 5K`,
+                      '5K',
+                      leaderboards.leaderboard5k
+                    )
+                  }
                 />
               )}
 
@@ -486,6 +518,13 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                   onPress={() => {
                     console.log('Navigate to 10K leaderboard');
                   }}
+                  onShare={() =>
+                    openShareModal(
+                      `${team.name} 10K`,
+                      '10K',
+                      leaderboards.leaderboard10k
+                    )
+                  }
                 />
               )}
 
@@ -498,6 +537,13 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                   onPress={() => {
                     console.log('Navigate to Half Marathon leaderboard');
                   }}
+                  onShare={() =>
+                    openShareModal(
+                      `${team.name} Half Marathon`,
+                      '21K',
+                      leaderboards.leaderboardHalf
+                    )
+                  }
                 />
               )}
 
@@ -510,12 +556,34 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
                   onPress={() => {
                     console.log('Navigate to Marathon leaderboard');
                   }}
+                  onShare={() =>
+                    openShareModal(
+                      `${team.name} Marathon`,
+                      '42K',
+                      leaderboards.leaderboardMarathon
+                    )
+                  }
                 />
               )}
             </View>
           )}
         </View>
       </ScrollView>
+
+      {/* Leaderboard Share Modal */}
+      {shareModalData && (
+        <LeaderboardShareModal
+          visible={shareModalVisible}
+          title={shareModalData.title}
+          distance={shareModalData.distance}
+          entries={shareModalData.entries}
+          userId={currentUserNpub || ''}
+          onClose={closeShareModal}
+          onSuccess={() => {
+            console.log('✅ Leaderboard shared successfully');
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 };

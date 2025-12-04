@@ -56,7 +56,13 @@ const REST_DURATIONS = [30, 60, 90, 120]; // seconds
 // Bodyweight exercises don't require weight input
 const BODYWEIGHT_EXERCISES: ExerciseType[] = ['pushups', 'pullups', 'situps'];
 
-export const StrengthTrackerScreen: React.FC = () => {
+interface StrengthTrackerScreenProps {
+  initialExercise?: ExerciseType;
+}
+
+export const StrengthTrackerScreen: React.FC<StrengthTrackerScreenProps> = ({
+  initialExercise,
+}) => {
   const navigation = useNavigation<any>();
   const publishingService = WorkoutPublishingService.getInstance();
   const [signer, setSigner] = useState<NDKSigner | null>(null);
@@ -65,9 +71,9 @@ export const StrengthTrackerScreen: React.FC = () => {
   const [userAvatar, setUserAvatar] = useState<string | undefined>(undefined);
   const [userName, setUserName] = useState<string | undefined>(undefined);
 
-  // Setup state
+  // Setup state - use initialExercise if provided
   const [selectedExercise, setSelectedExercise] =
-    useState<ExerciseType>('pushups');
+    useState<ExerciseType>(initialExercise || 'pushups');
   const [totalSets, setTotalSets] = useState(3);
   const [targetReps, setTargetReps] = useState(20);
   const [restDuration, setRestDuration] = useState(60);
@@ -109,6 +115,17 @@ export const StrengthTrackerScreen: React.FC = () => {
 
   // Timer refs
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Update selected exercise when initialExercise prop changes
+  useEffect(() => {
+    if (initialExercise) {
+      setSelectedExercise(initialExercise);
+      // Reset to setup phase when exercise changes
+      if (phase === 'setup') {
+        // Already in setup, just update the selection
+      }
+    }
+  }, [initialExercise]);
 
   // Load signer and health profile on mount
   useEffect(() => {
@@ -446,49 +463,60 @@ export const StrengthTrackerScreen: React.FC = () => {
         style={styles.container}
         contentContainerStyle={styles.setupContainer}
       >
+        {/* Dynamic icon and title based on selected exercise */}
         <View style={styles.iconContainer}>
-          <Ionicons name="barbell" size={64} color={theme.colors.text} />
+          <Ionicons
+            name={EXERCISE_OPTIONS.find(e => e.value === selectedExercise)?.icon || 'barbell'}
+            size={64}
+            color={theme.colors.text}
+          />
         </View>
 
-        <Text style={styles.title}>Strength Training</Text>
+        <Text style={styles.title}>
+          {initialExercise
+            ? EXERCISE_OPTIONS.find(e => e.value === initialExercise)?.label || 'Strength Training'
+            : 'Strength Training'}
+        </Text>
         <Text style={styles.subtitle}>Configure your workout</Text>
 
-        {/* Exercise Selector */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Exercise</Text>
-          <View style={styles.exerciseGrid}>
-            {EXERCISE_OPTIONS.map((exercise) => (
-              <TouchableOpacity
-                key={exercise.value}
-                style={[
-                  styles.exerciseOption,
-                  selectedExercise === exercise.value &&
-                    styles.exerciseOptionActive,
-                ]}
-                onPress={() => setSelectedExercise(exercise.value)}
-              >
-                <Ionicons
-                  name={exercise.icon}
-                  size={24}
-                  color={
-                    selectedExercise === exercise.value
-                      ? theme.colors.text
-                      : theme.colors.textMuted
-                  }
-                />
-                <Text
+        {/* Exercise Selector - only show if not pre-selected from menu */}
+        {!initialExercise && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Exercise</Text>
+            <View style={styles.exerciseGrid}>
+              {EXERCISE_OPTIONS.map((exercise) => (
+                <TouchableOpacity
+                  key={exercise.value}
                   style={[
-                    styles.exerciseLabel,
+                    styles.exerciseOption,
                     selectedExercise === exercise.value &&
-                      styles.exerciseLabelActive,
+                      styles.exerciseOptionActive,
                   ]}
+                  onPress={() => setSelectedExercise(exercise.value)}
                 >
-                  {exercise.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Ionicons
+                    name={exercise.icon}
+                    size={24}
+                    color={
+                      selectedExercise === exercise.value
+                        ? theme.colors.text
+                        : theme.colors.textMuted
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.exerciseLabel,
+                      selectedExercise === exercise.value &&
+                        styles.exerciseLabelActive,
+                    ]}
+                  >
+                    {exercise.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Sets Input */}
         <View style={styles.section}>

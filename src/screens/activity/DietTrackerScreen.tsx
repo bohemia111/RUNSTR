@@ -47,9 +47,17 @@ const MEAL_TYPES: {
 const ACTIVE_FAST_START_KEY = '@runstr:active_fast_start';
 const IS_FASTING_KEY = '@runstr:is_fasting';
 
-export const DietTrackerScreen: React.FC = () => {
+interface DietTrackerScreenProps {
+  initialMealType?: MealType;
+  startFasting?: boolean;
+}
+
+export const DietTrackerScreen: React.FC<DietTrackerScreenProps> = ({
+  initialMealType,
+  startFasting: shouldStartFasting,
+}) => {
   const [selectedMealType, setSelectedMealType] =
-    useState<MealType>('breakfast');
+    useState<MealType>(initialMealType || 'breakfast');
   const [selectedMealSize, setSelectedMealSize] = useState<MealSize>('medium');
   const [mealNotes, setMealNotes] = useState('');
   const [mealTime, setMealTime] = useState(new Date());
@@ -120,6 +128,16 @@ export const DietTrackerScreen: React.FC = () => {
     initializeData();
   }, []);
 
+  // Handle initial meal type change from parent
+  useEffect(() => {
+    if (initialMealType) {
+      setSelectedMealType(initialMealType);
+    }
+  }, [initialMealType]);
+
+  // Note: Removed auto-start behavior - user must click "Start Fasting" button
+  // shouldStartFasting prop now only indicates fasting UI mode should be shown
+
   // Calculate fasting duration in real-time (only when actively fasting)
   useEffect(() => {
     if (!isFasting || !fastStartTime) return;
@@ -142,8 +160,11 @@ export const DietTrackerScreen: React.FC = () => {
       ]);
 
       if (fastingFlag === 'true' && startTimeStr) {
+        const startTime = new Date(parseInt(startTimeStr));
+        const currentDuration = Math.floor((Date.now() - startTime.getTime()) / 1000);
         setIsFasting(true);
-        setFastStartTime(new Date(parseInt(startTimeStr)));
+        setFastStartTime(startTime);
+        setFastingDuration(Math.max(0, currentDuration)); // Set immediately to avoid 0 flash
         console.log('[DietTracker] ✅ Restored active fast from storage');
       }
     } catch (error) {
@@ -534,13 +555,30 @@ export const DietTrackerScreen: React.FC = () => {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
+      {/* Dynamic icon and title based on mode */}
       <View style={styles.iconContainer}>
-        <Ionicons name="restaurant" size={64} color={theme.colors.text} />
+        <Ionicons
+          name={shouldStartFasting || isFasting ? 'timer-outline' : (MEAL_TYPES.find(m => m.value === selectedMealType)?.icon || 'restaurant')}
+          size={64}
+          color={theme.colors.text}
+        />
       </View>
 
-      <Text style={styles.title}>Diet Tracker</Text>
+      <Text style={styles.title}>
+        {shouldStartFasting || isFasting
+          ? 'Fasting'
+          : initialMealType
+            ? MEAL_TYPES.find(m => m.value === initialMealType)?.label || 'Diet Tracker'
+            : 'Diet Tracker'}
+      </Text>
       <Text style={styles.subtitle}>
-        {isFasting ? 'Currently Fasting' : 'Log your meals and track fasting'}
+        {isFasting
+          ? 'Currently Fasting'
+          : shouldStartFasting
+            ? 'Ready to begin your fast'
+            : initialMealType
+              ? 'Log your meal'
+              : 'Log your meals and track fasting'}
       </Text>
 
       {/* Active Fasting Display */}
@@ -584,138 +622,192 @@ export const DietTrackerScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Meal Type Selector */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Meal Type</Text>
-        <View style={styles.mealTypeGrid}>
-          {MEAL_TYPES.map((mealType) => (
-            <TouchableOpacity
-              key={mealType.value}
-              style={[
-                styles.mealTypeOption,
-                selectedMealType === mealType.value &&
-                  styles.mealTypeOptionActive,
-              ]}
-              onPress={() => setSelectedMealType(mealType.value)}
-            >
-              <Ionicons
-                name={mealType.icon}
-                size={24}
-                color={
-                  selectedMealType === mealType.value
-                    ? theme.colors.text
-                    : theme.colors.textMuted
-                }
-              />
-              <Text
-                style={[
-                  styles.mealTypeLabel,
-                  selectedMealType === mealType.value &&
-                    styles.mealTypeLabelActive,
-                ]}
-              >
-                {mealType.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Meal Size Selector */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Meal Size (Optional)</Text>
-        <View style={styles.mealSizeGrid}>
-          {(['small', 'medium', 'large', 'xl'] as MealSize[]).map((size) => (
-            <TouchableOpacity
-              key={size}
-              style={[
-                styles.mealSizeOption,
-                selectedMealSize === size && styles.mealSizeOptionActive,
-              ]}
-              onPress={() => setSelectedMealSize(size)}
-            >
-              <Text
-                style={[
-                  styles.mealSizeLabel,
-                  selectedMealSize === size && styles.mealSizeLabelActive,
-                ]}
-              >
-                {size.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Time Selector */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Time</Text>
-        <TouchableOpacity
-          style={styles.timeButton}
-          onPress={() => setShowTimePicker(true)}
-        >
-          <Ionicons name="time-outline" size={20} color={theme.colors.text} />
-          <Text style={styles.timeButtonText}>
-            {mealTime.toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+      {/* Pre-Fasting Display - show when user selected Fast but hasn't started yet */}
+      {shouldStartFasting && !isFasting && (
+        <View style={styles.fastingCard}>
+          <View style={styles.fastingHeader}>
+            <Ionicons name="timer-outline" size={24} color={theme.colors.textMuted} />
+            <Text style={styles.fastingTitle}>Ready to Fast</Text>
+          </View>
+          <Text style={styles.fastingDuration}>00:00:00</Text>
+          <Text style={styles.fastingSubtitle}>
+            Tap the button below to begin tracking your fast
           </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.startFastingButton, { marginTop: 16 }]}
+            onPress={startFastingMode}
+          >
+            <Ionicons
+              name="play"
+              size={20}
+              color={theme.colors.background}
+            />
+            <Text style={styles.startFastingButtonText}>Start Fasting</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-        {showTimePicker && (
-          <DateTimePicker
-            value={mealTime}
-            mode="time"
-            is24Hour={false}
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleTimeChange}
-            accentColor={theme.colors.orangeBright}
-            themeVariant="dark"
+      {/* Meal Type Selector - only show if not pre-selected from menu and not in fasting mode */}
+      {!initialMealType && !shouldStartFasting && !isFasting && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Meal Type</Text>
+          <View style={styles.mealTypeGrid}>
+            {MEAL_TYPES.map((mealType) => (
+              <TouchableOpacity
+                key={mealType.value}
+                style={[
+                  styles.mealTypeOption,
+                  selectedMealType === mealType.value &&
+                    styles.mealTypeOptionActive,
+                ]}
+                onPress={() => setSelectedMealType(mealType.value)}
+              >
+                <Ionicons
+                  name={mealType.icon}
+                  size={24}
+                  color={
+                    selectedMealType === mealType.value
+                      ? theme.colors.text
+                      : theme.colors.textMuted
+                  }
+                />
+                <Text
+                  style={[
+                    styles.mealTypeLabel,
+                    selectedMealType === mealType.value &&
+                      styles.mealTypeLabelActive,
+                  ]}
+                >
+                  {mealType.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Meal Size Selector - hide when in fasting mode */}
+      {!isFasting && !shouldStartFasting && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Meal Size (Optional)</Text>
+          <View style={styles.mealSizeGrid}>
+            {(['small', 'medium', 'large', 'xl'] as MealSize[]).map((size) => (
+              <TouchableOpacity
+                key={size}
+                style={[
+                  styles.mealSizeOption,
+                  selectedMealSize === size && styles.mealSizeOptionActive,
+                ]}
+                onPress={() => setSelectedMealSize(size)}
+              >
+                <Text
+                  style={[
+                    styles.mealSizeLabel,
+                    selectedMealSize === size && styles.mealSizeLabelActive,
+                  ]}
+                >
+                  {size.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Time Selector - hide when in fasting mode */}
+      {!isFasting && !shouldStartFasting && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Time</Text>
+          <TouchableOpacity
+            style={styles.timeButton}
+            onPress={() => setShowTimePicker(true)}
+          >
+            <Ionicons name="time-outline" size={20} color={theme.colors.text} />
+            <Text style={styles.timeButtonText}>
+              {mealTime.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+          </TouchableOpacity>
+
+          {showTimePicker && (
+            <DateTimePicker
+              value={mealTime}
+              mode="time"
+              is24Hour={false}
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleTimeChange}
+              accentColor={theme.colors.orangeBright}
+              themeVariant="dark"
+            />
+          )}
+        </View>
+      )}
+
+      {/* Meal Notes - hide when in fasting mode */}
+      {!isFasting && !shouldStartFasting && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>What did you eat? (Optional)</Text>
+          <TextInput
+            style={styles.notesInput}
+            placeholder="E.g., Oatmeal with berries"
+            placeholderTextColor={theme.colors.textMuted}
+            value={mealNotes}
+            onChangeText={setMealNotes}
+            multiline
+            numberOfLines={3}
           />
-        )}
-      </View>
+        </View>
+      )}
 
-      {/* Meal Notes */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>What did you eat? (Optional)</Text>
-        <TextInput
-          style={styles.notesInput}
-          placeholder="E.g., Oatmeal with berries"
-          placeholderTextColor={theme.colors.textMuted}
-          value={mealNotes}
-          onChangeText={setMealNotes}
-          multiline
-          numberOfLines={3}
-        />
-      </View>
+      {/* Action Buttons - hide when in pre-fasting mode (button is in the card above) */}
+      {!shouldStartFasting && (
+        <View style={styles.buttonGroup}>
+          {!isFasting ? (
+            <>
+              <TouchableOpacity style={styles.saveMealButton} onPress={saveMeal}>
+                <Ionicons
+                  name="restaurant"
+                  size={20}
+                  color={theme.colors.background}
+                />
+                <Text style={styles.saveMealButtonText}>Log Meal</Text>
+              </TouchableOpacity>
 
-      {/* Action Buttons */}
-      <View style={styles.buttonGroup}>
-        {!isFasting ? (
-          <>
-            <TouchableOpacity style={styles.saveMealButton} onPress={saveMeal}>
-              <Ionicons
-                name="restaurant"
-                size={20}
-                color={theme.colors.background}
-              />
-              <Text style={styles.saveMealButtonText}>Log Meal</Text>
-            </TouchableOpacity>
-
+              <TouchableOpacity
+                style={styles.startFastingButton}
+                onPress={startFastingMode}
+              >
+                <Ionicons
+                  name="timer-outline"
+                  size={20}
+                  color={theme.colors.background}
+                />
+                <Text style={styles.startFastingButtonText}>Start Fasting</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
             <TouchableOpacity
-              style={styles.startFastingButton}
-              onPress={startFastingMode}
+              style={styles.breakFastButton}
+              onPress={breakFastAndLogMeal}
             >
               <Ionicons
-                name="timer-outline"
+                name="checkmark-circle"
                 size={20}
                 color={theme.colors.background}
               />
-              <Text style={styles.startFastingButtonText}>Start Fasting</Text>
+              <Text style={styles.breakFastButtonText}>
+                Break Fast + Log Meal
+              </Text>
             </TouchableOpacity>
-          </>
-        ) : (
+          )}
+        </View>
+      )}
+
+      {/* End Fast button when actively fasting (shown even when shouldStartFasting) */}
+      {isFasting && shouldStartFasting && (
+        <View style={styles.buttonGroup}>
           <TouchableOpacity
             style={styles.breakFastButton}
             onPress={breakFastAndLogMeal}
@@ -726,24 +818,27 @@ export const DietTrackerScreen: React.FC = () => {
               color={theme.colors.background}
             />
             <Text style={styles.breakFastButtonText}>
-              Break Fast + Log Meal
+              End Fast
             </Text>
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      )}
 
-      <View style={styles.hintBox}>
-        <Ionicons
-          name="information-circle-outline"
-          size={20}
-          color={theme.colors.textMuted}
-        />
-        <Text style={styles.hintText}>
-          {isFasting
-            ? 'Click "Break Fast + Log Meal" to end your fast and record what you eat.'
-            : '"Log Meal" saves your food. "Start Fasting" begins tracking a fasting period.'}
-        </Text>
-      </View>
+      {/* Hint box - hide in fasting mode */}
+      {!shouldStartFasting && (
+        <View style={styles.hintBox}>
+          <Ionicons
+            name="information-circle-outline"
+            size={20}
+            color={theme.colors.textMuted}
+          />
+          <Text style={styles.hintText}>
+            {isFasting
+              ? 'Click "Break Fast + Log Meal" to end your fast and record what you eat.'
+              : '"Log Meal" saves your food. "Start Fasting" begins tracking a fasting period.'}
+          </Text>
+        </View>
+      )}
 
       {/* Summary Modal */}
       <Modal visible={showSummary} animationType="slide" transparent>

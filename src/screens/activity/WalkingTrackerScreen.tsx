@@ -7,7 +7,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Platform,
-  ScrollView,
   View,
   Text,
   StyleSheet,
@@ -39,6 +38,15 @@ import type { StepGoalProgress } from '../../services/activity/DailyStepGoalServ
 import { HoldToStartButton } from '../../components/activity/HoldToStartButton';
 import { StepGoalPickerModal } from '../../components/activity/StepGoalPickerModal';
 import { EnhancedSocialShareModal } from '../../components/profile/shared/EnhancedSocialShareModal';
+// New redesigned components
+import { HeroMetric } from '../../components/activity/HeroMetric';
+import {
+  SecondaryMetricRow,
+  type SecondaryMetric,
+} from '../../components/activity/SecondaryMetricRow';
+import { CountdownOverlay } from '../../components/activity/CountdownOverlay';
+import { ControlBar } from '../../components/activity/ControlBar';
+import { LastActivityCard } from '../../components/activity/LastActivityCard';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { NostrProfile } from '../../services/nostr/NostrProfileService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -558,7 +566,7 @@ export const WalkingTrackerScreen: React.FC = () => {
         duration: elapsedTime,
         calories,
         elevation: session.elevationGain,
-        metadata: { steps },
+        steps,
         localWorkoutId: workoutId,
         gpsCoordinates, // Pass GPS data for route saving
       });
@@ -572,7 +580,7 @@ export const WalkingTrackerScreen: React.FC = () => {
         duration: elapsedTime,
         calories,
         elevation: session.elevationGain,
-        metadata: { steps },
+        steps,
         gpsCoordinates, // Pass GPS data even if local save failed
       });
       setSummaryModalVisible(true);
@@ -779,147 +787,127 @@ export const WalkingTrackerScreen: React.FC = () => {
     }
   }, [elapsedTime]);
 
+  // Secondary metrics for active tracking
+  const secondaryMetrics: SecondaryMetric[] = [
+    {
+      value: metrics.distance,
+      label: 'Distance',
+      icon: 'navigate-outline',
+    },
+    {
+      value: metrics.duration,
+      label: 'Duration',
+      icon: 'time-outline',
+    },
+    {
+      value: metrics.elevation,
+      label: 'Elevation',
+      icon: 'trending-up-outline',
+    },
+  ];
+
+  // Determine control bar state
+  const controlBarState = isTracking ? (isPaused ? 'paused' : 'tracking') : 'idle';
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: theme.colors.background }}
       edges={['top']}
     >
-      {/* Daily Step Counter */}
-      {!isTracking && !countdown && (
-        <DailyStepGoalCard
-          steps={dailySteps}
-          progress={stepProgress}
-          loading={stepCounterLoading}
-          error={stepCounterError}
-          onPostSteps={handlePostDailySteps}
-          onSetGoal={handleSetGoal}
-          postingState={postingState}
-          showBackgroundBanner={showBackgroundBanner}
-          onEnableBackground={handleRequestPermission}
-          isBackgroundActive={isBackgroundActive}
-        />
-      )}
+      {/* Countdown Overlay */}
+      <CountdownOverlay countdown={countdown} />
 
-      {/* Walking Tracker */}
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Metrics Display */}
-        <View style={styles.metricsContainer}>
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCard}>
-              <Ionicons
-                name="navigate"
-                size={20}
-                color={theme.colors.textMuted}
-                style={styles.metricIcon}
-              />
-              <Text style={styles.metricValue}>{metrics.distance}</Text>
-              <Text style={styles.metricLabel}>Distance</Text>
+      {isTracking ? (
+        /* ============ ACTIVE TRACKING STATE ============ */
+        <View style={styles.activeContainer}>
+          {/* Route Badge (if selected) */}
+          {selectedRoute && (
+            <View style={styles.routeBadge}>
+              <Ionicons name="map" size={14} color={theme.colors.accent} />
+              <Text style={styles.routeBadgeText}>{selectedRoute.name}</Text>
             </View>
-            <View style={styles.metricCard}>
-              <Ionicons
-                name="time"
-                size={20}
-                color={theme.colors.textMuted}
-                style={styles.metricIcon}
-              />
-              <Text style={styles.metricValue}>{metrics.duration}</Text>
-              <Text style={styles.metricLabel}>Duration</Text>
-            </View>
-          </View>
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCard}>
-              <Ionicons
-                name="walk"
-                size={20}
-                color={theme.colors.textMuted}
-                style={styles.metricIcon}
-              />
-              <Text style={styles.metricValue}>{metrics.steps}</Text>
-              <Text style={styles.metricLabel}>Steps</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Ionicons
-                name="trending-up"
-                size={20}
-                color={theme.colors.textMuted}
-                style={styles.metricIcon}
-              />
-              <Text style={styles.metricValue}>{metrics.elevation}</Text>
-              <Text style={styles.metricLabel}>Elevation</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Control Buttons */}
-        <View style={styles.controlsContainer}>
-          {!isTracking && !countdown ? (
-            <>
-              <TouchableOpacity
-                style={styles.routesButton}
-                onPress={() => setRouteSelectionVisible(true)}
-              >
-                <Ionicons
-                  name={selectedRoute ? 'map' : 'map-outline'}
-                  size={20}
-                  color={
-                    selectedRoute ? theme.colors.accent : theme.colors.text
-                  }
-                />
-                <Text
-                  style={[
-                    styles.routesButtonText,
-                    selectedRoute && { color: theme.colors.accent },
-                  ]}
-                >
-                  {selectedRoute ? selectedRoute.name : 'Routes'}
-                </Text>
-              </TouchableOpacity>
-              <HoldToStartButton
-                label="Start Walk"
-                onHoldComplete={handleHoldComplete}
-                disabled={false}
-                holdDuration={2000}
-              />
-            </>
-          ) : !isTracking && countdown ? (
-            <View style={styles.countdownContainer}>
-              <Text style={styles.countdownText}>{countdown}</Text>
-            </View>
-          ) : (
-            <>
-              {!isPaused ? (
-                <TouchableOpacity
-                  style={styles.pauseButton}
-                  onPress={pauseTracking}
-                >
-                  <Ionicons name="pause" size={30} color={theme.colors.text} />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={styles.resumeButton}
-                  onPress={resumeTracking}
-                >
-                  <Ionicons
-                    name="play"
-                    size={30}
-                    color={theme.colors.background}
-                  />
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={styles.stopButton}
-                onPress={stopTracking}
-              >
-                <Ionicons name="stop" size={30} color={theme.colors.text} />
-              </TouchableOpacity>
-            </>
           )}
+
+          {/* Hero Metric - Steps (large, centered) */}
+          <View style={styles.heroSection}>
+            <HeroMetric
+              primaryValue={metrics.steps}
+              primaryUnit="steps"
+              secondaryValue={metrics.duration}
+            />
+          </View>
+
+          {/* Secondary Metrics Row */}
+          <SecondaryMetricRow metrics={secondaryMetrics} />
+
+          {/* Spacer to push controls to bottom */}
+          <View style={{ flex: 1 }} />
+
+          {/* Control Bar - Fixed at bottom */}
+          <ControlBar
+            state={controlBarState}
+            startLabel="Start Walk"
+            onHoldComplete={handleHoldComplete}
+            onPause={pauseTracking}
+            onResume={resumeTracking}
+            onStop={stopTracking}
+          />
         </View>
-      </ScrollView>
+      ) : (
+        /* ============ IDLE STATE ============ */
+        <View style={styles.idleContainer}>
+          {/* Daily Step Goal Card (prominent in walking) */}
+          <DailyStepGoalCard
+            steps={dailySteps}
+            progress={stepProgress}
+            loading={stepCounterLoading}
+            error={stepCounterError}
+            onPostSteps={handlePostDailySteps}
+            onSetGoal={handleSetGoal}
+            postingState={postingState}
+            showBackgroundBanner={showBackgroundBanner}
+            onEnableBackground={handleRequestPermission}
+            isBackgroundActive={isBackgroundActive}
+          />
+
+          {/* Last Activity & Weekly Stats */}
+          <LastActivityCard activityType="walking" />
+
+          {/* Route Selection */}
+          <TouchableOpacity
+            style={styles.routeSelector}
+            onPress={() => setRouteSelectionVisible(true)}
+          >
+            <View style={styles.routeSelectorLeft}>
+              <Ionicons
+                name={selectedRoute ? 'map' : 'map-outline'}
+                size={20}
+                color={selectedRoute ? theme.colors.accent : theme.colors.textMuted}
+              />
+              <Text style={[
+                styles.routeSelectorText,
+                selectedRoute && { color: theme.colors.accent }
+              ]}>
+                {selectedRoute ? selectedRoute.name : 'Select a route (optional)'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Spacer to push controls to bottom */}
+          <View style={{ flex: 1 }} />
+
+          {/* Control Bar - Fixed at bottom */}
+          <ControlBar
+            state={controlBarState}
+            startLabel="Start Walk"
+            onHoldComplete={handleHoldComplete}
+            onPause={pauseTracking}
+            onResume={resumeTracking}
+            onStop={stopTracking}
+          />
+        </View>
+      )}
 
       {/* Workout Summary Modal */}
       {workoutData && (
@@ -1002,113 +990,63 @@ export const WalkingTrackerScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  // Active tracking state container
+  activeContainer: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 0, // Removed to eliminate gap with Today's Steps card
-    paddingBottom: 100, // Tab bar clearance
-  },
-  metricsContainer: {
-    flex: 0, // Don't expand, take only needed space
-    justifyContent: 'flex-start',
-    paddingTop: 0, // Removed - ScrollView has padding
-    paddingBottom: 4, // Reduced from 12 to compact layout
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8, // Reduced from 12 to tighten spacing
-  },
-  metricCard: {
+  // Idle state container
+  idleContainer: {
     flex: 1,
-    backgroundColor: theme.colors.card,
-    borderRadius: 12,
-    padding: 12, // Reduced from 16 to make cards more compact
-    marginHorizontal: 6,
+    backgroundColor: theme.colors.background,
+  },
+  // Route badge shown during tracking
+  routeBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: theme.colors.card,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  metricIcon: {
-    marginBottom: 6, // Reduced from 8 to compact cards
-  },
-  metricValue: {
-    fontSize: 32,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
-    marginBottom: 4,
-  },
-  metricLabel: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
-    fontWeight: theme.typography.weights.medium,
-  },
-  controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingBottom: 12, // Reduced from 20 to compact layout
-    gap: 16, // Reduced from 20 to tighten button spacing
-  },
-  routesButton: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  routesButtonText: {
-    color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: theme.typography.weights.bold,
-    letterSpacing: 0.5,
-  },
-  pauseButton: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 35,
-    width: 70,
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-  },
-  resumeButton: {
-    backgroundColor: theme.colors.orangeBright,
-    borderRadius: 35,
-    width: 70,
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stopButton: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 35,
-    width: 70,
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-  },
-  countdownContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    paddingVertical: 40,
-  },
-  countdownText: {
-    fontSize: 120,
-    fontWeight: theme.typography.weights.bold,
+  routeBadgeText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.semiBold,
     color: theme.colors.accent,
-    textAlign: 'center',
+  },
+  // Hero metric section
+  heroSection: {
+    flex: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  // Route selector in idle state
+  routeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.card,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  routeSelectorLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  routeSelectorText: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.textMuted,
   },
 });

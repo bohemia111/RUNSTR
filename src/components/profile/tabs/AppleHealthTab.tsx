@@ -274,7 +274,7 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
 
     try {
       await onSocialShare(workout);
-      CustomAlertManager.alert('Success', 'Workout shared to social feeds!');
+      // Success alert handled by EnhancedSocialShareModal
     } catch (error) {
       console.error('Social share failed:', error);
       CustomAlertManager.alert('Error', 'Failed to share workout');

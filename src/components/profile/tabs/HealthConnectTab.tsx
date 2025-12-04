@@ -68,7 +68,40 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
       if (status.authorized) {
         // Already authorized
         setHasPermission(true);
-        setIsLoading(false);
+
+        // Load cached workouts immediately for instant display
+        const cached = await healthConnectService.getCachedWorkouts();
+        if (cached && cached.length > 0) {
+          // Transform cached data to UI format matching Workout interface
+          const transformedWorkouts: Workout[] = cached.map((workout) => ({
+            id: workout.id,
+            userId: userId,
+            type: (workout.activityType || 'other') as Workout['type'],
+            source: 'health_connect' as const,
+            duration: workout.duration,
+            distance: workout.totalDistance || 0,
+            calories: workout.totalEnergyBurned || 0,
+            startTime: workout.startTime,
+            endTime: workout.endTime,
+            syncedAt: new Date().toISOString(),
+            steps: workout.steps,
+            heartRate: workout.heartRate,
+            metadata: {
+              sourceApp: workout.sourceName,
+              originalExerciseType: workout.exerciseType,
+              healthConnectId: workout.id,
+              syncedVia: 'health_connect_service',
+            },
+          }));
+          setWorkouts(transformedWorkouts);
+          setIsLoading(false);
+
+          // Fetch fresh data in background (don't show loading spinner)
+          loadHealthConnectWorkouts(false);
+        } else {
+          // No cache, fetch with loading state
+          await loadHealthConnectWorkouts(true);
+        }
       } else {
         // Not authorized - just update state, don't auto-request
         console.log('Health Connect not authorized - showing connect button');
@@ -170,9 +203,11 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
     }
   };
 
-  const loadHealthConnectWorkouts = async () => {
+  const loadHealthConnectWorkouts = async (showLoading: boolean = true) => {
     try {
-      setIsLoading(true);
+      if (showLoading) {
+        setIsLoading(true);
+      }
       console.log('Loading Health Connect workouts (last 30 days)...');
 
       // Add timeout protection to prevent hanging
@@ -219,7 +254,9 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
 
       setWorkouts([]);
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -268,7 +305,7 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
 
     try {
       await onSocialShare(workout);
-      CustomAlertManager.alert('Success', 'Workout shared to social feeds!');
+      // Success alert handled by the EnhancedSocialShareModal
     } catch (error) {
       console.error('Social share failed:', error);
       CustomAlertManager.alert('Error', 'Failed to share workout');

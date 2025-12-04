@@ -11,13 +11,16 @@ Team discovery, management, and display components for RUNSTR team functionality
 - **CaptainHeader.tsx** - Header component for captain dashboard and management
 - **CaptainWalletManager.tsx** - Wallet management component for team captains
 - **ChallengesCard.tsx** - Challenge display card for team dashboard (deprecated)
+- **CharitySection.tsx** - Charity display section for teams
 - **CompetitionTabs.tsx** - Tab navigation for League and Events sections
+- **DailyLeaderboardCard.tsx** - Daily leaderboard card (5K/10K/Half/Marathon) with share button
 - **CompetitionWinnersCard.tsx** - Display card showing competition winners with Zap button for P2P payments
 - **DifficultyIndicator.tsx** - Difficulty level indicator for team activities
 - **EventsCard.tsx** - Event display card for team dashboard
 - **JoinRequestCard.tsx** - Individual join request display component
 - **JoinRequestsSection.tsx** - Section for managing team join requests
 - **LeaderboardCard.tsx** - Team leaderboard display component
+- **LeaderboardShareModal.tsx** - Modal for sharing leaderboard results to Nostr with SVG card
 - **LeagueRankingsSection.tsx** - League rankings display section
 - **NostrMemberManager.tsx** - Nostr-based team member management component
 - **QuickActionsSection.tsx** - Quick action buttons for team management

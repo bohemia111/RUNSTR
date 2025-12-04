@@ -10,13 +10,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { AppStateManager } from '../../services/core/AppStateManager';
-import { HoldToStartButton } from '../../components/activity/HoldToStartButton';
 import { CustomAlert } from '../../components/ui/CustomAlert';
 import { simpleLocationTrackingService } from '../../services/activity/SimpleLocationTrackingService';
 import { activityMetricsService } from '../../services/activity/ActivityMetricsService';
@@ -29,6 +27,29 @@ import type { SavedRoute } from '../../services/routes/RouteStorageService';
 import { theme } from '../../styles/theme';
 import { appPermissionService } from '../../services/initialization/AppPermissionService';
 import { PermissionRequestModal } from '../../components/permissions/PermissionRequestModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// Weekly distance goal components
+import {
+  WeeklyDistanceGoalCard,
+  type PostingState,
+} from '../../components/activity/WeeklyDistanceGoalCard';
+import { DistanceGoalPickerModal } from '../../components/activity/DistanceGoalPickerModal';
+import { weeklyDistanceGoalService } from '../../services/activity/WeeklyDistanceGoalService';
+import type { DistanceGoalProgress } from '../../services/activity/WeeklyDistanceGoalService';
+import { EnhancedSocialShareModal } from '../../components/profile/shared/EnhancedSocialShareModal';
+import { nostrProfileService } from '../../services/nostr/NostrProfileService';
+import type { NostrProfile } from '../../services/nostr/NostrProfileService';
+import type { PublishableWorkout } from '../../services/nostr/workoutPublishingService';
+// Redesigned components
+import { SpeedGauge } from '../../components/activity/SpeedGauge';
+import { HeroMetric } from '../../components/activity/HeroMetric';
+import {
+  SecondaryMetricRow,
+  type SecondaryMetric,
+} from '../../components/activity/SecondaryMetricRow';
+import { CountdownOverlay } from '../../components/activity/CountdownOverlay';
+import { ControlBar } from '../../components/activity/ControlBar';
+import { LastActivityCard } from '../../components/activity/LastActivityCard';
 
 export const CyclingTrackerScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -42,6 +63,8 @@ export const CyclingTrackerScreen: React.FC = () => {
   });
   const [elapsedTime, setElapsedTime] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
+  const [maxSpeed, setMaxSpeed] = useState(0);
+  const [avgSpeed, setAvgSpeed] = useState(0);
   const [selectedRoute, setSelectedRoute] = useState<SavedRoute | null>(null);
   const [routeSelectionVisible, setRouteSelectionVisible] = useState(false);
   const [summaryModalVisible, setSummaryModalVisible] = useState(false);
@@ -76,6 +99,21 @@ export const CyclingTrackerScreen: React.FC = () => {
     message: '',
     buttons: [],
   });
+  // Weekly distance goal state
+  const [weeklyDistance, setWeeklyDistance] = useState<number | null>(null);
+  const [distanceGoal, setDistanceGoal] = useState<number>(50);
+  const [distanceProgress, setDistanceProgress] =
+    useState<DistanceGoalProgress | null>(null);
+  const [distanceLoading, setDistanceLoading] = useState(true);
+  const [distancePostingState, setDistancePostingState] =
+    useState<PostingState>('idle');
+  const [goalPickerVisible, setGoalPickerVisible] = useState(false);
+  const [showSocialModal, setShowSocialModal] = useState(false);
+  const [userProfile, setUserProfile] = useState<NostrProfile | null>(null);
+  const [userId, setUserId] = useState<string>('');
+  const [preparedWorkout, setPreparedWorkout] =
+    useState<PublishableWorkout | null>(null);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const metricsUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -89,6 +127,71 @@ export const CyclingTrackerScreen: React.FC = () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (metricsUpdateRef.current) clearInterval(metricsUpdateRef.current);
     };
+  }, []);
+
+  // Load user profile for social sharing
+  useEffect(() => {
+    const loadProfileAndId = async () => {
+      try {
+        const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+        const npub = await AsyncStorage.getItem('@runstr:npub');
+        const activeUserId = npub || pubkey || '';
+        setUserId(activeUserId);
+
+        if (pubkey) {
+          const profile = await nostrProfileService.getProfile(pubkey);
+          setUserProfile(profile);
+        }
+      } catch (error) {
+        console.error(
+          '[CyclingTrackerScreen] Failed to load user profile:',
+          error
+        );
+      }
+    };
+
+    loadProfileAndId();
+  }, []);
+
+  // Load weekly distance data on mount
+  useEffect(() => {
+    const loadWeeklyDistance = async () => {
+      try {
+        setDistanceLoading(true);
+
+        // Get goal
+        const goal = await weeklyDistanceGoalService.getGoal('cycling');
+        setDistanceGoal(goal);
+
+        // Get weekly distance
+        const distance =
+          await weeklyDistanceGoalService.getWeeklyDistance('cycling');
+        setWeeklyDistance(distance);
+
+        // Calculate progress
+        const progress = weeklyDistanceGoalService.calculateProgress(
+          distance,
+          goal
+        );
+        setDistanceProgress(progress);
+
+        console.log(
+          `[CyclingTrackerScreen] Weekly distance: ${distance.toFixed(
+            2
+          )}km, goal: ${goal}km`
+        );
+
+        setDistanceLoading(false);
+      } catch (error) {
+        console.error(
+          '[CyclingTrackerScreen] Error loading weekly distance:',
+          error
+        );
+        setDistanceLoading(false);
+      }
+    };
+
+    loadWeeklyDistance();
   }, []);
 
   // AppState listener for background/foreground transitions - using AppStateManager
@@ -287,17 +390,28 @@ export const CyclingTrackerScreen: React.FC = () => {
 
     const session = simpleLocationTrackingService.getCurrentSession();
     if (session) {
-      // Calculate current speed based on distance and time
-      let speed = activityMetricsService.calculateSpeed(
+      // Calculate average speed based on total distance and time
+      const calculatedAvgSpeed = activityMetricsService.calculateSpeed(
         session.distance,
         elapsedTime
       );
 
-      setCurrentSpeed(speed);
+      // Get current speed from recent position data if available
+      // For now we'll use avg speed as current (GPS updates will improve this)
+      const instantSpeed = calculatedAvgSpeed;
+
+      setCurrentSpeed(instantSpeed);
+      setAvgSpeed(calculatedAvgSpeed);
+
+      // Track max speed
+      if (instantSpeed > maxSpeed) {
+        setMaxSpeed(instantSpeed);
+      }
+
       setMetrics({
         distance: activityMetricsService.formatDistance(session.distance),
         duration: activityMetricsService.formatDuration(elapsedTime),
-        speed: activityMetricsService.formatSpeed(speed),
+        speed: activityMetricsService.formatSpeed(instantSpeed),
         elevation: activityMetricsService.formatElevation(
           session.elevationGain
         ),
@@ -421,6 +535,104 @@ export const CyclingTrackerScreen: React.FC = () => {
     });
     setElapsedTime(0);
     setCurrentSpeed(0);
+    setMaxSpeed(0);
+    setAvgSpeed(0);
+  };
+
+  // Handle posting weekly distance to Nostr
+  const handlePostWeeklyDistance = async () => {
+    if (!weeklyDistance || weeklyDistance === 0) {
+      console.warn('[CyclingTrackerScreen] Cannot post - no distance available');
+      return;
+    }
+
+    if (distancePostingState === 'posted') {
+      console.warn('[CyclingTrackerScreen] Weekly distance already posted');
+      return;
+    }
+
+    try {
+      setDistancePostingState('posting');
+      console.log(
+        `[CyclingTrackerScreen] Preparing to post ${weeklyDistance.toFixed(2)}km weekly distance`
+      );
+
+      const weekBounds = weeklyDistanceGoalService.getWeekBounds();
+      const weekNumber = weeklyDistanceGoalService.getWeekNumber();
+
+      // Create PublishableWorkout for social sharing
+      const publishableWorkout: PublishableWorkout = {
+        id: `weekly_cycling_${weekNumber}_${Date.now()}`,
+        userId: userId || 'unknown',
+        type: 'cycling',
+        startTime: weekBounds.start.toISOString(),
+        endTime: weekBounds.end.toISOString(),
+        duration: 0, // Weekly summary - no specific duration
+        distance: weeklyDistance * 1000, // Convert km to meters
+        calories: Math.round(weeklyDistance * 30), // Rough estimate for cycling
+        source: 'manual',
+        syncedAt: new Date().toISOString(),
+        sourceApp: 'RUNSTR',
+        unitSystem: 'metric',
+        canSyncToNostr: true,
+        metadata: {
+          title: `Week ${weekNumber} Cycling`,
+          sourceApp: 'RUNSTR',
+          notes: `Weekly cycling: ${weeklyDistance.toFixed(2)}km / ${distanceGoal}km goal (${distanceProgress?.percentage || 0}%)`,
+          weeklyGoal: distanceGoal,
+          weeklyProgress: distanceProgress?.percentage || 0,
+        },
+      };
+
+      // Open social share modal
+      setPreparedWorkout(publishableWorkout);
+      setShowSocialModal(true);
+      setDistancePostingState('idle');
+
+      console.log(
+        `[CyclingTrackerScreen] ✅ Opening social share modal for weekly distance`
+      );
+    } catch (error) {
+      console.error(
+        '[CyclingTrackerScreen] ❌ Failed to post weekly distance:',
+        error
+      );
+      setDistancePostingState('idle');
+
+      setAlertConfig({
+        title: 'Failed to Post',
+        message: 'Could not share weekly distance. Please try again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
+    }
+  };
+
+  // Handle setting distance goal
+  const handleSetGoal = () => {
+    console.log('[CyclingTrackerScreen] Opening goal selection modal...');
+    setGoalPickerVisible(true);
+  };
+
+  // Handle goal selected from picker
+  const handleGoalSelected = async (newGoal: number) => {
+    try {
+      await weeklyDistanceGoalService.setGoal('cycling', newGoal);
+      setDistanceGoal(newGoal);
+
+      // Recalculate progress
+      if (weeklyDistance !== null) {
+        const progress = weeklyDistanceGoalService.calculateProgress(
+          weeklyDistance,
+          newGoal
+        );
+        setDistanceProgress(progress);
+      }
+
+      console.log(`[CyclingTrackerScreen] ✅ Goal updated to ${newGoal}km`);
+    } catch (error) {
+      console.error('[CyclingTrackerScreen] ❌ Failed to update goal:', error);
+    }
   };
 
   useEffect(() => {
@@ -429,123 +641,132 @@ export const CyclingTrackerScreen: React.FC = () => {
     }
   }, [elapsedTime]);
 
+  // Secondary metrics for active tracking
+  const secondaryMetrics: SecondaryMetric[] = [
+    {
+      value: metrics.distance,
+      label: 'Distance',
+      icon: 'navigate-outline',
+    },
+    {
+      value: metrics.duration,
+      label: 'Duration',
+      icon: 'time-outline',
+    },
+    {
+      value: metrics.elevation,
+      label: 'Elevation',
+      icon: 'trending-up-outline',
+    },
+  ];
+
+  // Determine control bar state
+  const controlBarState = isTracking ? (isPaused ? 'paused' : 'tracking') : 'idle';
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: theme.colors.background }}
-      edges={['top', 'bottom']}
+      edges={['top']}
     >
-      <View style={styles.container}>
-        {/* Metrics Display */}
-        <View style={styles.metricsContainer}>
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCard}>
-              <Ionicons
-                name="navigate"
-                size={20}
-                color={theme.colors.textMuted}
-                style={styles.metricIcon}
-              />
-              <Text style={styles.metricValue}>{metrics.distance}</Text>
-              <Text style={styles.metricLabel}>Distance</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Ionicons
-                name="time"
-                size={20}
-                color={theme.colors.textMuted}
-                style={styles.metricIcon}
-              />
-              <Text style={styles.metricValue}>{metrics.duration}</Text>
-              <Text style={styles.metricLabel}>Duration</Text>
-            </View>
-          </View>
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCard}>
-              <Ionicons
-                name="speedometer"
-                size={20}
-                color={theme.colors.textMuted}
-                style={styles.metricIcon}
-              />
-              <Text style={styles.metricValue}>{metrics.speed}</Text>
-              <Text style={styles.metricLabel}>Speed</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Ionicons
-                name="trending-up"
-                size={20}
-                color={theme.colors.textMuted}
-                style={styles.metricIcon}
-              />
-              <Text style={styles.metricValue}>{metrics.elevation}</Text>
-              <Text style={styles.metricLabel}>Elevation</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Control Buttons */}
-        <View style={styles.controlsContainer}>
-          {!isTracking ? (
-            <>
-              {/* Routes Button */}
-              <TouchableOpacity
-                style={styles.routesButton}
-                onPress={() => setRouteSelectionVisible(true)}
-              >
-                <Ionicons
-                  name="map-outline"
-                  size={20}
-                  color={theme.colors.text}
-                />
-                <Text style={styles.routesButtonText}>
-                  {selectedRoute ? selectedRoute.name : 'Routes'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Hold to Start Button */}
-              <HoldToStartButton
-                label="Start Ride"
-                onHoldComplete={handleHoldComplete}
-                disabled={countdown !== null}
-                holdDuration={2000}
-              />
-            </>
-          ) : (
-            <>
-              {!isPaused ? (
-                <TouchableOpacity
-                  style={styles.pauseButton}
-                  onPress={pauseTracking}
-                >
-                  <Ionicons name="pause" size={30} color={theme.colors.text} />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={styles.resumeButton}
-                  onPress={resumeTracking}
-                >
-                  <Ionicons
-                    name="play"
-                    size={30}
-                    color={theme.colors.background}
-                  />
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={styles.stopButton}
-                onPress={stopTracking}
-              >
-                <Ionicons name="stop" size={30} color={theme.colors.text} />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-
       {/* Countdown Overlay */}
-      {countdown && (
-        <View style={styles.countdownOverlay}>
-          <Text style={styles.countdownText}>{countdown}</Text>
+      <CountdownOverlay countdown={countdown} />
+
+      {isTracking ? (
+        /* ============ ACTIVE TRACKING STATE ============ */
+        <View style={styles.activeContainer}>
+          {/* Route Badge (if selected) */}
+          {selectedRoute && (
+            <View style={styles.routeBadge}>
+              <Ionicons name="map" size={14} color={theme.colors.accent} />
+              <Text style={styles.routeBadgeText}>{selectedRoute.name}</Text>
+            </View>
+          )}
+
+          {/* Speed Gauge - Hero element for cycling */}
+          <View style={styles.gaugeSection}>
+            <SpeedGauge
+              currentSpeed={currentSpeed}
+              maxSpeed={maxSpeed}
+              avgSpeed={avgSpeed}
+              unit="km/h"
+            />
+          </View>
+
+          {/* Distance & Duration as hero below gauge */}
+          <View style={styles.heroMetricSection}>
+            <HeroMetric
+              primaryValue={metrics.distance.replace(' km', '')}
+              primaryUnit="km"
+              secondaryValue={metrics.duration}
+            />
+          </View>
+
+          {/* Secondary Metrics Row */}
+          <SecondaryMetricRow metrics={secondaryMetrics} />
+
+          {/* Spacer to push controls to bottom */}
+          <View style={{ flex: 1 }} />
+
+          {/* Control Bar - Fixed at bottom */}
+          <ControlBar
+            state={controlBarState}
+            startLabel="Start Ride"
+            onHoldComplete={handleHoldComplete}
+            onPause={pauseTracking}
+            onResume={resumeTracking}
+            onStop={stopTracking}
+          />
+        </View>
+      ) : (
+        /* ============ IDLE STATE ============ */
+        <View style={styles.idleContainer}>
+          {/* Weekly Distance Goal Card */}
+          <WeeklyDistanceGoalCard
+            activityType="cycling"
+            distance={weeklyDistance}
+            progress={distanceProgress}
+            loading={distanceLoading}
+            onPost={handlePostWeeklyDistance}
+            onSetGoal={handleSetGoal}
+            postingState={distancePostingState}
+          />
+
+          {/* Last Activity & Weekly Stats */}
+          <LastActivityCard activityType="cycling" />
+
+          {/* Route Selection */}
+          <TouchableOpacity
+            style={styles.routeSelector}
+            onPress={() => setRouteSelectionVisible(true)}
+          >
+            <View style={styles.routeSelectorLeft}>
+              <Ionicons
+                name={selectedRoute ? 'map' : 'map-outline'}
+                size={20}
+                color={selectedRoute ? theme.colors.accent : theme.colors.textMuted}
+              />
+              <Text style={[
+                styles.routeSelectorText,
+                selectedRoute && { color: theme.colors.accent }
+              ]}>
+                {selectedRoute ? selectedRoute.name : 'Select a route (optional)'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Spacer to push controls to bottom */}
+          <View style={{ flex: 1 }} />
+
+          {/* Control Bar - Fixed at bottom */}
+          <ControlBar
+            state={controlBarState}
+            startLabel="Start Ride"
+            onHoldComplete={handleHoldComplete}
+            onPause={pauseTracking}
+            onResume={resumeTracking}
+            onStop={stopTracking}
+          />
         </View>
       )}
 
@@ -596,120 +817,114 @@ export const CyclingTrackerScreen: React.FC = () => {
           }}
         />
       )}
+
+      {/* Distance Goal Picker Modal */}
+      <DistanceGoalPickerModal
+        visible={goalPickerVisible}
+        activityType="cycling"
+        currentGoal={distanceGoal}
+        onSelectGoal={handleGoalSelected}
+        onClose={() => setGoalPickerVisible(false)}
+      />
+
+      {/* Enhanced Social Share Modal */}
+      <EnhancedSocialShareModal
+        visible={showSocialModal}
+        workout={preparedWorkout}
+        userId={userId}
+        userAvatar={userProfile?.picture}
+        userName={userProfile?.name || userProfile?.display_name}
+        onClose={() => {
+          setShowSocialModal(false);
+          setPreparedWorkout(null);
+        }}
+        onSuccess={() => {
+          setShowSocialModal(false);
+          setPreparedWorkout(null);
+          setDistancePostingState('posted');
+          console.log(
+            '[CyclingTrackerScreen] ✅ Weekly distance posted successfully'
+          );
+        }}
+      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  // Active tracking state container
+  activeContainer: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    padding: 20,
   },
-  metricsContainer: {
+  // Idle state container
+  idleContainer: {
     flex: 1,
-    justifyContent: 'center',
-    paddingTop: 20,
+    backgroundColor: theme.colors.background,
   },
-  metricsRow: {
+  // Activity header in idle state
+  activityHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 12,
+  },
+  activityTitle: {
+    fontSize: 24,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text,
+  },
+  // Route badge shown during tracking
+  routeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: theme.colors.card,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  routeBadgeText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.accent,
+  },
+  // Speed gauge section
+  gaugeSection: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  // Hero metric section below gauge
+  heroMetricSection: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  // Route selector in idle state
+  routeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  metricCard: {
-    flex: 1,
     backgroundColor: theme.colors.card,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
     borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 8,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  metricIcon: {
-    marginBottom: 8,
+  routeSelectorLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  metricValue: {
-    fontSize: 28,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
-    marginBottom: 4,
-  },
-  metricLabel: {
+  routeSelectorText: {
     fontSize: 14,
-    color: theme.colors.textMuted,
     fontWeight: theme.typography.weights.medium,
-  },
-  controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 40,
-    paddingTop: 20,
-    marginTop: 40,
-    gap: 20,
-  },
-  routesButton: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    height: 200,
-  },
-  routesButtonText: {
-    color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: theme.typography.weights.bold,
-    letterSpacing: 0.5,
-  },
-  pauseButton: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 35,
-    width: 70,
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-  },
-  resumeButton: {
-    backgroundColor: theme.colors.text,
-    borderRadius: 35,
-    width: 70,
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stopButton: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 35,
-    width: 70,
-    height: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.text,
-  },
-  countdownOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  countdownText: {
-    fontSize: 120,
-    fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
+    color: theme.colors.textMuted,
   },
 });

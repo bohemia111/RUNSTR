@@ -18,7 +18,7 @@ export interface LocalWorkout {
   distance?: number; // meters
   calories?: number; // NEW: Estimated or actual calorie burn/intake
   steps?: number; // Step count (for daily steps workouts)
-  source: 'gps_tracker' | 'manual_entry' | 'daily_steps' | 'imported_nostr';
+  source: 'gps_tracker' | 'manual_entry' | 'daily_steps' | 'imported_nostr' | 'health_connect' | 'healthkit';
 
   // GPS-specific fields
   elevation?: number; // meters

@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.8] - 2025-12-03
+
+**Achievement**: Enhanced sharing and UI improvements
+
+### ✨ Features
+
+**Enhanced Sharing Cards**
+- Kind 1 posts now use template picker for beautiful sharing cards
+- Improved social media sharing experience
+
+**Activity Tracker UI**
+- Updated activity tracker interface
+
+### 🐛 Bug Fixes
+
+**Health Connect**
+- Fixed Health Connect integration issues
+
+**Fasting Timer**
+- Fixed fasting timer bug
+
+### 📱 Platform Updates
+- iOS: Version 0.9.8 (Build 84)
+- Android: Version 0.9.8 (Build 84)
+
 ## [0.9.7] - 2025-12-02
 
 **Achievement**: Bug fixes and stability improvements

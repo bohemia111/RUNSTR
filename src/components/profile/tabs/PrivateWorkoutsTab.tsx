@@ -152,12 +152,7 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
       setPostingType('social');
 
       await onPostToSocial(workout);
-      setAlertConfig({
-        title: 'Success',
-        message: 'Workout posted as kind 1 social post',
-        buttons: [{ text: 'OK', style: 'default' }],
-      });
-      setAlertVisible(true);
+      // Success alert handled by EnhancedSocialShareModal
     } catch (error) {
       console.error('Failed to post workout to social:', error);
       setAlertConfig({

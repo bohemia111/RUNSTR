@@ -91,8 +91,8 @@ android {
         applicationId 'com.anonymous.runstr.project'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 83
-        versionName "0.9.7"
+        versionCode 84
+        versionName "0.9.8"
     }
     signingConfigs {
         debug {

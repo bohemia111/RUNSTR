@@ -25,7 +25,8 @@ import { MeditationTrackerScreen } from './MeditationTrackerScreen';
 import { StrengthTrackerScreen } from './StrengthTrackerScreen';
 import { DietTrackerScreen } from './DietTrackerScreen';
 
-type ActivityTab =
+// Active activity - what screen is being shown
+type ActiveActivity =
   | 'run'
   | 'walk'
   | 'cycle'
@@ -33,7 +34,18 @@ type ActivityTab =
   | 'diet'
   | 'meditation'
   | 'manual';
-type MoreOption = 'strength' | 'diet' | 'meditation';
+
+// Cardio sub-activities shown in bottom sheet
+type CardioOption = 'run' | 'walk' | 'cycle';
+
+// Strength sub-activities shown in bottom sheet
+type StrengthOption = 'pushups' | 'pullups' | 'situps' | 'squats' | 'curls' | 'bench';
+
+// Diet sub-activities shown in bottom sheet
+type DietOption = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'fast';
+
+// Wellness sub-activities shown in bottom sheet (matches MeditationType in MeditationTrackerScreen)
+type WellnessOption = 'guided' | 'unguided' | 'breathwork' | 'body_scan' | 'gratitude';
 
 // AsyncStorage key for persisting active tab
 const ACTIVITY_TAB_KEY = '@runstr:activity_tab';
@@ -66,13 +78,13 @@ const TabButton: React.FC<TabButtonProps> = ({
   </TouchableOpacity>
 );
 
-interface MoreMenuProps {
+interface CardioMenuProps {
   visible: boolean;
   onClose: () => void;
-  onSelectOption: (option: MoreOption) => void;
+  onSelectOption: (option: CardioOption) => void;
 }
 
-const MoreMenu: React.FC<MoreMenuProps> = ({
+const CardioMenu: React.FC<CardioMenuProps> = ({
   visible,
   onClose,
   onSelectOption,
@@ -96,7 +108,7 @@ const MoreMenu: React.FC<MoreMenuProps> = ({
     }
   }, [visible]);
 
-  const handleSelectOption = (option: MoreOption) => {
+  const handleSelectOption = (option: CardioOption) => {
     onSelectOption(option);
     onClose();
   };
@@ -115,18 +127,18 @@ const MoreMenu: React.FC<MoreMenuProps> = ({
       >
         <Animated.View
           style={[
-            styles.moreMenuContainer,
+            styles.cardioMenuContainer,
             { transform: [{ translateY: slideAnim }] },
           ]}
         >
-          <View style={styles.moreMenuHandle} />
+          <View style={styles.menuHandle} />
 
           <TouchableOpacity
-            style={styles.moreMenuItem}
-            onPress={() => handleSelectOption('strength')}
+            style={styles.menuItem}
+            onPress={() => handleSelectOption('run')}
           >
-            <Ionicons name="barbell" size={24} color={theme.colors.text} />
-            <Text style={styles.moreMenuLabel}>Strength Training</Text>
+            <Ionicons name="walk" size={24} color={theme.colors.text} />
+            <Text style={styles.menuLabel}>Running</Text>
             <Ionicons
               name="chevron-forward"
               size={20}
@@ -137,11 +149,11 @@ const MoreMenu: React.FC<MoreMenuProps> = ({
           <View style={styles.menuDivider} />
 
           <TouchableOpacity
-            style={styles.moreMenuItem}
-            onPress={() => handleSelectOption('diet')}
+            style={styles.menuItem}
+            onPress={() => handleSelectOption('walk')}
           >
-            <Ionicons name="restaurant" size={24} color={theme.colors.text} />
-            <Text style={styles.moreMenuLabel}>Diet/Meals</Text>
+            <Ionicons name="footsteps" size={24} color={theme.colors.text} />
+            <Text style={styles.menuLabel}>Walking</Text>
             <Ionicons
               name="chevron-forward"
               size={20}
@@ -152,11 +164,11 @@ const MoreMenu: React.FC<MoreMenuProps> = ({
           <View style={styles.menuDivider} />
 
           <TouchableOpacity
-            style={styles.moreMenuItem}
-            onPress={() => handleSelectOption('meditation')}
+            style={styles.menuItem}
+            onPress={() => handleSelectOption('cycle')}
           >
-            <Ionicons name="body" size={24} color={theme.colors.text} />
-            <Text style={styles.moreMenuLabel}>Meditation</Text>
+            <Ionicons name="bicycle" size={24} color={theme.colors.text} />
+            <Text style={styles.menuLabel}>Cycling</Text>
             <Ionicons
               name="chevron-forward"
               size={20}
@@ -169,44 +181,320 @@ const MoreMenu: React.FC<MoreMenuProps> = ({
   );
 };
 
-export const ActivityTrackerScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ActivityTab>('run');
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
+// StrengthMenu - Bottom sheet for strength exercise selection
+interface StrengthMenuProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelectOption: (option: StrengthOption) => void;
+}
 
-  // Load saved tab from AsyncStorage on mount
+const StrengthMenu: React.FC<StrengthMenuProps> = ({
+  visible,
+  onClose,
+  onSelectOption,
+}) => {
+  const slideAnim = React.useRef(new Animated.Value(400)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 90,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 400,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible]);
+
+  const handleSelectOption = (option: StrengthOption) => {
+    onSelectOption(option);
+    onClose();
+  };
+
+  const menuItems: Array<{ option: StrengthOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+    { option: 'pushups', label: 'Pushups', icon: 'fitness-outline' },
+    { option: 'pullups', label: 'Pull-ups', icon: 'body-outline' },
+    { option: 'situps', label: 'Sit-ups', icon: 'body-outline' },
+    { option: 'squats', label: 'Squats', icon: 'accessibility-outline' },
+    { option: 'curls', label: 'Curls', icon: 'barbell-outline' },
+    { option: 'bench', label: 'Bench Press', icon: 'barbell-outline' },
+  ];
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <Animated.View
+          style={[
+            styles.cardioMenuContainer,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <View style={styles.menuHandle} />
+          {menuItems.map((item, index) => (
+            <React.Fragment key={item.option}>
+              {index > 0 && <View style={styles.menuDivider} />}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleSelectOption(item.option)}
+              >
+                <Ionicons name={item.icon} size={24} color={theme.colors.text} />
+                <Text style={styles.menuLabel}>{item.label}</Text>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+              </TouchableOpacity>
+            </React.Fragment>
+          ))}
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
+
+// DietMenu - Bottom sheet for diet/meal selection
+interface DietMenuProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelectOption: (option: DietOption) => void;
+}
+
+const DietMenu: React.FC<DietMenuProps> = ({
+  visible,
+  onClose,
+  onSelectOption,
+}) => {
+  const slideAnim = React.useRef(new Animated.Value(350)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 90,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 350,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible]);
+
+  const handleSelectOption = (option: DietOption) => {
+    onSelectOption(option);
+    onClose();
+  };
+
+  const menuItems: Array<{ option: DietOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+    { option: 'breakfast', label: 'Breakfast', icon: 'sunny-outline' },
+    { option: 'lunch', label: 'Lunch', icon: 'restaurant-outline' },
+    { option: 'dinner', label: 'Dinner', icon: 'moon-outline' },
+    { option: 'snack', label: 'Snack', icon: 'cafe-outline' },
+    { option: 'fast', label: 'Fast', icon: 'timer-outline' },
+  ];
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <Animated.View
+          style={[
+            styles.cardioMenuContainer,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <View style={styles.menuHandle} />
+          {menuItems.map((item, index) => (
+            <React.Fragment key={item.option}>
+              {index > 0 && <View style={styles.menuDivider} />}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleSelectOption(item.option)}
+              >
+                <Ionicons name={item.icon} size={24} color={theme.colors.text} />
+                <Text style={styles.menuLabel}>{item.label}</Text>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+              </TouchableOpacity>
+            </React.Fragment>
+          ))}
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
+
+// WellnessMenu - Bottom sheet for wellness/meditation selection
+interface WellnessMenuProps {
+  visible: boolean;
+  onClose: () => void;
+  onSelectOption: (option: WellnessOption) => void;
+}
+
+const WellnessMenu: React.FC<WellnessMenuProps> = ({
+  visible,
+  onClose,
+  onSelectOption,
+}) => {
+  const slideAnim = React.useRef(new Animated.Value(350)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 20,
+        stiffness: 90,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 350,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible]);
+
+  const handleSelectOption = (option: WellnessOption) => {
+    onSelectOption(option);
+    onClose();
+  };
+
+  const menuItems: Array<{ option: WellnessOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+    { option: 'guided', label: 'Guided Meditation', icon: 'headset-outline' },
+    { option: 'unguided', label: 'Unguided Meditation', icon: 'leaf-outline' },
+    { option: 'breathwork', label: 'Breath Work', icon: 'water-outline' },
+    { option: 'body_scan', label: 'Body Scan', icon: 'body-outline' },
+    { option: 'gratitude', label: 'Gratitude', icon: 'heart-outline' },
+  ];
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <Animated.View
+          style={[
+            styles.cardioMenuContainer,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <View style={styles.menuHandle} />
+          {menuItems.map((item, index) => (
+            <React.Fragment key={item.option}>
+              {index > 0 && <View style={styles.menuDivider} />}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleSelectOption(item.option)}
+              >
+                <Ionicons name={item.icon} size={24} color={theme.colors.text} />
+                <Text style={styles.menuLabel}>{item.label}</Text>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+              </TouchableOpacity>
+            </React.Fragment>
+          ))}
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
+
+export const ActivityTrackerScreen: React.FC = () => {
+  const [activeActivity, setActiveActivity] = useState<ActiveActivity>('run');
+  const [showCardioMenu, setShowCardioMenu] = useState(false);
+  const [showStrengthMenu, setShowStrengthMenu] = useState(false);
+  const [showDietMenu, setShowDietMenu] = useState(false);
+  const [showWellnessMenu, setShowWellnessMenu] = useState(false);
+
+  // Selected sub-options for each category
+  const [selectedStrength, setSelectedStrength] = useState<StrengthOption>('pushups');
+  const [selectedDiet, setSelectedDiet] = useState<DietOption>('breakfast');
+  const [selectedWellness, setSelectedWellness] = useState<WellnessOption>('guided');
+
+  // Load saved activity from AsyncStorage on mount
   useEffect(() => {
-    const loadSavedTab = async () => {
+    const loadSavedActivity = async () => {
       try {
-        const savedTab = await AsyncStorage.getItem(ACTIVITY_TAB_KEY);
-        if (savedTab && (savedTab as ActivityTab)) {
-          setActiveTab(savedTab as ActivityTab);
-          console.log('[ActivityTracker] Restored saved tab:', savedTab);
+        const savedActivity = await AsyncStorage.getItem(ACTIVITY_TAB_KEY);
+        if (savedActivity && (savedActivity as ActiveActivity)) {
+          setActiveActivity(savedActivity as ActiveActivity);
+          console.log('[ActivityTracker] Restored saved activity:', savedActivity);
         }
       } catch (error) {
-        console.warn('[ActivityTracker] Failed to load saved tab:', error);
+        console.warn('[ActivityTracker] Failed to load saved activity:', error);
       }
     };
-    loadSavedTab();
+    loadSavedActivity();
   }, []);
 
-  // Save tab to AsyncStorage whenever it changes
-  const handleTabChange = async (tab: ActivityTab) => {
-    setActiveTab(tab);
+  // Save activity to AsyncStorage whenever it changes
+  const handleActivityChange = async (activity: ActiveActivity) => {
+    setActiveActivity(activity);
     try {
-      await AsyncStorage.setItem(ACTIVITY_TAB_KEY, tab);
-      console.log('[ActivityTracker] Saved tab:', tab);
+      await AsyncStorage.setItem(ACTIVITY_TAB_KEY, activity);
+      console.log('[ActivityTracker] Saved activity:', activity);
     } catch (error) {
-      console.warn('[ActivityTracker] Failed to save tab:', error);
+      console.warn('[ActivityTracker] Failed to save activity:', error);
     }
   };
 
-  const handleMoreOptionSelect = (option: MoreOption) => {
-    handleTabChange(option);
-    setShowMoreMenu(false);
+  const handleCardioOptionSelect = (option: CardioOption) => {
+    handleActivityChange(option);
+    setShowCardioMenu(false);
   };
 
+  const handleStrengthOptionSelect = (option: StrengthOption) => {
+    setSelectedStrength(option);
+    handleActivityChange('strength');
+    setShowStrengthMenu(false);
+  };
+
+  const handleDietOptionSelect = (option: DietOption) => {
+    setSelectedDiet(option);
+    handleActivityChange('diet');
+    setShowDietMenu(false);
+  };
+
+  const handleWellnessOptionSelect = (option: WellnessOption) => {
+    setSelectedWellness(option);
+    handleActivityChange('meditation');
+    setShowWellnessMenu(false);
+  };
+
+  // Helper to check if current activity is cardio
+  const isCardioActive = ['run', 'walk', 'cycle'].includes(activeActivity);
+
   const renderContent = () => {
-    switch (activeTab) {
+    switch (activeActivity) {
       case 'run':
         return <RunningTrackerScreen />;
       case 'walk':
@@ -214,11 +502,16 @@ export const ActivityTrackerScreen: React.FC = () => {
       case 'cycle':
         return <CyclingTrackerScreen />;
       case 'strength':
-        return <StrengthTrackerScreen />;
+        return <StrengthTrackerScreen initialExercise={selectedStrength} />;
       case 'diet':
-        return <DietTrackerScreen />;
+        return (
+          <DietTrackerScreen
+            initialMealType={selectedDiet !== 'fast' ? selectedDiet : undefined}
+            startFasting={selectedDiet === 'fast'}
+          />
+        );
       case 'meditation':
-        return <MeditationTrackerScreen />;
+        return <MeditationTrackerScreen initialType={selectedWellness} />;
       case 'manual':
         return <ManualWorkoutScreen />;
     }
@@ -232,37 +525,55 @@ export const ActivityTrackerScreen: React.FC = () => {
 
       <View style={styles.tabContainer}>
         <TabButton
-          label="Run"
-          isActive={activeTab === 'run'}
-          onPress={() => handleTabChange('run')}
-          icon="body"
-        />
-        <TabButton
-          label="Walk"
-          isActive={activeTab === 'walk'}
-          onPress={() => handleTabChange('walk')}
+          label="Cardio"
+          isActive={isCardioActive}
+          onPress={() => setShowCardioMenu(true)}
           icon="walk"
         />
         <TabButton
-          label="Cycle"
-          isActive={activeTab === 'cycle'}
-          onPress={() => handleTabChange('cycle')}
-          icon="bicycle"
+          label="Strength"
+          isActive={activeActivity === 'strength'}
+          onPress={() => setShowStrengthMenu(true)}
+          icon="barbell"
         />
         <TabButton
-          label="More"
-          isActive={['strength', 'diet', 'meditation'].includes(activeTab)}
-          onPress={() => setShowMoreMenu(true)}
-          icon="ellipsis-horizontal"
+          label="Diet"
+          isActive={activeActivity === 'diet'}
+          onPress={() => setShowDietMenu(true)}
+          icon="restaurant"
+        />
+        <TabButton
+          label="Wellness"
+          isActive={activeActivity === 'meditation'}
+          onPress={() => setShowWellnessMenu(true)}
+          icon="leaf"
         />
       </View>
 
       {renderContent()}
 
-      <MoreMenu
-        visible={showMoreMenu}
-        onClose={() => setShowMoreMenu(false)}
-        onSelectOption={handleMoreOptionSelect}
+      <CardioMenu
+        visible={showCardioMenu}
+        onClose={() => setShowCardioMenu(false)}
+        onSelectOption={handleCardioOptionSelect}
+      />
+
+      <StrengthMenu
+        visible={showStrengthMenu}
+        onClose={() => setShowStrengthMenu(false)}
+        onSelectOption={handleStrengthOptionSelect}
+      />
+
+      <DietMenu
+        visible={showDietMenu}
+        onClose={() => setShowDietMenu(false)}
+        onSelectOption={handleDietOptionSelect}
+      />
+
+      <WellnessMenu
+        visible={showWellnessMenu}
+        onClose={() => setShowWellnessMenu(false)}
+        onSelectOption={handleWellnessOptionSelect}
       />
     </SafeAreaView>
   );
@@ -344,7 +655,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
-  moreMenuContainer: {
+  cardioMenuContainer: {
     backgroundColor: theme.colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -355,7 +666,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderColor: theme.colors.border,
   },
-  moreMenuHandle: {
+  menuHandle: {
     width: 40,
     height: 4,
     backgroundColor: theme.colors.border,
@@ -363,13 +674,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 20,
   },
-  moreMenuItem: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 20,
   },
-  moreMenuLabel: {
+  menuLabel: {
     flex: 1,
     fontSize: 16,
     fontWeight: theme.typography.weights.medium,

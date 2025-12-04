@@ -46,12 +46,18 @@ const MEDITATION_TYPES: {
   { value: 'gratitude', label: 'Gratitude', icon: 'heart-outline' },
 ];
 
-export const MeditationTrackerScreen: React.FC = () => {
+interface MeditationTrackerScreenProps {
+  initialType?: MeditationType;
+}
+
+export const MeditationTrackerScreen: React.FC<MeditationTrackerScreenProps> = ({
+  initialType,
+}) => {
   // Session state
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [selectedType, setSelectedType] = useState<MeditationType>('unguided');
+  const [selectedType, setSelectedType] = useState<MeditationType>(initialType || 'unguided');
   const [userWeight, setUserWeight] = useState<number | undefined>(undefined);
   const [estimatedCalories, setEstimatedCalories] = useState<number>(0);
 
@@ -133,6 +139,13 @@ export const MeditationTrackerScreen: React.FC = () => {
     };
     loadUserAndSigner();
   }, []);
+
+  // Update selected type when initialType prop changes
+  useEffect(() => {
+    if (initialType) {
+      setSelectedType(initialType);
+    }
+  }, [initialType]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -341,43 +354,57 @@ export const MeditationTrackerScreen: React.FC = () => {
         style={styles.container}
         contentContainerStyle={styles.startContainer}
       >
+        {/* Dynamic icon and title based on selected type */}
         <View style={styles.iconContainer}>
-          <Ionicons name="body" size={64} color={theme.colors.text} />
+          <Ionicons
+            name={MEDITATION_TYPES.find(t => t.value === selectedType)?.icon || 'body'}
+            size={64}
+            color={theme.colors.text}
+          />
         </View>
 
-        <Text style={styles.title}>Meditation Session</Text>
-        <Text style={styles.subtitle}>Select your meditation type</Text>
+        <Text style={styles.title}>
+          {initialType
+            ? MEDITATION_TYPES.find(t => t.value === initialType)?.label || 'Meditation Session'
+            : 'Meditation Session'}
+        </Text>
+        <Text style={styles.subtitle}>
+          {initialType ? 'Ready to begin' : 'Select your meditation type'}
+        </Text>
 
-        <View style={styles.typeGrid}>
-          {MEDITATION_TYPES.map((type) => (
-            <TouchableOpacity
-              key={type.value}
-              style={[
-                styles.typeCard,
-                selectedType === type.value && styles.typeCardActive,
-              ]}
-              onPress={() => setSelectedType(type.value)}
-            >
-              <Ionicons
-                name={type.icon}
-                size={32}
-                color={
-                  selectedType === type.value
-                    ? theme.colors.text
-                    : theme.colors.textMuted
-                }
-              />
-              <Text
+        {/* Type Selector - only show if not pre-selected from menu */}
+        {!initialType && (
+          <View style={styles.typeGrid}>
+            {MEDITATION_TYPES.map((type) => (
+              <TouchableOpacity
+                key={type.value}
                 style={[
-                  styles.typeLabel,
-                  selectedType === type.value && styles.typeLabelActive,
+                  styles.typeCard,
+                  selectedType === type.value && styles.typeCardActive,
                 ]}
+                onPress={() => setSelectedType(type.value)}
               >
-                {type.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+                <Ionicons
+                  name={type.icon}
+                  size={32}
+                  color={
+                    selectedType === type.value
+                      ? theme.colors.text
+                      : theme.colors.textMuted
+                  }
+                />
+                <Text
+                  style={[
+                    styles.typeLabel,
+                    selectedType === type.value && styles.typeLabelActive,
+                  ]}
+                >
+                  {type.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <TouchableOpacity style={styles.startButton} onPress={startMeditation}>
           <Text style={styles.startButtonText}>Begin Meditation</Text>

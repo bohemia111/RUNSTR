@@ -97,6 +97,7 @@ export class HealthConnectService {
   private readonly PERMISSION_TIMEOUT = 30000; // 30 seconds for permissions
   private isModuleAvailable: boolean = false;
   private sdkAvailable: boolean | null = null;
+  private clientInitialized: boolean = false;
 
   private constructor() {
     this.initializeModule();
@@ -160,6 +161,30 @@ export class HealthConnectService {
   }
 
   /**
+   * Ensure the Health Connect client is initialized before any API calls
+   * This is idempotent - safe to call multiple times
+   */
+  private async ensureClientInitialized(): Promise<boolean> {
+    if (this.clientInitialized) {
+      return true;
+    }
+
+    if (!this.isAvailable()) {
+      return false;
+    }
+
+    try {
+      const initialized = await HealthConnect.initialize();
+      this.clientInitialized = true;
+      debugLog('Health Connect: Client initialized:', initialized);
+      return true;
+    } catch (error) {
+      errorLog('Health Connect: Failed to initialize client:', error);
+      return false;
+    }
+  }
+
+  /**
    * Check if Health Connect SDK is available (Android 14+ or Health Connect app installed)
    */
   async checkSdkAvailability(): Promise<boolean> {
@@ -208,16 +233,29 @@ export class HealthConnectService {
       }
 
       // Initialize the Health Connect client
-      const initialized = await HealthConnect.initialize();
-      debugLog('Health Connect: Client initialized:', initialized);
+      const clientReady = await this.ensureClientInitialized();
+      if (!clientReady) {
+        return {
+          success: false,
+          error: 'Failed to initialize Health Connect client',
+        };
+      }
 
-      // Request permissions
-      const permissionsResult = await this.requestPermissions();
-      debugLog('Health Connect: Permission request result:', permissionsResult);
+      // Request permissions (don't call this.requestPermissions() to avoid circular dependency)
+      const grantedPermissions = await HealthConnect.requestPermission(HEALTH_CONNECT_PERMISSIONS);
+      debugLog('Health Connect: Granted permissions:', grantedPermissions);
 
-      if (!permissionsResult.success) {
+      // Check if we got at least the essential permissions (ExerciseSession)
+      const hasExercisePermission = grantedPermissions.some(
+        (p: any) => p.recordType === 'ExerciseSession' && p.accessType === 'read'
+      );
+
+      if (!hasExercisePermission) {
         await this.saveAuthorizationStatus(false);
-        return permissionsResult;
+        return {
+          success: false,
+          error: 'Exercise permission not granted. Please allow access to workout data.',
+        };
       }
 
       await this.saveAuthorizationStatus(true);
@@ -243,6 +281,15 @@ export class HealthConnectService {
 
     try {
       debugLog('Health Connect: Requesting permissions...');
+
+      // Ensure client is initialized before requesting permissions
+      const clientReady = await this.ensureClientInitialized();
+      if (!clientReady) {
+        return {
+          success: false,
+          error: 'Failed to initialize Health Connect client',
+        };
+      }
 
       const grantedPermissions = await HealthConnect.requestPermission(HEALTH_CONNECT_PERMISSIONS);
 
@@ -293,6 +340,12 @@ export class HealthConnectService {
     this.syncInProgress = true;
 
     try {
+      // Ensure client is initialized before reading records
+      const clientReady = await this.ensureClientInitialized();
+      if (!clientReady) {
+        throw new Error('Failed to initialize Health Connect client');
+      }
+
       const endTime = new Date().toISOString();
       const startTime = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
@@ -483,10 +536,14 @@ export class HealthConnectService {
     let actuallyAuthorized = false;
     if (sdkAvailable && this.isAvailable()) {
       try {
-        const permissions = await HealthConnect.getGrantedPermissions();
-        actuallyAuthorized = permissions.some(
-          (p: any) => p.recordType === 'ExerciseSession' && p.accessType === 'read'
-        );
+        // Ensure client is initialized before checking permissions
+        const clientReady = await this.ensureClientInitialized();
+        if (clientReady) {
+          const permissions = await HealthConnect.getGrantedPermissions();
+          actuallyAuthorized = permissions.some(
+            (p: any) => p.recordType === 'ExerciseSession' && p.accessType === 'read'
+          );
+        }
       } catch (e) {
         debugLog('Health Connect: Error checking permissions:', e);
       }
@@ -685,6 +742,13 @@ export class HealthConnectService {
     }
 
     try {
+      // Ensure client is initialized before reading records
+      const clientReady = await this.ensureClientInitialized();
+      if (!clientReady) {
+        debugLog('Health Connect: Failed to initialize client for steps');
+        return null;
+      }
+
       // Calculate today's time range (midnight to now)
       const startTime = new Date();
       startTime.setHours(0, 0, 0, 0); // Midnight today
@@ -755,6 +819,10 @@ export class HealthConnectService {
       const sdkAvailable = await this.checkSdkAvailability();
       if (!sdkAvailable) return false;
 
+      // Ensure client is initialized before checking permissions
+      const clientReady = await this.ensureClientInitialized();
+      if (!clientReady) return false;
+
       const permissions = await HealthConnect.getGrantedPermissions();
       return permissions.some(
         (p: any) => p.recordType === 'Steps' && p.accessType === 'read'
@@ -774,6 +842,8 @@ export class HealthConnectService {
     }
 
     try {
+      // Ensure client is initialized before opening settings
+      await this.ensureClientInitialized();
       await HealthConnect.openHealthConnectSettings();
     } catch (error) {
       errorLog('Health Connect: Error opening settings:', error);
