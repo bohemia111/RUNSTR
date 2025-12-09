@@ -6,6 +6,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.9] - 2025-12-09
+
+**Achievement**: Enhanced activity tracking and routes system
+
+### ✨ Features
+
+**Routes System Revamp**
+- New simplified routes flow: "Routes" button opens modal
+- Save routes from your last 3 runs with custom names
+- View all runs within a saved route
+- Select route before run → Auto-added on completion
+
+**Running Personal Records**
+- Displays best times for 5K, 10K, Half Marathon, and Marathon
+- Track progress toward new PRs with each run
+
+**Walking Improvements**
+- New "Best Walk" display showing walk with most steps tracked
+- Clearer step counting with platform-specific labels
+
+**Enhanced GPS Tracking**
+- Smart GPS watchdog detects and recovers from tracking failures
+- Battery-adaptive GPS modes optimize power usage
+- Zombie interval detection for reliable tracking
+
+**Compact Analytics**
+- More compact layout for advanced analytics screen
+
+**RUNSTR Premium**
+- Added link to RUNSTR Premium in settings
+
+**RUNSTR COACH Improvements**
+- Enhanced nutritional breakdown capabilities
+- Better context generation for AI coaching
+
+### 🐛 Bug Fixes
+
+**iOS 30-Minute Crash**
+- Fixed tracking crash after 30 minutes with intelligent write batching
+
+**Android Health Connect**
+- Fixed step double-counting issue
+- Corrected exercise type mappings for 20+ activities
+
+**Meditation Sessions**
+- Fixed meditation session tracking bug
+- Improved meditation UI
+
+**Activity Tracker**
+- Improved elevation tracking during workouts
+- Session persistence across app restarts
+
+### 📱 Platform Updates
+- iOS: Version 0.9.9 (Build 85)
+- Android: Version 0.9.9 (Build 85)
+
 ## [0.9.8] - 2025-12-03
 
 **Achievement**: Enhanced sharing and UI improvements
