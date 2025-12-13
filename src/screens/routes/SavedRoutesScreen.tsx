@@ -1,5 +1,5 @@
 /**
- * SavedRoutesScreen - Browse and manage saved GPS routes
+ * SavedRoutesScreen - Browse and manage saved route labels
  * Shows list of saved routes with filtering by activity type
  * Allows viewing route details, renaming, and deleting routes
  */
@@ -13,14 +13,13 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
-  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import routeStorageService, {
-  SavedRoute,
+  RouteLabel,
 } from '../../services/routes/RouteStorageService';
 import type { WorkoutType } from '../../types/workout';
 
@@ -28,12 +27,11 @@ type ActivityFilter = 'all' | WorkoutType;
 
 export const SavedRoutesScreen: React.FC = () => {
   const navigation = useNavigation();
-  const [routes, setRoutes] = useState<SavedRoute[]>([]);
-  const [filteredRoutes, setFilteredRoutes] = useState<SavedRoute[]>([]);
+  const [routes, setRoutes] = useState<RouteLabel[]>([]);
+  const [filteredRoutes, setFilteredRoutes] = useState<RouteLabel[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<ActivityFilter>('all');
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadRoutes();
@@ -41,16 +39,16 @@ export const SavedRoutesScreen: React.FC = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [routes, activeFilter, searchQuery]);
+  }, [routes, activeFilter]);
 
   const loadRoutes = async () => {
     try {
       setIsLoading(true);
       const allRoutes = await routeStorageService.getAllRoutes();
       setRoutes(allRoutes);
-      console.log(`📍 Loaded ${allRoutes.length} saved routes`);
+      console.log(`[SavedRoutes] Loaded ${allRoutes.length} routes`);
     } catch (error) {
-      console.error('❌ Failed to load routes:', error);
+      console.error('[SavedRoutes] Failed to load routes:', error);
     } finally {
       setIsLoading(false);
     }
@@ -64,17 +62,6 @@ export const SavedRoutesScreen: React.FC = () => {
       filtered = filtered.filter((r) => r.activityType === activeFilter);
     }
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          r.name.toLowerCase().includes(query) ||
-          r.description?.toLowerCase().includes(query) ||
-          r.tags?.some((tag) => tag.toLowerCase().includes(query))
-      );
-    }
-
     setFilteredRoutes(filtered);
   };
 
@@ -84,7 +71,7 @@ export const SavedRoutesScreen: React.FC = () => {
     setIsRefreshing(false);
   };
 
-  const handleDeleteRoute = (route: SavedRoute) => {
+  const handleDeleteRoute = (route: RouteLabel) => {
     Alert.alert(
       'Delete Route',
       `Are you sure you want to delete "${route.name}"? This cannot be undone.`,
@@ -97,7 +84,7 @@ export const SavedRoutesScreen: React.FC = () => {
             try {
               await routeStorageService.deleteRoute(route.id);
               await loadRoutes();
-              console.log(`✅ Deleted route: ${route.name}`);
+              console.log(`[SavedRoutes] Deleted route: ${route.name}`);
             } catch (error) {
               console.error('Failed to delete route:', error);
               Alert.alert('Error', 'Failed to delete route');
@@ -108,7 +95,7 @@ export const SavedRoutesScreen: React.FC = () => {
     );
   };
 
-  const handleRenameRoute = (route: SavedRoute) => {
+  const handleRenameRoute = (route: RouteLabel) => {
     Alert.prompt(
       'Rename Route',
       `Enter new name for "${route.name}"`,
@@ -121,7 +108,7 @@ export const SavedRoutesScreen: React.FC = () => {
             try {
               await routeStorageService.renameRoute(route.id, newName.trim());
               await loadRoutes();
-              console.log(`✅ Renamed route to: ${newName}`);
+              console.log(`[SavedRoutes] Renamed route to: ${newName}`);
             } catch (error) {
               console.error('Failed to rename route:', error);
               Alert.alert('Error', 'Failed to rename route');
@@ -134,11 +121,6 @@ export const SavedRoutesScreen: React.FC = () => {
     );
   };
 
-  const formatDistance = (meters: number): string => {
-    const km = meters / 1000;
-    return `${km.toFixed(2)} km`;
-  };
-
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
@@ -149,15 +131,6 @@ export const SavedRoutesScreen: React.FC = () => {
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     return date.toLocaleDateString();
-  };
-
-  const formatTime = (seconds: number): string => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return h > 0
-      ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-      : `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   const getActivityIcon = (
@@ -193,7 +166,7 @@ export const SavedRoutesScreen: React.FC = () => {
   };
 
   const renderRouteCard = useCallback(
-    ({ item: route }: { item: SavedRoute }) => {
+    ({ item: route }: { item: RouteLabel }) => {
       const activityColor = getActivityColor(route.activityType);
 
       return (
@@ -245,42 +218,34 @@ export const SavedRoutesScreen: React.FC = () => {
           {/* Stats */}
           <View style={styles.routeStats}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {formatDistance(route.distance)}
-              </Text>
-              <Text style={styles.statLabel}>Distance</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {route.elevationGain.toFixed(0)}m
-              </Text>
-              <Text style={styles.statLabel}>Elevation</Text>
-            </View>
-            <View style={styles.statItem}>
               <Text style={styles.statValue}>{route.timesUsed}</Text>
               <Text style={styles.statLabel}>Times Used</Text>
             </View>
+            {route.bestTime && (
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>
+                  {formatTime(route.bestTime)}
+                </Text>
+                <Text style={styles.statLabel}>Best Time</Text>
+              </View>
+            )}
+            {route.bestPace && (
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>
+                  {formatPace(route.bestPace)}
+                </Text>
+                <Text style={styles.statLabel}>Best Pace</Text>
+              </View>
+            )}
           </View>
 
-          {/* Best Performance */}
+          {/* Best Performance Highlight */}
           {route.bestTime && (
             <View style={styles.bestPerformance}>
               <Ionicons name="trophy" size={14} color={theme.colors.accent} />
               <Text style={styles.bestPerformanceText}>
-                Best: {formatTime(route.bestTime)}
-                {route.bestPace && ` • ${route.bestPace.toFixed(2)} min/km`}
+                Personal Record: {formatTime(route.bestTime)}
               </Text>
-            </View>
-          )}
-
-          {/* Tags */}
-          {route.tags && route.tags.length > 0 && (
-            <View style={styles.tagsContainer}>
-              {route.tags.map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
             </View>
           )}
         </View>
@@ -289,13 +254,27 @@ export const SavedRoutesScreen: React.FC = () => {
     []
   );
 
+  const formatTime = (seconds: number): string => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return h > 0
+      ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+      : `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const formatPace = (paceMinPerKm: number): string => {
+    const mins = Math.floor(paceMinPerKm);
+    const secs = Math.round((paceMinPerKm - mins) * 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}/km`;
+  };
+
   const renderFilters = () => {
     const filters: { label: string; value: ActivityFilter }[] = [
       { label: 'All', value: 'all' },
       { label: 'Running', value: 'running' },
       { label: 'Cycling', value: 'cycling' },
       { label: 'Walking', value: 'walking' },
-      { label: 'Hiking', value: 'hiking' },
     ];
 
     return (
@@ -325,27 +304,6 @@ export const SavedRoutesScreen: React.FC = () => {
 
   const renderHeader = () => (
     <>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={theme.colors.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search routes..."
-          placeholderTextColor={theme.colors.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons
-              name="close-circle"
-              size={20}
-              color={theme.colors.textMuted}
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-
       {/* Activity Filters */}
       {renderFilters()}
 
@@ -353,7 +311,7 @@ export const SavedRoutesScreen: React.FC = () => {
       <View style={styles.summaryContainer}>
         <Text style={styles.summaryText}>
           {filteredRoutes.length} route{filteredRoutes.length !== 1 ? 's' : ''}
-          {activeFilter !== 'all' && ` • ${activeFilter}`}
+          {activeFilter !== 'all' && ` for ${activeFilter}`}
         </Text>
       </View>
     </>
@@ -364,11 +322,9 @@ export const SavedRoutesScreen: React.FC = () => {
       <Ionicons name="map-outline" size={64} color={theme.colors.textMuted} />
       <Text style={styles.emptyStateTitle}>No Routes Yet</Text>
       <Text style={styles.emptyStateText}>
-        {searchQuery
-          ? 'No routes match your search'
-          : activeFilter !== 'all'
+        {activeFilter !== 'all'
           ? `No ${activeFilter} routes saved yet`
-          : 'Save your first route by completing a GPS-tracked workout'}
+          : 'Create a route by naming one of your completed workouts from the Routes modal'}
       </Text>
     </View>
   );
@@ -460,23 +416,6 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 100,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.cardBackground,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    color: theme.colors.text,
-    fontSize: 14,
   },
   filtersContainer: {
     flexDirection: 'row',
@@ -592,25 +531,6 @@ const styles = StyleSheet.create({
   bestPerformanceText: {
     color: theme.colors.text,
     fontSize: 12,
-    fontWeight: theme.typography.weights.medium,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 12,
-  },
-  tag: {
-    backgroundColor: theme.colors.background,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  tagText: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
     fontWeight: theme.typography.weights.medium,
   },
   emptyState: {

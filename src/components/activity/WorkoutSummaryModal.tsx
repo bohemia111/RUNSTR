@@ -28,17 +28,9 @@ import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService
 import { CustomAlert } from '../ui/CustomAlert';
 import { RewardEarnedModal } from '../rewards/RewardEarnedModal';
 import routeStorageService from '../../services/routes/RouteStorageService';
-import routeMatchingService from '../../services/routes/RouteMatchingService';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { NostrProfile } from '../../services/nostr/NostrProfileService';
 import { LocalTeamMembershipService } from '../../services/team/LocalTeamMembershipService';
-
-interface GPSCoordinate {
-  latitude: number;
-  longitude: number;
-  altitude?: number;
-  timestamp?: number;
-}
 
 interface WorkoutSummaryProps {
   visible: boolean;
@@ -54,7 +46,10 @@ interface WorkoutSummaryProps {
     steps?: number; // for walking
     splits?: Split[]; // kilometer splits for running
     localWorkoutId?: string; // For marking as synced after posting
-    gpsCoordinates?: GPSCoordinate[]; // GPS track for route saving
+    routeId?: string; // Route label ID if workout was tagged
+    routeName?: string; // Route label name for display
+    rewardSent?: boolean; // True if Bitcoin reward was sent on save
+    rewardAmount?: number; // Amount of sats rewarded
   };
 }
 
@@ -69,8 +64,6 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
   const [saved, setSaved] = useState(false);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isSavingRoute, setIsSavingRoute] = useState(false);
-  const [routeSaved, setRouteSaved] = useState(false);
   const [userProfile, setUserProfile] = useState<NostrProfile | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [preparedWorkout, setPreparedWorkout] =
@@ -124,60 +117,62 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
     }
   }, [visible]);
 
+  // Show reward modal when a reward was sent with this workout
+  useEffect(() => {
+    if (visible && workout.rewardSent && workout.rewardAmount) {
+      // Small delay to let the summary modal render first
+      const timer = setTimeout(() => {
+        setRewardAmount(workout.rewardAmount!);
+        setShowRewardModal(true);
+        console.log(`[WorkoutSummaryModal] Showing reward modal: ${workout.rewardAmount} sats`);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [visible, workout.rewardSent, workout.rewardAmount]);
+
   // Check for route achievements when modal opens
   useEffect(() => {
     const checkRouteAchievements = async () => {
-      // Check if we have a matched route from the tracking session
-      const matchedRoute = routeMatchingService.getMatchedRoute();
+      // Check if workout was tagged with a route (passed from tracker screen)
+      if (!workout.routeId || !workout.duration) return;
 
-      if (matchedRoute && workout.duration) {
-        try {
-          // Calculate pace for the workout
-          const workoutPace = workout.duration / 60 / (workout.distance / 1000);
+      try {
+        // Get route to check achievements
+        const route = await routeStorageService.getRouteById(workout.routeId);
 
-          // Update route stats with this completion
-          await routeStorageService.updateRouteStats(matchedRoute.id, {
-            workoutId: workout.localWorkoutId || `workout_${Date.now()}`,
-            workoutTime: workout.duration,
-            workoutPace: workoutPace,
-          });
+        if (route) {
+          const achievements: typeof routeAchievements = {
+            isNewPR: false,
+            routeName: route.name,
+            timesCompleted: route.timesUsed,
+          };
 
-          // Get updated route to check achievements
-          const updatedRoute = await routeStorageService.getRouteById(
-            matchedRoute.id
-          );
-
-          if (updatedRoute) {
-            const achievements: any = {
-              routeName: updatedRoute.name,
-              timesCompleted: updatedRoute.timesUsed,
-            };
-
-            // Check if this is a new PR
-            if (
-              updatedRoute.bestTime &&
-              workout.duration < updatedRoute.bestTime
-            ) {
+          // Check if this is a new PR (route stats already updated in tracker screen)
+          if (route.bestTime && workout.duration <= route.bestTime) {
+            // This workout might be the new best
+            if (route.bestWorkoutId === workout.localWorkoutId) {
               achievements.isNewPR = true;
-              achievements.previousBestTime = updatedRoute.bestTime;
-            } else if (!updatedRoute.bestTime || updatedRoute.timesUsed === 1) {
-              // First time completing the route
-              achievements.milestone = 'first';
-              achievements.isNewPR = true;
+              // Find previous best from other workouts if possible
             }
-
-            // Check for milestones
-            if (updatedRoute.timesUsed === 10) {
-              achievements.milestone = 'tenth';
-            } else if (updatedRoute.timesUsed === 100) {
-              achievements.milestone = 'hundredth';
-            }
-
-            setRouteAchievements(achievements);
           }
-        } catch (error) {
-          console.error('Failed to check route achievements:', error);
+
+          // First completion is always a PR
+          if (route.timesUsed === 1) {
+            achievements.milestone = 'first';
+            achievements.isNewPR = true;
+          }
+
+          // Check for milestones
+          if (route.timesUsed === 10) {
+            achievements.milestone = 'tenth';
+          } else if (route.timesUsed === 100) {
+            achievements.milestone = 'hundredth';
+          }
+
+          setRouteAchievements(achievements);
         }
+      } catch (error) {
+        console.error('Failed to check route achievements:', error);
       }
     };
 
@@ -386,67 +381,6 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
       });
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleSaveAsRoute = async () => {
-    // Check if GPS coordinates are available
-    if (!workout.gpsCoordinates || workout.gpsCoordinates.length === 0) {
-      setAlertState({
-        visible: true,
-        title: 'No GPS Data',
-        message:
-          "This workout doesn't have GPS tracking data. Only workouts with GPS can be saved as routes.",
-      });
-      return;
-    }
-
-    setIsSavingRoute(true);
-    try {
-      // Generate default route name based on workout
-      const activityName =
-        workout.type.charAt(0).toUpperCase() + workout.type.slice(1);
-      const distanceKm = (workout.distance / 1000).toFixed(1);
-      const defaultName = `${activityName} ${distanceKm}km`;
-
-      // Convert GPS coordinates to RouteStorageService format
-      const coordinates = workout.gpsCoordinates.map((coord) => ({
-        latitude: coord.latitude,
-        longitude: coord.longitude,
-        altitude: coord.altitude,
-        timestamp: coord.timestamp,
-      }));
-
-      // Save route
-      const routeId = await routeStorageService.saveRoute({
-        name: defaultName,
-        description: `Saved from ${new Date().toLocaleDateString()}`,
-        activityType: workout.type,
-        coordinates,
-        distance: workout.distance,
-        elevationGain: workout.elevation || 0,
-        workoutId: workout.localWorkoutId,
-        workoutTime: workout.duration,
-        tags: [],
-      });
-
-      setRouteSaved(true);
-      setAlertState({
-        visible: true,
-        title: 'Route Saved! 📍',
-        message: `"${defaultName}" has been saved to your route library. You can reuse this route or compare future workouts against it.`,
-      });
-
-      console.log(`✅ Saved workout as route: ${routeId}`);
-    } catch (error) {
-      console.error('Failed to save route:', error);
-      setAlertState({
-        visible: true,
-        title: 'Error',
-        message: 'Failed to save route. Please try again.',
-      });
-    } finally {
-      setIsSavingRoute(false);
     }
   };
 
@@ -773,33 +707,6 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
               )}
             </TouchableOpacity>
 
-            {/* Save as Route Button - Only show if GPS data available */}
-            {workout.gpsCoordinates && workout.gpsCoordinates.length > 0 && (
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  styles.routeButton,
-                  routeSaved && styles.disabledButton,
-                ]}
-                onPress={handleSaveAsRoute}
-                disabled={isSavingRoute || routeSaved}
-              >
-                {isSavingRoute ? (
-                  <ActivityIndicator size="small" color={theme.colors.text} />
-                ) : (
-                  <>
-                    <Ionicons
-                      name={routeSaved ? 'checkmark-circle' : 'map-outline'}
-                      size={20}
-                      color={theme.colors.text}
-                    />
-                    <Text style={styles.routeButtonText}>
-                      {routeSaved ? 'Route Saved' : 'Save Route'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
           </View>
 
           {/* Info Text */}
@@ -812,12 +719,6 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
               <Text style={styles.infoBold}>Public:</Text> Enter into active
               competitions and leaderboards
             </Text>
-            {workout.gpsCoordinates && workout.gpsCoordinates.length > 0 && (
-              <Text style={styles.infoText}>
-                <Text style={styles.infoBold}>Save Route:</Text> Save this GPS
-                track to reuse later
-              </Text>
-            )}
           </View>
 
           {/* Dismiss Button */}
@@ -851,12 +752,7 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
         amount={rewardAmount}
         onClose={() => {
           setShowRewardModal(false);
-          // Show success message after reward modal is closed
-          setAlertState({
-            visible: true,
-            title: 'Saved to Nostr! ✅',
-            message: 'Your workout has been saved to Nostr!',
-          });
+          // Just close the modal - user can continue with the summary
         }}
       />
 
@@ -965,11 +861,6 @@ const styles = StyleSheet.create({
   saveButton: {
     backgroundColor: theme.colors.accent, // #FF7B1C
   },
-  routeButton: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
-  },
   disabledButton: {
     opacity: 0.5,
   },
@@ -980,11 +871,6 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: theme.colors.accentText,
-    fontSize: 16,
-    fontWeight: theme.typography.weights.bold,
-  },
-  routeButtonText: {
-    color: theme.colors.text,
     fontSize: 16,
     fontWeight: theme.typography.weights.bold,
   },

@@ -30,6 +30,7 @@ import { CardioPerformanceAnalytics } from '../services/analytics/CardioPerforma
 import { BodyCompositionAnalytics } from '../services/analytics/BodyCompositionAnalytics';
 import { StreakAnalyticsService } from '../services/analytics/StreakAnalyticsService';
 import { HealthSnapshotCard } from '../components/analytics/HealthSnapshotCard';
+import { LevelCard } from '../components/analytics/LevelCard';
 import { CoachRunstrCard } from '../components/analytics/CoachRunstrCard';
 import { GoalsHabitsCard } from '../components/analytics/GoalsHabitsCard';
 import { CollapsibleAchievementsCard } from '../components/analytics/CollapsibleAchievementsCard';
@@ -266,12 +267,9 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
       >
-        {/* Section 1: Health Metrics (BMI | VO2 Max | Fitness Age) */}
-        <Text style={styles.sectionTitle}>Health Metrics</Text>
-        <HealthSnapshotCard
-          bodyComposition={analytics?.bodyComposition}
-          vo2MaxData={analytics?.cardio?.vo2MaxEstimate}
-        />
+        {/* Section 1: Level (XP-based progression system) */}
+        <Text style={styles.sectionTitle}>Level</Text>
+        <LevelCard workouts={workouts} />
 
         {/* Section 2: Achievements (Personal Records) */}
         {personalRecords && (

@@ -32,6 +32,8 @@ import { WorkoutHistoryScreen } from '../screens/WorkoutHistoryScreen';
 import { MyTeamsScreen } from '../screens/MyTeamsScreen';
 import { HealthProfileScreen } from '../screens/HealthProfileScreen';
 import { FitnessTestResultsScreen } from '../screens/FitnessTestResultsScreen';
+import { SatlantisDiscoveryScreen } from '../screens/satlantis/SatlantisDiscoveryScreen';
+import { SatlantisEventDetailScreen } from '../screens/satlantis/SatlantisEventDetailScreen';
 import type { DiscoveredNostrUser } from '../services/user/UserDiscoveryService';
 
 // Navigation Configuration
@@ -73,6 +75,8 @@ export type RootStackParamList = {
   MyTeams: undefined;
   HealthProfile: undefined;
   FitnessTestResults: { testId: string };
+  SatlantisDiscovery: undefined;
+  SatlantisEventDetail: { eventId: string; eventPubkey: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -517,6 +521,26 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
       <Stack.Screen
         name="FitnessTestResults"
         component={FitnessTestResultsScreen}
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      />
+
+      {/* Satlantis Discovery Screen - Race Events Feed */}
+      <Stack.Screen
+        name="SatlantisDiscovery"
+        component={SatlantisDiscoveryScreen}
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      />
+
+      {/* Satlantis Event Detail Screen */}
+      <Stack.Screen
+        name="SatlantisEventDetail"
+        component={SatlantisEventDetailScreen}
         options={{
           ...defaultScreenOptions,
           headerShown: false,

@@ -154,6 +154,9 @@ import { ProfileEditScreen } from './screens/ProfileEditScreen';
 import { SavedRoutesScreen } from './screens/routes/SavedRoutesScreen';
 import { AdvancedAnalyticsScreen } from './screens/AdvancedAnalyticsScreen';
 import { HealthProfileScreen } from './screens/HealthProfileScreen';
+import { SatlantisDiscoveryScreen } from './screens/satlantis/SatlantisDiscoveryScreen';
+import { SatlantisEventDetailScreen } from './screens/satlantis/SatlantisEventDetailScreen';
+import { Season2Screen } from './screens/season2/Season2Screen';
 import { User } from './types';
 import { useWalletStore } from './store/walletStore';
 import { theme } from './styles/theme';
@@ -221,6 +224,9 @@ type AuthenticatedStackParamList = {
   SavedRoutes: { activityType?: 'running' | 'cycling' | 'walking' };
   AdvancedAnalytics: undefined;
   HealthProfile: undefined;
+  SatlantisDiscovery: undefined;
+  SatlantisEventDetail: { eventId: string; eventPubkey: string };
+  Season2: undefined;
 };
 
 const AuthenticatedStack = createStackNavigator<AuthenticatedStackParamList>();
@@ -946,6 +952,36 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
             headerShown: false,
           }}
           component={HealthProfileScreen}
+        />
+
+        {/* Satlantis Race Discovery Screen */}
+        <AuthenticatedStack.Screen
+          name="SatlantisDiscovery"
+          options={{
+            headerShown: false,
+          }}
+          component={SatlantisDiscoveryScreen}
+        />
+
+        {/* Satlantis Event Detail Screen */}
+        <AuthenticatedStack.Screen
+          name="SatlantisEventDetail"
+          options={{
+            headerShown: false,
+          }}
+        >
+          {({ navigation, route }) => (
+            <SatlantisEventDetailScreen route={route} navigation={navigation} />
+          )}
+        </AuthenticatedStack.Screen>
+
+        {/* RUNSTR Season 2 Competition Screen */}
+        <AuthenticatedStack.Screen
+          name="Season2"
+          options={{
+            headerShown: false,
+          }}
+          component={Season2Screen}
         />
       </AuthenticatedStack.Navigator>
     );

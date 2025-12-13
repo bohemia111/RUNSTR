@@ -31,6 +31,13 @@ const ActivityTrackerScreen = React.lazy(() =>
   }))
 );
 
+// Lazy load Events (Satlantis) screen
+const SatlantisDiscoveryScreen = React.lazy(() =>
+  import('../screens/satlantis/SatlantisDiscoveryScreen').then((m) => ({
+    default: m.SatlantisDiscoveryScreen,
+  }))
+);
+
 // Loading fallback component
 const LoadingFallback = () => (
   <View
@@ -55,6 +62,7 @@ import { createNavigationHandlers } from './navigationHandlers';
 export type BottomTabParamList = {
   Teams: undefined;
   Exercise: undefined;
+  Events: undefined;
   Profile: undefined;
 };
 
@@ -110,6 +118,8 @@ export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
             iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'Exercise') {
             iconName = focused ? 'fitness' : 'fitness-outline';
+          } else if (route.name === 'Events') {
+            iconName = focused ? 'calendar' : 'calendar-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -137,6 +147,21 @@ export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
         {() => (
           <Suspense fallback={<LoadingFallback />}>
             <ActivityTrackerScreen />
+          </Suspense>
+        )}
+      </Tab.Screen>
+
+      {/* Events Tab - Race Events from Satlantis */}
+      <Tab.Screen
+        name="Events"
+        options={{
+          title: 'Events',
+          headerShown: false,
+        }}
+      >
+        {({ navigation }) => (
+          <Suspense fallback={<LoadingFallback />}>
+            <SatlantisDiscoveryScreen navigation={navigation} />
           </Suspense>
         )}
       </Tab.Screen>

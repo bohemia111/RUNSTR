@@ -26,8 +26,7 @@ import type { RunSession } from '../../services/activity/SimpleRunTracker';
 import { WorkoutSummaryModal } from '../../components/activity/WorkoutSummaryModal';
 import LocalWorkoutStorageService from '../../services/fitness/LocalWorkoutStorageService';
 import { RouteSelectionModal } from '../../components/routes/RouteSelectionModal';
-import routeMatchingService from '../../services/routes/RouteMatchingService';
-import type { SavedRoute } from '../../services/routes/RouteStorageService';
+import routeStorageService from '../../services/routes/RouteStorageService';
 import {
   DailyStepGoalCard,
   type PostingState,
@@ -69,7 +68,7 @@ export const WalkingTrackerScreen: React.FC = () => {
     elevation: '0 m',
   });
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [selectedRoute, setSelectedRoute] = useState<SavedRoute | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<{ id: string; name: string } | null>(null);
   const [routeSelectionVisible, setRouteSelectionVisible] = useState(false);
   const [summaryModalVisible, setSummaryModalVisible] = useState(false);
   const [workoutData, setWorkoutData] = useState<{
@@ -80,12 +79,10 @@ export const WalkingTrackerScreen: React.FC = () => {
     elevation?: number;
     steps?: number;
     localWorkoutId?: string; // For marking as synced later
-    gpsCoordinates?: Array<{
-      latitude: number;
-      longitude: number;
-      altitude?: number;
-      timestamp?: number;
-    }>; // For route saving
+    routeId?: string; // Route label ID if tagged
+    routeName?: string; // Route label name for display
+    rewardSent?: boolean; // True if Bitcoin reward was sent
+    rewardAmount?: number; // Amount of sats rewarded
   } | null>(null);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
@@ -452,14 +449,6 @@ export const WalkingTrackerScreen: React.FC = () => {
     pauseStartTimeRef.current = 0;
     totalPausedTimeRef.current = 0;
 
-    // Initialize route matching if a route is selected
-    if (selectedRoute) {
-      routeMatchingService.startMatching(selectedRoute);
-      console.log(
-        `[WalkingTrackerScreen] Started route matching for: ${selectedRoute.name}`
-      );
-    }
-
     timerRef.current = setInterval(() => {
       if (!isPausedRef.current) {
         const now = Date.now();
@@ -519,11 +508,6 @@ export const WalkingTrackerScreen: React.FC = () => {
       metricsUpdateRef.current = null;
     }
 
-    // Stop route matching if active
-    if (selectedRoute) {
-      routeMatchingService.stopMatching();
-    }
-
     const session = await simpleRunTracker.stopTracking();
     setIsTracking(false);
     setIsPaused(false);
@@ -543,25 +527,38 @@ export const WalkingTrackerScreen: React.FC = () => {
       elapsedTime
     );
 
-    // Convert GPSPoint[] to GPSCoordinate[] for route saving
-    const gpsCoordinates = session.gpsPoints.map((point) => ({
-      latitude: point.latitude,
-      longitude: point.longitude,
-      altitude: point.altitude,
-      timestamp: point.timestamp,
-    }));
-
     // Save workout to local storage BEFORE showing modal
     try {
-      const workoutId = await LocalWorkoutStorageService.saveGPSWorkout({
+      const result = await LocalWorkoutStorageService.saveGPSWorkout({
         type: 'walking',
         distance: session.distance,
         duration: elapsedTime,
         calories,
         elevation: session.elevationGain || 0,
+        // Pass route info if selected
+        routeId: selectedRoute?.id,
+        routeLabel: selectedRoute?.name,
       });
 
-      console.log(`✅ Walking workout saved locally: ${workoutId}`);
+      console.log(`✅ Walking workout saved locally: ${result.workoutId}`);
+      if (result.rewardSent) {
+        console.log(`[WalkingTracker] ⚡ Reward sent: ${result.rewardAmount} sats!`);
+      }
+
+      // If a route was selected, add this workout to the route
+      if (selectedRoute) {
+        try {
+          await routeStorageService.addWorkoutToRoute(
+            selectedRoute.id,
+            result.workoutId,
+            elapsedTime,
+            undefined // No pace for walking
+          );
+          console.log(`[WalkingTracker] Workout added to route "${selectedRoute.name}"`);
+        } catch (routeError) {
+          console.error('[WalkingTracker] Failed to add workout to route:', routeError);
+        }
+      }
 
       setWorkoutData({
         type: 'walking',
@@ -570,8 +567,11 @@ export const WalkingTrackerScreen: React.FC = () => {
         calories,
         elevation: session.elevationGain || 0,
         steps,
-        localWorkoutId: workoutId,
-        gpsCoordinates, // Pass GPS data for route saving
+        localWorkoutId: result.workoutId,
+        routeId: selectedRoute?.id,
+        routeName: selectedRoute?.name,
+        rewardSent: result.rewardSent,
+        rewardAmount: result.rewardAmount,
       });
       setSummaryModalVisible(true);
     } catch (error) {
@@ -584,12 +584,14 @@ export const WalkingTrackerScreen: React.FC = () => {
         calories,
         elevation: session.elevationGain || 0,
         steps,
-        gpsCoordinates, // Pass GPS data even if local save failed
+        routeId: selectedRoute?.id,
+        routeName: selectedRoute?.name,
       });
       setSummaryModalVisible(true);
     }
 
     resetMetrics();
+    setSelectedRoute(null); // Clear selected route after workout
   };
 
   const resetMetrics = () => {
@@ -888,7 +890,7 @@ export const WalkingTrackerScreen: React.FC = () => {
               styles.routeSelectorText,
               selectedRoute && { color: theme.colors.accent }
             ]}>
-              {selectedRoute ? selectedRoute.name : 'Select Route'}
+              {selectedRoute ? selectedRoute.name : 'Routes'}
             </Text>
             <Ionicons
               name="chevron-down"
@@ -937,12 +939,8 @@ export const WalkingTrackerScreen: React.FC = () => {
       <RouteSelectionModal
         visible={routeSelectionVisible}
         activityType="walking"
-        onSelectRoute={(route) => {
-          setSelectedRoute(route);
-          setRouteSelectionVisible(false);
-        }}
-        onTrackFreely={() => {
-          setSelectedRoute(null);
+        onSelectRoute={(routeId, routeName) => {
+          setSelectedRoute({ id: routeId, name: routeName });
           setRouteSelectionVisible(false);
         }}
         onClose={() => setRouteSelectionVisible(false)}

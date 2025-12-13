@@ -7,17 +7,23 @@ export const REWARD_CONFIG = {
   /**
    * Sender NWC Connection String
    * This is the wallet that sends automated rewards to users
-   * Replace with your actual NWC string
+   * TESTING: Using coinos.io NWC for reward distribution
    */
   SENDER_NWC:
     process.env.REWARD_SENDER_NWC ||
-    'nostr+walletconnect://YOUR_NWC_STRING_HERE',
+    'nostr+walletconnect://72bdbc57bdd6dfc4e62685051de8041d148c3c68fe42bf301f71aa6cf53e52fb?relay=wss%3A%2F%2Frelay.coinos.io&secret=e827878f1a5b3ab0a65d47fc8301d78a5e3f586c6ab5b5f4f1fd565338c22aa4&lud16=RUNSTR@coinos.io',
 
   /**
    * Daily Workout Reward Amount
    * Amount in satoshis sent for first workout of the day
    */
-  DAILY_WORKOUT_REWARD: 50,
+  DAILY_WORKOUT_REWARD: 21,
+
+  /**
+   * Minimum Workout Distance for Reward
+   * Distance in meters required to qualify for a reward
+   */
+  MIN_WORKOUT_DISTANCE_METERS: 1000, // 1km minimum
 
   /**
    * Maximum Rewards Per Day

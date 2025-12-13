@@ -79,8 +79,8 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
               npub={entry.npub}
               fallbackName={entry.name}
               showQuickZap={true}
-              showChallengeButton={true}
               zapAmount={21}
+              recipientLightningAddress={entry.lightningAddress}
             />
           </View>
           <Text style={styles.runnerTime}>{entry.formattedScore}</Text>

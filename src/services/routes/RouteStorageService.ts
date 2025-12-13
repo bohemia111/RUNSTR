@@ -1,54 +1,29 @@
 /**
- * RouteStorageService - Persistent storage for saved GPS routes
- * Allows users to save favorite workout routes and reuse them later
- * Integrates with RouteMatchingService for automatic course comparison
+ * RouteStorageService - Simple label-based route storage
+ * Routes are just names for grouping similar runs - no GPS data
+ * Create a route by naming a past run, then tag future runs with that route
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { WorkoutType } from '../../types/workout';
 
-export interface GPSPoint {
-  latitude: number;
-  longitude: number;
-  altitude?: number; // meters
-  timestamp?: number; // Unix timestamp
-}
-
-export interface SavedRoute {
-  id: string; // Unique identifier
-  name: string; // User-defined route name
-  description?: string;
-  activityType: WorkoutType; // Primary activity type for this route
-
-  // GPS track data
-  coordinates: GPSPoint[];
-
-  // Route metrics
-  distance: number; // meters
-  elevationGain: number; // meters
-  averageGrade?: number; // percentage
-
-  // Route metadata
+export interface RouteLabel {
+  id: string;
+  name: string; // "The Lake", "Park Loop", etc.
+  activityType: WorkoutType;
   createdAt: string; // ISO timestamp
-  lastUsed?: string; // ISO timestamp of last workout on this route
-  timesUsed: number; // How many times this route has been used
-
-  // Best performance on this route
+  lastUsed?: string; // ISO timestamp
+  timesUsed: number;
+  workoutIds: string[]; // IDs of workouts tagged with this route
+  // Stats (calculated from workouts)
   bestTime?: number; // seconds
-  bestPace?: number; // minutes per km
-  bestWorkoutId?: string; // Reference to best workout
-
-  // Optional: Start/end location names (for display)
-  startLocationName?: string;
-  endLocationName?: string;
-
-  // Optional: Route tags for categorization
-  tags?: string[]; // e.g., ['hilly', 'scenic', 'urban', 'trail']
+  bestPace?: number; // min/km
+  bestWorkoutId?: string;
 }
 
 const STORAGE_KEYS = {
-  SAVED_ROUTES: 'saved_routes',
-  ROUTE_ID_COUNTER: 'route_id_counter',
+  ROUTES: 'route_labels',
+  ROUTE_ID_COUNTER: 'route_label_id_counter',
 };
 
 export class RouteStorageService {
@@ -78,88 +53,50 @@ export class RouteStorageService {
         newCounter.toString()
       );
 
-      // Format: route_[timestamp]_[counter]_[random]
       const timestamp = Date.now();
       const random = Math.random().toString(36).substring(2, 9);
       return `route_${timestamp}_${newCounter}_${random}`;
     } catch (error) {
-      console.error('❌ Failed to generate route ID:', error);
-      // Fallback to simple timestamp-based ID
-      return `route_${Date.now()}_${Math.random()
-        .toString(36)
-        .substring(2, 9)}`;
+      console.error('[RouteStorage] Failed to generate route ID:', error);
+      return `route_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     }
   }
 
   /**
-   * Save a new route from workout GPS data
+   * Create a new route from an existing workout
    */
-  async saveRoute(params: {
-    name: string;
-    description?: string;
-    activityType: WorkoutType;
-    coordinates: GPSPoint[];
-    distance: number;
-    elevationGain: number;
-    averageGrade?: number;
-    workoutId?: string; // Optional: Link to workout that created this route
-    workoutTime?: number; // Optional: Workout duration for initial best time
-    tags?: string[];
-  }): Promise<string> {
+  async createRoute(
+    name: string,
+    activityType: WorkoutType,
+    firstWorkoutId: string,
+    workoutDuration?: number,
+    workoutPace?: number
+  ): Promise<string> {
     try {
       const routeId = await this.generateRouteId();
       const now = new Date().toISOString();
 
-      // Calculate pace if workout time provided
-      const pace =
-        params.workoutTime && params.distance > 0
-          ? params.workoutTime / 60 / (params.distance / 1000)
-          : undefined;
-
-      const route: SavedRoute = {
+      const route: RouteLabel = {
         id: routeId,
-        name: params.name,
-        description: params.description,
-        activityType: params.activityType,
-        coordinates: params.coordinates,
-        distance: params.distance,
-        elevationGain: params.elevationGain,
-        averageGrade: params.averageGrade,
+        name: name.trim(),
+        activityType,
         createdAt: now,
         lastUsed: now,
         timesUsed: 1,
-        bestTime: params.workoutTime,
-        bestPace: pace,
-        bestWorkoutId: params.workoutId,
-        tags: params.tags || [],
+        workoutIds: [firstWorkoutId],
+        bestTime: workoutDuration,
+        bestPace: workoutPace,
+        bestWorkoutId: firstWorkoutId,
       };
 
-      await this.addRoute(route);
-      console.log(
-        `✅ Saved route: ${route.name} (${(route.distance / 1000).toFixed(
-          2
-        )}km, ${route.coordinates.length} points)`
-      );
-      return routeId;
-    } catch (error) {
-      console.error('❌ Failed to save route:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Internal method to add route to storage
-   */
-  private async addRoute(route: SavedRoute): Promise<void> {
-    try {
       const routes = await this.getAllRoutes();
       routes.push(route);
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.SAVED_ROUTES,
-        JSON.stringify(routes)
-      );
+      await AsyncStorage.setItem(STORAGE_KEYS.ROUTES, JSON.stringify(routes));
+
+      console.log(`[RouteStorage] Created route: "${name}" with workout ${firstWorkoutId}`);
+      return routeId;
     } catch (error) {
-      console.error('❌ Failed to add route to storage:', error);
+      console.error('[RouteStorage] Failed to create route:', error);
       throw error;
     }
   }
@@ -167,12 +104,12 @@ export class RouteStorageService {
   /**
    * Get all saved routes
    */
-  async getAllRoutes(): Promise<SavedRoute[]> {
+  async getAllRoutes(): Promise<RouteLabel[]> {
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_ROUTES);
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.ROUTES);
       if (!data) return [];
 
-      const routes: SavedRoute[] = JSON.parse(data);
+      const routes: RouteLabel[] = JSON.parse(data);
 
       // Sort by last used (most recent first)
       return routes.sort((a, b) => {
@@ -181,7 +118,7 @@ export class RouteStorageService {
         return timeB - timeA;
       });
     } catch (error) {
-      console.error('❌ Failed to retrieve routes:', error);
+      console.error('[RouteStorage] Failed to retrieve routes:', error);
       return [];
     }
   }
@@ -189,7 +126,7 @@ export class RouteStorageService {
   /**
    * Get routes filtered by activity type
    */
-  async getRoutesByActivity(activityType: WorkoutType): Promise<SavedRoute[]> {
+  async getRoutesByActivity(activityType: WorkoutType): Promise<RouteLabel[]> {
     const allRoutes = await this.getAllRoutes();
     return allRoutes.filter((r) => r.activityType === activityType);
   }
@@ -197,56 +134,60 @@ export class RouteStorageService {
   /**
    * Get a specific route by ID
    */
-  async getRouteById(routeId: string): Promise<SavedRoute | null> {
+  async getRouteById(routeId: string): Promise<RouteLabel | null> {
     const routes = await this.getAllRoutes();
     return routes.find((r) => r.id === routeId) || null;
   }
 
   /**
-   * Update route metadata after completing a workout on this route
+   * Add a workout to a route and update stats
    */
-  async updateRouteStats(
+  async addWorkoutToRoute(
     routeId: string,
-    params: {
-      workoutId: string;
-      workoutTime: number;
-      workoutPace: number;
-    }
+    workoutId: string,
+    workoutDuration?: number,
+    workoutPace?: number
   ): Promise<void> {
     try {
       const routes = await this.getAllRoutes();
       const route = routes.find((r) => r.id === routeId);
 
       if (!route) {
-        console.warn(`⚠️ Route ${routeId} not found`);
+        console.warn(`[RouteStorage] Route ${routeId} not found`);
         return;
+      }
+
+      // Add workout if not already in list
+      if (!route.workoutIds.includes(workoutId)) {
+        route.workoutIds.push(workoutId);
       }
 
       // Update usage stats
       route.lastUsed = new Date().toISOString();
-      route.timesUsed = (route.timesUsed || 0) + 1;
+      route.timesUsed = route.workoutIds.length;
 
-      // Update best performance if this workout was faster
-      if (!route.bestTime || params.workoutTime < route.bestTime) {
-        route.bestTime = params.workoutTime;
-        route.bestPace = params.workoutPace;
-        route.bestWorkoutId = params.workoutId;
-        console.log(
-          `🏆 New best time on route "${route.name}": ${params.workoutTime}s`
-        );
+      // Update best time if this workout was faster
+      if (workoutDuration && (!route.bestTime || workoutDuration < route.bestTime)) {
+        route.bestTime = workoutDuration;
+        route.bestPace = workoutPace;
+        route.bestWorkoutId = workoutId;
+        console.log(`[RouteStorage] New PR on "${route.name}": ${workoutDuration}s`);
       }
 
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.SAVED_ROUTES,
-        JSON.stringify(routes)
-      );
-      console.log(
-        `✅ Updated route stats for "${route.name}" (${route.timesUsed} times used)`
-      );
+      await AsyncStorage.setItem(STORAGE_KEYS.ROUTES, JSON.stringify(routes));
+      console.log(`[RouteStorage] Added workout to "${route.name}" (${route.timesUsed} runs)`);
     } catch (error) {
-      console.error('❌ Failed to update route stats:', error);
+      console.error('[RouteStorage] Failed to add workout to route:', error);
       throw error;
     }
+  }
+
+  /**
+   * Get all workout IDs for a route
+   */
+  async getWorkoutIdsForRoute(routeId: string): Promise<string[]> {
+    const route = await this.getRouteById(routeId);
+    return route?.workoutIds || [];
   }
 
   /**
@@ -261,50 +202,11 @@ export class RouteStorageService {
         throw new Error(`Route ${routeId} not found`);
       }
 
-      route.name = newName;
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.SAVED_ROUTES,
-        JSON.stringify(routes)
-      );
-      console.log(`✅ Renamed route to "${newName}"`);
+      route.name = newName.trim();
+      await AsyncStorage.setItem(STORAGE_KEYS.ROUTES, JSON.stringify(routes));
+      console.log(`[RouteStorage] Renamed route to "${newName}"`);
     } catch (error) {
-      console.error('❌ Failed to rename route:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update route description and tags
-   */
-  async updateRouteMetadata(
-    routeId: string,
-    params: {
-      description?: string;
-      tags?: string[];
-    }
-  ): Promise<void> {
-    try {
-      const routes = await this.getAllRoutes();
-      const route = routes.find((r) => r.id === routeId);
-
-      if (!route) {
-        throw new Error(`Route ${routeId} not found`);
-      }
-
-      if (params.description !== undefined) {
-        route.description = params.description;
-      }
-      if (params.tags !== undefined) {
-        route.tags = params.tags;
-      }
-
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.SAVED_ROUTES,
-        JSON.stringify(routes)
-      );
-      console.log(`✅ Updated route metadata for "${route.name}"`);
-    } catch (error) {
-      console.error('❌ Failed to update route metadata:', error);
+      console.error('[RouteStorage] Failed to rename route:', error);
       throw error;
     }
   }
@@ -318,73 +220,47 @@ export class RouteStorageService {
       const filteredRoutes = routes.filter((r) => r.id !== routeId);
 
       if (routes.length === filteredRoutes.length) {
-        console.warn(`⚠️ Route ${routeId} not found (nothing to delete)`);
+        console.warn(`[RouteStorage] Route ${routeId} not found`);
         return;
       }
 
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.SAVED_ROUTES,
-        JSON.stringify(filteredRoutes)
-      );
-      console.log(`✅ Deleted route ${routeId}`);
+      await AsyncStorage.setItem(STORAGE_KEYS.ROUTES, JSON.stringify(filteredRoutes));
+      console.log(`[RouteStorage] Deleted route ${routeId}`);
     } catch (error) {
-      console.error('❌ Failed to delete route:', error);
+      console.error('[RouteStorage] Failed to delete route:', error);
       throw error;
     }
   }
 
   /**
-   * Get storage statistics
-   */
-  async getStats(): Promise<{
-    totalRoutes: number;
-    totalDistance: number; // meters
-    mostUsedRoute: SavedRoute | null;
-    totalStorageKB: number;
-  }> {
-    try {
-      const routes = await this.getAllRoutes();
-
-      const totalDistance = routes.reduce((sum, r) => sum + r.distance, 0);
-
-      const mostUsedRoute =
-        routes.length > 0
-          ? routes.reduce((prev, curr) =>
-              curr.timesUsed > prev.timesUsed ? curr : prev
-            )
-          : null;
-
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_ROUTES);
-      const storageBytes = data ? new Blob([data]).size : 0;
-
-      return {
-        totalRoutes: routes.length,
-        totalDistance,
-        mostUsedRoute,
-        totalStorageKB: Math.round(storageBytes / 1024),
-      };
-    } catch (error) {
-      console.error('❌ Failed to get route stats:', error);
-      return {
-        totalRoutes: 0,
-        totalDistance: 0,
-        mostUsedRoute: null,
-        totalStorageKB: 0,
-      };
-    }
-  }
-
-  /**
-   * Clear all routes (use with caution)
+   * Clear all routes (for migration/reset)
    */
   async clearAllRoutes(): Promise<void> {
     try {
-      await AsyncStorage.removeItem(STORAGE_KEYS.SAVED_ROUTES);
-      console.log('✅ Cleared all saved routes');
+      await AsyncStorage.removeItem(STORAGE_KEYS.ROUTES);
+      console.log('[RouteStorage] Cleared all routes');
     } catch (error) {
-      console.error('❌ Failed to clear routes:', error);
+      console.error('[RouteStorage] Failed to clear routes:', error);
       throw error;
     }
+  }
+
+  /**
+   * Format time for display (e.g., "24:30")
+   */
+  static formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Format pace for display (e.g., "4:42/km")
+   */
+  static formatPace(paceMinPerKm: number): string {
+    const mins = Math.floor(paceMinPerKm);
+    const secs = Math.round((paceMinPerKm - mins) * 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}/km`;
   }
 }
 

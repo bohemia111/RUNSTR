@@ -44,18 +44,24 @@ function formatWorkoutsForContext(workouts: LocalWorkout[]): string {
     const distance = w.distance
       ? `${(w.distance / 1000).toFixed(2)}km`
       : undefined;
+    // Format duration differently for daily step accumulations vs actual workouts
     const duration = w.duration
-      ? `${Math.round(w.duration / 60)}min`
+      ? w.source === 'daily_steps'
+        ? `${(w.duration / 3600).toFixed(1)}h (daily step accumulation)`
+        : `${Math.round(w.duration / 60)}min`
       : undefined;
     const pace = w.pace ? `${formatPace(w.pace)}/km` : undefined;
 
     return {
       date: w.startTime.split('T')[0],
       type: w.type || 'unknown',
+      source: w.source || 'unknown', // Include data source for AI context
+      isStepAccumulation: w.source === 'daily_steps', // Flag for daily step data
       distance,
       duration,
       pace,
       calories: w.calories || undefined,
+      steps: w.steps || undefined, // Include step count if available
     };
   });
 
@@ -75,7 +81,17 @@ function formatPace(paceSecondsPerKm: number): string {
  * Get system prompt for each insight type
  */
 async function getSystemPrompt(type: PromptType): Promise<string> {
-  const basePrompt = `You are Coach RUNSTR, a professional fitness coach analyzing workout data. Provide insights in exactly 3 bullet points. Be specific with numbers and dates. Keep each bullet point concise (1-2 sentences max).`;
+  const basePrompt = `You are Coach RUNSTR, a professional fitness coach analyzing workout data. Provide insights in exactly 3 bullet points. Be specific with numbers and dates. Keep each bullet point concise (1-2 sentences max).
+
+IMPORTANT DATA CONTEXT:
+- Each workout has a "source" field indicating how it was recorded:
+  - "gps_tracker": Real-time GPS-tracked workout (accurate duration/distance)
+  - "manual_entry": User manually logged the workout
+  - "daily_steps": Daily step count ACCUMULATION - NOT a single workout session. Duration represents time since midnight, not actual walking time. Treat these as daily activity totals.
+  - "healthkit" or "health_connect": Imported from Apple Health or Google Health
+  - "imported_nostr": Imported from Nostr network
+- When "isStepAccumulation" is true, do NOT report the duration as a workout session length. Instead, focus on the step count.
+- Only reference actual workout durations for gps_tracker, manual_entry, and healthkit sources.`;
 
   // Load RUNSTR.md context file
   let contextFile = await RunstrContextGenerator.getContext();

@@ -43,9 +43,9 @@ export const TeamSelectionModal: React.FC<TeamSelectionModalProps> = ({
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Select Competition Team</Text>
+            <Text style={styles.title}>Select Team</Text>
             <Text style={styles.subtitle}>
-              Your workouts will appear on this team's leaderboards
+              Team shown in your social posts
             </Text>
           </View>
 
@@ -65,9 +65,6 @@ export const TeamSelectionModal: React.FC<TeamSelectionModalProps> = ({
             >
               <View style={styles.teamInfo}>
                 <Text style={styles.teamName}>No Team</Text>
-                <Text style={styles.teamDescription}>
-                  Workouts stay private
-                </Text>
               </View>
               {currentTeamId === null && (
                 <Ionicons
@@ -91,13 +88,6 @@ export const TeamSelectionModal: React.FC<TeamSelectionModalProps> = ({
               >
                 <View style={styles.teamInfo}>
                   <Text style={styles.teamName}>{team.teamName}</Text>
-                  <Text style={styles.teamDescription}>
-                    {team.status === 'official'
-                      ? 'Official member'
-                      : team.status === 'requested'
-                      ? 'Join request pending'
-                      : 'Local member'}
-                  </Text>
                 </View>
                 {currentTeamId === team.teamId && (
                   <Ionicons

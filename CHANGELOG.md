@@ -6,6 +6,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-12-13
+
+**Achievement**: RUNSTR 1.0 - Major milestone release with Events system and Season 2
+
+### ✨ Features
+
+**Events System**
+- Events tab renamed to Leaderboard
+- External events display in-app with leaderboards
+- Event creators have captain dashboard access for leaderboard customization
+- Payout information display
+- Minimum distance and maximum duration settings
+- Lottery component for events
+
+**In-App Event Creation**
+- Create events directly within the app
+- NWC integration for Lightning payments
+- Automated payouts to winners
+- RSVP system for event participation
+- Events viewable across other Nostr clients
+
+**RUNSTR Season 2**
+- Season 2 banner added to Profile screen
+- New seasonal content and challenges
+
+**Daily Rewards System**
+- 21 sats reward per daily workout
+- Integrated with workout completion flow
+
+**Level System**
+- New level-based progression replaces health metrics display
+- Level-based achievements and milestones
+
+**Leaderboard Improvements**
+- Zap users directly from leaderboard (instead of charity-only)
+
+### 🐛 Bug Fixes
+
+**RUNSTR COACH**
+- Fixed step count tracking in Coach Runstr
+
+**Alby Hub**
+- Alby Hub app submission compatibility updates
+
+### 📱 Platform Updates
+- iOS: Version 1.0.0 (Build 100)
+- Android: Version 1.0.0 (Build 100)
+
 ## [0.9.9] - 2025-12-09
 
 **Achievement**: Enhanced activity tracking and routes system

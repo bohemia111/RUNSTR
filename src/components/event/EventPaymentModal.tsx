@@ -3,7 +3,7 @@
  * Shows QR code and copyable invoice for user to pay from any Lightning wallet
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -12,12 +12,14 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { CustomAlert } from '../ui/CustomAlert';
+import { NWCWalletService } from '../../services/wallet/NWCWalletService';
 
 interface EventPaymentModalProps {
   visible: boolean;
@@ -32,6 +34,11 @@ interface EventPaymentModalProps {
 }
 
 const { width } = Dimensions.get('window');
+
+// How often to check for payment (ms)
+const POLL_INTERVAL = 3000;
+// Show manual "I Paid" fallback after this time (ms)
+const MANUAL_FALLBACK_DELAY = 30000;
 
 export const EventPaymentModal: React.FC<EventPaymentModalProps> = ({
   visible,
@@ -59,6 +66,90 @@ export const EventPaymentModal: React.FC<EventPaymentModalProps> = ({
     message: '',
     buttons: [],
   });
+
+  // Payment verification state
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [showManualFallback, setShowManualFallback] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Start polling for payment verification when modal opens
+  useEffect(() => {
+    if (!visible || !invoice) {
+      // Clean up when modal closes
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+        fallbackTimeoutRef.current = null;
+      }
+      setIsVerifying(false);
+      setShowManualFallback(false);
+      return;
+    }
+
+    // Check if NWC is available for auto-verification
+    const startPolling = async () => {
+      const hasNWC = await NWCWalletService.hasNWCConfigured();
+      if (!hasNWC) {
+        // No NWC - show manual fallback immediately
+        console.log('[EventPayment] No NWC configured - showing manual option');
+        setShowManualFallback(true);
+        return;
+      }
+
+      console.log('[EventPayment] Starting payment verification polling...');
+      setIsVerifying(true);
+
+      // Poll for payment confirmation
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          console.log('[EventPayment] Checking payment status...');
+          const result = await NWCWalletService.lookupInvoice(invoice);
+
+          if (result.success && result.paid) {
+            console.log('[EventPayment] Payment confirmed!');
+
+            // Stop polling
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            if (fallbackTimeoutRef.current) {
+              clearTimeout(fallbackTimeoutRef.current);
+              fallbackTimeoutRef.current = null;
+            }
+
+            setIsVerifying(false);
+            onPaid();
+          }
+        } catch (error) {
+          console.log('[EventPayment] Polling error:', error);
+        }
+      }, POLL_INTERVAL);
+
+      // Show manual fallback after delay
+      fallbackTimeoutRef.current = setTimeout(() => {
+        console.log('[EventPayment] Showing manual fallback option');
+        setShowManualFallback(true);
+      }, MANUAL_FALLBACK_DELAY);
+    };
+
+    startPolling();
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+        fallbackTimeoutRef.current = null;
+      }
+    };
+  }, [visible, invoice, onPaid]);
 
   const handleCopyInvoice = async () => {
     try {
@@ -226,24 +317,38 @@ export const EventPaymentModal: React.FC<EventPaymentModalProps> = ({
                 <Text style={styles.stepNumberText}>3</Text>
               </View>
               <Text style={styles.stepText}>
-                Click "I Paid" below after completing payment
+                {isVerifying
+                  ? 'Payment will be detected automatically'
+                  : 'Click "I Paid" below after completing payment'}
               </Text>
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <TouchableOpacity
-            style={styles.paidButton}
-            onPress={handlePaid}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="checkmark-circle"
-              size={20}
-              color={theme.colors.accentText}
-            />
-            <Text style={styles.paidButtonText}>I Paid This Invoice</Text>
-          </TouchableOpacity>
+          {/* Verification Status */}
+          {isVerifying && (
+            <View style={styles.verificationContainer}>
+              <ActivityIndicator size="small" color={theme.colors.accent} />
+              <Text style={styles.verificationText}>
+                Waiting for payment confirmation...
+              </Text>
+            </View>
+          )}
+
+          {/* Manual Fallback Button - shown after 30 seconds or if no NWC */}
+          {showManualFallback && (
+            <TouchableOpacity
+              style={styles.paidButton}
+              onPress={handlePaid}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={theme.colors.accentText}
+              />
+              <Text style={styles.paidButtonText}>I Paid This Invoice</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.cancelButton}
@@ -520,5 +625,22 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+
+  // Verification Status
+  verificationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.cardBackground,
+    padding: 16,
+    borderRadius: theme.borderRadius.medium,
+    marginBottom: 12,
+  },
+
+  verificationText: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
   },
 });

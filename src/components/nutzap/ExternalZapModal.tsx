@@ -46,7 +46,7 @@ interface ExternalZapModalProps {
   recipientNpub: string; // Can be npub OR Lightning address
   recipientName: string;
   amount?: number; // Optional - if not provided, user selects amount
-  memo?: string; // Optional - will default to "Donation to {recipientName}"
+  memo?: string; // Optional - will default to "RUNSTR Community Rewards"
   onClose: () => void;
   onSuccess?: () => void;
 }
@@ -293,13 +293,13 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
       );
       console.log(
         '[ExternalZapModal] Memo:',
-        memo || `Donation to ${recipientName}`
+        memo || 'RUNSTR Community Rewards'
       );
 
       const invoiceResult = await getInvoiceFromLightningAddress(
         lnAddress,
         amount,
-        memo || `Donation to ${recipientName}`
+        memo || 'RUNSTR Community Rewards'
       );
 
       console.log('[ExternalZapModal] Invoice result:', {
@@ -428,7 +428,7 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
             <View style={styles.titleContainer}>
               <Ionicons name="flash" size={24} color={theme.colors.accent} />
               <Text style={styles.title}>
-                {showInvoice ? 'Pay with Wallet' : 'Donate to Charity'}
+                {showInvoice ? 'Pay with Wallet' : 'Send Sats'}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -443,7 +443,7 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
           >
             {/* Recipient Info */}
             <View style={styles.recipientSection}>
-              <Text style={styles.recipientLabel}>Supporting:</Text>
+              <Text style={styles.recipientLabel}>Sending to:</Text>
               <Text style={styles.recipientName}>{recipientName}</Text>
               {showInvoice && (
                 <Text style={styles.amount}>{effectiveAmount} sats</Text>

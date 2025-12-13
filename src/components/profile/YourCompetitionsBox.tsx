@@ -31,7 +31,7 @@ export const YourCompetitionsBox: React.FC = () => {
       activeOpacity={0.7}
     >
       <Ionicons name="trophy-outline" size={24} color={theme.colors.text} />
-      <Text style={styles.title}>EVENTS</Text>
+      <Text style={styles.title}>LEADERBOARDS</Text>
     </TouchableOpacity>
   );
 };

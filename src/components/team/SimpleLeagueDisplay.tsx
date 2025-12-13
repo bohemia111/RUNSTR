@@ -22,7 +22,8 @@ interface LeaderboardEntry {
   score: number;
   formattedScore: string;
   workoutCount: number;
-  participationType?: 'in-person' | 'virtual'; // ✅ NEW: How user is participating
+  participationType?: 'in-person' | 'virtual'; // How user is participating
+  lightningAddress?: string; // User's lightning address for zapping
 }
 
 interface SimpleLeagueDisplayProps {
@@ -109,6 +110,7 @@ export const SimpleLeagueDisplay: React.FC<SimpleLeagueDisplayProps> = ({
                 fallbackName={entry.name}
                 showQuickZap={true}
                 style={styles.userRowInLeaderboard}
+                recipientLightningAddress={entry.lightningAddress}
               />
             </View>
 

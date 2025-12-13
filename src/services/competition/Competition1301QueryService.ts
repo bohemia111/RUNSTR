@@ -488,6 +488,211 @@ export class Competition1301QueryService {
     this.queryCache.clear();
     console.log('🧹 Cleared competition query cache');
   }
+
+  /**
+   * Query ALL kind 1301 workouts in a date range for open events
+   * Unlike queryMemberWorkouts, this doesn't filter by author - it gets ALL qualifying workouts
+   * Used for Satlantis open events where anyone can participate without RSVP
+   */
+  async queryOpenEventWorkouts(params: {
+    activityType: string;
+    startDate: Date;
+    endDate: Date;
+    minDistance?: number; // Minimum distance in km (e.g., 5 for 5K events)
+    minSplits?: number; // Minimum split count (e.g., 5 for 5K events)
+  }): Promise<QueryResult> {
+    const startTime = Date.now();
+    const { activityType, startDate, endDate, minDistance, minSplits } = params;
+
+    const cacheKey = `open:${activityType}:${startDate.getTime()}:${endDate.getTime()}:${minDistance}:${minSplits}`;
+
+    // Check cache
+    const cached = this.queryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_EXPIRY) {
+      console.log('✅ Returning cached open event query results');
+      return { ...cached.result, fromCache: true };
+    }
+
+    console.log(`🔓 Querying OPEN EVENT workouts (no author filter)`);
+    console.log(
+      `📅 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`
+    );
+    console.log(`🏃 Activity type: ${activityType}`);
+    if (minDistance) console.log(`📏 Min distance: ${minDistance} km`);
+    if (minSplits) console.log(`📊 Min splits: ${minSplits}`);
+
+    try {
+      const ndk = await GlobalNDKService.getInstance();
+
+      // Check relay connectivity
+      const status = GlobalNDKService.getStatus();
+      console.log(`🔌 Relay status: ${status.connectedRelays}/${status.relayCount} relays connected`);
+      if (status.connectedRelays === 0) {
+        console.log('⚠️ No relays connected! Waiting for connection...');
+        await GlobalNDKService.waitForMinimumConnection(1, 5000);
+        const newStatus = GlobalNDKService.getStatus();
+        console.log(`🔌 After wait: ${newStatus.connectedRelays}/${newStatus.relayCount} relays connected`);
+      }
+
+      // Build filter - NO authors field to get ALL kind 1301 events in range
+      const filter: any = {
+        kinds: [1301],
+        since: Math.floor(startDate.getTime() / 1000),
+        until: Math.floor(endDate.getTime() / 1000),
+        limit: 500,
+      };
+
+      console.log(`📡 NDK Filter:`, JSON.stringify(filter));
+
+      const events: any[] = [];
+
+      // Subscribe with timeout (5 seconds for broader query)
+      const sub = ndk.subscribe(filter, { closeOnEose: false });
+
+      await new Promise<void>((resolve) => {
+        sub.on('event', (event: any) => {
+          events.push(event);
+        });
+
+        // 5-second timeout for open queries (larger result set)
+        setTimeout(() => {
+          sub.stop();
+          resolve();
+        }, 5000);
+      });
+
+      console.log(`📥 Received ${events.length} raw kind 1301 events`);
+
+      // DEBUG: Log first 5 events to see what we're getting
+      if (events.length > 0) {
+        console.log(`🔍 DEBUG: Sample events (first 5):`);
+        events.slice(0, 5).forEach((event, i) => {
+          const tags = event.tags || [];
+          const exerciseTag = tags.find((t: string[]) => t[0] === 'exercise')?.[1] || 'unknown';
+          const distanceTag = tags.find((t: string[]) => t[0] === 'distance');
+          const splitCount = tags.filter((t: string[]) => t[0] === 'split').length;
+          console.log(`  [${i}] pubkey: ${event.pubkey?.substring(0, 8)}..., activity: ${exerciseTag}, distance: ${distanceTag ? distanceTag[1] + ' ' + (distanceTag[2] || 'km') : 'none'}, splits: ${splitCount}, created: ${new Date(event.created_at * 1000).toISOString()}`);
+        });
+      }
+
+      // Parse and filter workouts
+      const metrics = new Map<string, WorkoutMetrics>();
+      let totalWorkouts = 0;
+      let filteredByActivity = 0;
+      let filteredByDistance = 0;
+      let filteredBySplits = 0;
+
+      for (const event of events) {
+        const workout = this.parseWorkoutEvent(event);
+
+        // Filter by activity type (case-insensitive comparison)
+        // mapSportToActivityType returns 'Running' but kind 1301 uses 'running'
+        const normalizedWorkoutType = (workout.activityType || '').toLowerCase();
+        const normalizedQueryType = activityType.toLowerCase();
+        if (normalizedQueryType !== 'any' && normalizedWorkoutType !== normalizedQueryType) {
+          filteredByActivity++;
+          // DEBUG: Log first few filtered-by-activity
+          if (filteredByActivity <= 3) {
+            console.log(`   ❌ Filtered by activity: got "${workout.activityType}" (${normalizedWorkoutType}), wanted "${activityType}" (${normalizedQueryType})`);
+          }
+          continue;
+        }
+
+        // Filter by minimum distance (convert meters to km)
+        const distanceKm = (workout.distance || 0) / 1000;
+        if (minDistance && distanceKm < minDistance * 0.95) {
+          // 5% tolerance
+          filteredByDistance++;
+          // DEBUG: Log first few filtered-by-distance
+          if (filteredByDistance <= 3) {
+            console.log(`   ❌ Filtered by distance: got ${distanceKm.toFixed(2)}km, need ${(minDistance * 0.95).toFixed(2)}km`);
+          }
+          continue;
+        }
+
+        // Filter by minimum splits
+        const splitCount = this.countSplits(event);
+        if (minSplits && splitCount < minSplits) {
+          filteredBySplits++;
+          // DEBUG: Log first few filtered-by-splits
+          if (filteredBySplits <= 3) {
+            console.log(`   ❌ Filtered by splits: got ${splitCount}, need ${minSplits}`);
+          }
+          continue;
+        }
+
+        // DEBUG: Log qualifying workouts
+        console.log(`   ✅ QUALIFYING: pubkey ${event.pubkey?.substring(0, 8)}..., activity: ${workout.activityType}, distance: ${distanceKm.toFixed(2)}km, splits: ${splitCount}`);
+
+        // Add to metrics (keyed by pubkey/npub)
+        const npub = workout.nostrPubkey || event.pubkey;
+        const existing = metrics.get(npub);
+
+        if (existing) {
+          // Add to existing metrics
+          existing.workouts.push(workout);
+          existing.totalDistance += distanceKm;
+          existing.totalDuration += (workout.duration || 0) / 60;
+          existing.workoutCount++;
+          if (distanceKm > existing.longestDistance) {
+            existing.longestDistance = distanceKm;
+          }
+        } else {
+          // Create new metrics entry
+          metrics.set(npub, {
+            npub,
+            totalDistance: distanceKm,
+            totalDuration: (workout.duration || 0) / 60,
+            totalCalories: workout.calories || 0,
+            workoutCount: 1,
+            activeDays: 1,
+            longestDistance: distanceKm,
+            longestDuration: (workout.duration || 0) / 60,
+            streakDays: 0,
+            workouts: [workout],
+          });
+        }
+
+        totalWorkouts++;
+      }
+
+      console.log(`✅ Open event query complete:`);
+      console.log(`   - ${totalWorkouts} qualifying workouts`);
+      console.log(`   - ${metrics.size} unique participants`);
+      console.log(
+        `   - Filtered: ${filteredByActivity} by activity, ${filteredByDistance} by distance, ${filteredBySplits} by splits`
+      );
+
+      const result: QueryResult = {
+        metrics,
+        totalWorkouts,
+        queryTime: Date.now() - startTime,
+        fromCache: false,
+      };
+
+      // Cache result
+      this.queryCache.set(cacheKey, { result, timestamp: Date.now() });
+
+      return result;
+    } catch (error) {
+      console.error('❌ Open event query failed:', error);
+      return {
+        metrics: new Map(),
+        totalWorkouts: 0,
+        queryTime: Date.now() - startTime,
+        fromCache: false,
+        error: error instanceof Error ? error.message : 'Query failed',
+      };
+    }
+  }
+
+  /**
+   * Count split tags in a workout event
+   */
+  private countSplits(event: any): number {
+    const tags = event.tags || [];
+    return tags.filter((t: string[]) => t[0] === 'split').length;
+  }
 }
 
 export default Competition1301QueryService.getInstance();

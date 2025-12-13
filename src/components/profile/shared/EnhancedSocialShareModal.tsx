@@ -172,7 +172,7 @@ export const EnhancedSocialShareModal: React.FC<
           try {
             cardImageUri = await captureRef(cardRef.current, {
               format: 'png',
-              quality: 0.9,
+              quality: 0.7, // Reduced from 0.9 for faster capture
             });
             console.log('✅ Card captured successfully:', {
               uri: cardImageUri,

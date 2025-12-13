@@ -8,6 +8,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { WorkoutType } from '../../types/workout';
 import type { Split } from '../activity/SplitTrackingService';
 import { RunstrContextGenerator } from '../ai/RunstrContextGenerator';
+import { DailyRewardService } from '../rewards/DailyRewardService';
+import { REWARD_CONFIG } from '../../config/rewards';
+
+/**
+ * Result returned from saveGPSWorkout including reward info
+ */
+export interface SaveGPSWorkoutResult {
+  workoutId: string;
+  rewardSent?: boolean;
+  rewardAmount?: number;
+}
 
 export interface LocalWorkout {
   id: string; // Unique identifier for deduplication
@@ -81,6 +92,10 @@ export interface LocalWorkout {
     windSpeed?: number; // Wind speed in m/s
   };
 
+  // Route labeling (simple name-based grouping)
+  routeId?: string; // Reference to RouteLabel.id if this workout is tagged with a route
+  routeLabel?: string; // Route name for display convenience
+
   // Metadata
   createdAt: string; // ISO timestamp
   syncedToNostr: boolean;
@@ -137,6 +152,7 @@ export class LocalWorkoutStorageService {
 
   /**
    * Save GPS-tracked workout to local storage
+   * Returns workout ID and reward info if a reward was sent
    */
   async saveGPSWorkout(workout: {
     type: WorkoutType;
@@ -151,7 +167,10 @@ export class LocalWorkoutStorageService {
     // Optional: GPS coordinates for weather lookup
     startLatitude?: number;
     startLongitude?: number;
-  }): Promise<string> {
+    // Optional: Route tagging
+    routeId?: string;
+    routeLabel?: string;
+  }): Promise<SaveGPSWorkoutResult> {
     try {
       const workoutId = await this.generateWorkoutId();
       const now = new Date().toISOString();
@@ -205,6 +224,8 @@ export class LocalWorkoutStorageService {
         splits: workout.splits,
         raceDistance: workout.raceDistance,
         weather, // Add weather data
+        routeId: workout.routeId,
+        routeLabel: workout.routeLabel,
         source: 'gps_tracker',
         createdAt: now,
         syncedToNostr: false,
@@ -216,7 +237,44 @@ export class LocalWorkoutStorageService {
           workout.distance / 1000
         ).toFixed(2)}km)`
       );
-      return workoutId;
+
+      // Check if qualifying for reward (≥1km distance)
+      let rewardSent = false;
+      let rewardAmount = 0;
+
+      if (workout.distance >= REWARD_CONFIG.MIN_WORKOUT_DISTANCE_METERS) {
+        try {
+          const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+          if (pubkey) {
+            console.log(
+              `[LocalWorkoutStorage] Checking reward eligibility for ${(
+                workout.distance / 1000
+              ).toFixed(2)}km workout...`
+            );
+            const result = await DailyRewardService.sendReward(pubkey);
+            if (result.success && result.amount) {
+              rewardSent = true;
+              rewardAmount = result.amount;
+              console.log(
+                `[LocalWorkoutStorage] ⚡ Reward sent: ${rewardAmount} sats!`
+              );
+            } else {
+              console.log(
+                `[LocalWorkoutStorage] Reward not sent: ${result.reason || 'unknown'}`
+              );
+            }
+          }
+        } catch (rewardError) {
+          // Silent failure - don't block workout save for reward issues
+          console.warn('[LocalWorkoutStorage] Reward error (silent):', rewardError);
+        }
+      } else {
+        console.log(
+          `[LocalWorkoutStorage] Workout distance ${(workout.distance / 1000).toFixed(2)}km < 1km minimum, no reward`
+        );
+      }
+
+      return { workoutId, rewardSent, rewardAmount };
     } catch (error) {
       console.error('❌ Failed to save GPS workout:', error);
       throw error;
@@ -490,6 +548,53 @@ export class LocalWorkoutStorageService {
       console.error('❌ Failed to cleanup synced workouts:', error);
       return 0;
     }
+  }
+
+  /**
+   * Update route for an existing workout
+   */
+  async updateWorkoutRoute(
+    workoutId: string,
+    routeId: string,
+    routeLabel: string
+  ): Promise<void> {
+    try {
+      const workouts = await this.getAllWorkouts();
+      const workout = workouts.find((w) => w.id === workoutId);
+
+      if (!workout) {
+        console.warn(`[LocalWorkoutStorage] Workout ${workoutId} not found`);
+        return;
+      }
+
+      workout.routeId = routeId;
+      workout.routeLabel = routeLabel;
+
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.LOCAL_WORKOUTS,
+        JSON.stringify(workouts)
+      );
+      console.log(`[LocalWorkoutStorage] Updated workout ${workoutId} with route "${routeLabel}"`);
+    } catch (error) {
+      console.error('[LocalWorkoutStorage] Failed to update workout route:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get workout by ID
+   */
+  async getWorkoutById(workoutId: string): Promise<LocalWorkout | null> {
+    const workouts = await this.getAllWorkouts();
+    return workouts.find((w) => w.id === workoutId) || null;
+  }
+
+  /**
+   * Get workouts by route ID
+   */
+  async getWorkoutsByRoute(routeId: string): Promise<LocalWorkout[]> {
+    const workouts = await this.getAllWorkouts();
+    return workouts.filter((w) => w.routeId === routeId);
   }
 
   /**

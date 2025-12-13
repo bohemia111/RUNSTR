@@ -22,7 +22,8 @@ export interface LeaderboardEntry {
   score: number;
   formattedScore: string;
   workoutCount: number;
-  participationType?: 'in-person' | 'virtual'; // ✅ NEW: Track how user is participating
+  participationType?: 'in-person' | 'virtual'; // Track how user is participating
+  lightningAddress?: string; // User's lightning address from workout ["lightning", "..."] tag
 }
 
 export interface Workout {
@@ -35,6 +36,7 @@ export interface Workout {
   timestamp: number; // Unix timestamp
   splits?: Map<number, number>; // km -> elapsed time in seconds (e.g., km 5 -> 1440s)
   splitPaces?: Map<number, number>; // km -> pace in seconds per km
+  lightningAddress?: string; // User's reward lightning address from ["lightning", "..."] tag
 }
 
 export class SimpleLeaderboardService {
@@ -106,6 +108,7 @@ export class SimpleLeaderboardService {
           score: memberData.score,
           formattedScore: this.formatScore(memberData.score, league.metric),
           workoutCount: memberData.workoutCount,
+          lightningAddress: memberData.lightningAddress,
         };
       } else {
         // Member has NO workouts - show them with 0 score
@@ -257,7 +260,8 @@ export class SimpleLeaderboardService {
           score: memberData.score,
           formattedScore: this.formatScore(memberData.score, scoringType),
           workoutCount: memberData.workoutCount,
-          participationType, // ✅ NEW: Include participation type
+          participationType,
+          lightningAddress: memberData.lightningAddress,
         };
       } else {
         // Member has NO workouts - show them with 0 score
@@ -268,7 +272,7 @@ export class SimpleLeaderboardService {
           score: 0,
           formattedScore: this.formatScore(0, scoringType),
           workoutCount: 0,
-          participationType, // ✅ NEW: Include participation type
+          participationType,
         };
       }
     });
@@ -693,9 +697,12 @@ export class SimpleLeaderboardService {
         npubFormat = event.pubkey; // Fallback to hex if encoding fails
       }
 
+      // Get user's lightning address from workout event
+      const lightningAddress = getTag('lightning');
+
       return {
         id: event.id,
-        npub: npubFormat, // ✅ Now stores npub1... format instead of hex
+        npub: npubFormat, // Now stores npub1... format instead of hex
         activityType,
         distance,
         duration,
@@ -703,6 +710,7 @@ export class SimpleLeaderboardService {
         timestamp: event.created_at,
         splits: splits.size > 0 ? splits : undefined,
         splitPaces: splitPaces.size > 0 ? splitPaces : undefined,
+        lightningAddress,
       };
     } catch (error) {
       console.error('Failed to parse workout event:', error);
@@ -792,16 +800,18 @@ export class SimpleLeaderboardService {
   private calculateScores(
     workouts: Workout[],
     metric: string
-  ): Map<string, { score: number; workoutCount: number }> {
+  ): Map<string, { score: number; workoutCount: number; lightningAddress?: string; lastTimestamp: number }> {
     const scoresByMember = new Map<
       string,
-      { score: number; workoutCount: number }
+      { score: number; workoutCount: number; lightningAddress?: string; lastTimestamp: number }
     >();
 
     for (const workout of workouts) {
       const existing = scoresByMember.get(workout.npub) || {
         score: 0,
         workoutCount: 0,
+        lightningAddress: undefined,
+        lastTimestamp: 0,
       };
 
       let score = existing.score;
@@ -852,9 +862,17 @@ export class SimpleLeaderboardService {
           score += workout.distance;
       }
 
+      // Track lightning address from the most recent workout
+      const isMoreRecent = workout.timestamp > existing.lastTimestamp;
+      const lightningAddress = isMoreRecent && workout.lightningAddress
+        ? workout.lightningAddress
+        : existing.lightningAddress;
+
       scoresByMember.set(workout.npub, {
         score,
         workoutCount: existing.workoutCount + 1,
+        lightningAddress,
+        lastTimestamp: isMoreRecent ? workout.timestamp : existing.lastTimestamp,
       });
     }
 
@@ -906,10 +924,14 @@ export class SimpleLeaderboardService {
    * Returns singleton leaderboards based on split count in kind 1301 events
    * ✅ NEW: Fully open teams with auto-activating leaderboards
    * @param userHexPubkey - Optional: Filter to only show leaderboards where this user participated
+   * @param forceRefresh - Optional: Bypass cache and fetch fresh data from relays
+   * @param _isRetry - Internal: Used for retry mechanism (do not set manually)
    */
   async getTeamDailyLeaderboards(
     teamId: string,
-    userHexPubkey?: string
+    userHexPubkey?: string,
+    forceRefresh: boolean = false,
+    _isRetry: boolean = false
   ): Promise<{
     teamId: string;
     date: string;
@@ -920,26 +942,42 @@ export class SimpleLeaderboardService {
   }> {
     const todayMidnight = this.getTodayMidnightLocal(); // Changed to LOCAL timezone
     const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const queryStartTime = Date.now();
 
-    console.log(`📊 Loading daily leaderboards for team: ${teamId}`);
+    // ========== DEBUG LOGGING: QUERY START ==========
+    console.log(`📊 [Leaderboard] ========== QUERY START ==========`);
+    console.log(`📊 [Leaderboard] Team: ${teamId}`);
+    console.log(`📊 [Leaderboard] Force Refresh: ${forceRefresh}`);
+    console.log(`📊 [Leaderboard] Is Retry: ${_isRetry}`);
     console.log(
-      `   🕐 Query range: ${new Date(todayMidnight * 1000).toISOString()} → now`
-    );
-    console.log(
-      `   🕐 Local midnight: ${new Date(todayMidnight * 1000).toLocaleString()}`
+      `📊 [Leaderboard] Query range: ${new Date(todayMidnight * 1000).toISOString()} → now`
     );
 
-    // Check cache first (5-minute TTL)
+    // Check cache first (5-minute TTL) - unless forceRefresh is true
     const cacheKey = `team:${teamId}:daily:${todayDate}`;
-    const cached = await this.cacheService.get(cacheKey);
-    if (cached) {
-      console.log(`   ✅ Cache hit for ${teamId} daily leaderboards`);
-      return cached;
+
+    if (forceRefresh) {
+      console.log(`📊 [Leaderboard] 🔄 FORCE REFRESH: Bypassing cache for ${teamId}`);
+      // Clear existing cache entry
+      await this.cacheService.invalidate(cacheKey);
+    } else {
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        console.log(`📊 [Leaderboard] ✅ CACHE HIT - Returning cached data`);
+        console.log(`📊 [Leaderboard] ========== QUERY END (cached) ==========`);
+        return cached;
+      }
+      console.log(`📊 [Leaderboard] ❌ CACHE MISS - Querying relays`);
     }
 
     // Query ALL kind 1301 events from today (no team filter - causes NDK hang)
     // We'll filter client-side for team tag instead
     const ndk = await GlobalNDKService.getInstance();
+
+    // Log relay connection status
+    const relayStatus = GlobalNDKService.getStatus();
+    console.log(`📊 [Leaderboard] Relay Status: ${relayStatus.connectedRelays}/${relayStatus.relayCount} connected`);
+
     const filter: NDKFilter = {
       kinds: [1301],
       since: todayMidnight,
@@ -947,25 +985,59 @@ export class SimpleLeaderboardService {
     };
 
     console.log(
-      `   🔍 Query filter (no #team to avoid NDK hang):`,
+      `📊 [Leaderboard] Query filter:`,
       JSON.stringify(filter, null, 2)
     );
 
-    // Query with 5s timeout for more reliable relay responses
-    const timeoutPromise = new Promise<Set<NDKEvent>>((resolve) => {
+    // ========== EOSE-AWARE QUERY with early exit ==========
+    // Exit early when EOSE received, max wait 5s
+    const collectedEvents = new Set<NDKEvent>();
+    let eoseReceived = false;
+
+    const allEvents = await new Promise<Set<NDKEvent>>((resolve) => {
+      const subscription = ndk.subscribe(filter, { closeOnEose: false });
+
+      subscription.on('event', (event: NDKEvent) => {
+        collectedEvents.add(event);
+      });
+
+      subscription.on('eose', () => {
+        eoseReceived = true;
+        console.log(`📊 [Leaderboard] EOSE received - ${collectedEvents.size} events collected`);
+      });
+
+      // Check every 100ms if EOSE received, max wait 5s
+      const checkInterval = setInterval(() => {
+        if (eoseReceived) {
+          clearInterval(checkInterval);
+          subscription.stop();
+          const queryDuration = Date.now() - queryStartTime;
+          console.log(`📊 [Leaderboard] ✅ Early exit on EOSE (${queryDuration}ms)`);
+          resolve(collectedEvents);
+        }
+      }, 100);
+
+      // Hard timeout after 5s
       setTimeout(() => {
-        console.log(
-          `   ⚠️ Query timed out after 5s, returning partial results`
-        );
-        resolve(new Set<NDKEvent>());
-      }, 5000); // Increased from 1500ms to 5000ms
+        clearInterval(checkInterval);
+        subscription.stop();
+        const queryDuration = Date.now() - queryStartTime;
+        if (!eoseReceived) {
+          console.log(`📊 [Leaderboard] ⚠️ Timeout after 5s (no EOSE) - ${collectedEvents.size} events (${queryDuration}ms)`);
+        }
+        resolve(collectedEvents);
+      }, 5000);
     });
 
-    const allEvents = await Promise.race([
-      ndk.fetchEvents(filter, { cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY }),
-      timeoutPromise,
-    ]);
-    console.log(`   ✅ Found ${allEvents.size} total kind 1301 events today`);
+    console.log(`📊 [Leaderboard] Total events received: ${allEvents.size}`);
+
+    // ========== RETRY MECHANISM for empty results ==========
+    if (allEvents.size === 0 && !_isRetry) {
+      console.log(`📊 [Leaderboard] ⚠️ 0 events received - retrying once after 1s...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Recursive call with retry flag
+      return this.getTeamDailyLeaderboards(teamId, userHexPubkey, forceRefresh, true);
+    }
 
     // Filter client-side for matching team tag (avoids broken NDK #team filter)
     const teamEvents = Array.from(allEvents).filter((event) => {
@@ -974,7 +1046,7 @@ export class SimpleLeaderboardService {
     });
 
     console.log(
-      `   🎯 Filtered to ${teamEvents.length} workouts with team tag: ${teamId}`
+      `📊 [Leaderboard] Filtered to ${teamEvents.length} workouts with team tag: ${teamId}`
     );
     if (teamEvents.length > 0) {
       console.log(
@@ -995,14 +1067,7 @@ export class SimpleLeaderboardService {
       }
     }
 
-    console.log(`   📝 Parsed ${workouts.length} workouts with split data`);
-    workouts.forEach((w, i) => {
-      console.log(
-        `      Workout ${i + 1}: ${w.splits?.size || 0} splits, distance: ${
-          w.distance
-        }km`
-      );
-    });
+    console.log(`📊 [Leaderboard] Parsed ${workouts.length} workouts with split data`);
 
     // Filter by activity type (running only), split count OR distance
     // 5K/10K/Half/Marathon leaderboards are for running workouts only
@@ -1031,7 +1096,7 @@ export class SimpleLeaderboardService {
     });
 
     console.log(
-      `   🏆 Eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}`
+      `📊 [Leaderboard] 🏆 Eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}`
     );
 
     // Calculate leaderboards using split-based time extraction
@@ -1094,13 +1159,9 @@ export class SimpleLeaderboardService {
       // Cache with smart TTL (5min for today, 24hr for historical)
       const ttl = this.getSmartTTL(todayDate);
       await this.cacheService.setWithCustomTTL(cacheKey, result, ttl);
-      console.log(
-        `   💾 Cached with ${ttl === 300 ? '5min' : '24hr'} TTL (${
-          todayDate === new Date().toISOString().split('T')[0]
-            ? 'active'
-            : 'historical'
-        })`
-      );
+      const totalDuration = Date.now() - queryStartTime;
+      console.log(`📊 [Leaderboard] 💾 Cached with ${ttl === 300 ? '5min' : '24hr'} TTL`);
+      console.log(`📊 [Leaderboard] ========== QUERY END (${totalDuration}ms) ==========`);
 
       return result;
     }
@@ -1115,13 +1176,9 @@ export class SimpleLeaderboardService {
     // Cache with smart TTL (5min for today, 24hr for historical)
     const ttl = this.getSmartTTL(todayDate);
     await this.cacheService.setWithCustomTTL(cacheKey, result, ttl);
-    console.log(
-      `   💾 Cached with ${ttl === 300 ? '5min' : '24hr'} TTL (${
-        todayDate === new Date().toISOString().split('T')[0]
-          ? 'active'
-          : 'historical'
-      })`
-    );
+    const totalDuration = Date.now() - queryStartTime;
+    console.log(`📊 [Leaderboard] 💾 Cached with ${ttl === 300 ? '5min' : '24hr'} TTL`);
+    console.log(`📊 [Leaderboard] ========== QUERY END (${totalDuration}ms) ==========`);
 
     return result;
   }
@@ -1130,49 +1187,108 @@ export class SimpleLeaderboardService {
    * Get global daily leaderboards (5K/10K/Half/Marathon)
    * Queries ALL kind 1301 events from today across all teams
    * Returns singleton leaderboards based on split count
+   * @param forceRefresh - Optional: Bypass cache and fetch fresh data from relays
+   * @param _isRetry - Internal: Used for retry mechanism (do not set manually)
    */
-  async getGlobalDailyLeaderboards(): Promise<{
+  async getGlobalDailyLeaderboards(
+    forceRefresh: boolean = false,
+    _isRetry: boolean = false
+  ): Promise<{
     date: string;
     leaderboard5k: LeaderboardEntry[];
     leaderboard10k: LeaderboardEntry[];
     leaderboardHalf: LeaderboardEntry[];
     leaderboardMarathon: LeaderboardEntry[];
   }> {
-    const todayMidnight = this.getTodayMidnightUTC();
+    const todayMidnight = this.getTodayMidnightLocal(); // Use LOCAL timezone to include today's workouts
     const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const queryStartTime = Date.now();
 
-    console.log(`🌍 Loading GLOBAL daily leaderboards for ${todayDate}`);
+    // ========== DEBUG LOGGING: QUERY START ==========
+    console.log(`📊 [GlobalLeaderboard] ========== QUERY START ==========`);
+    console.log(`📊 [GlobalLeaderboard] Date: ${todayDate}`);
+    console.log(`📊 [GlobalLeaderboard] Force Refresh: ${forceRefresh}`);
+    console.log(`📊 [GlobalLeaderboard] Is Retry: ${_isRetry}`);
 
-    // Check cache first (5-minute TTL)
+    // Check cache first (5-minute TTL) - unless forceRefresh is true
     const cacheKey = `global:daily:${todayDate}`;
-    const cached = await this.cacheService.get(cacheKey);
-    if (cached) {
-      console.log(`   ✅ Cache hit for global daily leaderboards`);
-      return cached;
+
+    if (forceRefresh) {
+      console.log(`📊 [GlobalLeaderboard] 🔄 FORCE REFRESH: Bypassing cache`);
+      await this.cacheService.invalidate(cacheKey);
+    } else {
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        console.log(`📊 [GlobalLeaderboard] ✅ CACHE HIT - Returning cached data`);
+        console.log(`📊 [GlobalLeaderboard] ========== QUERY END (cached) ==========`);
+        return cached;
+      }
+      console.log(`📊 [GlobalLeaderboard] ❌ CACHE MISS - Querying relays`);
     }
 
     // Query ALL kind 1301 events from today (no team filter)
     const ndk = await GlobalNDKService.getInstance();
+
+    // Log relay connection status
+    const relayStatus = GlobalNDKService.getStatus();
+    console.log(`📊 [GlobalLeaderboard] Relay Status: ${relayStatus.connectedRelays}/${relayStatus.relayCount} connected`);
+
     const filter: NDKFilter = {
       kinds: [1301],
       since: todayMidnight,
     };
 
-    // Query with 2s timeout for global query (slightly longer than team query)
-    const timeoutPromise = new Promise<Set<NDKEvent>>((resolve) => {
+    console.log(`📊 [GlobalLeaderboard] Query filter:`, JSON.stringify(filter, null, 2));
+
+    // ========== EOSE-AWARE QUERY with early exit ==========
+    // Exit early when EOSE received, max wait 5s
+    const collectedEvents = new Set<NDKEvent>();
+    let eoseReceived = false;
+
+    const events = await new Promise<Set<NDKEvent>>((resolve) => {
+      const subscription = ndk.subscribe(filter, { closeOnEose: false });
+
+      subscription.on('event', (event: NDKEvent) => {
+        collectedEvents.add(event);
+      });
+
+      subscription.on('eose', () => {
+        eoseReceived = true;
+        console.log(`📊 [GlobalLeaderboard] EOSE received - ${collectedEvents.size} events collected`);
+      });
+
+      // Check every 100ms if EOSE received, max wait 5s
+      const checkInterval = setInterval(() => {
+        if (eoseReceived) {
+          clearInterval(checkInterval);
+          subscription.stop();
+          const queryDuration = Date.now() - queryStartTime;
+          console.log(`📊 [GlobalLeaderboard] ✅ Early exit on EOSE (${queryDuration}ms)`);
+          resolve(collectedEvents);
+        }
+      }, 100);
+
+      // Hard timeout after 5s
       setTimeout(() => {
-        console.log(
-          `   ⚠️ Global query timed out after 2s, returning empty results`
-        );
-        resolve(new Set<NDKEvent>());
-      }, 2000);
+        clearInterval(checkInterval);
+        subscription.stop();
+        const queryDuration = Date.now() - queryStartTime;
+        if (!eoseReceived) {
+          console.log(`📊 [GlobalLeaderboard] ⚠️ Timeout after 5s (no EOSE) - ${collectedEvents.size} events (${queryDuration}ms)`);
+        }
+        resolve(collectedEvents);
+      }, 5000);
     });
 
-    const events = await Promise.race([
-      ndk.fetchEvents(filter),
-      timeoutPromise,
-    ]);
-    console.log(`   Found ${events.size} workouts globally today`);
+    console.log(`📊 [GlobalLeaderboard] Total events received: ${events.size}`);
+
+    // ========== RETRY MECHANISM for empty results ==========
+    if (events.size === 0 && !_isRetry) {
+      console.log(`📊 [GlobalLeaderboard] ⚠️ 0 events received - retrying once after 1s...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Recursive call with retry flag
+      return this.getGlobalDailyLeaderboards(forceRefresh, true);
+    }
 
     // Parse workouts and extract split data
     const workouts: Workout[] = [];
@@ -1210,7 +1326,7 @@ export class SimpleLeaderboardService {
     });
 
     console.log(
-      `   Global eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}`
+      `📊 [GlobalLeaderboard] 🏆 Eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}`
     );
 
     // Calculate global leaderboards
@@ -1224,6 +1340,9 @@ export class SimpleLeaderboardService {
 
     // Cache for 5 minutes
     await this.cacheService.set(cacheKey, result, 300);
+    const totalDuration = Date.now() - queryStartTime;
+    console.log(`📊 [GlobalLeaderboard] 💾 Cached with 5min TTL`);
+    console.log(`📊 [GlobalLeaderboard] ========== QUERY END (${totalDuration}ms) ==========`);
 
     return result;
   }
@@ -1267,6 +1386,7 @@ export class SimpleLeaderboardService {
         formattedScore: this.formatTime(time),
         workoutCount: 1,
         rank: 0, // Will be set after sorting
+        lightningAddress: workout.lightningAddress,
       }))
       .sort((a, b) => a.time - b.time) // Fastest first
       .map((entry, index) => ({

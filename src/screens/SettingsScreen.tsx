@@ -56,12 +56,9 @@ import { useCoachRunstr } from '../services/ai/useCoachRunstr';
 import { ModelManager, type AIModel } from '../services/ai/ModelManager';
 import { LocalTeamMembershipService } from '../services/team/LocalTeamMembershipService';
 import { RewardLightningAddressService } from '../services/rewards/RewardLightningAddressService';
-// REMOVED: TeamMembershipService and TeamSelectionModal - Users now auto-assigned to Team RUNSTR
-// import {
-//   TeamMembershipService,
-//   type LocalMembership,
-// } from '../services/team/teamMembershipService';
-// import { TeamSelectionModal } from '../components/team/TeamSelectionModal';
+import { TeamSelectionModal } from '../components/team/TeamSelectionModal';
+import { HARDCODED_TEAMS } from '../constants/hardcodedTeams';
+import type { LocalMembership } from '../services/team/teamMembershipService';
 import { useNavigationData } from '../contexts/NavigationDataContext';
 
 interface SettingsScreenProps {
@@ -130,10 +127,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [backgroundTrackingEnabled, setBackgroundTrackingEnabled] =
     useState(false);
 
-  // Competition Team state - REMOVED: Users now auto-assigned to Team RUNSTR
-  // const [competitionTeam, setCompetitionTeam] = useState<string | null>(null);
-  // const [followedTeams, setFollowedTeams] = useState<LocalMembership[]>([]);
-  // const [showTeamSelectionModal, setShowTeamSelectionModal] = useState(false);
+  // Competition Team state
+  const [competitionTeam, setCompetitionTeam] = useState<string | null>(null);
+  const [showTeamSelectionModal, setShowTeamSelectionModal] = useState(false);
 
   // Charity Selection state
   const [selectedCharity, setSelectedCharity] = useState<Charity | null>(null);
@@ -260,10 +256,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         setIsValidLightningAddress(true);
       }
 
-      // Load competition team - REMOVED: Users now auto-assigned to Team RUNSTR
-      // const currentCompetitionTeam =
-      //   await LocalTeamMembershipService.getCompetitionTeam();
-      // setCompetitionTeam(currentCompetitionTeam);
+      // Load competition team
+      const currentCompetitionTeam =
+        await LocalTeamMembershipService.getCompetitionTeam();
+      setCompetitionTeam(currentCompetitionTeam);
 
       // Load selected AI model
       const model = await ModelManager.getSelectedModel();
@@ -605,6 +601,36 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setShowCharityModal(false);
   };
 
+  // Competition Team handlers
+  const handleChangeCompetitionTeam = () => {
+    setShowTeamSelectionModal(true);
+  };
+
+  const handleTeamSelect = async (teamId: string | null) => {
+    try {
+      if (teamId) {
+        await LocalTeamMembershipService.setCompetitionTeam(teamId);
+      } else {
+        await LocalTeamMembershipService.clearCompetitionTeam();
+      }
+      setCompetitionTeam(teamId);
+      setShowTeamSelectionModal(false);
+    } catch (error) {
+      console.error('Error setting competition team:', error);
+      setShowTeamSelectionModal(false);
+      setTimeout(() => {
+        setAlertTitle('Error');
+        setAlertMessage('Failed to update team. Please try again.');
+        setAlertButtons([{ text: 'OK' }]);
+        setAlertVisible(true);
+      }, 100);
+    }
+  };
+
+  const handleTeamCancel = () => {
+    setShowTeamSelectionModal(false);
+  };
+
   // Reward Lightning Address handlers
   const handleLightningAddressChange = (text: string) => {
     setRewardLightningAddress(text);
@@ -850,21 +876,29 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             defaultExpanded={false}
           >
             <Card style={styles.accordionCard}>
-              {/* Competition Team - Now Read-Only (RUNSTR) */}
-              <View style={styles.competitionTeamSelector}>
+              {/* Competition Team Selection */}
+              <TouchableOpacity
+                style={styles.competitionTeamSelector}
+                onPress={handleChangeCompetitionTeam}
+                activeOpacity={0.7}
+              >
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Your Competition Team</Text>
-                  <Text style={styles.competitionTeamName}>RUNSTR</Text>
+                  <Text style={styles.competitionTeamName}>
+                    {competitionTeam
+                      ? LocalTeamMembershipService.getTeamNameById(competitionTeam) || 'Unknown Team'
+                      : 'No Team'}
+                  </Text>
                   <Text style={styles.settingSubtitle}>
-                    All workouts appear on global RUNSTR leaderboards
+                    Team shown in social posts
                   </Text>
                 </View>
                 <Ionicons
-                  name="lock-closed"
+                  name="chevron-forward"
                   size={20}
                   color={theme.colors.textMuted}
                 />
-              </View>
+              </TouchableOpacity>
 
               {/* Charity Support */}
               <TouchableOpacity
@@ -938,11 +972,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     Invalid format. Use: user@domain.com
                   </Text>
                 )}
-                <TouchableOpacity onPress={handleUnlockRewards} style={styles.unlockRewardsLink}>
-                  <Text style={styles.unlockRewardsText}>
-                    Unlock RUNSTR Premium →
-                  </Text>
-                </TouchableOpacity>
               </View>
             </Card>
           </SettingsAccordion>
@@ -1379,6 +1408,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             )}
           </TouchableOpacity>
         </View>
+
+        {/* App Version Info */}
+        <View style={styles.versionContainer}>
+          <Text style={styles.versionText}>Version 1.0.0 (Build 100)</Text>
+        </View>
       </ScrollView>
 
       {/* Custom Alert Modal */}
@@ -1397,6 +1431,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         selectedCharityId={selectedCharity?.id}
         onSelect={handleCharitySelect}
         onCancel={handleCharityCancel}
+      />
+
+      {/* Team Selection Modal */}
+      <TeamSelectionModal
+        visible={showTeamSelectionModal}
+        teams={HARDCODED_TEAMS.map((t) => ({
+          teamId: t.id,
+          teamName: t.name,
+          captainPubkey: t.captainHex,
+          joinedAt: Date.now(),
+          status: 'local' as const,
+        }))}
+        currentTeamId={competitionTeam}
+        onSelect={handleTeamSelect}
+        onCancel={handleTeamCancel}
       />
 
       {/* PPQ.AI API Key Configuration Modal */}
@@ -1660,6 +1709,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
     color: '#000000', // Black text for contrast on light orange
+  },
+
+  versionContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingBottom: 40,
+  },
+
+  versionText: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
   },
 
   buttonDisabled: {

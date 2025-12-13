@@ -195,7 +195,7 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
 
       // Open external wallet modal with default amount
       setExternalZapAmount(defaultAmount);
-      setExternalZapMemo(`⚡ Zap from RUNSTR to ${recipientName}`);
+      setExternalZapMemo('RUNSTR Community Rewards');
       setShowExternalModal(true);
     }
   };
@@ -245,9 +245,7 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
     ]).start();
 
     try {
-      const memo = recipientLightningAddress
-        ? `⚡ Donation to ${recipientName} from RUNSTR!`
-        : `⚡ Quick zap from RUNSTR!`;
+      const memo = 'RUNSTR Community Rewards';
 
       // Use lightning address directly if provided, otherwise use recipientHex
       const zapTarget = recipientLightningAddress || recipientHex;

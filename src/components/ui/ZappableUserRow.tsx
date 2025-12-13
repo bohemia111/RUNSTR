@@ -1,9 +1,9 @@
 /**
  * ZappableUserRow Component
- * Reusable component for displaying users with profile resolution and charity zapping
+ * Reusable component for displaying users with profile resolution and direct user zapping
  * Used across league rankings, team member lists, and competition displays
  *
- * Updated: Lightning button now zaps charity, charity name is non-interactive display
+ * Updated: Lightning button now zaps user directly (RUNSTR Community Rewards)
  */
 
 import React from 'react';
@@ -12,20 +12,18 @@ import { theme } from '../../styles/theme';
 import { Avatar } from './Avatar';
 import { NWCLightningButton } from '../lightning/NWCLightningButton';
 import { useNostrProfile } from '../../hooks/useCachedData';
-import type { WorkoutCharity } from '../../types/nostrWorkout';
 
 interface ZappableUserRowProps {
   npub: string;
   fallbackName?: string;
   additionalContent?: React.ReactNode;
   showQuickZap?: boolean;
-  showChallengeButton?: boolean; // Now controls charity name display
   zapAmount?: number;
   onZapSuccess?: () => void;
   style?: any;
   disabled?: boolean;
-  hideActionsForCurrentUser?: boolean; // Hide challenge/zap for current user
-  charity?: WorkoutCharity; // Charity info from workout event
+  hideActionsForCurrentUser?: boolean; // Hide zap for current user
+  recipientLightningAddress?: string; // User's lightning address from workout event or profile
 }
 
 export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
@@ -33,13 +31,12 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
   fallbackName,
   additionalContent,
   showQuickZap = true,
-  showChallengeButton = true,
   zapAmount = 21,
   onZapSuccess,
   style,
   disabled = false,
   hideActionsForCurrentUser = false,
-  charity,
+  recipientLightningAddress,
 }) => {
   const { profile } = useNostrProfile(npub);
 
@@ -57,17 +54,8 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
 
   const avatarUrl = profile?.picture;
 
-  // Default charity when no charity tag in 1301 event
-  const DEFAULT_CHARITY = {
-    id: 'opensats',
-    name: 'OpenSats',
-    lightningAddress: 'opensats@vlt.ge',
-  };
-
-  // Get charity info (from prop or default to OpenSats)
-  const charityDisplayName = charity?.name || DEFAULT_CHARITY.name;
-  const charityLightningAddress =
-    charity?.lightningAddress || DEFAULT_CHARITY.lightningAddress;
+  // Get user's lightning address: prop (from workout event) → profile lud16 → undefined
+  const userLightningAddress = recipientLightningAddress || profile?.lud16;
 
   return (
     <View style={[styles.container, style]}>
@@ -87,13 +75,13 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
               {displayName}
             </Text>
 
-            {/* Lightning button now zaps charity */}
-            {!hideActionsForCurrentUser && showQuickZap && (
+            {/* Lightning button zaps user directly (RUNSTR Community Rewards) */}
+            {!hideActionsForCurrentUser && showQuickZap && userLightningAddress && (
               <View style={styles.actionButtons}>
                 <NWCLightningButton
                   recipientNpub={npub}
-                  recipientName={charityDisplayName}
-                  recipientLightningAddress={charityLightningAddress}
+                  recipientName={displayName}
+                  recipientLightningAddress={userLightningAddress}
                   size="small"
                   disabled={disabled}
                   onZapSuccess={onZapSuccess}
@@ -102,17 +90,6 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
               </View>
             )}
           </View>
-
-          {/* Charity name display (non-interactive) */}
-          {!hideActionsForCurrentUser &&
-            showChallengeButton &&
-            charityDisplayName && (
-              <View style={styles.charityDisplay}>
-                <Text style={styles.charityDisplayText} numberOfLines={1}>
-                  {charityDisplayName}
-                </Text>
-              </View>
-            )}
         </View>
       </View>
 
@@ -176,25 +153,5 @@ const styles = StyleSheet.create({
 
   zapButton: {
     // Gap handled by actionButtons
-  },
-
-  charityDisplay: {
-    marginTop: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255, 140, 0, 0.1)', // Subtle orange background
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 140, 0, 0.3)', // Subtle orange border
-    alignSelf: 'flex-start', // Shrink to content width
-    flexShrink: 0, // Prevent squishing
-    minWidth: 80, // Ensure minimum readable width
-    maxWidth: 150, // Adjusted for charity name only
-  },
-
-  charityDisplayText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: theme.colors.orangeBright || '#FF8C00',
   },
 });

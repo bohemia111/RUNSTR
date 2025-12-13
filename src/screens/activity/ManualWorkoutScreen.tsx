@@ -121,9 +121,10 @@ export const ManualWorkoutScreen: React.FC = () => {
           : notes;
 
       // Save workout to local storage
+      // Note: User enters duration in minutes (UI label), convert to seconds for storage
       const workoutId = await LocalWorkoutStorageService.saveManualWorkout({
         type: mappedType,
-        duration: duration ? parseInt(duration) : undefined,
+        duration: duration ? parseInt(duration) * 60 : undefined,
         distance: distance ? parseFloat(distance) : undefined,
         reps: reps ? parseInt(reps) : undefined,
         sets: sets ? parseInt(sets) : undefined,

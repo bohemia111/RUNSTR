@@ -200,6 +200,7 @@ const RankingRow: React.FC<{
       <ZappableUserRow
         npub={entry.npub}
         fallbackName={entry.name}
+        recipientLightningAddress={entry.lightningAddress}
         additionalContent={
           <View style={styles.statsContainer}>
             <Text style={styles.memberStats}>{formatStats(entry)}</Text>

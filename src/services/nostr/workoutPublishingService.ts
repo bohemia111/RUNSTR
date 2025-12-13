@@ -21,6 +21,7 @@ import { FEATURES } from '../../config/features';
 import { ImageUploadService } from '../media/ImageUploadService';
 import { LocalTeamMembershipService } from '../team/LocalTeamMembershipService';
 import { CharitySelectionService } from '../charity/CharitySelectionService';
+import { HARDCODED_TEAMS } from '../../constants/hardcodedTeams';
 import type { Charity } from '../../constants/charities';
 
 // Import split type for race replay data
@@ -148,10 +149,10 @@ export class WorkoutPublishingService {
         pubkey = user.pubkey;
       }
 
-      // Get competition team for tagging (use workout's team if available, otherwise fetch current)
-      const competitionTeam =
-        workout.competitionTeam ||
-        (await LocalTeamMembershipService.getCompetitionTeam());
+      // For kind 1301, ALWAYS use RUNSTR team for leaderboard compatibility
+      // User's team selection only affects kind 1 social posts
+      const RUNSTR_TEAM_ID = '87d30c8b-aa18-4424-a629-d41ea7f89078';
+      const competitionTeam = workout.competitionTeam || RUNSTR_TEAM_ID;
 
       // Get user's selected charity for tagging
       const selectedCharity =
@@ -329,8 +330,10 @@ export class WorkoutPublishingService {
               imageDimensions = uploadResult.dimensions || cardData.dimensions;
               console.log(`✅ Image uploaded successfully to: ${imageUrl}`);
             } else {
-              console.warn('⚠️ Image upload failed:', uploadResult.error);
-              // Continue without image - post will still have text content
+              // Throw error instead of continuing silently - user needs feedback
+              throw new Error(
+                `Image upload failed: ${uploadResult.error || 'Unknown error'}`
+              );
             }
           } else {
             console.warn('⚠️ No cardImageUri provided - posting without image');
@@ -1091,7 +1094,7 @@ export class WorkoutPublishingService {
    * Generate social post content with clean format
    * If imageUrl is provided, content is minimal (image + hashtags only)
    * Otherwise, full text stats are included
-   * ✅ UPDATED: Now includes competition team hashtag
+   * ✅ UPDATED: Now includes competition team name and hashtag
    */
   private async generateSocialPostContent(
     workout: PublishableWorkout,
@@ -1101,15 +1104,23 @@ export class WorkoutPublishingService {
     let content = '';
     const activityHashtag = this.getActivityHashtag(workout.type);
 
-    // Get competition team for hashtag
-    const competitionTeam =
+    // Get competition team ID and name
+    const competitionTeamId =
       await LocalTeamMembershipService.getCompetitionTeam();
+    let teamName: string | null = null;
+    if (competitionTeamId) {
+      teamName = this.getTeamNameById(competitionTeamId);
+    }
 
     // If we have an image, keep it minimal - the card has all the stats
     if (imageUrl) {
-      content = `${imageUrl}\n\n#RUNSTR #${activityHashtag}`;
-      if (competitionTeam) {
-        const teamHashtag = competitionTeam.replace(/-/g, '');
+      content = `${imageUrl}\n\n`;
+      if (teamName) {
+        content += `Team: ${teamName}\n\n`;
+      }
+      content += `#RUNSTR #${activityHashtag}`;
+      if (teamName) {
+        const teamHashtag = teamName.replace(/[^a-zA-Z0-9]/g, '');
         content += ` #${teamHashtag}`;
       }
       return content;
@@ -1150,16 +1161,29 @@ export class WorkoutPublishingService {
     }
 
     // Add workout stats in vertical format
-    content += this.formatWorkoutStats(workout) + '\n\n';
+    content += this.formatWorkoutStats(workout);
+
+    // Add team name if selected
+    if (teamName) {
+      content += `\n\nTeam: ${teamName}`;
+    }
 
     // Add hashtags (including team hashtag if user has competition team)
-    content += `#RUNSTR #${activityHashtag}`;
-    if (competitionTeam) {
-      const teamHashtag = competitionTeam.replace(/-/g, '');
+    content += `\n\n#RUNSTR #${activityHashtag}`;
+    if (teamName) {
+      const teamHashtag = teamName.replace(/[^a-zA-Z0-9]/g, '');
       content += ` #${teamHashtag}`;
     }
 
     return content.trim();
+  }
+
+  /**
+   * Get team name by ID from hardcoded teams
+   */
+  private getTeamNameById(teamId: string): string | null {
+    const team = HARDCODED_TEAMS.find((t) => t.id === teamId);
+    return team?.name || null;
   }
 
   /**

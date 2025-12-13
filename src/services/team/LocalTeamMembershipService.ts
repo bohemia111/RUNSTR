@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { HARDCODED_TEAMS } from '../../constants/hardcodedTeams';
 
 /**
  * Local Team Membership Service
@@ -52,6 +53,14 @@ export class LocalTeamMembershipService {
       console.error('Error getting competition team:', error);
       return null;
     }
+  }
+
+  /**
+   * Get team name by ID from hardcoded teams
+   */
+  static getTeamNameById(teamId: string): string | null {
+    const team = HARDCODED_TEAMS.find((t) => t.id === teamId);
+    return team?.name || null;
   }
 
   /**

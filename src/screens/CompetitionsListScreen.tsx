@@ -41,16 +41,16 @@ export const CompetitionsListScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Load global leaderboards from all 1301 notes
-  const loadGlobalLeaderboards = async () => {
+  const loadGlobalLeaderboards = async (forceRefresh: boolean = false) => {
     try {
       setIsLoading(true);
       console.log(
-        '[CompetitionsListScreen] 🌍 Loading global leaderboards from all 1301 notes'
+        `[CompetitionsListScreen] 🌍 Loading global leaderboards from all 1301 notes (forceRefresh: ${forceRefresh})`
       );
 
       // Fetch global daily leaderboards (queries ALL kind 1301 events from today)
       const leaderboards =
-        await SimpleLeaderboardService.getGlobalDailyLeaderboards();
+        await SimpleLeaderboardService.getGlobalDailyLeaderboards(forceRefresh);
 
       console.log('[CompetitionsListScreen] ✅ Global leaderboards loaded:', {
         date: leaderboards.date,
@@ -76,10 +76,10 @@ export const CompetitionsListScreen: React.FC = () => {
     loadGlobalLeaderboards();
   }, []);
 
-  // Handle pull-to-refresh
+  // Handle pull-to-refresh - force bypass cache
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadGlobalLeaderboards();
+    await loadGlobalLeaderboards(true); // forceRefresh = true
     setRefreshing(false);
   };
 
@@ -104,7 +104,7 @@ export const CompetitionsListScreen: React.FC = () => {
             >
               <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
             </TouchableOpacity>
-            <Text style={styles.title}>Events</Text>
+            <Text style={styles.title}>Leaderboards</Text>
             <View style={styles.headerSpacer} />
           </View>
         </View>
@@ -129,7 +129,7 @@ export const CompetitionsListScreen: React.FC = () => {
             >
               <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
             </TouchableOpacity>
-            <Text style={styles.title}>Events</Text>
+            <Text style={styles.title}>Leaderboards</Text>
             <View style={styles.headerSpacer} />
           </View>
         </View>
@@ -171,7 +171,7 @@ export const CompetitionsListScreen: React.FC = () => {
           >
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text style={styles.title}>Events</Text>
+          <Text style={styles.title}>Leaderboards</Text>
           <View style={styles.headerSpacer} />
         </View>
       </View>

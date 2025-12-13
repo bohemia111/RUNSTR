@@ -2,17 +2,21 @@
  * DailyRewardService - Automated workout rewards
  *
  * REWARD FLOW:
- * 1. User publishes first workout of the day
+ * 1. User saves qualifying workout locally (≥1km distance)
  * 2. Check eligibility (once per day limit)
- * 3. Get user's Lightning address from their Nostr profile (lud16)
+ * 3. Get user's Lightning address (settings first, then profile fallback)
  * 4. Request Lightning invoice from their address via LNURL protocol
  * 5. Reward sender wallet (app's wallet) pays the invoice
- * 6. User receives 50 sats to their Lightning address
+ * 6. User receives 21 sats to their Lightning address
+ *
+ * LIGHTNING ADDRESS PRIORITY:
+ * 1. Settings-stored address (same as embedded in kind 1301 notes)
+ * 2. Nostr profile lud16 field (fallback)
  *
  * PAYMENT ARCHITECTURE:
- * - User provides: Lightning address in Nostr profile bio (lud16 field)
+ * - User provides: Lightning address in settings or Nostr profile
  * - App requests: Invoice from Lightning address via LNURL
- * - Reward sender wallet: Pays invoice using REWARD_SENDER_NWC env variable
+ * - Reward sender wallet: Pays invoice using REWARD_SENDER_NWC
  *
  * SILENT FAILURE: If any step fails, user never sees error
  * Workout publishing always succeeds regardless of reward status
@@ -22,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REWARD_CONFIG, REWARD_STORAGE_KEYS } from '../../config/rewards';
 import { RewardSenderWallet } from './RewardSenderWallet';
 import { ProfileService } from '../user/profileService';
+import { RewardLightningAddressService } from './RewardLightningAddressService';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 
 export interface RewardResult {
@@ -62,11 +67,14 @@ class DailyRewardServiceClass {
   }
 
   /**
-   * Get user's Lightning address from their Nostr profile
+   * Get user's Lightning address for rewards
+   *
+   * PRIORITY ORDER:
+   * 1. Settings-stored address (same as embedded in kind 1301 notes)
+   * 2. Nostr profile lud16 field (fallback)
    *
    * Lightning addresses allow any app to send Bitcoin to users
    * without requiring them to have NWC wallet setup in our app.
-   * Users just need a Lightning address in their Nostr profile (lud16 field).
    *
    * @param userPubkey - User's public key (npub or hex)
    * @returns Lightning address if found, null otherwise
@@ -75,7 +83,18 @@ class DailyRewardServiceClass {
     userPubkey: string
   ): Promise<string | null> {
     try {
-      // Fetch user profile from Nostr
+      // PRIORITY 1: Check settings-stored address (same as in 1301 notes)
+      const settingsAddress =
+        await RewardLightningAddressService.getRewardLightningAddress();
+      if (settingsAddress) {
+        console.log(
+          '[Reward] Using settings Lightning address:',
+          settingsAddress
+        );
+        return settingsAddress;
+      }
+
+      // PRIORITY 2: Fallback to Nostr profile lud16
       const profile = await ProfileService.getUserProfile(userPubkey);
 
       if (!profile || !profile.lud16) {
@@ -83,7 +102,7 @@ class DailyRewardServiceClass {
         return null;
       }
 
-      console.log('[Reward] Found Lightning address:', profile.lud16);
+      console.log('[Reward] Using profile Lightning address:', profile.lud16);
       return profile.lud16;
     } catch (error) {
       console.error('[Reward] Error getting user Lightning address:', error);

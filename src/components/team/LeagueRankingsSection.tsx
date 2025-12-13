@@ -539,6 +539,7 @@ export const LeagueRankingsSection: React.FC<LeagueRankingsSectionProps> = ({
                 npub={entry.npub}
                 fallbackName={entry.name}
                 showQuickZap={true}
+                recipientLightningAddress={(entry as any).lightningAddress}
                 additionalContent={
                   <View style={styles.rankingStats}>
                     <Text style={styles.memberStats}>

@@ -302,18 +302,23 @@ export const SimpleTeamScreen: React.FC<SimpleTeamScreenProps> = ({
     }
   }, [currentUserNpub, team, isJoining, membershipService, navigationData]);
 
-  // Pull-to-refresh handler
+  // Pull-to-refresh handler - forces cache invalidation
   const onRefresh = useCallback(async () => {
     if (!team?.id) return;
 
     setRefreshing(true);
     try {
       console.log(
-        '[SimpleTeamScreen] 🔄 Pull-to-refresh: Fetching leaderboards for team:',
+        '[SimpleTeamScreen] 🔄 Pull-to-refresh: Force refreshing leaderboards for team:',
         team.id
       );
+      // Pass forceRefresh=true to bypass cache and fetch fresh data from relays
       const dailyLeaderboards =
-        await SimpleLeaderboardService.getTeamDailyLeaderboards(team.id);
+        await SimpleLeaderboardService.getTeamDailyLeaderboards(
+          team.id,
+          undefined,  // userHexPubkey
+          true        // forceRefresh = true
+        );
       console.log('[SimpleTeamScreen] ✅ Pull-to-refresh: Leaderboards loaded');
       setLeaderboards(dailyLeaderboards);
     } catch (error) {

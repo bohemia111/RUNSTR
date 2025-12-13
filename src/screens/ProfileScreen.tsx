@@ -26,6 +26,7 @@ import { NotificationPreferencesService } from '../services/notifications/Notifi
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 // Wallet components moved to Settings
 import { MyTeamsBox } from '../components/profile/MyTeamsBox';
+import { Season2Banner } from '../components/season2/Season2Banner';
 import { ChallengeNotificationsBox } from '../components/profile/ChallengeNotificationsBox';
 import { YourCompetitionsBox } from '../components/profile/YourCompetitionsBox';
 import { YourWorkoutsBox } from '../components/profile/YourWorkoutsBox';
@@ -349,17 +350,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header with Settings Button */}
+      {/* Header with Season 2 Banner (centered) and Settings Button */}
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
-
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={handleSettingsPress}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="menu-outline" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
+        <Season2Banner />
+        <View style={styles.headerSpacer}>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={handleSettingsPress}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="menu-outline" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -444,6 +447,7 @@ const styles = StyleSheet.create({
 
   headerSpacer: {
     flex: 1,
+    alignItems: 'flex-end',
   },
 
   qrButton: {
