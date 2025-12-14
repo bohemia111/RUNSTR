@@ -323,16 +323,25 @@ class SatlantisEventServiceClass {
       const tags = getTags('t');
       const sportType = this.inferSportType(tags, title, event.content || '');
 
-      // Parse distance if present (from tags or RUNSTR distance tag)
-      let distance = this.parseDistance(tags, title, event.content || '');
+      // Parse distance - CHECK STRUCTURED TAG FIRST (most reliable)
+      let distance: { value: number; unit: 'km' | 'miles' } | undefined;
 
-      // Check for RUNSTR distance tag ['distance', '5', 'km']
+      // Priority 1: Check for RUNSTR distance tag ['distance', 'value', 'unit']
       const distanceTag = event.tags.find((t) => t[0] === 'distance');
       if (distanceTag && distanceTag[1]) {
         const distValue = parseFloat(distanceTag[1]);
         const distUnit = (distanceTag[2] as 'km' | 'miles') || 'km';
-        if (!isNaN(distValue)) {
+        if (!isNaN(distValue) && distValue > 0) {
           distance = { value: distValue, unit: distUnit };
+          console.log(`[SatlantisEvent] 📏 Distance from tag: ${distValue} ${distUnit}`);
+        }
+      }
+
+      // Priority 2: Fallback to heuristic parsing from title/tags if no structured tag
+      if (!distance) {
+        distance = this.parseDistance(tags, title, event.content || '');
+        if (distance) {
+          console.log(`[SatlantisEvent] 📏 Distance from heuristic: ${distance.value} ${distance.unit}`);
         }
       }
 

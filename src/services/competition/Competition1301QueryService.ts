@@ -217,6 +217,7 @@ export class Competition1301QueryService {
       const allWorkouts = events.map((event) => this.parseWorkoutEvent(event));
 
       // ✅ CLIENT-SIDE FILTERING: Filter by activity type AFTER fetching (nuclear pattern)
+      // Use case-insensitive comparison (mapSportToActivityType returns 'Running', kind 1301 has 'running')
       if (query.activityType === 'Any') {
         console.log(
           `📦 Returning all ${allWorkouts.length} workouts (any activity type)`
@@ -224,11 +225,12 @@ export class Competition1301QueryService {
         return allWorkouts;
       }
 
+      const normalizedQueryType = query.activityType.toLowerCase();
       const filteredWorkouts = allWorkouts.filter(
-        (workout) => workout.activityType === query.activityType
+        (workout) => (workout.activityType || '').toLowerCase() === normalizedQueryType
       );
       console.log(
-        `📦 Filtered ${allWorkouts.length} → ${filteredWorkouts.length} ${query.activityType} workouts`
+        `📦 Filtered ${allWorkouts.length} → ${filteredWorkouts.length} ${query.activityType} workouts (case-insensitive)`
       );
       return filteredWorkouts;
     } catch (error) {

@@ -136,29 +136,43 @@ export function useSatlantisEventDetail(
   const loadEventDetail = useCallback(async () => {
     if (!eventPubkey || !eventId) return;
 
+    console.log(`[useSatlantisEventDetail] 🚀 Loading event detail...`);
+    console.log(`[useSatlantisEventDetail]   - eventPubkey: ${eventPubkey.slice(0, 16)}...`);
+    console.log(`[useSatlantisEventDetail]   - eventId: ${eventId}`);
+
     setIsLoading(true);
     setError(null);
 
     try {
       // Load event details
+      console.log(`[useSatlantisEventDetail] 📥 Fetching event data...`);
       const eventData = await SatlantisEventService.getEventById(eventId, eventPubkey);
       if (!isMounted.current) return;
 
       if (!eventData) {
+        console.log(`[useSatlantisEventDetail] ❌ Event not found!`);
         setError('Event not found');
         setIsLoading(false);
         return;
       }
 
+      console.log(`[useSatlantisEventDetail] ✅ Event found: "${eventData.title}"`);
       setEvent(eventData);
       setEventStatus(getEventStatus(eventData));
 
       // Load participants from RSVPs
+      console.log(`[useSatlantisEventDetail] 👥 Loading participants...`);
       const participantPubkeys = await SatlantisRSVPService.getEventParticipants(
         eventPubkey,
         eventId
       );
       if (!isMounted.current) return;
+
+      console.log(`[useSatlantisEventDetail] 👥 Participants found: ${participantPubkeys.length}`);
+      if (participantPubkeys.length > 0) {
+        console.log(`[useSatlantisEventDetail]   - Participant pubkeys:`, participantPubkeys.map(p => p.slice(0, 16) + '...'));
+      }
+
       setFetchedParticipants(participantPubkeys);
       setIsLoading(false);
 
@@ -171,15 +185,16 @@ export function useSatlantisEventDetail(
       console.log(`   - Event start: ${new Date(eventData.startTime * 1000).toISOString()}`);
       console.log(`   - Event end: ${new Date(eventData.endTime * 1000).toISOString()}`);
       console.log(`   - Has started: ${now >= eventData.startTime}`);
-      console.log(`   - Participants from RSVPs: ${participantPubkeys.length}`);
+      console.log(`   - Participants from RSVPs + local: ${participantPubkeys.length}`);
 
       if (now >= eventData.startTime) {
+        console.log(`[useSatlantisEventDetail] ⏱️ Event has started - loading leaderboard...`);
         await loadLeaderboard(eventData, participantPubkeys);
       } else {
         console.log(`[useSatlantisEventDetail] ⏳ Event hasn't started yet, skipping leaderboard load`);
       }
     } catch (err) {
-      console.error('[useSatlantisEventDetail] Error:', err);
+      console.error('[useSatlantisEventDetail] ❌ Error:', err);
       if (isMounted.current) {
         setError(err instanceof Error ? err.message : 'Failed to load event');
         setIsLoading(false);
@@ -194,36 +209,56 @@ export function useSatlantisEventDetail(
     if (!isMounted.current) return;
     setIsLoadingLeaderboard(true);
 
+    console.log(`[useSatlantisEventDetail] 🏁 loadLeaderboard called`);
+    console.log(`[useSatlantisEventDetail]   - Event: "${eventData.title}"`);
+    console.log(`[useSatlantisEventDetail]   - Participants count: ${participantPubkeys.length}`);
+    console.log(`[useSatlantisEventDetail]   - Sport type: ${eventData.sportType}`);
+    console.log(`[useSatlantisEventDetail]   - Scoring type: ${eventData.scoringType || 'fastest_time'}`);
+    console.log(`[useSatlantisEventDetail]   - Target distance: ${eventData.distance || 'none'}`);
+
     try {
       const queryService = Competition1301QueryService.getInstance();
 
       // Map Satlantis sport type to RUNSTR activity type
       const activityType = mapSportToActivityType(eventData.sportType);
+      console.log(`[useSatlantisEventDetail]   - Mapped activity type: ${activityType}`);
 
-      // Satlantis events require RSVP to appear on leaderboard
-      // If no RSVPs yet, show empty leaderboard (not all workout posters)
-      if (participantPubkeys.length === 0) {
-        console.log('[useSatlantisEventDetail] 📋 No RSVPs yet - showing empty leaderboard');
-        console.log('[useSatlantisEventDetail] 💡 Users must join event to appear on leaderboard');
-        setLeaderboard([]);
-        setIsLoadingLeaderboard(false);
-        return;
+      // Query workouts - if participants exist, filter to them; otherwise query ALL workouts
+      // This matches the website behavior: open events show all qualifying workouts
+      let result;
+
+      if (participantPubkeys.length > 0) {
+        // RSVPs exist - query only participants' workouts
+        console.log(`[useSatlantisEventDetail] 📋 RSVP MODE: Querying ${participantPubkeys.length} participants' workouts`);
+        console.log(`[useSatlantisEventDetail]   - Date range: ${new Date(eventData.startTime * 1000).toISOString()} to ${new Date(eventData.endTime * 1000).toISOString()}`);
+        result = await queryService.queryMemberWorkouts({
+          memberNpubs: participantPubkeys,
+          activityType: activityType as any,
+          startDate: new Date(eventData.startTime * 1000),
+          endDate: new Date(eventData.endTime * 1000),
+        });
+        console.log(`[useSatlantisEventDetail] 📊 queryMemberWorkouts returned ${result.metrics.size} users with workouts`);
+      } else {
+        // No RSVPs - query ALL qualifying workouts (open event, like website)
+        console.log('[useSatlantisEventDetail] 🌐 OPEN MODE: No participants found - querying ALL qualifying workouts');
+        console.log(`[useSatlantisEventDetail]   - This should show anyone who completed a qualifying workout!`);
+        console.log(`[useSatlantisEventDetail]   - Date range: ${new Date(eventData.startTime * 1000).toISOString()} to ${new Date(eventData.endTime * 1000).toISOString()}`);
+        console.log(`[useSatlantisEventDetail]   - Activity type: ${activityType}`);
+        console.log(`[useSatlantisEventDetail]   - Min distance: ${eventData.distance || 'none'}`);
+        result = await queryService.queryOpenEventWorkouts({
+          activityType: activityType,
+          startDate: new Date(eventData.startTime * 1000),
+          endDate: new Date(eventData.endTime * 1000),
+          minDistance: eventData.distance, // Use event's target distance if set
+        });
+        console.log(`[useSatlantisEventDetail] 📊 queryOpenEventWorkouts returned ${result.metrics.size} users with workouts`);
       }
-
-      // Query workouts only from RSVPd participants
-      console.log(`[useSatlantisEventDetail] 📋 RSVP event - querying ${participantPubkeys.length} participants`);
-
-      const result = await queryService.queryMemberWorkouts({
-        memberNpubs: participantPubkeys,
-        activityType: activityType as any,
-        startDate: new Date(eventData.startTime * 1000),
-        endDate: new Date(eventData.endTime * 1000),
-      });
 
       if (!isMounted.current) return;
 
       // Build leaderboard entries using scoring service
       // Supports: fastest_time, most_distance, participation
+      console.log(`[useSatlantisEventDetail] 🧮 Building leaderboard with ${result.metrics.size} users...`);
       const entries = SatlantisEventScoringService.buildLeaderboard(
         result.metrics,
         eventData.scoringType || 'fastest_time',
@@ -234,9 +269,19 @@ export function useSatlantisEventDetail(
         `[useSatlantisEventDetail] 🏆 Leaderboard built with ${entries.length} entries ` +
           `(scoring: ${eventData.scoringType || 'fastest_time'})`
       );
+
+      if (entries.length > 0) {
+        console.log(`[useSatlantisEventDetail] 📋 Leaderboard entries:`);
+        entries.slice(0, 5).forEach((e, i) => {
+          console.log(`   ${i + 1}. ${e.npub.slice(0, 16)}... - ${e.formattedScore} (${e.workoutCount} workouts)`);
+        });
+      } else {
+        console.log(`[useSatlantisEventDetail] ⚠️ No leaderboard entries! Check workout query.`);
+      }
+
       setLeaderboard(entries);
     } catch (err) {
-      console.error('[useSatlantisEventDetail] Leaderboard error:', err);
+      console.error('[useSatlantisEventDetail] ❌ Leaderboard error:', err);
     } finally {
       if (isMounted.current) {
         setIsLoadingLeaderboard(false);

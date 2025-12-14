@@ -40,6 +40,144 @@ interface SatlantisEventDetailScreenProps {
   navigation: any;
 }
 
+// Debug Section Component - for troubleshooting RSVP issues
+const DebugSection: React.FC<{
+  eventId: string;
+  eventPubkey: string;
+  onRefresh: () => void;
+  currentUserHexPubkey: string | null;
+}> = ({ eventId, eventPubkey, onRefresh, currentUserHexPubkey }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+  const handleClearLocalJoin = async () => {
+    console.log('[DEBUG] Clearing local join for event:', eventId);
+    await SatlantisEventJoinService.debugClearLocalJoin(eventPubkey, eventId);
+    setDebugInfo('Local join cleared! You can now re-join.');
+    // Wait a moment then refresh
+    setTimeout(() => {
+      onRefresh();
+    }, 500);
+  };
+
+  const handleForceLocalJoin = async () => {
+    if (!currentUserHexPubkey) {
+      setDebugInfo('Error: No user pubkey available');
+      return;
+    }
+    console.log('[DEBUG] Force adding local join for user:', currentUserHexPubkey.slice(0, 16) + '...');
+    await SatlantisEventJoinService.debugForceLocalJoin(eventPubkey, eventId, currentUserHexPubkey);
+    setDebugInfo('Force joined locally! Refreshing...');
+    setTimeout(() => {
+      onRefresh();
+    }, 500);
+  };
+
+  const handleForceReJoin = async () => {
+    if (!currentUserHexPubkey) {
+      setDebugInfo('Error: No user pubkey available');
+      return;
+    }
+    setDebugInfo('Publishing new RSVP to Nostr...');
+    console.log('[DEBUG] Force re-joining event with pubkey:', currentUserHexPubkey.slice(0, 16) + '...');
+
+    // First clear local join to allow re-joining
+    await SatlantisEventJoinService.debugClearLocalJoin(eventPubkey, eventId);
+
+    // Create a minimal SatlantisEvent object for joinEvent
+    const minimalEvent = {
+      id: eventId,
+      pubkey: eventPubkey,
+      title: 'Event',
+      startTime: 0,
+      endTime: 0,
+      sportType: 'running',
+      joinMethod: 'open',
+    } as any;
+
+    // Publish new RSVP
+    const result = await SatlantisEventJoinService.joinEvent(minimalEvent);
+
+    if (result.success) {
+      setDebugInfo(`✅ New RSVP published!\nEvent ID: ${result.rsvpEventId?.slice(0, 16)}...\nYour pubkey: ${currentUserHexPubkey.slice(0, 16)}...\n\nRefreshing...`);
+      setTimeout(() => {
+        onRefresh();
+      }, 1000);
+    } else {
+      setDebugInfo(`❌ Failed: ${result.error}`);
+    }
+  };
+
+  const handleShowDebugInfo = async () => {
+    const allJoins = await SatlantisEventJoinService.debugGetAllLocalJoins();
+    const key = `${eventPubkey}:${eventId}`;
+    const eventJoin = allJoins[key];
+    const info = [
+      `Event ID: ${eventId}`,
+      `Event Pubkey: ${eventPubkey.slice(0, 16)}...`,
+      `Your Pubkey: ${currentUserHexPubkey?.slice(0, 16) || 'N/A'}...`,
+      `---`,
+      `Local join for this event:`,
+      eventJoin ? JSON.stringify(eventJoin, null, 2) : 'None',
+      `---`,
+      `All local joins count: ${Object.keys(allJoins).length}`,
+    ];
+    setDebugInfo(info.join('\n'));
+  };
+
+  if (!isExpanded) {
+    return (
+      <TouchableOpacity
+        style={styles.debugToggle}
+        onPress={() => setIsExpanded(true)}
+      >
+        <Ionicons name="bug" size={14} color={theme.colors.textMuted} />
+        <Text style={styles.debugToggleText}>Debug Tools</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View style={styles.debugSection}>
+      <TouchableOpacity
+        style={styles.debugHeader}
+        onPress={() => setIsExpanded(false)}
+      >
+        <Ionicons name="bug" size={16} color={theme.colors.accent} />
+        <Text style={styles.debugTitle}>RSVP Debug Tools</Text>
+        <Ionicons name="chevron-up" size={16} color={theme.colors.textMuted} />
+      </TouchableOpacity>
+
+      <View style={styles.debugButtonRow}>
+        <TouchableOpacity style={styles.debugButton} onPress={handleClearLocalJoin}>
+          <Text style={styles.debugButtonText}>Clear Local Join</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.debugButton} onPress={handleForceLocalJoin}>
+          <Text style={styles.debugButtonText}>Force Local Join</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity style={[styles.debugButton, { backgroundColor: theme.colors.accent }]} onPress={handleForceReJoin}>
+        <Text style={[styles.debugButtonText, { fontWeight: 'bold' }]}>🔄 Force Re-Join (Publish RSVP)</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.debugButton} onPress={handleShowDebugInfo}>
+        <Text style={styles.debugButtonText}>Show Debug Info</Text>
+      </TouchableOpacity>
+
+      {debugInfo ? (
+        <View style={styles.debugInfoBox}>
+          <Text style={styles.debugInfoText}>{debugInfo}</Text>
+        </View>
+      ) : null}
+
+      <Text style={styles.debugHint}>
+        Use these tools if your join isn't being detected. Check Metro logs for detailed output.
+      </Text>
+    </View>
+  );
+};
+
 export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProps> = ({
   route,
   navigation,
@@ -56,7 +194,19 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
     isLoadingLeaderboard,
     error,
     refresh,
+    addLocalParticipant,
   } = useSatlantisEventDetail(eventPubkey, eventId);
+
+  // Get user's hex pubkey for optimistic UI
+  const currentUserHexPubkey = React.useMemo(() => {
+    if (!currentUser?.npub) return null;
+    try {
+      const decoded = nip19.decode(currentUser.npub);
+      return decoded.data as string;
+    } catch {
+      return null;
+    }
+  }, [currentUser?.npub]);
 
   // Payment modal state
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
@@ -87,13 +237,19 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
   // Handle successful join
   const handleJoinSuccess = useCallback(() => {
     setPendingPayment(null); // Clear pending payment on success
+
+    // Add user to local participant list immediately for optimistic UI
+    if (currentUserHexPubkey) {
+      addLocalParticipant(currentUserHexPubkey);
+    }
+
     setAlertConfig({
       title: 'Joined!',
       message: 'You have successfully joined this event.',
     });
     setAlertVisible(true);
     refresh();
-  }, [refresh]);
+  }, [refresh, currentUserHexPubkey, addLocalParticipant]);
 
   // Handle payment required (paid events)
   const handlePaymentRequired = useCallback((invoiceResult: InvoiceResult) => {
@@ -114,6 +270,11 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
     );
 
     if (result.success) {
+      // Add user to local participant list immediately for optimistic UI
+      if (currentUserHexPubkey) {
+        addLocalParticipant(currentUserHexPubkey);
+      }
+
       setAlertConfig({
         title: 'Joined!',
         message: 'Payment received. You have joined the event.',
@@ -129,7 +290,7 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
     }
 
     setPendingInvoice(null);
-  }, [event, pendingInvoice, refresh]);
+  }, [event, pendingInvoice, refresh, currentUserHexPubkey, addLocalParticipant]);
 
   // Handle join error
   const handleJoinError = useCallback((error: string) => {
@@ -424,6 +585,14 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
             </View>
           )}
 
+        {/* Debug Section - for troubleshooting RSVP issues */}
+        <DebugSection
+          eventId={eventId}
+          eventPubkey={eventPubkey}
+          onRefresh={refresh}
+          currentUserHexPubkey={currentUserHexPubkey}
+        />
+
         <View style={styles.bottomPadding} />
       </ScrollView>
 
@@ -670,6 +839,80 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.textSecondary,
     lineHeight: 18,
+  },
+  // Debug Section Styles
+  debugToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    opacity: 0.5,
+    gap: 6,
+  },
+  debugToggleText: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+  },
+  debugSection: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  debugHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  debugTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.text,
+  },
+  debugButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  debugButton: {
+    flex: 1,
+    backgroundColor: theme.colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  debugButtonText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text,
+  },
+  debugInfoBox: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: theme.colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  debugInfoText: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    color: theme.colors.textSecondary,
+    lineHeight: 16,
+  },
+  debugHint: {
+    marginTop: 12,
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
 

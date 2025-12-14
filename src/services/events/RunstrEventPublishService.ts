@@ -163,6 +163,7 @@ class RunstrEventPublishServiceClass {
 
     // Distance-related tags for fastest_time events
     if (config.scoringType === 'fastest_time' && config.targetDistance) {
+      console.log(`[RunstrEventPublish] 📏 Adding distance tag: ${config.targetDistance} ${config.targetDistanceUnit || 'km'}`);
       tags.push([
         'distance',
         config.targetDistance.toString(),
@@ -174,8 +175,11 @@ class RunstrEventPublishServiceClass {
         (p) => Math.abs(p.value - config.targetDistance!) < 0.5
       );
       if (preset) {
+        console.log(`[RunstrEventPublish] 📏 Adding preset tags: ${preset.tags.join(', ')}`);
         preset.tags.forEach((tag) => tags.push(['t', tag]));
       }
+    } else {
+      console.log(`[RunstrEventPublish] ⚠️ No distance tag added - scoringType: ${config.scoringType}, targetDistance: ${config.targetDistance}`);
     }
 
     // RUNSTR-specific configuration tags
