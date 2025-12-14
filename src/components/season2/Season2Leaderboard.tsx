@@ -23,7 +23,7 @@ export const Season2Leaderboard: React.FC<Season2LeaderboardProps> = ({
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={theme.colors.accent} />
+        <ActivityIndicator size="small" color={theme.colors.orangeBright} />
         <Text style={styles.loadingText}>Loading leaderboard...</Text>
       </View>
     );
@@ -75,11 +75,6 @@ export const Season2Leaderboard: React.FC<Season2LeaderboardProps> = ({
             <Text style={styles.distanceText}>{formattedDistance}</Text>
             {item.charityName && (
               <Text style={styles.charityText}>• {item.charityName}</Text>
-            )}
-            {item.isLocalJoin && (
-              <View style={styles.pendingBadge}>
-                <Text style={styles.pendingText}>Pending</Text>
-              </View>
             )}
           </View>
         </View>
@@ -172,7 +167,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   topRank: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.orangeBright,
   },
   firstPlace: {
     backgroundColor: theme.colors.orangeBright,
@@ -197,23 +192,13 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   distanceText: {
-    color: theme.colors.accent,
+    color: theme.colors.orangeBright,
     fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
   },
   charityText: {
     color: theme.colors.textMuted,
     fontSize: 12,
-  },
-  pendingBadge: {
-    backgroundColor: theme.colors.border,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  pendingText: {
-    color: theme.colors.textMuted,
-    fontSize: 10,
   },
   separator: {
     height: 1,

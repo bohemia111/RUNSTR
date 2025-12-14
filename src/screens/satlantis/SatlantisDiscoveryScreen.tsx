@@ -70,6 +70,13 @@ export const SatlantisDiscoveryScreen: React.FC<SatlantisDiscoveryScreenProps> =
   const renderHeader = () => (
     <View style={styles.header}>
       <Text style={styles.headerTitle}>Events</Text>
+      <TouchableOpacity
+        style={styles.createButton}
+        onPress={() => setShowCreationModal(true)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="add" size={24} color={theme.colors.background} />
+      </TouchableOpacity>
     </View>
   );
 
@@ -152,15 +159,6 @@ export const SatlantisDiscoveryScreen: React.FC<SatlantisDiscoveryScreenProps> =
         }
       />
 
-      {/* FAB - Create Event Button */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setShowCreationModal(true)}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={28} color={theme.colors.background} />
-      </TouchableOpacity>
-
       {/* Event Creation Modal */}
       <RunstrEventCreationModal
         visible={showCreationModal}
@@ -177,8 +175,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -187,10 +186,15 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: theme.typography.weights.bold,
-    color: theme.colors.text,
+    color: '#FFB366',
   },
-  _unused: {
-    width: 32,
+  createButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFB366',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterContainer: {
     borderBottomWidth: 1,
@@ -210,8 +214,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   filterChipActive: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
+    backgroundColor: '#FFB366',
+    borderColor: '#FFB366',
   },
   filterText: {
     fontSize: 14,
@@ -248,22 +252,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: 'center',
     fontStyle: 'italic',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
   },
 });
 

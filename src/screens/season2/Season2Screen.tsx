@@ -86,7 +86,7 @@ export const Season2Screen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>RUNSTR Season 2</Text>
+        <Text style={styles.headerTitle}>RUNSTR SEASON II</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -98,7 +98,7 @@ export const Season2Screen: React.FC = () => {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={theme.colors.accent}
+            tintColor={theme.colors.orangeBright}
           />
         }
       >
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.medium,
   },
   tabButtonActive: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.orangeBright,
   },
   tabText: {
     color: theme.colors.textMuted,

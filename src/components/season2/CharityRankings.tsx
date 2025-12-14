@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   firstPlaceRank: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.orangeBright,
   },
   rankText: {
     color: theme.colors.text,
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   distanceText: {
-    color: theme.colors.accent,
+    color: theme.colors.orangeBright,
     fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
   },

@@ -6,11 +6,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import type { LocalWorkout } from '../../services/fitness/LocalWorkoutStorageService';
-import { StreakRewardsModal } from './StreakRewardsModal';
 
 interface StreakRewardsCardProps {
   workouts: LocalWorkout[];
@@ -19,7 +18,6 @@ interface StreakRewardsCardProps {
 export const StreakRewardsCard: React.FC<StreakRewardsCardProps> = ({
   workouts,
 }) => {
-  const [showModal, setShowModal] = useState(false);
   const [daysThisWeek, setDaysThisWeek] = useState(0);
   const [totalStreak, setTotalStreak] = useState(0);
 
@@ -102,58 +100,41 @@ export const StreakRewardsCard: React.FC<StreakRewardsCardProps> = ({
   };
 
   return (
-    <>
-      <TouchableOpacity
-        style={styles.container}
-        onPress={() => setShowModal(true)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.header}>
-          <View style={styles.titleRow}>
-            <Ionicons name="flame" size={16} color="#FF9D42" />
-            <Text style={styles.title}>Streaks</Text>
-          </View>
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={theme.colors.textMuted}
-          />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.titleRow}>
+          <Ionicons name="flame" size={16} color="#FF9D42" />
+          <Text style={styles.title}>Streaks</Text>
+        </View>
+      </View>
+
+      <View style={styles.content}>
+        {/* Days this week display */}
+        <Text style={styles.daysText}>
+          {daysThisWeek} day{daysThisWeek !== 1 ? 's' : ''} this week
+        </Text>
+
+        {/* Compact progress dots */}
+        <View style={styles.dotsRow}>
+          {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+            <View
+              key={day}
+              style={[styles.dot, day <= daysThisWeek && styles.dotFilled]}
+            />
+          ))}
         </View>
 
-        <View style={styles.content}>
-          {/* Days this week display */}
-          <Text style={styles.daysText}>
-            {daysThisWeek} day{daysThisWeek !== 1 ? 's' : ''} this week
-          </Text>
-
-          {/* Compact progress dots */}
-          <View style={styles.dotsRow}>
-            {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-              <View
-                key={day}
-                style={[styles.dot, day <= daysThisWeek && styles.dotFilled]}
-              />
-            ))}
+        {/* Total streak if > 7 days */}
+        {totalStreak > 7 && (
+          <View style={styles.totalStreakRow}>
+            <Ionicons name="trophy" size={12} color="#FFB366" />
+            <Text style={styles.totalStreakText}>
+              {totalStreak} day streak
+            </Text>
           </View>
-
-          {/* Total streak if > 7 days */}
-          {totalStreak > 7 && (
-            <View style={styles.totalStreakRow}>
-              <Ionicons name="trophy" size={12} color="#FFB366" />
-              <Text style={styles.totalStreakText}>
-                {totalStreak} day streak
-              </Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-
-      <StreakRewardsModal
-        visible={showModal}
-        onClose={() => setShowModal(false)}
-        currentStreak={totalStreak}
-      />
-    </>
+        )}
+      </View>
+    </View>
   );
 };
 

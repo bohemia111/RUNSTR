@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: theme.typography.weights.semiBold,
-    color: theme.colors.text,
+    color: '#FFB366',
   },
   headerSpacer: {
     width: 32,
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: theme.typography.weights.medium,
-    color: theme.colors.text,
+    color: '#FFB366',
     marginBottom: 8,
   },
   textInput: {
@@ -491,8 +491,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   optionButtonSelected: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
+    backgroundColor: '#FFB366',
+    borderColor: '#FFB366',
   },
   optionButtonText: {
     fontSize: 14,
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
     borderTopColor: theme.colors.border,
   },
   createButton: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: '#FFB366',
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',

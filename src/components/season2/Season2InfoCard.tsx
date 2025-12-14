@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   prizeAmount: {
-    color: theme.colors.accent,
+    color: theme.colors.orangeBright,
     fontSize: 20,
     fontWeight: theme.typography.weights.bold,
   },

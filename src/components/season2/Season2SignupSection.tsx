@@ -24,6 +24,7 @@ export const Season2SignupSection: React.FC = () => {
     isOfficial,
     isLocalOnly,
     isLoading,
+    joinLocally,
   } = useSeason2Registration();
   const { isEnded } = useSeason2Status();
 
@@ -62,7 +63,7 @@ export const Season2SignupSection: React.FC = () => {
         <Ionicons
           name="time-outline"
           size={24}
-          color={theme.colors.accent}
+          color={theme.colors.orangeBright}
         />
         <Text style={styles.pendingText}>Registration pending verification</Text>
         <Text style={styles.pendingSubtext}>
@@ -72,7 +73,15 @@ export const Season2SignupSection: React.FC = () => {
     );
   }
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
+    // Add user locally immediately for instant feedback
+    try {
+      await joinLocally();
+    } catch (err) {
+      console.log('[Season2Signup] Could not join locally:', err);
+    }
+
+    // Open payment page
     if (SEASON_2_CONFIG.paymentUrl) {
       Linking.openURL(SEASON_2_CONFIG.paymentUrl);
     } else {
@@ -86,7 +95,7 @@ export const Season2SignupSection: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={theme.colors.accent} />
+        <ActivityIndicator size="small" color={theme.colors.orangeBright} />
       </View>
     );
   }
@@ -115,7 +124,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButton: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.orangeBright,
     borderRadius: theme.borderRadius.large,
     paddingVertical: 16,
     alignItems: 'center',
@@ -141,7 +150,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.weights.semiBold,
   },
   pendingText: {
-    color: theme.colors.accent,
+    color: theme.colors.orangeBright,
     fontSize: 16,
     fontWeight: theme.typography.weights.medium,
   },

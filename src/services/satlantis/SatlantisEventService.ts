@@ -72,10 +72,12 @@ class SatlantisEventServiceClass {
    * Uses progressive relay connectivity (2/3 relays minimum)
    * @param filter - Optional filter for sport types, tags, etc.
    * @param forceRefresh - If true, bypasses cache and queries relays directly
+   * @param _isRetry - Internal flag for retry mechanism
    */
   async discoverSportsEvents(
     filter?: SatlantisEventFilter,
-    forceRefresh: boolean = false
+    forceRefresh: boolean = false,
+    _isRetry: boolean = false
   ): Promise<SatlantisEvent[]> {
     const cacheKey = `satlantis_events_${JSON.stringify(filter || {})}`;
 
@@ -142,21 +144,57 @@ class SatlantisEventServiceClass {
       tagsCount: tagsToQuery.length,
     });
 
-    // Query with 8s timeout (nuclear pattern)
-    let events: Set<NDKEvent>;
-    try {
-      events = await Promise.race([
-        ndk.fetchEvents(ndkFilter),
-        new Promise<Set<NDKEvent>>((resolve) =>
-          setTimeout(() => resolve(new Set()), 8000)
-        ),
-      ]);
-    } catch (error) {
-      console.error('[Satlantis] Query error:', error);
-      events = new Set();
-    }
+    // EOSE-aware subscription pattern (replaces unreliable Promise.race)
+    const collectedEvents = new Set<NDKEvent>();
+    let eoseReceived = false;
+
+    const events = await new Promise<Set<NDKEvent>>((resolve) => {
+      try {
+        const subscription = ndk.subscribe(ndkFilter, { closeOnEose: false });
+
+        subscription.on('event', (event: NDKEvent) => {
+          collectedEvents.add(event);
+        });
+
+        subscription.on('eose', () => {
+          eoseReceived = true;
+          console.log(`[Satlantis] EOSE received - ${collectedEvents.size} events collected`);
+        });
+
+        // Check every 100ms if EOSE received, max wait 8s
+        const checkInterval = setInterval(() => {
+          if (eoseReceived) {
+            clearInterval(checkInterval);
+            subscription.stop();
+            console.log(`[Satlantis] ✅ Early exit on EOSE`);
+            resolve(collectedEvents);
+          }
+        }, 100);
+
+        // Hard timeout after 8s
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          subscription.stop();
+          if (!eoseReceived) {
+            console.log(`[Satlantis] ⚠️ Timeout (8s) - returning ${collectedEvents.size} events`);
+          }
+          resolve(collectedEvents);
+        }, 8000);
+      } catch (error) {
+        console.error('[Satlantis] Query error:', error);
+        resolve(new Set());
+      }
+    });
 
     console.log(`[Satlantis] Fetched ${events.size} raw events from Nostr`);
+
+    // Retry once if 0 events and not already a retry
+    // This handles cases where relay.nostr.band disconnected mid-query
+    if (events.size === 0 && !_isRetry) {
+      console.log(`[Satlantis] ⚠️ 0 events received - retrying once after 1s...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return this.discoverSportsEvents(filter, forceRefresh, true);
+    }
 
     // Parse events
     const parsedEvents: SatlantisEvent[] = [];
