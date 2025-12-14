@@ -98,6 +98,13 @@ export const EnhancedWorkoutCard: React.FC<EnhancedWorkoutCardProps> = ({
       : `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  // Format pace from seconds per km to MM:SS format
+  const formatPace = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const formatDate = (dateString: string): string => {
     const workoutDate = new Date(dateString);
     const today = new Date();
@@ -260,10 +267,7 @@ export const EnhancedWorkoutCard: React.FC<EnhancedWorkoutCardProps> = ({
               {workout.pace && (
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>
-                    {Math.floor(workout.pace)}:
-                    {Math.floor((workout.pace % 1) * 60)
-                      .toString()
-                      .padStart(2, '0')}
+                    {formatPace(workout.pace)}
                   </Text>
                   <Text style={styles.statLabel}>Pace /km</Text>
                 </View>

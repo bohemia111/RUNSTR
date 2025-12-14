@@ -54,6 +54,10 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<NostrProfile | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const [importStats, setImportStats] = useState<{
     totalImported: number;
     importedAt: string;
@@ -380,6 +384,7 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
   const handleImportNostrHistory = async () => {
     try {
       setImporting(true);
+      setImportProgress({ current: 0, total: 0 }); // Initialize progress UI
 
       // Get user's pubkey
       const userPubkey = await AsyncStorage.getItem('@runstr:npub');
@@ -389,6 +394,7 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       if (!userKey) {
         console.error('[WorkoutHistory] No pubkey found - cannot import workouts');
         setImporting(false);
+        setImportProgress(null);
         return;
       }
 
@@ -401,6 +407,11 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
           console.log(
             `[Import Progress] ${progress.imported}/${progress.total} - ${progress.current}`
           );
+          // Update visible progress UI
+          setImportProgress({
+            current: progress.imported,
+            total: progress.total,
+          });
           // Update import stats to show progress
           setImportStats({
             totalImported: progress.imported,
@@ -427,9 +438,11 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       }
 
       setImporting(false);
+      setImportProgress(null); // Clear progress UI
     } catch (error) {
       console.error('[WorkoutHistory] Import error:', error);
       setImporting(false);
+      setImportProgress(null);
       CustomAlertManager.alert('Import Error', 'Failed to import workouts');
     }
   };
@@ -494,6 +507,18 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
         </TouchableOpacity>
       </View>
 
+      {/* Import Progress Banner */}
+      {importing && importProgress && (
+        <View style={styles.importProgressBanner}>
+          <Ionicons name="cloud-download" size={18} color="#FF9D42" />
+          <Text style={styles.importProgressText}>
+            {importProgress.total === 0
+              ? 'Connecting to Nostr relays...'
+              : `Syncing workouts: ${importProgress.current} / ${importProgress.total}`}
+          </Text>
+        </View>
+      )}
+
       {/* Three-Tab Workout Navigator */}
       <WorkoutTabNavigator
         userId={userId}
@@ -557,6 +582,24 @@ const styles = StyleSheet.create({
 
   syncButton: {
     padding: 8,
+  },
+
+  importProgressBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 157, 66, 0.1)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 157, 66, 0.2)',
+  },
+
+  importProgressText: {
+    color: '#FF9D42',
+    fontSize: 14,
+    fontWeight: '500',
   },
 
   errorContainer: {

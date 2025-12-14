@@ -142,6 +142,12 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "RUNSTR needs camera access to scan QR codes for wallet connections, challenges, and events."
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "RUNSTR needs location access to track your running, walking, and cycling activities accurately.",

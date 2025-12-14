@@ -1,11 +1,19 @@
 /**
  * WelcomePermissionModal Component
- * Simple educational modal shown on first app launch
- * Introduces app features without requesting permissions
+ * Educational modal shown on first app launch
+ * Explains RUNSTR's local-first philosophy and permission requirements
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 
@@ -27,71 +35,102 @@ export const WelcomePermissionModal: React.FC<WelcomePermissionModalProps> = ({
     >
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
-          {/* Logo/Icon */}
-          <View style={styles.iconContainer}>
-            <Ionicons
-              name="trophy"
-              size={64}
-              color={theme.colors.orangeBright}
-            />
-          </View>
-
-          {/* Title */}
-          <Text style={styles.title}>WELCOME TO RUNSTR</Text>
-
-          {/* Feature List */}
-          <View style={styles.featureList}>
-            <View style={styles.featureItem}>
-              <Ionicons
-                name="search"
-                size={24}
-                color={theme.colors.orangeBright}
-                style={styles.featureIcon}
-              />
-              <Text style={styles.featureText}>
-                Discover bitcoin powered teams and events
-              </Text>
-            </View>
-
-            <View style={styles.featureItem}>
-              <Ionicons
-                name="fitness"
-                size={24}
-                color={theme.colors.orangeBright}
-                style={styles.featureIcon}
-              />
-              <Text style={styles.featureText}>
-                Track health and fitness activity
-              </Text>
-            </View>
-
-            <View style={styles.featureItem}>
-              <Ionicons
-                name="person"
-                size={24}
-                color={theme.colors.orangeBright}
-                style={styles.featureIcon}
-              />
-              <Text style={styles.featureText}>
-                Review your fitness profile
-              </Text>
-            </View>
-          </View>
-
-          {/* Get Started Button */}
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={onComplete}
-            activeOpacity={0.7}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
           >
-            <Ionicons
-              name="arrow-forward"
-              size={20}
-              color={theme.colors.background}
-              style={styles.buttonIcon}
-            />
-            <Text style={styles.primaryButtonText}>GET STARTED</Text>
-          </TouchableOpacity>
+            {/* Title */}
+            <Text style={styles.title}>WELCOME TO RUNSTR</Text>
+            <Text style={styles.subtitle}>Your Data, Your Device</Text>
+
+            {/* Introduction */}
+            <Text style={styles.paragraph}>
+              RUNSTR takes a different approach to fitness tracking. There's no
+              central database storing your workouts, no account to create, and
+              no cloud sync required. Your fitness data stays on your device
+              unless you choose to share it.
+            </Text>
+
+            {/* Local-First Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons
+                  name="phone-portrait-outline"
+                  size={22}
+                  color={theme.colors.orangeBright}
+                />
+                <Text style={styles.sectionTitle}>Local-First Design</Text>
+              </View>
+              <Text style={styles.sectionText}>
+                All workouts are stored locally on your phone. You decide what
+                to publish to Nostr and what stays private.
+              </Text>
+            </View>
+
+            {/* Background Tracking Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons
+                  name="location-outline"
+                  size={22}
+                  color={theme.colors.orangeBright}
+                />
+                <Text style={styles.sectionTitle}>Background Tracking</Text>
+              </View>
+              <Text style={styles.sectionText}>
+                To accurately track runs, walks, and rides while using other
+                apps like music or podcasts, RUNSTR needs continuous location
+                access.
+              </Text>
+            </View>
+
+            {/* Permission Instructions */}
+            <View style={styles.instructionsBox}>
+              <Text style={styles.instructionsTitle}>
+                When prompted for location permissions:
+              </Text>
+              {Platform.OS === 'ios' ? (
+                <View style={styles.instructionItem}>
+                  <Text style={styles.instructionBullet}>•</Text>
+                  <Text style={styles.instructionText}>
+                    Select <Text style={styles.highlight}>"Always"</Text>
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.instructionItem}>
+                    <Text style={styles.instructionBullet}>•</Text>
+                    <Text style={styles.instructionText}>
+                      Select{' '}
+                      <Text style={styles.highlight}>"Allow all the time"</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.instructionItem}>
+                    <Text style={styles.instructionBullet}>•</Text>
+                    <Text style={styles.instructionText}>
+                      Set battery to{' '}
+                      <Text style={styles.highlight}>"Unrestricted"</Text>
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
+
+            {/* Get Started Button */}
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={onComplete}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.primaryButtonText}>Get Started</Text>
+              <Ionicons
+                name="arrow-forward"
+                size={20}
+                color={theme.colors.background}
+                style={styles.buttonIcon}
+              />
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -101,48 +140,99 @@ export const WelcomePermissionModal: React.FC<WelcomePermissionModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
   modalContainer: {
     backgroundColor: theme.colors.cardBackground,
     borderRadius: 16,
-    padding: 32,
     width: '100%',
     maxWidth: 400,
+    maxHeight: '85%',
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  iconContainer: {
-    alignSelf: 'center',
-    marginBottom: 24,
+  scrollContent: {
+    padding: 28,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
     color: theme.colors.text,
     textAlign: 'center',
-    letterSpacing: 0.5,
-    marginBottom: 32,
+    letterSpacing: 1,
+    marginBottom: 8,
   },
-  featureList: {
-    marginBottom: 32,
-    gap: 20,
+  subtitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: theme.colors.orangeBright,
+    textAlign: 'center',
+    marginBottom: 24,
   },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  featureIcon: {
-    marginRight: 16,
-  },
-  featureText: {
+  paragraph: {
     fontSize: 15,
     color: theme.colors.text,
-    flex: 1,
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  sectionText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
     lineHeight: 22,
+    paddingLeft: 32,
+  },
+  instructionsBox: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.orangeDeep,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  instructionsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: 12,
+  },
+  instructionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  instructionBullet: {
+    fontSize: 14,
+    color: theme.colors.orangeBright,
+    marginRight: 8,
+    marginTop: 1,
+  },
+  instructionText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    flex: 1,
+    lineHeight: 20,
+  },
+  highlight: {
+    color: theme.colors.orangeBright,
+    fontWeight: '600',
   },
   primaryButton: {
     backgroundColor: theme.colors.orangeBright,
@@ -154,12 +244,12 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   buttonIcon: {
-    marginRight: 8,
+    marginLeft: 8,
   },
   primaryButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: theme.colors.background,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 });

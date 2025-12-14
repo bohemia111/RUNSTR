@@ -101,6 +101,9 @@ export interface LocalWorkout {
   syncedToNostr: boolean;
   nostrEventId?: string; // Set when synced
   syncedAt?: string; // ISO timestamp when synced
+
+  // Manual entry flag for competition filtering
+  isManualEntry?: boolean; // True for custom/manual workouts (excluded from competitions)
 }
 
 const STORAGE_KEYS = {
@@ -108,6 +111,13 @@ const STORAGE_KEYS = {
   WORKOUT_ID_COUNTER: 'local_workout_id_counter',
   NOSTR_IMPORT_FLAG: 'nostr_workout_import_completed',
   NOSTR_IMPORT_STATS: 'nostr_workout_import_stats',
+  // Custom exercise name storage (per category)
+  CUSTOM_EXERCISES_CARDIO: '@runstr:custom_exercises_cardio',
+  CUSTOM_EXERCISES_STRENGTH: '@runstr:custom_exercises_strength',
+  CUSTOM_EXERCISES_DIET: '@runstr:custom_exercises_diet',
+  CUSTOM_EXERCISES_WELLNESS: '@runstr:custom_exercises_wellness',
+  // Water tracking
+  WATER_DAILY_GOAL: '@runstr:water_daily_goal',
 };
 
 export class LocalWorkoutStorageService {
@@ -676,6 +686,10 @@ export class LocalWorkoutStorageService {
     reps?: number;
     sets?: number;
     notes?: string;
+    // NEW: Enhanced fields from Nostr kind 1301
+    elevation?: number; // meters (elevation gain)
+    pace?: number; // seconds per km
+    splits?: Split[];
   }): Promise<string> {
     try {
       // Check if this Nostr event ID already exists to prevent duplicates
@@ -704,6 +718,10 @@ export class LocalWorkoutStorageService {
         reps: workout.reps,
         sets: workout.sets,
         notes: workout.notes,
+        // NEW: Include enhanced fields from Nostr
+        elevation: workout.elevation,
+        pace: workout.pace,
+        splits: workout.splits,
         source: 'imported_nostr',
         createdAt: new Date().toISOString(),
         syncedToNostr: true, // Already exists on Nostr
@@ -714,7 +732,7 @@ export class LocalWorkoutStorageService {
       console.log(
         `✅ Imported Nostr workout: ${workoutId} (${workout.type}, ${new Date(
           workout.startTime
-        ).toLocaleDateString()})`
+        ).toLocaleDateString()})${workout.splits ? ` [${workout.splits.length} splits]` : ''}`
       );
       return workoutId;
     } catch (error) {
@@ -911,6 +929,142 @@ export class LocalWorkoutStorageService {
       return workoutId;
     } catch (error) {
       console.error('❌ Failed to save fitness test workout:', error);
+      throw error;
+    }
+  }
+
+  // ========================================================================
+  // CUSTOM EXERCISE NAME STORAGE (for Manual Entry feature)
+  // ========================================================================
+
+  /**
+   * Get the storage key for a given category
+   */
+  private getCustomExerciseKey(
+    category: 'cardio' | 'strength' | 'diet' | 'wellness'
+  ): string {
+    const keyMap = {
+      cardio: STORAGE_KEYS.CUSTOM_EXERCISES_CARDIO,
+      strength: STORAGE_KEYS.CUSTOM_EXERCISES_STRENGTH,
+      diet: STORAGE_KEYS.CUSTOM_EXERCISES_DIET,
+      wellness: STORAGE_KEYS.CUSTOM_EXERCISES_WELLNESS,
+    };
+    return keyMap[category];
+  }
+
+  /**
+   * Save a custom exercise name for a category
+   * Prevents duplicates (case-insensitive)
+   */
+  async saveCustomExerciseName(
+    category: 'cardio' | 'strength' | 'diet' | 'wellness',
+    name: string
+  ): Promise<void> {
+    try {
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        console.warn('⚠️ Cannot save empty exercise name');
+        return;
+      }
+
+      const key = this.getCustomExerciseKey(category);
+      const existing = await this.getCustomExerciseNames(category);
+
+      // Check for case-insensitive duplicate
+      const isDuplicate = existing.some(
+        (existingName) =>
+          existingName.toLowerCase() === trimmedName.toLowerCase()
+      );
+
+      if (isDuplicate) {
+        console.log(
+          `⚠️ Custom exercise "${trimmedName}" already exists in ${category}`
+        );
+        return;
+      }
+
+      // Add to list and save
+      existing.push(trimmedName);
+      await AsyncStorage.setItem(key, JSON.stringify(existing));
+      console.log(`✅ Saved custom exercise "${trimmedName}" to ${category}`);
+    } catch (error) {
+      console.error('❌ Failed to save custom exercise name:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all custom exercise names for a category
+   */
+  async getCustomExerciseNames(
+    category: 'cardio' | 'strength' | 'diet' | 'wellness'
+  ): Promise<string[]> {
+    try {
+      const key = this.getCustomExerciseKey(category);
+      const data = await AsyncStorage.getItem(key);
+      if (!data) return [];
+      return JSON.parse(data);
+    } catch (error) {
+      console.error('❌ Failed to get custom exercise names:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a custom exercise name from a category
+   */
+  async deleteCustomExerciseName(
+    category: 'cardio' | 'strength' | 'diet' | 'wellness',
+    name: string
+  ): Promise<void> {
+    try {
+      const key = this.getCustomExerciseKey(category);
+      const existing = await this.getCustomExerciseNames(category);
+
+      // Filter out the name (case-insensitive match)
+      const filtered = existing.filter(
+        (existingName) => existingName.toLowerCase() !== name.toLowerCase()
+      );
+
+      await AsyncStorage.setItem(key, JSON.stringify(filtered));
+      console.log(`✅ Deleted custom exercise "${name}" from ${category}`);
+    } catch (error) {
+      console.error('❌ Failed to delete custom exercise name:', error);
+      throw error;
+    }
+  }
+
+  // ========================================================================
+  // WATER TRACKING
+  // ========================================================================
+
+  /**
+   * Get the user's daily water goal (in ml)
+   * Returns default of 2000ml if not set
+   */
+  async getWaterDailyGoal(): Promise<number> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.WATER_DAILY_GOAL);
+      if (!data) return 2000; // Default 2000ml
+      return parseInt(data, 10);
+    } catch (error) {
+      console.error('❌ Failed to get water daily goal:', error);
+      return 2000;
+    }
+  }
+
+  /**
+   * Set the user's daily water goal (in ml)
+   */
+  async setWaterDailyGoal(goalMl: number): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.WATER_DAILY_GOAL,
+        goalMl.toString()
+      );
+      console.log(`✅ Set water daily goal to ${goalMl}ml`);
+    } catch (error) {
+      console.error('❌ Failed to set water daily goal:', error);
       throw error;
     }
   }

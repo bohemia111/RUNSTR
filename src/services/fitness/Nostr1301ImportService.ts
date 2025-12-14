@@ -100,6 +100,10 @@ export class Nostr1301ImportService {
             calories: nostrWorkout.calories,
             reps: nostrWorkout.reps,
             sets: nostrWorkout.sets,
+            // NEW: Enhanced fields from Nostr kind 1301
+            elevation: nostrWorkout.elevationGain,
+            pace: nostrWorkout.pace,
+            splits: nostrWorkout.splits,
           });
 
           importedCount++;

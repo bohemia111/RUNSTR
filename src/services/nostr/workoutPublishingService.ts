@@ -437,13 +437,19 @@ export class WorkoutPublishingService {
           exerciseVerb.charAt(0).toUpperCase() + exerciseVerb.slice(1)
         } Workout`;
 
+    // Determine source tag value based on workout origin
+    // Manual entries are tagged differently to exclude from GPS-based competitions
+    const isManual = (workout as any).isManualEntry === true ||
+                     (workout as any).source === 'manual_entry';
+    const sourceTag = isManual ? 'manual' : 'gps';
+
     // Start with required tags (always present)
     const tags: string[][] = [
       ['d', workout.id], // Unique workout ID
       ['title', title],
       ['exercise', exerciseVerb], // Simple activity type: running, yoga, strength, etc.
       ['duration', durationFormatted], // HH:MM:SS format (always included)
-      ['source', 'RUNSTR'], // App identification
+      ['source', sourceTag], // Data source: 'gps' for tracked, 'manual' for manual entry
       ['client', 'RUNSTR', '0.1.7'], // Client info with version
       ['t', this.getActivityHashtag(workout.type)], // Primary hashtag
     ];

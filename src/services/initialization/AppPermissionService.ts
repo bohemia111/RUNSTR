@@ -1,22 +1,20 @@
 /**
- * AppPermissionService - Centralized permission management for Android
+ * AppPermissionService - Centralized permission management
  * Checks and requests all required permissions on app startup
  *
  * Required permissions:
  * 1. Location (foreground + background) - for workout tracking
- * 2. Notifications (Android 13+) - for background service
- * 3. Battery optimization exemption (Android 14+) - prevent Doze Mode from killing tracking
+ * 2. Battery optimization exemption (Android) - prevent Doze Mode from killing tracking
+ *
+ * Note: Notification permission removed - tracking works without it
  */
 
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { locationPermissionService } from '../activity/LocationPermissionService';
 import { BatteryOptimizationService } from '../activity/BatteryOptimizationService';
 
 export interface PermissionStatus {
   location: boolean;
-  notification: boolean;
   batteryOptimization: boolean;
   allGranted: boolean;
 }
@@ -50,16 +48,6 @@ export class AppPermissionService {
         : locationStatus.foreground === 'granted' &&
           locationStatus.background === 'granted';
 
-    // Check notification permission (Android 13+ only)
-    let notificationGranted = true;
-    if (Platform.OS === 'android') {
-      const apiLevel = Device.platformApiLevel || 0;
-      if (apiLevel >= 33) {
-        const { status } = await Notifications.getPermissionsAsync();
-        notificationGranted = status === 'granted';
-      }
-    }
-
     // Check battery optimization exemption (Android only)
     let batteryGranted = true;
     if (Platform.OS === 'android') {
@@ -69,18 +57,16 @@ export class AppPermissionService {
       batteryGranted = batteryStatus.prompted; // User was prompted (may have granted or declined)
     }
 
-    const allGranted = locationGranted && notificationGranted && batteryGranted;
+    const allGranted = locationGranted && batteryGranted;
 
     console.log('[AppPermissionService] Permission status:', {
       location: locationGranted,
-      notification: notificationGranted,
       battery: batteryGranted,
       allGranted,
     });
 
     return {
       location: locationGranted,
-      notification: notificationGranted,
       batteryOptimization: batteryGranted,
       allGranted,
     };
@@ -118,29 +104,7 @@ export class AppPermissionService {
         // Continue anyway - foreground tracking still works
       }
 
-      // Step 2: Request notification permission (Android 13+ only)
-      // Note: We continue even if denied - tracking works without notification,
-      // just won't show persistent notification in status bar
-      if (Platform.OS === 'android') {
-        const apiLevel = Device.platformApiLevel || 0;
-
-        if (apiLevel >= 33) {
-          console.log(
-            '[AppPermissionService] Requesting notification permission...'
-          );
-          const { status } = await Notifications.requestPermissionsAsync();
-
-          if (status !== 'granted') {
-            console.warn(
-              '[AppPermissionService] Notification permission denied - tracking will work but no status bar notification'
-            );
-            // Continue anyway - don't block tracking just because notification is denied
-            // The foreground service still works, just won't show a visible notification
-          }
-        }
-      }
-
-      // Step 3: Request battery optimization exemption (Android only)
+      // Step 2: Request battery optimization exemption (Android only)
       if (Platform.OS === 'android') {
         console.log(
           '[AppPermissionService] Requesting battery optimization exemption...'
@@ -176,7 +140,6 @@ export class AppPermissionService {
    */
   async getDetailedStatus(): Promise<{
     location: { granted: boolean; foreground: string; background: string };
-    notification: { granted: boolean; status: string; required: boolean };
     battery: { granted: boolean; prompted: boolean };
   }> {
     if (Platform.OS !== 'android') {
@@ -186,28 +149,12 @@ export class AppPermissionService {
           foreground: 'granted',
           background: 'granted',
         },
-        notification: { granted: true, status: 'granted', required: false },
         battery: { granted: true, prompted: true },
       };
     }
 
     const locationStatus =
       await locationPermissionService.checkPermissionStatus();
-    const apiLevel = Device.platformApiLevel || 0;
-
-    let notificationStatus = {
-      granted: true,
-      status: 'granted',
-      required: false,
-    };
-    if (apiLevel >= 33) {
-      const { status } = await Notifications.getPermissionsAsync();
-      notificationStatus = {
-        granted: status === 'granted',
-        status,
-        required: true,
-      };
-    }
 
     const batteryService = BatteryOptimizationService.getInstance();
     const batteryStatus = await batteryService.checkBatteryOptimizationStatus();
@@ -220,7 +167,6 @@ export class AppPermissionService {
         foreground: locationStatus.foreground,
         background: locationStatus.background,
       },
-      notification: notificationStatus,
       battery: {
         granted: batteryStatus.prompted,
         prompted: batteryStatus.prompted,

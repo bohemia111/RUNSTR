@@ -5,6 +5,7 @@
  */
 
 import type { Workout, WorkoutType } from './workout';
+import type { Split } from '../services/activity/SplitTrackingService';
 
 // Core Nostr Event Structure (Kind 1301)
 export interface NostrEvent {
@@ -50,6 +51,8 @@ export interface NostrWorkoutContent {
   // Charity support
   charity?: WorkoutCharity; // User's selected charity from workout event
   team?: string; // Team ID from workout event
+  // Data source for competition filtering
+  dataSource?: 'gps' | 'manual' | 'healthkit' | 'RUNSTR'; // Source tag from kind 1301
 }
 
 export interface NostrRoutePoint {
@@ -77,11 +80,15 @@ export interface NostrWorkout extends Workout {
   nostrPubkey: string;
   nostrCreatedAt: number;
   elevationGain?: number;
+  elevationLoss?: number;
+  splits?: Split[];
   route?: NostrRoutePoint[];
   unitSystem: 'metric' | 'imperial';
   sourceApp?: string;
   location?: string;
   rawNostrEvent?: NostrWorkoutEvent;
+  // Data source for competition filtering (manual entries excluded from leaderboards)
+  dataSource?: 'gps' | 'manual' | 'healthkit' | 'RUNSTR';
 }
 
 // Competition-focused Nostr workout interface
@@ -97,6 +104,7 @@ export interface NostrWorkoutCompetition {
   calories?: number;
   metrics?: NostrWorkoutMetrics;
   rawEvent?: string;
+  dataSource?: 'gps' | 'manual' | 'healthkit' | 'RUNSTR'; // Source tag for competition filtering
 }
 
 export interface NostrWorkoutMetrics {

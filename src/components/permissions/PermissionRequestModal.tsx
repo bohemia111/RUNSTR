@@ -33,8 +33,6 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
   const [isRequesting, setIsRequesting] = useState(false);
   const [locationState, setLocationState] =
     useState<PermissionState>('pending');
-  const [notificationState, setNotificationState] =
-    useState<PermissionState>('pending');
   const [batteryState, setBatteryState] = useState<PermissionState>('pending');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
@@ -48,7 +46,6 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
       const status = await appPermissionService.checkAllPermissions();
 
       setLocationState(status.location ? 'granted' : 'pending');
-      setNotificationState(status.notification ? 'granted' : 'pending');
       setBatteryState(status.batteryOptimization ? 'granted' : 'pending');
 
       // If all granted, close modal automatically
@@ -75,7 +72,6 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
         const finalStatus = await appPermissionService.checkAllPermissions();
 
         setLocationState(finalStatus.location ? 'granted' : 'error');
-        setNotificationState(finalStatus.notification ? 'granted' : 'error');
         setBatteryState(finalStatus.batteryOptimization ? 'granted' : 'error');
 
         if (finalStatus.allGranted) {
@@ -92,7 +88,6 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
           'Failed to get required permissions. Please enable permissions in Settings and restart the app.'
         );
         setLocationState('error');
-        setNotificationState('error');
         setBatteryState('error');
       }
     } catch (error) {
@@ -104,7 +99,6 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
         'An error occurred. Please try again or enable permissions in Settings.'
       );
       setLocationState('error');
-      setNotificationState('error');
       setBatteryState('error');
     } finally {
       setIsRequesting(false);
@@ -139,9 +133,7 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
   };
 
   const allGranted =
-    locationState === 'granted' &&
-    notificationState === 'granted' &&
-    batteryState === 'granted';
+    locationState === 'granted' && batteryState === 'granted';
 
   return (
     <Modal
@@ -179,19 +171,6 @@ export const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
                 </Text>
               </View>
             </View>
-
-            {/* Notification Permission (Android 13+ only) */}
-            {Platform.OS === 'android' && (
-              <View style={styles.permissionItem}>
-                {getStateIcon(notificationState)}
-                <View style={styles.permissionText}>
-                  <Text style={styles.permissionTitle}>Notifications</Text>
-                  <Text style={styles.permissionDescription}>
-                    Required for background tracking service
-                  </Text>
-                </View>
-              </View>
-            )}
 
             {/* Battery Optimization */}
             {Platform.OS === 'android' && (

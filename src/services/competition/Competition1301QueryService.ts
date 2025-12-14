@@ -216,21 +216,37 @@ export class Competition1301QueryService {
       // Parse events into NostrWorkout format
       const allWorkouts = events.map((event) => this.parseWorkoutEvent(event));
 
+      // ✅ FILTER OUT MANUAL ENTRIES: Exclude manual entries from competition leaderboards
+      // Manual entries (custom exercises) are tagged with ['source', 'manual'] and should not
+      // be included in GPS-based competitions to ensure fair leaderboard rankings
+      const competitiveWorkouts = allWorkouts.filter((workout) => {
+        // If dataSource is 'manual', exclude from competitions
+        // All other sources (gps, healthkit, RUNSTR, undefined) are allowed
+        return workout.dataSource !== 'manual';
+      });
+
+      const manualEntriesFiltered = allWorkouts.length - competitiveWorkouts.length;
+      if (manualEntriesFiltered > 0) {
+        console.log(
+          `🚫 Excluded ${manualEntriesFiltered} manual entries from competition (${allWorkouts.length} → ${competitiveWorkouts.length})`
+        );
+      }
+
       // ✅ CLIENT-SIDE FILTERING: Filter by activity type AFTER fetching (nuclear pattern)
       // Use case-insensitive comparison (mapSportToActivityType returns 'Running', kind 1301 has 'running')
       if (query.activityType === 'Any') {
         console.log(
-          `📦 Returning all ${allWorkouts.length} workouts (any activity type)`
+          `📦 Returning all ${competitiveWorkouts.length} workouts (any activity type)`
         );
-        return allWorkouts;
+        return competitiveWorkouts;
       }
 
       const normalizedQueryType = query.activityType.toLowerCase();
-      const filteredWorkouts = allWorkouts.filter(
+      const filteredWorkouts = competitiveWorkouts.filter(
         (workout) => (workout.activityType || '').toLowerCase() === normalizedQueryType
       );
       console.log(
-        `📦 Filtered ${allWorkouts.length} → ${filteredWorkouts.length} ${query.activityType} workouts (case-insensitive)`
+        `📦 Filtered ${competitiveWorkouts.length} → ${filteredWorkouts.length} ${query.activityType} workouts (case-insensitive)`
       );
       return filteredWorkouts;
     } catch (error) {
@@ -367,6 +383,22 @@ export class Competition1301QueryService {
     const startTimestamp = event.created_at * 1000;
     const endTimestamp = startTimestamp + duration * 1000; // duration is in seconds
 
+    // Parse source tag for competition filtering
+    const sourceTag = this.extractTag(tags, 'source');
+    let dataSource: 'gps' | 'manual' | 'healthkit' | 'RUNSTR' | undefined;
+    if (sourceTag) {
+      const sourceValue = sourceTag.toLowerCase();
+      if (sourceValue === 'manual') {
+        dataSource = 'manual';
+      } else if (sourceValue === 'gps') {
+        dataSource = 'gps';
+      } else if (sourceValue === 'healthkit') {
+        dataSource = 'healthkit';
+      } else if (sourceValue === 'runstr') {
+        dataSource = 'RUNSTR';
+      }
+    }
+
     const workout: NostrWorkout = {
       id: event.id,
       source: 'nostr',
@@ -383,6 +415,7 @@ export class Competition1301QueryService {
       nostrPubkey: event.pubkey,
       nostrCreatedAt: event.created_at,
       unitSystem: 'metric' as any, // Default to metric since we store in meters
+      dataSource: dataSource, // For filtering manual entries from competitions
     };
 
     return workout;
@@ -583,9 +616,20 @@ export class Competition1301QueryService {
       let filteredByActivity = 0;
       let filteredByDistance = 0;
       let filteredBySplits = 0;
+      let filteredByManual = 0;
 
       for (const event of events) {
         const workout = this.parseWorkoutEvent(event);
+
+        // ✅ FILTER OUT MANUAL ENTRIES: Exclude manual entries from competition leaderboards
+        // Manual entries (custom exercises) should not be included in competitive events
+        if (workout.dataSource === 'manual') {
+          filteredByManual++;
+          if (filteredByManual <= 3) {
+            console.log(`   🚫 Filtered manual entry: pubkey ${event.pubkey?.substring(0, 8)}...`);
+          }
+          continue;
+        }
 
         // Filter by activity type (case-insensitive comparison)
         // mapSportToActivityType returns 'Running' but kind 1301 uses 'running'
@@ -662,7 +706,7 @@ export class Competition1301QueryService {
       console.log(`   - ${totalWorkouts} qualifying workouts`);
       console.log(`   - ${metrics.size} unique participants`);
       console.log(
-        `   - Filtered: ${filteredByActivity} by activity, ${filteredByDistance} by distance, ${filteredBySplits} by splits`
+        `   - Filtered: ${filteredByManual} manual, ${filteredByActivity} by activity, ${filteredByDistance} by distance, ${filteredBySplits} by splits`
       );
 
       const result: QueryResult = {

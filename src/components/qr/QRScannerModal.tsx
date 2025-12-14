@@ -38,6 +38,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
   useEffect(() => {
     if (visible) {
+      console.log('[QRScanner] Modal visible, resetting scanned state');
       setScanned(false);
       // Check if device supports native scanner (iOS 16+ or Android)
       checkNativeScannerSupport();
@@ -47,6 +48,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const checkNativeScannerSupport = async () => {
     if (Platform.OS === 'android') {
       // Android uses Google Code Scanner - available on most devices
+      console.log('[QRScanner] Android detected, using native scanner');
       setUseNativeScanner(true);
       return;
     }
@@ -58,9 +60,11 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         typeof osVersion === 'string'
           ? parseInt(osVersion.split('.')[0], 10)
           : osVersion;
+      console.log('[QRScanner] iOS version:', majorVersion, '- using', majorVersion >= 16 ? 'native' : 'fallback', 'scanner');
       setUseNativeScanner(majorVersion >= 16);
     } else {
       // Web or other platforms - use fallback
+      console.log('[QRScanner] Using fallback scanner');
       setUseNativeScanner(false);
     }
   };
@@ -170,7 +174,11 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
    * Fallback handler for continuous camera scanning (older iOS / web)
    */
   const handleBarCodeScanned = ({ data }: { data: string }) => {
-    if (scanned) return;
+    console.log('[QRScanner] Barcode scanned callback fired, data:', data?.substring(0, 50) + '...');
+    if (scanned) {
+      console.log('[QRScanner] Already scanned, ignoring');
+      return;
+    }
     setScanned(true);
     handleScanResult(data);
   };

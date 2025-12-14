@@ -5,6 +5,7 @@
  */
 
 import type { NostrWorkout } from '../../types/nostrWorkout';
+import type { Split } from '../activity/SplitTrackingService';
 import { GlobalNDKService } from '../nostr/GlobalNDKService';
 
 export class Nuclear1301Service {
@@ -150,6 +151,14 @@ export class Nuclear1301Service {
           let weight = 0;
           let mealType: string | undefined;
           let mealSize: string | undefined;
+          // Data source tracking (for filtering manual entries from competitions)
+          let dataSource: 'gps' | 'manual' | 'healthkit' | 'RUNSTR' | undefined;
+          // NEW: Elevation, pace, splits parsing
+          let elevationGain = 0;
+          let elevationLoss = 0;
+          let pace = 0; // seconds per km
+          const splits: Split[] = [];
+          const splitPaces: Record<number, number> = {}; // Temporary storage for split paces
 
           // Parse tags with support for both runstr and other formats
           for (const tag of tags) {
@@ -220,12 +229,97 @@ export class Nuclear1301Service {
               mealSize = tag[1];
             }
 
-            // Source identification (to identify RUNSTR posts)
-            if (tag[0] === 'source' && tag[1] === 'RUNSTR') {
-              // This is a RUNSTR-generated workout
-              console.log('📱 Detected RUNSTR workout');
+            // NEW: Elevation gain parsing (supports meters and feet)
+            if (tag[0] === 'elevation_gain' && tag[1]) {
+              const value = parseFloat(tag[1]) || 0;
+              const unit = tag[2] || 'm';
+              // Convert feet to meters if needed
+              elevationGain = unit === 'ft' ? value * 0.3048 : value;
+            }
+
+            // NEW: Elevation loss parsing
+            if (tag[0] === 'elevation_loss' && tag[1]) {
+              const value = parseFloat(tag[1]) || 0;
+              const unit = tag[2] || 'm';
+              elevationLoss = unit === 'ft' ? value * 0.3048 : value;
+            }
+
+            // NEW: Average pace parsing (formats: "05:24" MM:SS or raw seconds)
+            if (tag[0] === 'avg_pace' && tag[1]) {
+              const paceStr = tag[1];
+              if (paceStr.includes(':')) {
+                const parts = paceStr.split(':').map((p: string) => parseInt(p) || 0);
+                if (parts.length === 2) {
+                  pace = parts[0] * 60 + parts[1]; // MM:SS to seconds
+                }
+              } else {
+                pace = parseInt(paceStr) || 0;
+              }
+            }
+
+            // NEW: Split elapsed time parsing (format: ['split', '1', '00:05:12'])
+            if (tag[0] === 'split' && tag[1] && tag[2]) {
+              const splitNum = parseInt(tag[1]);
+              const elapsedStr = tag[2];
+              let elapsedTime = 0;
+              if (elapsedStr.includes(':')) {
+                const parts = elapsedStr.split(':').map((p: string) => parseInt(p) || 0);
+                if (parts.length === 3) {
+                  elapsedTime = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                } else if (parts.length === 2) {
+                  elapsedTime = parts[0] * 60 + parts[1];
+                }
+              } else {
+                elapsedTime = parseInt(elapsedStr) || 0;
+              }
+              // Store basic split data (pace will be merged later)
+              const prevSplit = splits.find(s => s.number === splitNum - 1);
+              const prevElapsed = prevSplit ? prevSplit.elapsedTime : 0;
+              splits.push({
+                number: splitNum,
+                distanceKm: splitNum,
+                elapsedTime,
+                splitTime: elapsedTime - prevElapsed,
+                pace: 0, // Will be set from split_pace or calculated
+                timestamp: 0,
+              });
+            }
+
+            // NEW: Split pace parsing (format: ['split_pace', '1', '312'])
+            if (tag[0] === 'split_pace' && tag[1] && tag[2]) {
+              const splitNum = parseInt(tag[1]);
+              const splitPace = parseInt(tag[2]) || 0;
+              splitPaces[splitNum] = splitPace;
+            }
+
+            // Source identification (to identify RUNSTR posts and manual entries)
+            if (tag[0] === 'source' && tag[1]) {
+              // Capture source value for filtering manual entries from competitions
+              const sourceValue = tag[1].toLowerCase();
+              if (sourceValue === 'manual') {
+                dataSource = 'manual';
+              } else if (sourceValue === 'gps') {
+                dataSource = 'gps';
+              } else if (sourceValue === 'healthkit') {
+                dataSource = 'healthkit';
+              } else if (sourceValue === 'runstr') {
+                dataSource = 'RUNSTR';
+                console.log('📱 Detected RUNSTR workout');
+              }
             }
           }
+
+          // Merge split paces into splits
+          for (const split of splits) {
+            if (splitPaces[split.number]) {
+              split.pace = splitPaces[split.number];
+            } else if (split.splitTime > 0) {
+              // Calculate pace from splitTime if not provided
+              split.pace = split.splitTime; // For 1km splits, splitTime = pace
+            }
+          }
+          // Sort splits by number
+          splits.sort((a, b) => a.number - b.number);
 
           // ULTRA NUCLEAR: Create workout even if ALL fields are missing/zero
           const workout: NostrWorkout = {
@@ -239,11 +333,19 @@ export class Nuclear1301Service {
             duration: duration, // Duration in seconds
             distance: distance, // Distance in meters
             calories: calories,
+            pace: pace > 0 ? pace : undefined, // NEW: Average pace (seconds per km)
             sets: sets > 0 ? sets : undefined, // Strength training
             reps: reps > 0 ? reps : undefined, // Strength training
             weight: weight > 0 ? weight : undefined, // Strength training
             mealType: mealType as any, // Diet tracking
             mealSize: mealSize as any, // Diet tracking
+            // NEW: Elevation data
+            elevationGain: elevationGain > 0 ? elevationGain : undefined,
+            elevationLoss: elevationLoss > 0 ? elevationLoss : undefined,
+            // NEW: Splits data
+            splits: splits.length > 0 ? splits : undefined,
+            // Data source for competition filtering (manual entries excluded from leaderboards)
+            dataSource: dataSource,
             source: 'nostr',
             nostrEventId: event.id,
             nostrPubkey: event.pubkey,

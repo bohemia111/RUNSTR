@@ -174,8 +174,9 @@ class LocationPermissionService {
     }
 
     // Step 2: Request background permission (optional, continues if denied)
-    // We delay the background request slightly to avoid iOS dialog conflicts
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // We delay the background request to ensure iOS dialog fully dismisses
+    // iOS dialogs need ~2 seconds to animate out before showing next prompt
+    await new Promise((resolve) => setTimeout(resolve, 2500));
     const backgroundGranted = await this.requestBackgroundPermission();
 
     return {

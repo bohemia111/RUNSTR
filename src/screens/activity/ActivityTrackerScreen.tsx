@@ -24,6 +24,9 @@ import { ManualWorkoutScreen } from './ManualWorkoutScreen';
 import { MeditationTrackerScreen } from './MeditationTrackerScreen';
 import { StrengthTrackerScreen } from './StrengthTrackerScreen';
 import { DietTrackerScreen } from './DietTrackerScreen';
+import { WaterTrackerScreen } from './WaterTrackerScreen';
+import { ManualEntryScreen, type ManualEntryCategory } from './ManualEntryScreen';
+import LocalWorkoutStorageService from '../../services/fitness/LocalWorkoutStorageService';
 
 // Active activity - what screen is being shown
 type ActiveActivity =
@@ -33,19 +36,24 @@ type ActiveActivity =
   | 'strength'
   | 'diet'
   | 'meditation'
+  | 'water'
+  | 'manual_cardio'
+  | 'manual_strength'
+  | 'manual_diet'
+  | 'manual_wellness'
   | 'manual';
 
 // Cardio sub-activities shown in bottom sheet
-type CardioOption = 'run' | 'walk' | 'cycle';
+type CardioOption = 'run' | 'walk' | 'cycle' | 'add_custom' | string;
 
 // Strength sub-activities shown in bottom sheet
-type StrengthOption = 'pushups' | 'pullups' | 'situps' | 'squats' | 'curls' | 'bench';
+type StrengthOption = 'pushups' | 'pullups' | 'situps' | 'squats' | 'curls' | 'bench' | 'add_custom' | string;
 
 // Diet sub-activities shown in bottom sheet
-type DietOption = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'fast';
+type DietOption = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'fast' | 'water' | 'add_custom' | string;
 
 // Wellness sub-activities shown in bottom sheet (matches MeditationType in MeditationTrackerScreen)
-type WellnessOption = 'guided' | 'unguided' | 'breathwork' | 'body_scan' | 'gratitude';
+type WellnessOption = 'guided' | 'unguided' | 'breathwork' | 'body_scan' | 'gratitude' | 'add_custom' | string;
 
 // AsyncStorage key for persisting active tab
 const ACTIVITY_TAB_KEY = '@runstr:activity_tab';
@@ -82,12 +90,14 @@ interface CardioMenuProps {
   visible: boolean;
   onClose: () => void;
   onSelectOption: (option: CardioOption) => void;
+  customExercises: string[];
 }
 
 const CardioMenu: React.FC<CardioMenuProps> = ({
   visible,
   onClose,
   onSelectOption,
+  customExercises,
 }) => {
   const slideAnim = React.useRef(new Animated.Value(300)).current;
 
@@ -113,6 +123,24 @@ const CardioMenu: React.FC<CardioMenuProps> = ({
     onClose();
   };
 
+  const builtInItems: Array<{ option: CardioOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+    { option: 'run', label: 'Running', icon: 'walk' },
+    { option: 'walk', label: 'Walking', icon: 'footsteps' },
+    { option: 'cycle', label: 'Cycling', icon: 'bicycle' },
+  ];
+
+  const customItems = customExercises.map(name => ({
+    option: `custom_${name}` as CardioOption,
+    label: name,
+    icon: 'document-text-outline' as keyof typeof Ionicons.glyphMap,
+  }));
+
+  const allItems = [
+    ...builtInItems,
+    ...customItems,
+    { option: 'add_custom' as CardioOption, label: 'Add Custom', icon: 'add-circle-outline' as keyof typeof Ionicons.glyphMap },
+  ];
+
   return (
     <Modal
       transparent
@@ -132,49 +160,21 @@ const CardioMenu: React.FC<CardioMenuProps> = ({
           ]}
         >
           <View style={styles.menuHandle} />
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => handleSelectOption('run')}
-          >
-            <Ionicons name="walk" size={24} color={theme.colors.text} />
-            <Text style={styles.menuLabel}>Running</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={theme.colors.textMuted}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => handleSelectOption('walk')}
-          >
-            <Ionicons name="footsteps" size={24} color={theme.colors.text} />
-            <Text style={styles.menuLabel}>Walking</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={theme.colors.textMuted}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.menuDivider} />
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => handleSelectOption('cycle')}
-          >
-            <Ionicons name="bicycle" size={24} color={theme.colors.text} />
-            <Text style={styles.menuLabel}>Cycling</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={theme.colors.textMuted}
-            />
-          </TouchableOpacity>
+          <ScrollView style={{ maxHeight: 400 }}>
+            {allItems.map((item, index) => (
+              <React.Fragment key={item.option}>
+                {index > 0 && <View style={styles.menuDivider} />}
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSelectOption(item.option)}
+                >
+                  <Ionicons name={item.icon} size={24} color={theme.colors.text} />
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+                </TouchableOpacity>
+              </React.Fragment>
+            ))}
+          </ScrollView>
         </Animated.View>
       </TouchableOpacity>
     </Modal>
@@ -186,12 +186,14 @@ interface StrengthMenuProps {
   visible: boolean;
   onClose: () => void;
   onSelectOption: (option: StrengthOption) => void;
+  customExercises: string[];
 }
 
 const StrengthMenu: React.FC<StrengthMenuProps> = ({
   visible,
   onClose,
   onSelectOption,
+  customExercises,
 }) => {
   const slideAnim = React.useRef(new Animated.Value(400)).current;
 
@@ -217,13 +219,25 @@ const StrengthMenu: React.FC<StrengthMenuProps> = ({
     onClose();
   };
 
-  const menuItems: Array<{ option: StrengthOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+  const builtInItems: Array<{ option: StrengthOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
     { option: 'pushups', label: 'Pushups', icon: 'fitness-outline' },
     { option: 'pullups', label: 'Pull-ups', icon: 'body-outline' },
     { option: 'situps', label: 'Sit-ups', icon: 'body-outline' },
     { option: 'squats', label: 'Squats', icon: 'accessibility-outline' },
     { option: 'curls', label: 'Curls', icon: 'barbell-outline' },
     { option: 'bench', label: 'Bench Press', icon: 'barbell-outline' },
+  ];
+
+  const customItems = customExercises.map(name => ({
+    option: `custom_${name}` as StrengthOption,
+    label: name,
+    icon: 'document-text-outline' as keyof typeof Ionicons.glyphMap,
+  }));
+
+  const allItems = [
+    ...builtInItems,
+    ...customItems,
+    { option: 'add_custom' as StrengthOption, label: 'Add Custom', icon: 'add-circle-outline' as keyof typeof Ionicons.glyphMap },
   ];
 
   return (
@@ -245,19 +259,21 @@ const StrengthMenu: React.FC<StrengthMenuProps> = ({
           ]}
         >
           <View style={styles.menuHandle} />
-          {menuItems.map((item, index) => (
-            <React.Fragment key={item.option}>
-              {index > 0 && <View style={styles.menuDivider} />}
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => handleSelectOption(item.option)}
-              >
-                <Ionicons name={item.icon} size={24} color={theme.colors.text} />
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
+          <ScrollView style={{ maxHeight: 400 }}>
+            {allItems.map((item, index) => (
+              <React.Fragment key={item.option}>
+                {index > 0 && <View style={styles.menuDivider} />}
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSelectOption(item.option)}
+                >
+                  <Ionicons name={item.icon} size={24} color={theme.colors.text} />
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+                </TouchableOpacity>
+              </React.Fragment>
+            ))}
+          </ScrollView>
         </Animated.View>
       </TouchableOpacity>
     </Modal>
@@ -269,12 +285,14 @@ interface DietMenuProps {
   visible: boolean;
   onClose: () => void;
   onSelectOption: (option: DietOption) => void;
+  customExercises: string[];
 }
 
 const DietMenu: React.FC<DietMenuProps> = ({
   visible,
   onClose,
   onSelectOption,
+  customExercises,
 }) => {
   const slideAnim = React.useRef(new Animated.Value(350)).current;
 
@@ -300,12 +318,27 @@ const DietMenu: React.FC<DietMenuProps> = ({
     onClose();
   };
 
-  const menuItems: Array<{ option: DietOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+  const builtInItems: Array<{ option: DietOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
     { option: 'breakfast', label: 'Breakfast', icon: 'sunny-outline' },
     { option: 'lunch', label: 'Lunch', icon: 'restaurant-outline' },
     { option: 'dinner', label: 'Dinner', icon: 'moon-outline' },
     { option: 'snack', label: 'Snack', icon: 'cafe-outline' },
     { option: 'fast', label: 'Fast', icon: 'timer-outline' },
+    { option: 'water', label: 'Water', icon: 'water-outline' },
+  ];
+
+  // Custom exercises with paper/pen icon
+  const customItems = customExercises.map(name => ({
+    option: `custom_${name}` as DietOption,
+    label: name,
+    icon: 'document-text-outline' as keyof typeof Ionicons.glyphMap,
+    isCustom: true,
+  }));
+
+  const allItems = [
+    ...builtInItems,
+    ...customItems,
+    { option: 'add_custom' as DietOption, label: 'Add Custom', icon: 'add-circle-outline' as keyof typeof Ionicons.glyphMap },
   ];
 
   return (
@@ -327,19 +360,21 @@ const DietMenu: React.FC<DietMenuProps> = ({
           ]}
         >
           <View style={styles.menuHandle} />
-          {menuItems.map((item, index) => (
-            <React.Fragment key={item.option}>
-              {index > 0 && <View style={styles.menuDivider} />}
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => handleSelectOption(item.option)}
-              >
-                <Ionicons name={item.icon} size={24} color={theme.colors.text} />
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
+          <ScrollView style={{ maxHeight: 400 }}>
+            {allItems.map((item, index) => (
+              <React.Fragment key={item.option}>
+                {index > 0 && <View style={styles.menuDivider} />}
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSelectOption(item.option)}
+                >
+                  <Ionicons name={item.icon} size={24} color={theme.colors.text} />
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+                </TouchableOpacity>
+              </React.Fragment>
+            ))}
+          </ScrollView>
         </Animated.View>
       </TouchableOpacity>
     </Modal>
@@ -351,12 +386,14 @@ interface WellnessMenuProps {
   visible: boolean;
   onClose: () => void;
   onSelectOption: (option: WellnessOption) => void;
+  customExercises: string[];
 }
 
 const WellnessMenu: React.FC<WellnessMenuProps> = ({
   visible,
   onClose,
   onSelectOption,
+  customExercises,
 }) => {
   const slideAnim = React.useRef(new Animated.Value(350)).current;
 
@@ -382,12 +419,24 @@ const WellnessMenu: React.FC<WellnessMenuProps> = ({
     onClose();
   };
 
-  const menuItems: Array<{ option: WellnessOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+  const builtInItems: Array<{ option: WellnessOption; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
     { option: 'guided', label: 'Guided Meditation', icon: 'headset-outline' },
     { option: 'unguided', label: 'Unguided Meditation', icon: 'leaf-outline' },
     { option: 'breathwork', label: 'Breath Work', icon: 'water-outline' },
     { option: 'body_scan', label: 'Body Scan', icon: 'body-outline' },
     { option: 'gratitude', label: 'Gratitude', icon: 'heart-outline' },
+  ];
+
+  const customItems = customExercises.map(name => ({
+    option: `custom_${name}` as WellnessOption,
+    label: name,
+    icon: 'document-text-outline' as keyof typeof Ionicons.glyphMap,
+  }));
+
+  const allItems = [
+    ...builtInItems,
+    ...customItems,
+    { option: 'add_custom' as WellnessOption, label: 'Add Custom', icon: 'add-circle-outline' as keyof typeof Ionicons.glyphMap },
   ];
 
   return (
@@ -409,19 +458,21 @@ const WellnessMenu: React.FC<WellnessMenuProps> = ({
           ]}
         >
           <View style={styles.menuHandle} />
-          {menuItems.map((item, index) => (
-            <React.Fragment key={item.option}>
-              {index > 0 && <View style={styles.menuDivider} />}
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => handleSelectOption(item.option)}
-              >
-                <Ionicons name={item.icon} size={24} color={theme.colors.text} />
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
+          <ScrollView style={{ maxHeight: 400 }}>
+            {allItems.map((item, index) => (
+              <React.Fragment key={item.option}>
+                {index > 0 && <View style={styles.menuDivider} />}
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleSelectOption(item.option)}
+                >
+                  <Ionicons name={item.icon} size={24} color={theme.colors.text} />
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+                </TouchableOpacity>
+              </React.Fragment>
+            ))}
+          </ScrollView>
         </Animated.View>
       </TouchableOpacity>
     </Modal>
@@ -440,7 +491,35 @@ export const ActivityTrackerScreen: React.FC = () => {
   const [selectedDiet, setSelectedDiet] = useState<DietOption>('breakfast');
   const [selectedWellness, setSelectedWellness] = useState<WellnessOption>('guided');
 
-  // Load saved activity from AsyncStorage on mount
+  // Custom exercise names per category
+  const [customCardio, setCustomCardio] = useState<string[]>([]);
+  const [customStrength, setCustomStrength] = useState<string[]>([]);
+  const [customDiet, setCustomDiet] = useState<string[]>([]);
+  const [customWellness, setCustomWellness] = useState<string[]>([]);
+
+  // Manual entry state
+  const [manualCategory, setManualCategory] = useState<ManualEntryCategory>('cardio');
+  const [manualPrefillName, setManualPrefillName] = useState<string>('');
+
+  // Load custom exercises when menus open
+  const loadCustomExercises = async () => {
+    try {
+      const [cardio, strength, diet, wellness] = await Promise.all([
+        LocalWorkoutStorageService.getCustomExerciseNames('cardio'),
+        LocalWorkoutStorageService.getCustomExerciseNames('strength'),
+        LocalWorkoutStorageService.getCustomExerciseNames('diet'),
+        LocalWorkoutStorageService.getCustomExerciseNames('wellness'),
+      ]);
+      setCustomCardio(cardio);
+      setCustomStrength(strength);
+      setCustomDiet(diet);
+      setCustomWellness(wellness);
+    } catch (error) {
+      console.warn('[ActivityTracker] Failed to load custom exercises:', error);
+    }
+  };
+
+  // Load saved activity and custom exercises on mount
   useEffect(() => {
     const loadSavedActivity = async () => {
       try {
@@ -454,6 +533,7 @@ export const ActivityTrackerScreen: React.FC = () => {
       }
     };
     loadSavedActivity();
+    loadCustomExercises();
   }, []);
 
   // Save activity to AsyncStorage whenever it changes
@@ -468,30 +548,79 @@ export const ActivityTrackerScreen: React.FC = () => {
   };
 
   const handleCardioOptionSelect = (option: CardioOption) => {
-    handleActivityChange(option);
+    if (option === 'add_custom') {
+      setManualCategory('cardio');
+      setManualPrefillName('');
+      handleActivityChange('manual_cardio');
+    } else if (option.startsWith('custom_')) {
+      const name = option.replace('custom_', '');
+      setManualCategory('cardio');
+      setManualPrefillName(name);
+      handleActivityChange('manual_cardio');
+    } else {
+      handleActivityChange(option as ActiveActivity);
+    }
     setShowCardioMenu(false);
   };
 
   const handleStrengthOptionSelect = (option: StrengthOption) => {
-    setSelectedStrength(option);
-    handleActivityChange('strength');
+    if (option === 'add_custom') {
+      setManualCategory('strength');
+      setManualPrefillName('');
+      handleActivityChange('manual_strength');
+    } else if (option.startsWith('custom_')) {
+      const name = option.replace('custom_', '');
+      setManualCategory('strength');
+      setManualPrefillName(name);
+      handleActivityChange('manual_strength');
+    } else {
+      setSelectedStrength(option);
+      handleActivityChange('strength');
+    }
     setShowStrengthMenu(false);
   };
 
   const handleDietOptionSelect = (option: DietOption) => {
-    setSelectedDiet(option);
-    handleActivityChange('diet');
+    if (option === 'water') {
+      handleActivityChange('water');
+    } else if (option === 'add_custom') {
+      setManualCategory('diet');
+      setManualPrefillName('');
+      handleActivityChange('manual_diet');
+    } else if (option.startsWith('custom_')) {
+      const name = option.replace('custom_', '');
+      setManualCategory('diet');
+      setManualPrefillName(name);
+      handleActivityChange('manual_diet');
+    } else {
+      setSelectedDiet(option);
+      handleActivityChange('diet');
+    }
     setShowDietMenu(false);
   };
 
   const handleWellnessOptionSelect = (option: WellnessOption) => {
-    setSelectedWellness(option);
-    handleActivityChange('meditation');
+    if (option === 'add_custom') {
+      setManualCategory('wellness');
+      setManualPrefillName('');
+      handleActivityChange('manual_wellness');
+    } else if (option.startsWith('custom_')) {
+      const name = option.replace('custom_', '');
+      setManualCategory('wellness');
+      setManualPrefillName(name);
+      handleActivityChange('manual_wellness');
+    } else {
+      setSelectedWellness(option);
+      handleActivityChange('meditation');
+    }
     setShowWellnessMenu(false);
   };
 
   // Helper to check if current activity is cardio
-  const isCardioActive = ['run', 'walk', 'cycle'].includes(activeActivity);
+  const isCardioActive = ['run', 'walk', 'cycle', 'manual_cardio'].includes(activeActivity);
+  const isStrengthActive = ['strength', 'manual_strength'].includes(activeActivity);
+  const isDietActive = ['diet', 'water', 'manual_diet'].includes(activeActivity);
+  const isWellnessActive = ['meditation', 'manual_wellness'].includes(activeActivity);
 
   const renderContent = () => {
     switch (activeActivity) {
@@ -512,9 +641,44 @@ export const ActivityTrackerScreen: React.FC = () => {
         );
       case 'meditation':
         return <MeditationTrackerScreen initialType={selectedWellness} />;
+      case 'water':
+        return <WaterTrackerScreen />;
+      case 'manual_cardio':
+      case 'manual_strength':
+      case 'manual_diet':
+      case 'manual_wellness':
+        return (
+          <ManualEntryScreen
+            category={manualCategory}
+            prefillName={manualPrefillName}
+          />
+        );
       case 'manual':
         return <ManualWorkoutScreen />;
+      default:
+        return <RunningTrackerScreen />;
     }
+  };
+
+  // Reload custom exercises when returning from manual entry
+  const handleOpenCardioMenu = () => {
+    loadCustomExercises();
+    setShowCardioMenu(true);
+  };
+
+  const handleOpenStrengthMenu = () => {
+    loadCustomExercises();
+    setShowStrengthMenu(true);
+  };
+
+  const handleOpenDietMenu = () => {
+    loadCustomExercises();
+    setShowDietMenu(true);
+  };
+
+  const handleOpenWellnessMenu = () => {
+    loadCustomExercises();
+    setShowWellnessMenu(true);
   };
 
   return (
@@ -523,25 +687,25 @@ export const ActivityTrackerScreen: React.FC = () => {
         <TabButton
           label="Cardio"
           isActive={isCardioActive}
-          onPress={() => setShowCardioMenu(true)}
+          onPress={handleOpenCardioMenu}
           icon="walk"
         />
         <TabButton
           label="Strength"
-          isActive={activeActivity === 'strength'}
-          onPress={() => setShowStrengthMenu(true)}
+          isActive={isStrengthActive}
+          onPress={handleOpenStrengthMenu}
           icon="barbell"
         />
         <TabButton
           label="Diet"
-          isActive={activeActivity === 'diet'}
-          onPress={() => setShowDietMenu(true)}
+          isActive={isDietActive}
+          onPress={handleOpenDietMenu}
           icon="restaurant"
         />
         <TabButton
           label="Wellness"
-          isActive={activeActivity === 'meditation'}
-          onPress={() => setShowWellnessMenu(true)}
+          isActive={isWellnessActive}
+          onPress={handleOpenWellnessMenu}
           icon="leaf"
         />
       </View>
@@ -552,24 +716,28 @@ export const ActivityTrackerScreen: React.FC = () => {
         visible={showCardioMenu}
         onClose={() => setShowCardioMenu(false)}
         onSelectOption={handleCardioOptionSelect}
+        customExercises={customCardio}
       />
 
       <StrengthMenu
         visible={showStrengthMenu}
         onClose={() => setShowStrengthMenu(false)}
         onSelectOption={handleStrengthOptionSelect}
+        customExercises={customStrength}
       />
 
       <DietMenu
         visible={showDietMenu}
         onClose={() => setShowDietMenu(false)}
         onSelectOption={handleDietOptionSelect}
+        customExercises={customDiet}
       />
 
       <WellnessMenu
         visible={showWellnessMenu}
         onClose={() => setShowWellnessMenu(false)}
         onSelectOption={handleWellnessOptionSelect}
+        customExercises={customWellness}
       />
     </SafeAreaView>
   );

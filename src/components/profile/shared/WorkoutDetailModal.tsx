@@ -249,7 +249,7 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Splits</Text>
             <View style={styles.splitsTable}>
-              {/* Table Header */}
+              {/* Table Header - Removed duplicate Split column (same as Pace for 1km segments) */}
               <View style={styles.splitsHeader}>
                 <Text style={[styles.splitsHeaderText, styles.kmColumn]}>
                   Km
@@ -259,9 +259,6 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
                 </Text>
                 <Text style={[styles.splitsHeaderText, styles.paceColumn]}>
                   Pace
-                </Text>
-                <Text style={[styles.splitsHeaderText, styles.splitColumn]}>
-                  Split
                 </Text>
               </View>
 
@@ -282,9 +279,6 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
                   </Text>
                   <Text style={[styles.splitsRowText, styles.paceColumn]}>
                     {formatPace(split.pace)}
-                  </Text>
-                  <Text style={[styles.splitsRowText, styles.splitColumn]}>
-                    {formatSplitTime(split.splitTime || 0)}
                   </Text>
                 </View>
               ))}
