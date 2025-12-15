@@ -11,9 +11,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { theme } from '../../../styles/theme';
+import { CustomAlertManager } from '../../ui/CustomAlert';
 import { WorkoutPublishingService } from '../../../services/nostr/workoutPublishingService';
 import { WorkoutStatusTracker } from '../../../services/fitness/WorkoutStatusTracker';
 import { getNsecFromStorage } from '../../../utils/nostr';
@@ -65,7 +65,7 @@ export const SocialShareModal: React.FC<SocialShareModalProps> = ({
         // Get user's nsec
         const nsec = await getNsecFromStorage(userId);
         if (!nsec) {
-          Alert.alert(
+          CustomAlertManager.alert(
             'Authentication Required',
             'Please log in with your Nostr key to share workouts.'
           );
@@ -89,7 +89,7 @@ export const SocialShareModal: React.FC<SocialShareModalProps> = ({
           // Mark as posted
           await statusTracker.markAsPosted(workout.id, result.eventId);
 
-          Alert.alert('Success', 'Workout shared to Nostr successfully!', [
+          CustomAlertManager.alert('Success', 'Workout shared to Nostr successfully!', [
             {
               text: 'OK',
               onPress: () => {
@@ -103,14 +103,14 @@ export const SocialShareModal: React.FC<SocialShareModalProps> = ({
         }
       } catch (error) {
         console.error('Failed to share to Nostr:', error);
-        Alert.alert('Error', 'Failed to share workout. Please try again.');
+        CustomAlertManager.alert('Error', 'Failed to share workout. Please try again.');
       } finally {
         setLoading(false);
         setSelectedPlatform(null);
       }
     } else {
       // Coming soon for other platforms
-      Alert.alert(
+      CustomAlertManager.alert(
         'Coming Soon',
         `${platform.name} integration is coming soon!`
       );

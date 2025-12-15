@@ -43,7 +43,7 @@ export const Season2ExplainerModal: React.FC<Season2ExplainerModalProps> = ({
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>RUNSTR Season 2</Text>
+            <Text style={styles.headerTitle}>RUNSTR SEASON II</Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={onClose}

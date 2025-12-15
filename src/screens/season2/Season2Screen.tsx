@@ -142,7 +142,7 @@ export const Season2Screen: React.FC = () => {
               color={theme.colors.success}
             />
             <Text style={styles.registeredText}>
-              You're competing in Season 2
+              You're competing in SEASON II
             </Text>
           </View>
         )}

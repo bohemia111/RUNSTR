@@ -37,7 +37,7 @@ export const Season2SignupSection: React.FC = () => {
           size={24}
           color={theme.colors.textMuted}
         />
-        <Text style={styles.statusText}>Season 2 has ended</Text>
+        <Text style={styles.statusText}>SEASON II has ended</Text>
       </View>
     );
   }

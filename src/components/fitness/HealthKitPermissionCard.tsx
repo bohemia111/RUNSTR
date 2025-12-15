@@ -9,11 +9,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   InteractionManager,
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
+import { CustomAlertManager } from '../ui/CustomAlert';
 import { Card } from '../ui/Card';
 import healthKitService from '../../services/fitness/healthKitService';
 import { WorkoutMergeService } from '../../services/fitness/workoutMergeService';
@@ -165,7 +165,7 @@ export const HealthKitPermissionCard: React.FC<
           setStatus('denied');
           onPermissionDenied?.(permissionResult.error || 'Permission denied');
 
-          Alert.alert(
+          CustomAlertManager.alert(
             'Permission Required',
             'To sync your Apple Health workouts with RUNSTR competitions, please enable permissions in iPhone Settings > Privacy & Security > Health > RUNSTR',
             [
@@ -207,14 +207,14 @@ export const HealthKitPermissionCard: React.FC<
           onPermissionGranted?.({ newWorkouts, totalWorkouts });
 
           if (newWorkouts > 0) {
-            Alert.alert(
-              'Apple Health Connected! 🍎',
+            CustomAlertManager.alert(
+              'Apple Health Connected!',
               `Successfully synced ${newWorkouts} new workouts from Apple Health. These will automatically count toward your team competitions!`,
               [{ text: 'Awesome!' }]
             );
           } else {
-            Alert.alert(
-              'Apple Health Connected! 🍎',
+            CustomAlertManager.alert(
+              'Apple Health Connected!',
               'RUNSTR will now automatically sync your workouts and include them in competitions. Your future workouts will appear here within 30 minutes.',
               [{ text: 'Great!' }]
             );
@@ -281,8 +281,8 @@ export const HealthKitPermissionCard: React.FC<
           const newWorkouts = syncResult.newWorkouts || 0;
 
           if (newWorkouts > 0) {
-            Alert.alert(
-              'Sync Complete! ✅',
+            CustomAlertManager.alert(
+              'Sync Complete!',
               `Found ${newWorkouts} new workouts from Apple Health`,
               [{ text: 'Great!' }]
             );
@@ -291,8 +291,8 @@ export const HealthKitPermissionCard: React.FC<
               totalWorkouts: syncResult.workoutsCount || 0,
             });
           } else {
-            Alert.alert(
-              'Sync Complete! ✅',
+            CustomAlertManager.alert(
+              'Sync Complete!',
               'Your Apple Health workouts are up to date',
               [{ text: 'OK' }]
             );
@@ -319,7 +319,7 @@ export const HealthKitPermissionCard: React.FC<
             ? 'Sync is taking too long. Please try again or check your internet connection.'
             : 'Could not sync workouts at this time. Please try again later.';
 
-          Alert.alert('Sync Failed', userMessage);
+          CustomAlertManager.alert('Sync Failed', userMessage);
         }
       } finally {
         setIsLoading(false);

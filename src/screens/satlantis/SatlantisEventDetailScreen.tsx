@@ -582,18 +582,19 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
               <EventCreatorControls
                 event={event}
                 leaderboard={leaderboard}
-                onPayoutComplete={refresh}
               />
             </View>
           )}
 
-        {/* Debug Section - for troubleshooting RSVP issues */}
-        <DebugSection
-          eventId={eventId}
-          eventPubkey={eventPubkey}
-          onRefresh={refresh}
-          currentUserHexPubkey={currentUserHexPubkey}
-        />
+        {/* Debug Section - only show in development */}
+        {__DEV__ && (
+          <DebugSection
+            eventId={eventId}
+            eventPubkey={eventPubkey}
+            onRefresh={refresh}
+            currentUserHexPubkey={currentUserHexPubkey}
+          />
+        )}
 
         <View style={styles.bottomPadding} />
       </ScrollView>

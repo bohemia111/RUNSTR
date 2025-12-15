@@ -12,9 +12,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ViewStyle,
-  Alert,
 } from 'react-native';
 import { theme } from '../../styles/theme';
+import { CustomAlertManager } from '../ui/CustomAlert';
 import { NostrWorkoutSyncService } from '../../services/fitness/nostrWorkoutSyncService';
 import type {
   NostrSyncStatus,
@@ -95,19 +95,19 @@ export const WorkoutSyncStatus: React.FC<WorkoutSyncStatusProps> = ({
 
       // Show result feedback
       if (result.status === 'completed') {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Sync Complete',
           `Imported ${result.parsedWorkouts} workouts`
         );
       } else if (result.status === 'partial_error') {
-        Alert.alert(
+        CustomAlertManager.alert(
           'Partial Sync',
           `Imported ${result.parsedWorkouts} workouts with ${result.failedEvents} errors`
         );
       }
     } catch (error) {
       console.error('Manual sync failed:', error);
-      Alert.alert('Sync Failed', 'Unable to sync workouts. Please try again.');
+      CustomAlertManager.alert('Sync Failed', 'Unable to sync workouts. Please try again.');
     } finally {
       setIsManualSyncing(false);
     }
@@ -309,7 +309,7 @@ export const WorkoutSyncStatus: React.FC<WorkoutSyncStatusProps> = ({
                     const errorSummary = lastSyncResult.errors
                       .map((e) => `${e.type}: ${e.message}`)
                       .join('\n');
-                    Alert.alert('Sync Errors', errorSummary);
+                    CustomAlertManager.alert('Sync Errors', errorSummary);
                   }}
                   style={styles.errorButton}
                 >

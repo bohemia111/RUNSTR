@@ -14,10 +14,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
+import { CustomAlertManager } from '../ui/CustomAlert';
 import {
   RunstrAutoPayoutService,
   PayoutStatus,
@@ -32,13 +32,11 @@ import type { SatlantisEvent, SatlantisLeaderboardEntry } from '../../types/satl
 interface EventCreatorControlsProps {
   event: SatlantisEvent;
   leaderboard: SatlantisLeaderboardEntry[];
-  onPayoutComplete?: () => void;
 }
 
 export const EventCreatorControls: React.FC<EventCreatorControlsProps> = ({
   event,
   leaderboard,
-  onPayoutComplete,
 }) => {
   const [payoutStatus, setPayoutStatus] = useState<PayoutStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,7 +93,7 @@ export const EventCreatorControls: React.FC<EventCreatorControlsProps> = ({
   // LONG-PRESS: NWC batch payment
   const handleLongPress = useCallback(async () => {
     if (!hasNWC) {
-      Alert.alert(
+      CustomAlertManager.alert(
         'NWC Required',
         'Set up NWC wallet in Settings to batch pay all winners',
         [{ text: 'OK' }]
@@ -134,13 +132,11 @@ export const EventCreatorControls: React.FC<EventCreatorControlsProps> = ({
 
     // Show result
     if (failCount === 0) {
-      Alert.alert('Success!', `Paid ${successCount} winners`);
+      CustomAlertManager.alert('Success!', `Paid ${successCount} winners`);
     } else {
-      Alert.alert('Partial Success', `Paid ${successCount}, failed ${failCount}`);
+      CustomAlertManager.alert('Partial Success', `Paid ${successCount}, failed ${failCount}`);
     }
-
-    onPayoutComplete?.();
-  }, [hasNWC, calculatedPayouts, sendZap, event.title, onPayoutComplete]);
+  }, [hasNWC, calculatedPayouts, sendZap, event.title]);
 
   // Button press handlers for tap vs long-press detection
   const handlePressIn = useCallback(() => {
@@ -334,7 +330,6 @@ export const EventCreatorControls: React.FC<EventCreatorControlsProps> = ({
               setCurrentPayoutIndex(currentPayoutIndex + 1);
             } else {
               setShowExternalModal(false);
-              onPayoutComplete?.();
             }
           }}
         />

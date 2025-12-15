@@ -354,18 +354,20 @@ export const EnhancedSocialShareModal: React.FC<
                   style={[
                     styles.cardWrapper,
                     {
-                      width: cardDimensions.width,
-                      height: cardDimensions.height,
-                      transform: [{ scale: dynamicScale }],
+                      width: cardDimensions.width * dynamicScale,
+                      height: cardDimensions.height * dynamicScale,
+                      overflow: 'hidden',
                     },
                   ]}
                 >
-                  <WorkoutCardRenderer
-                    ref={cardRef}
-                    svgContent={cardSvg}
-                    width={cardDimensions.width}
-                    height={cardDimensions.height}
-                  />
+                  <View style={{ transform: [{ scale: dynamicScale }], transformOrigin: 'top left' }}>
+                    <WorkoutCardRenderer
+                      ref={cardRef}
+                      svgContent={cardSvg}
+                      width={cardDimensions.width}
+                      height={cardDimensions.height}
+                    />
+                  </View>
                 </View>
               ) : (
                 <View
@@ -400,7 +402,7 @@ export const EnhancedSocialShareModal: React.FC<
                   color={theme.colors.accentText}
                 />
               ) : (
-                <Text style={styles.shareButtonText}>⚡ Share to Nostr</Text>
+                <Text style={styles.shareButtonText}>Share to Nostr</Text>
               )}
             </TouchableOpacity>
 
@@ -501,7 +503,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   cardPreviewContainer: {
-    marginBottom: 20,
+    marginBottom: 6,
   },
   cardWrapper: {
     transformOrigin: 'top left',
