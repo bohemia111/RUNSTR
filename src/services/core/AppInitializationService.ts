@@ -111,6 +111,24 @@ class AppInitializationService {
             }
           );
 
+          // Step 4: Prefetch Satlantis events (for instant Events screen)
+          if (!signal.aborted) {
+            console.log('📅 AppInit: Prefetching Satlantis events...');
+            try {
+              const { SatlantisEventService } = await import(
+                '../satlantis/SatlantisEventService'
+              );
+              await SatlantisEventService.prefetchEventsForOfflineAccess();
+              console.log('✅ AppInit: Satlantis events cached');
+            } catch (satlantisError) {
+              console.warn(
+                '⚠️ AppInit: Satlantis prefetch failed (non-blocking):',
+                satlantisError
+              );
+              // Don't throw - Satlantis prefetch failure shouldn't block app initialization
+            }
+          }
+
           console.log('✅ AppInit: All data loaded!');
         }
 

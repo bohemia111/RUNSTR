@@ -51,10 +51,10 @@ const SPORTS_TAGS = [
   'charity',
 ];
 
-// Cache TTLs in seconds (24 hours - refresh via pull-to-refresh)
+// Cache TTLs in seconds (7 days - refresh via pull-to-refresh)
 const CACHE_TTL = {
-  EVENTS_LIST: 86400, // 24 hours for discovery feed
-  SINGLE_EVENT: 86400, // 24 hours for single event detail
+  EVENTS_LIST: 604800, // 7 days for discovery feed
+  SINGLE_EVENT: 604800, // 7 days for single event detail
 };
 
 class SatlantisEventServiceClass {
@@ -515,6 +515,43 @@ class SatlantisEventServiceClass {
     }
 
     return 'other';
+  }
+
+  /**
+   * Prefetch all events and their details for instant navigation
+   * Called during app background initialization
+   * Caches: event list + individual event details + participant lists
+   */
+  async prefetchEventsForOfflineAccess(): Promise<void> {
+    console.log('[Satlantis] 🚀 Prefetching events for offline access...');
+
+    try {
+      // 1. Discover all sports events (populates events list cache)
+      const events = await this.discoverSportsEvents(undefined, false);
+
+      if (events.length === 0) {
+        console.log('[Satlantis] ⚠️ No events to prefetch');
+        return;
+      }
+
+      // 2. Cache each event individually (for instant detail screen navigation)
+      console.log(`[Satlantis] 📦 Caching ${events.length} individual event details...`);
+
+      for (const event of events) {
+        const cacheKey = `satlantis_event_${event.pubkey}_${event.id}`;
+        await UnifiedCacheService.setWithCustomTTL(cacheKey, event, CACHE_TTL.SINGLE_EVENT);
+      }
+
+      // 3. Prefetch participants for each event (for instant participant counts)
+      console.log(`[Satlantis] 👥 Prefetching participants for ${events.length} events...`);
+      const { SatlantisRSVPService } = await import('./SatlantisRSVPService');
+      await SatlantisRSVPService.prefetchParticipantsForEvents(events);
+
+      console.log('[Satlantis] ✅ Prefetch complete - all events and participants cached');
+    } catch (error) {
+      console.error('[Satlantis] ❌ Prefetch failed:', error);
+      // Don't throw - prefetch failure shouldn't block app initialization
+    }
   }
 
   /**

@@ -586,15 +586,14 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
             </View>
           )}
 
-        {/* Debug Section - only show in development */}
-        {__DEV__ && (
-          <DebugSection
-            eventId={eventId}
-            eventPubkey={eventPubkey}
-            onRefresh={refresh}
-            currentUserHexPubkey={currentUserHexPubkey}
-          />
-        )}
+        {/* Debug Section - hidden for now
+        <DebugSection
+          eventId={eventId}
+          eventPubkey={eventPubkey}
+          onRefresh={refresh}
+          currentUserHexPubkey={currentUserHexPubkey}
+        />
+        */}
 
         <View style={styles.bottomPadding} />
       </ScrollView>

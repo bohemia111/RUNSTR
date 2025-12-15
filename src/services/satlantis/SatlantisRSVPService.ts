@@ -20,8 +20,8 @@ import type { SatlantisRSVP, SatlantisRSVPStatus } from '../../types/satlantis';
 // NIP-52 Calendar RSVP kind (not in NDK's standard kinds)
 const KIND_CALENDAR_RSVP = 31925 as NDKKind;
 
-// Cache TTL in seconds (24 hours - refresh via pull-to-refresh)
-const CACHE_TTL_RSVPS = 86400; // 24 hours
+// Cache TTL in seconds (7 days - refresh via pull-to-refresh)
+const CACHE_TTL_RSVPS = 604800; // 7 days
 
 class SatlantisRSVPServiceClass {
   private static instance: SatlantisRSVPServiceClass;
@@ -248,6 +248,33 @@ class SatlantisRSVPServiceClass {
     }
 
     return false;
+  }
+
+  /**
+   * Bulk prefetch participants for multiple events
+   * Called during app background initialization for instant event detail screens
+   * @param events - Array of events to prefetch participants for
+   */
+  async prefetchParticipantsForEvents(
+    events: { pubkey: string; id: string }[]
+  ): Promise<void> {
+    console.log(`[Satlantis RSVP] 👥 Bulk prefetching participants for ${events.length} events...`);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const event of events) {
+      try {
+        // Use skipCache=false to leverage existing cache where available
+        await this.getEventParticipants(event.pubkey, event.id, false);
+        successCount++;
+      } catch (error) {
+        console.warn(`[Satlantis RSVP] ⚠️ Failed to prefetch participants for ${event.id}:`, error);
+        errorCount++;
+      }
+    }
+
+    console.log(`[Satlantis RSVP] ✅ Bulk prefetch complete: ${successCount} success, ${errorCount} errors`);
   }
 
   /**
