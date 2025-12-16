@@ -9,6 +9,7 @@ import { Platform, InteractionManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { supabase } from '../supabase';  // REMOVED: Project now uses pure Nostr
 import type { WorkoutData, WorkoutType } from '../../types/workout';
+import { DailyRewardService } from '../rewards/DailyRewardService';
 
 // Environment-based logging utility
 const isDevelopment = __DEV__;
@@ -720,6 +721,7 @@ export class HealthKitService {
   /**
    * Save workout to AsyncStorage cache (returns 'saved', 'skipped', or 'error')
    * Pure Nostr architecture - workouts are cached locally, published via other services
+   * Also triggers daily reward check on new saves.
    */
   private async saveWorkout(
     workout: WorkoutData
@@ -745,6 +747,22 @@ export class HealthKitService {
       debugLog(
         `HealthKit: Cached workout - ${workout.type}, ${workout.duration}s`
       );
+
+      // REWARD TRIGGER: New HealthKit workout saved triggers daily reward check
+      // Rate limited to 1 per day by DailyRewardService.canClaimToday()
+      try {
+        const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+        if (pubkey) {
+          debugLog(`HealthKit: Triggering daily reward check for ${workout.type} import...`);
+          DailyRewardService.sendReward(pubkey).catch((rewardError) => {
+            debugLog('HealthKit: Reward error (silent):', rewardError);
+          });
+        }
+      } catch (rewardError) {
+        // Silent failure - never block HealthKit sync for reward issues
+        debugLog('HealthKit: Reward trigger error (silent):', rewardError);
+      }
+
       return 'saved';
     } catch (error) {
       errorLog('HealthKit: Error caching workout:', error);

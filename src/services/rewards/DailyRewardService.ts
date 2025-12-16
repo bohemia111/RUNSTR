@@ -23,11 +23,15 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 import { REWARD_CONFIG, REWARD_STORAGE_KEYS } from '../../config/rewards';
 import { RewardSenderWallet } from './RewardSenderWallet';
 import { ProfileService } from '../user/profileService';
 import { RewardLightningAddressService } from './RewardLightningAddressService';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
+
+// DEBUG FLAG: Set to true to show visible alerts for debugging reward failures
+const DEBUG_REWARDS = true;
 
 export interface RewardResult {
   success: boolean;
@@ -232,10 +236,17 @@ class DailyRewardServiceClass {
         userPubkey.slice(0, 8) + '...'
       );
 
+      if (DEBUG_REWARDS) {
+        Alert.alert('Reward Debug', `🚀 Reward triggered!\n\nUser: ${userPubkey.slice(0, 8)}...`);
+      }
+
       // Check if user can claim today
       const canClaim = await this.canClaimToday(userPubkey);
       if (!canClaim) {
         console.log('[Reward] User already claimed today');
+        if (DEBUG_REWARDS) {
+          Alert.alert('Reward Debug', 'Already claimed today - only 1 reward per day allowed');
+        }
         return {
           success: false,
           reason: 'already_claimed_today',
@@ -248,6 +259,9 @@ class DailyRewardServiceClass {
         console.log(
           '[Reward] User has no Lightning address in profile, skipping reward'
         );
+        if (DEBUG_REWARDS) {
+          Alert.alert('Reward Debug', 'No Lightning address found!\n\nSet one in Settings → Rewards, or add lud16 to your Nostr profile');
+        }
         return {
           success: false,
           reason: 'no_lightning_address',
@@ -255,6 +269,9 @@ class DailyRewardServiceClass {
       }
 
       // Request invoice from user's Lightning address
+      if (DEBUG_REWARDS) {
+        Alert.alert('Reward Debug', `Requesting invoice from ${lightningAddress} for ${REWARD_CONFIG.DAILY_WORKOUT_REWARD} sats...`);
+      }
       const userInvoice = await this.requestInvoiceFromUserAddress(
         lightningAddress,
         REWARD_CONFIG.DAILY_WORKOUT_REWARD
@@ -263,6 +280,9 @@ class DailyRewardServiceClass {
         console.log(
           '[Reward] Could not get invoice from Lightning address, skipping reward'
         );
+        if (DEBUG_REWARDS) {
+          Alert.alert('Reward Debug', `LNURL invoice request failed!\n\nCould not get invoice from ${lightningAddress}.\n\nPossible causes:\n- Lightning address provider is down\n- Network timeout\n- Invalid address format`);
+        }
         return {
           success: false,
           reason: 'invoice_failed',
@@ -295,6 +315,10 @@ class DailyRewardServiceClass {
           'sats'
         );
 
+        if (DEBUG_REWARDS) {
+          Alert.alert('Reward Success! 🎉', `${REWARD_CONFIG.DAILY_WORKOUT_REWARD} sats sent to ${lightningAddress}!`);
+        }
+
         return {
           success: true,
           amount: REWARD_CONFIG.DAILY_WORKOUT_REWARD,
@@ -306,6 +330,10 @@ class DailyRewardServiceClass {
           paymentResult.error
         );
 
+        if (DEBUG_REWARDS) {
+          Alert.alert('Reward Debug', `Payment failed!\n\nError: ${paymentResult.error || 'Unknown error'}\n\nPossible causes:\n- Reward wallet empty\n- NWC connection failed\n- Invoice expired`);
+        }
+
         return {
           success: false,
           reason: 'payment_failed',
@@ -314,6 +342,10 @@ class DailyRewardServiceClass {
     } catch (error) {
       // SILENT FAILURE - just log error
       console.error('[Reward] Error sending reward (silent):', error);
+
+      if (DEBUG_REWARDS) {
+        Alert.alert('Reward Debug', `Unexpected error!\n\n${error instanceof Error ? error.message : String(error)}`);
+      }
 
       return {
         success: false,

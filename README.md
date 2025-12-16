@@ -1,290 +1,181 @@
-# ⚡ RUNSTR
+# RUNSTR
 
-**Bitcoin-powered fitness competitions on Nostr protocol**
+**Anonymous fitness tracking meets Bitcoin-powered competitions**
 
-The first fitness competition platform that combines the decentralized power of Nostr with real Bitcoin rewards through the Lightning Network. Built entirely on the Nostr protocol, every workout, team membership, and competition exists as permanent, user-owned data that no company can delete or monetize without your permission.
+No email. No phone number. No credit card. No account creation. Just tap start, generate a key, and own your data.
 
-## 🎯 Three Core Pillars
+[![Website](https://img.shields.io/badge/Website-runstr.club-blue)](https://www.runstr.club/)
+[![iOS](https://img.shields.io/badge/iOS-App%20Store-black)](https://apps.apple.com/app/runstr)
+[![Android](https://img.shields.io/badge/Android-Zap.Store-green)](https://zap.store/)
+[![Nostr](https://img.shields.io/badge/Nostr-Follow%20Us-purple)](https://njump.me/npub1vygzr642y6f8gxcjx6auaf2vd25lyzarpjkwx9kr4y752zy6058s8jvy4e)
 
-RUNSTR focuses on three essential components that make fitness competitions work:
+---
 
-### 1. **Teams** - Community-Driven Fitness Groups
-Join or create teams that share your fitness goals and values. Each team can designate a charity (OpenSats, Human Rights Foundation, local organizations), creating purpose beyond personal achievement. Teams receive payments via Nostr Wallet Connect, enabling instant Bitcoin coordination without custodial risk.
+## Download RUNSTR
 
-### 2. **Competitions** - Bitcoin-Incentivized Events
-Participate in virtual fitness events (5Ks, cycling challenges, strength competitions) with real Bitcoin entry fees that create genuine commitment. Event tickets are purchased via Lightning invoices that work with any wallet (Cash App, Strike, self-custodial), detected automatically, and trigger instant event participation with captain approval.
+| Platform | Link |
+|----------|------|
+| Website | [runstr.club](https://www.runstr.club/) |
+| iOS | [App Store](https://apps.apple.com/app/runstr) |
+| Android | [Zap.Store](https://zap.store/) |
+| Nostr | `npub1vygzr642y6f8gxcjx6auaf2vd25lyzarpjkwx9kr4y752zy6058s8jvy4e` |
 
-### 3. **Workouts** - Local-First Data Control
-All workouts are stored locally on your device until you choose to publish. Post as social shares (kind 1) or competition entries (kind 1301), giving you complete control over your fitness data while maintaining flexibility to participate whenever ready.
+---
 
-![RUNSTR](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
-![React Native](https://img.shields.io/badge/React%20Native-0.79.5-blue)
-![Nostr Protocol](https://img.shields.io/badge/Nostr-Protocol-purple)
-![Lightning Network](https://img.shields.io/badge/Lightning-Network-orange)
+## Why RUNSTR?
 
-## 🌟 Breaking Free from Digital Fitness Silos
+Traditional fitness apps turn you into a product. They collect your email, phone number, location history, heart rate patterns, sleep schedule, and body weight—then sell it to advertisers.
 
-**The Problem: Digital Silos at War**
-The current fitness app landscape is fragmented into digital silos - Nike Run Club, Strava, Apple Fitness, Garmin Connect - each fighting for user retention through proprietary ecosystems. These platforms offer in-app challenges, events, levels, friends lists, and workout histories, but they're black boxes for your data with little to no monetary incentive to participate. Users are forced to choose between platforms, losing their community, history, and progress if they switch. RUNSTR breaks down these walls by creating an interoperable fitness layer on top of existing apps - you can run with Nike Run Club and still participate in Bitcoin-earning competitions, eliminating switching costs while adding real financial rewards to your existing fitness routine.
+**RUNSTR knows nothing about you.**
 
-**The Solution: Nostr-Native Fitness Protocol**
-RUNSTR is pioneering a new category of Nostr client - the fitness client - that transforms isolated workout data into a unified, portable, and monetizable fitness identity. By leveraging Nostr's decentralized protocol, RUNSTR enables users to login with their Nostr identity (nsec), save all workouts locally, and selectively publish to Nostr's social feeds (Kind 1 events) or competitive workout records (Kind 1301). This approach won first place in the NosFabrica challenge, validating the concept of bringing health and fitness to the decentralized web. Users maintain complete ownership of their data while gaining the ability to earn Bitcoin from any workout, regardless of which app they use to track it.
+- Your identity is a cryptographic keypair generated on your device
+- Your workout data stays on your phone until you choose to share it
+- Your Apple Watch, Garmin, and Fitbit data belongs to you, not to cloud servers
+- Earn real Bitcoin in competitions, not worthless points
 
-**P2P Bitcoin Fitness Economy**
-RUNSTR enables peer-to-peer fitness communities where teams receive payments via Nostr Wallet Connect (NWC), enabling instant Bitcoin transactions without platform custody. Captains create teams and host competitions with entry fees in satoshis—users pay with any Lightning wallet (Cash App, Strike, Alby, self-custodial), and payment detection automatically adds them to events. Team pages feature charity integration (captain-selected causes like OpenSats or Human Rights Foundation), creating purpose beyond personal achievement. Members can challenge each other to 1v1 competitions with Bitcoin wagers, creating hyper-personalized motivation where both participants put sats into escrow and the winner receives automatic payout when the challenge deadline expires.
+---
 
-**Captain-Led Community Empowerment**
-Team captains become fitness entrepreneurs with tools to build and monetize their communities. Through wizard-driven competition creation, captains set parameters for leagues, events, and challenges across seven activity types (running, walking, cycling, hiking, swimming, rowing, strength training). The system aggregates workouts from Apple Health, Garmin, and Google Fit, allowing members to cross-post from their preferred apps while participating in Nostr-based competitions. Captains can distribute prizes directly via Lightning zaps, manage team memberships through Nostr lists (Kind 30000), and build their brand through team-specific merchandise and subscription tiers.
+## Core Features
 
-**Vision & Go-to-Market Strategy**
-RUNSTR targets the Bitcoin and Nostr communities first—50,000+ people who already understand private keys, Lightning payments, and decentralized protocols. This solves the cold start problem that kills most fitness apps by entering a community primed for an app combining financial incentives with health improvement. For Bitcoiners without Nostr accounts, RUNSTR generates nsec keys automatically, making onboarding seamless while maintaining the cryptographic foundation that enables trustless competition. The app focuses on three core features that work: Teams (community with charity support), Competitions (Bitcoin-incentivized events with ticket sales), and Workouts (local-first data with selective publishing). Performance optimizations eliminate "Nostr slowness" through aggressive caching, making RUNSTR the fastest fitness app that also happens to be decentralized, censorship-resistant, and economically aligned with its users.
+### Zero-Identity Onboarding
+Tap "Start" and you're in. Your identity is a Nostr keypair you control—no email verification, no phone confirmation, no password managers. For Bitcoiners without Nostr accounts, we auto-generate keys with backup instructions.
 
-## ⚡ Core Features
+### Wearable Integration Without Surveillance
+RUNSTR pulls workout data from HealthKit and other fitness apps, then lets you decide what happens next. Push workouts into competitions. Keep them stored locally. Post them to Nostr for decentralized backup. Your fitness data finally belongs to you.
 
-### 🏃‍♂️ **Nostr-Powered Competition System**
-- **Decentralized Competitions**: All competitions exist as Nostr events (Kind 31013) with cryptographic verification
-- **Bitcoin Prize Pools**: Entry fees in sats create real monetary incentives for participation
-- **Transparent Leaderboards**: Every workout submission (Kind 1301) is publicly verifiable on Nostr
-- **Team Management**: Teams stored as Nostr lists (Kind 30000) with captain-controlled membership
+### Bitcoin-Powered Competitions
+Your daily workout becomes a lottery ticket for satoshis. Join competitions where completing workouts makes you eligible for Bitcoin rewards. Appear on leaderboards and get zapped by community members impressed by your performance. Real money, real athletes, Lightning-fast payments.
 
-### 💰 **Bitcoin Integration via Nostr Wallet Connect**
-- **NWC Lightning Payments**: Teams receive payments via Nostr Wallet Connect connection strings
-- **Universal Wallet Support**: Users pay with ANY Lightning wallet (Cash App, Strike, Alby, self-custodial)
-- **Event Ticket Sales**: Entry fees generate Lightning invoices, payment detection triggers instant participation
-- **1v1 Bitcoin Wagers**: Challenge friends with sats on the line, automatic escrow and winner payout
-- **Charity Integration**: Team pages display selected charities (OpenSats, HRF, community orgs)
+### Season II: The Distance Challenge
+**Live now**: A 2-month distance competition with a **1,000,000 satoshi prize pool**. Log your runs, walks, hikes, and cycling sessions to climb the leaderboard. Top performers split the pot. Anonymous athletes from around the world competing for Bitcoin using nothing but movement and commitment.
 
-### 📱 **Multi-App Fitness Aggregation**
-- **HealthKit Integration**: Aggregate workouts from any Apple HealthKit-compatible fitness app
-- **Unified Storage**: All workouts stored locally with option to publish to Nostr
-- **Dual Publishing**: Post as Kind 1 social events or Kind 1301 competition entries
-- **Beautiful Social Cards**: Transform workouts into shareable achievement graphics with RUNSTR branding
+### Create Your Own Events
+Any RUNSTR user can become an event captain and create competitions. Set the activity type, define the time period, establish entry fees in satoshis, invite participants. RUNSTR handles leaderboard calculations and payment distribution through Lightning Network.
 
-### 🔐 **Nostr-Native Authentication**
-- **Simple Nsec Login**: Direct Nostr private key authentication imports profile and workout history instantly
-- **Auto-Generation for Bitcoiners**: New users get auto-generated nsec keys with secure backup instructions
-- **Data Portability**: Your fitness data remains permanently accessible across any Nostr client
-- **No Platform Lock-In**: Your workouts, teams, and competitions exist on Nostr relays you control
+### Local-First, Publish-Second
+Every workout lives on your device first. RUNSTR never forces you to upload anything. View your complete training history offline. Then, when you're ready, selectively publish to Nostr for backup, post to competitions for Bitcoin rewards, or share to social media.
 
-## 🛠 Technical Architecture
+---
 
-### **Decentralized Foundation**
+## How It Works
+
+### For Athletes
+1. **Download** → Generate your Nostr identity (or import existing)
+2. **Connect** → Link your Apple Watch, Garmin, or other fitness tracker
+3. **Train** → Your workouts sync automatically and stay on your device
+4. **Compete** → Join competitions to earn Bitcoin rewards
+5. **Publish** → Share achievements to Nostr when you want
+
+### For Captains
+1. **Create Team** → Set up your fitness community
+2. **Configure Wallet** → Add NWC connection for Lightning payments
+3. **Host Competitions** → Create events with entry fees and prize pools
+4. **Manage Members** → Approve join requests and build your community
+5. **Distribute Rewards** → Lightning payouts to top performers
+
+---
+
+## Technical Architecture
+
+### Decentralized Foundation
+All data lives on the Nostr protocol—no central database, no company that can delete your fitness history, no algorithm hiding your achievements.
+
 ```
-Nostr Relays (Damus, Primal, nos.lol)
-├── Profile Data (Kind 0 events)
-├── Workout Data (Kind 1301 events) 
-├── Team Management (Kind 30000/30001 lists)
-├── Competition Events (Kind 31013 events)
-└── Social Posts (Kind 1 events with beautiful cards)
+Nostr Relays
+├── Profile Data (Kind 0)
+├── Workout Records (Kind 1301)
+├── Team Membership (Kind 30000)
+├── Competition Events (Kind 30101)
+└── Social Posts (Kind 1)
 ```
 
-### **Bitcoin Payment Layer**
-```
-Lightning Network (via NWC + Lightning Addresses)
-├── Nostr Wallet Connect integration
-├── Universal wallet compatibility (Cash App, Strike, Alby, self-custodial)
-├── Event ticket Lightning invoice generation
-├── Payment detection and automatic participation
-├── 1v1 challenge escrow and automatic payouts
-└── Team-level NWC connection strings
-```
+### Bitcoin Payment Layer
+Non-custodial Lightning payments via Nostr Wallet Connect. Teams control their own wallets, users pay with any Lightning-compatible app (Cash App, Strike, Alby, self-custodial).
 
-### **Mobile Application Stack**
-- **Framework**: React Native with Expo for cross-platform deployment
-- **Navigation**: React Navigation with bottom tab + modal flows
-- **State Management**: Zustand for predictable state updates
-- **Fitness Integration**: Apple HealthKit for iOS workout data
-- **Real-time Updates**: WebSocket connections to multiple Nostr relays
+### Mobile Stack
+- **Framework**: React Native + Expo
+- **Fitness**: Apple HealthKit integration
+- **State**: Zustand
+- **Real-time**: WebSocket connections to multiple Nostr relays
 
-## 🚀 Getting Started
+---
+
+## Development
 
 ### Prerequisites
-- Node.js 18+ and npm
-- iOS Simulator or physical iOS device
-- Expo CLI (`npm install -g @expo/cli`)
+- Node.js 18+
+- iOS Simulator or device
+- Expo CLI
 
-### Installation
-
-1. **Clone the repository**
+### Quick Start
 ```bash
 git clone https://github.com/RUNSTR-LLC/RUNSTR.git
 cd RUNSTR
-```
-
-2. **Install dependencies**
-```bash
 npm install
-```
-
-3. **Start the development server**
-```bash
-# iOS (recommended - HealthKit integration available)
 npm run ios
-
-# Android 
-npm run android
-
-# Development server
-npm run start
 ```
 
-### First Run Setup
-
-1. **Launch the app** - You'll see the RUNSTR Rewards splash screen with Nostr connection status
-2. **Authenticate with Nostr** - Enter your nsec private key to import your profile and workout data
-3. **Choose your role** - Select "Member" to join teams or "Captain" to create and manage teams
-4. **Explore teams** - Browse available fitness teams and join competitions
-5. **Start competing** - Log workouts to earn leaderboard points and Bitcoin rewards
-
-## 👨‍💻 Development
-
-### Quality Assurance Commands
+### Commands
 ```bash
-# Type checking
-npm run typecheck
-
-# Code linting  
-npm run lint
-
-# Run tests
-npm test
-
-# Format code
-npx prettier --write "src/**/*.{ts,tsx}"
+npm run start          # Development server
+npm run ios            # Run on iOS
+npm run android        # Run on Android
+npm run typecheck      # TypeScript validation
+npm run lint           # Code linting
+npm test               # Run tests
 ```
 
 ### Project Structure
 ```
 src/
-├── components/        # UI components (<500 lines each)
-│   ├── ui/           # Basic components (Button, Card, Avatar)
-│   ├── team/         # Team management components
-│   ├── fitness/      # Workout and HealthKit components
-│   └── wizards/      # Competition creation flows
-├── screens/          # Main application screens
-├── services/         # External integrations & business logic
-│   ├── auth/         # Nostr authentication
-│   ├── nostr/        # Nostr protocol handlers
-│   ├── fitness/      # HealthKit & workout processing
-│   └── competitions/ # Competition scoring & management
-├── navigation/       # App navigation configuration
-├── store/           # Zustand state management
-├── types/           # TypeScript definitions
-└── utils/           # Helper functions
+├── components/     # UI components (<500 lines each)
+├── screens/        # App screens
+├── services/       # Business logic & integrations
+├── store/          # Zustand state management
+├── types/          # TypeScript definitions
+└── utils/          # Helper functions
+
+scripts/
+├── testing/        # Test scripts
+├── diagnostics/    # Debugging tools
+└── maintenance/    # Build & audit scripts
 ```
-
-### Key Services
-
-**Nostr Integration**
-- `NostrRelayManager.ts` - Multi-relay WebSocket connections
-- `NostrWorkoutService.ts` - Kind 1301 workout event processing
-- `NostrAuthProvider.ts` - Private key authentication and profile import
-
-**Fitness Data**
-- `HealthKitService.ts` - Apple Health integration
-- `WorkoutMergeService.ts` - Unified HealthKit + Nostr workout display
-- `WorkoutCardGenerator.ts` - Social media card creation
-
-**Competition System**  
-- `CompetitionWizard.tsx` - Step-by-step competition creation
-- `LeaderboardService.ts` - Real-time scoring and ranking
-- `RewardDistributionService.ts` - Bitcoin payout automation
-
-**Bitcoin Integration**
-- `CoinOSService.ts` - Lightning Network wallet management
-- `TeamWalletPermissions.ts` - Captain fund management
-
-## 🎯 User Journeys
-
-### **Member Experience**
-1. **Nostr Login** → Auto-import profile and workout history
-2. **Team Discovery** → Browse teams across Nostr relays
-3. **Join Team** → Instant local membership + captain approval request
-4. **Compete** → Log workouts that automatically score in active competitions
-5. **Earn Bitcoin** → Receive Lightning Network payouts for winning performances
-
-### **Captain Experience**  
-1. **Team Creation** → Set up team profile and Bitcoin wallet
-2. **Competition Wizard** → Create events/leagues with custom scoring rules
-3. **Member Management** → Approve join requests and manage team membership
-4. **Fund Management** → Set entry fees and manage prize pool distribution
-5. **Community Building** → Foster team engagement and competition participation
-
-## ⚙️ Configuration
-
-### Environment Variables
-Create `.env` file with:
-```bash
-# Lightning Network Integration (NWC)
-EXPO_PUBLIC_RUNSTR_NWC_CONNECTION=nostr+walletconnect://...
-EXPO_PUBLIC_RUNSTR_LIGHTNING_ADDRESS=RUNSTR@getalby.com
-
-# Nostr Relay Configuration
-EXPO_PUBLIC_DEFAULT_RELAYS=wss://relay.damus.io,wss://relay.primal.net,wss://nos.lol
-```
-
-### Nostr Event Types Used
-- **Kind 0**: User profiles and metadata
-- **Kind 1**: Social workout posts with achievement cards
-- **Kind 1301**: Structured workout data for competition scoring
-- **Kind 30000/30001**: Team membership lists
-- **Kind 31013**: Competition definitions with wizard parameters
-- **Kind 33404**: Team creation and metadata
-- **Kind 33406**: Team join requests
-
-## 🔒 Privacy & Security
-
-**Private Key Security**: Your Nostr private key is stored securely using React Native's secure storage and never transmitted to our servers.
-
-**Decentralized Data**: All workout data, team memberships, and competition results are stored as Nostr events across multiple relays - no central database.
-
-**Bitcoin Payments**: Non-custodial Lightning payments via Nostr Wallet Connect - teams control their own wallets, no platform custody.
-
-**Data Portability**: Your complete fitness history and social connections are accessible from any Nostr client forever.
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
-
-- Code style and standards (500 line limit per file)
-- Pull request process
-- Issue reporting
-- Feature request guidelines
-
-### Development Principles
-- **File Size Limit**: Maximum 500 lines per file for maintainability
-- **Real Data Only**: No mock implementations - all features use live Nostr data
-- **Nostr-First**: Decentralized architecture with user-owned data
-- **Quality Assurance**: TypeScript compilation required before any PR merge
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## 🌐 Community
-
-- **Nostr**: Find us on Nostr relays - npub[your-npub-here]
-- **GitHub Issues**: Report bugs and request features
-- **Lightning Tips**: Support development via RUNSTR@coinos.io
-
-## 🚧 Development Status
-
-**Current Status**: Production Ready - Refocusing on Core Features
-- ✅ Nostr authentication and profile import
-- ✅ Real-time workout sync from Kind 1301 events
-- ✅ Team discovery and management
-- ✅ Competition creation wizards
-- ✅ Apple HealthKit workout posting
-- ✅ Beautiful social workout cards
-- ✅ Real-time leaderboards
-- ⚙️ NWC payment integration (replacing NIP-60/61)
-- ⚙️ Event ticket purchase flow with Lightning invoices
-- ⚙️ 1v1 challenge system with Bitcoin escrow
-- ⚙️ Charity integration on team pages
-- ⚙️ Performance optimization (aggressive caching)
-
-**Strategic Focus**: Three pillars (Teams/Competitions/Workouts) targeting Bitcoin/Nostr community first, then mainstream expansion.
 
 ---
 
-**RUNSTR** - Where fitness meets Bitcoin on the decentralized web ⚡🏃‍♂️₿
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+**Key principles:**
+- Maximum 500 lines per file
+- No mock data—all features use live Nostr data
+- TypeScript compilation required before PR merge
+
+---
+
+## Privacy & Security
+
+- **Your keys, your data**: Nostr private key stored securely on device, never transmitted
+- **Decentralized storage**: Workouts exist as Nostr events across relays you choose
+- **Non-custodial payments**: Teams control their own Lightning wallets
+- **Full portability**: Export your complete fitness history anytime
+
+---
+
+## Community
+
+- **Website**: [runstr.club](https://www.runstr.club/)
+- **Nostr**: [npub1vygzr6...](https://njump.me/npub1vygzr642y6f8gxcjx6auaf2vd25lyzarpjkwx9kr4y752zy6058s8jvy4e)
+- **GitHub Issues**: Bug reports and feature requests welcome
+- **Lightning Tips**: Support development via Lightning
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+**RUNSTR** — Your workout should pay you, not the app developer.

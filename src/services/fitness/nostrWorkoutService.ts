@@ -8,6 +8,7 @@ import SimpleWorkoutService from './SimpleWorkoutService';
 import { NostrWorkoutParser } from '../../utils/nostrWorkoutParser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Event } from 'nostr-tools';
+import { DailyRewardService } from '../rewards/DailyRewardService';
 import type {
   NostrEvent,
   NostrWorkout,
@@ -277,6 +278,7 @@ export class NostrWorkoutService {
 
   /**
    * Store workouts in local storage
+   * Also triggers daily reward check when new workouts are synced from Nostr.
    */
   private async storeWorkouts(
     userId: string,
@@ -308,6 +310,23 @@ export class NostrWorkoutService {
         `${STORAGE_KEYS.LAST_SYNC}_${userId}`,
         new Date().toISOString()
       );
+
+      // REWARD TRIGGER: New Nostr workouts synced triggers daily reward check
+      // Rate limited to 1 per day by DailyRewardService.canClaimToday()
+      if (workouts.length > 0) {
+        try {
+          const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+          if (pubkey) {
+            console.log(`[NostrWorkout] Triggering daily reward check for ${workouts.length} synced workouts...`);
+            DailyRewardService.sendReward(pubkey).catch((rewardError) => {
+              console.warn('[NostrWorkout] Reward error (silent):', rewardError);
+            });
+          }
+        } catch (rewardError) {
+          // Silent failure - never block Nostr sync for reward issues
+          console.warn('[NostrWorkout] Reward trigger error (silent):', rewardError);
+        }
+      }
     } catch (error) {
       console.error('❌ Failed to store workouts:', error);
       throw new Error('Failed to store workout data locally');

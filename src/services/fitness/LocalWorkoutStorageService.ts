@@ -9,7 +9,6 @@ import type { WorkoutType } from '../../types/workout';
 import type { Split } from '../activity/SplitTrackingService';
 import { RunstrContextGenerator } from '../ai/RunstrContextGenerator';
 import { DailyRewardService } from '../rewards/DailyRewardService';
-import { REWARD_CONFIG } from '../../config/rewards';
 
 /**
  * Result returned from saveGPSWorkout including reward info
@@ -248,43 +247,10 @@ export class LocalWorkoutStorageService {
         ).toFixed(2)}km)`
       );
 
-      // Check if qualifying for reward (≥1km distance)
-      let rewardSent = false;
-      let rewardAmount = 0;
-
-      if (workout.distance >= REWARD_CONFIG.MIN_WORKOUT_DISTANCE_METERS) {
-        try {
-          const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
-          if (pubkey) {
-            console.log(
-              `[LocalWorkoutStorage] Checking reward eligibility for ${(
-                workout.distance / 1000
-              ).toFixed(2)}km workout...`
-            );
-            const result = await DailyRewardService.sendReward(pubkey);
-            if (result.success && result.amount) {
-              rewardSent = true;
-              rewardAmount = result.amount;
-              console.log(
-                `[LocalWorkoutStorage] ⚡ Reward sent: ${rewardAmount} sats!`
-              );
-            } else {
-              console.log(
-                `[LocalWorkoutStorage] Reward not sent: ${result.reason || 'unknown'}`
-              );
-            }
-          }
-        } catch (rewardError) {
-          // Silent failure - don't block workout save for reward issues
-          console.warn('[LocalWorkoutStorage] Reward error (silent):', rewardError);
-        }
-      } else {
-        console.log(
-          `[LocalWorkoutStorage] Workout distance ${(workout.distance / 1000).toFixed(2)}km < 1km minimum, no reward`
-        );
-      }
-
-      return { workoutId, rewardSent, rewardAmount };
+      // Reward is now triggered in the central saveWorkout() method
+      // This ensures ANY workout hitting local storage triggers reward check
+      // (rate limited to 1 per day by DailyRewardService)
+      return { workoutId, rewardSent: false, rewardAmount: 0 };
     } catch (error) {
       console.error('❌ Failed to save GPS workout:', error);
       throw error;
@@ -442,6 +408,8 @@ export class LocalWorkoutStorageService {
 
   /**
    * Internal method to save workout to AsyncStorage
+   * This is the central point for ALL local workout saves - GPS, manual, etc.
+   * Reward trigger is here to ensure ANY workout triggers the daily reward check.
    */
   private async saveWorkout(workout: LocalWorkout): Promise<void> {
     try {
@@ -459,6 +427,22 @@ export class LocalWorkoutStorageService {
           error
         );
       });
+
+      // REWARD TRIGGER: Any workout hitting local storage triggers daily reward check
+      // Rate limited to 1 per day by DailyRewardService.canClaimToday()
+      try {
+        const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+        if (pubkey) {
+          console.log(`[LocalWorkoutStorage] Triggering daily reward check for ${workout.type} workout...`);
+          // Fire and forget - don't block workout save for reward
+          DailyRewardService.sendReward(pubkey).catch((rewardError) => {
+            console.warn('[LocalWorkoutStorage] Reward error (silent):', rewardError);
+          });
+        }
+      } catch (rewardError) {
+        // Silent failure - never block workout saves for reward issues
+        console.warn('[LocalWorkoutStorage] Reward trigger error (silent):', rewardError);
+      }
     } catch (error) {
       console.error('❌ Failed to save workout to storage:', error);
       throw error;

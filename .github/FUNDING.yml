@@ -1,0 +1,6 @@
+# Support RUNSTR development via Lightning Network
+# Users can zap the project's Nostr account or send to the Lightning address
+
+custom:
+  - "Lightning: RUNSTR@getalby.com"
+  - "Nostr: npub1vygzr642y6f8gxcjx6auaf2vd25lyzarpjkwx9kr4y752zy6058s8jvy4e"

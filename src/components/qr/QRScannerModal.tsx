@@ -1,7 +1,7 @@
 /**
- * QRScannerModal - Camera-based QR code scanner
+ * QRScannerModal - Camera-based QR code scanner for NWC wallet connections
  * Uses modern DataScannerViewController on iOS 16+ for better QR detection
- * Falls back to continuous camera scanning on older devices
+ * Falls back to continuous camera scanning on Android and older iOS devices
  */
 
 import React, { useState, useEffect } from 'react';
@@ -46,16 +46,26 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   }, [visible]);
 
   const checkNativeScannerSupport = async () => {
-    // Always use fallback continuous camera scanner
     // Native scanner APIs (launchScanner, onModernBarcodeScanned, dismissScanner)
-    // are iOS 16+ only and don't work on Android
-    // The fallback CameraView with onBarcodeScanned works reliably on all platforms
-    console.log('[QRScanner] Using fallback continuous camera scanner');
-    setUseNativeScanner(false);
+    // are iOS 16+ only - they work great on iOS but don't exist on Android
+    if (Platform.OS === 'ios') {
+      const osVersion = Platform.Version;
+      const majorVersion =
+        typeof osVersion === 'string'
+          ? parseInt(osVersion.split('.')[0], 10)
+          : osVersion;
+      const useNative = majorVersion >= 16;
+      console.log('[QRScanner] iOS version:', majorVersion, '- using', useNative ? 'native' : 'fallback', 'scanner');
+      setUseNativeScanner(useNative);
+    } else {
+      // Android and other platforms use fallback CameraView scanner
+      console.log('[QRScanner] Non-iOS platform, using fallback scanner');
+      setUseNativeScanner(false);
+    }
   };
 
   /**
-   * Launch native scanner modal (iOS 16+ DataScannerViewController / Android Google Code Scanner)
+   * Launch native scanner modal (iOS 16+ DataScannerViewController)
    * Much more reliable for high-density QR codes like NWC connection strings
    */
   const handleLaunchNativeScanner = async () => {
@@ -117,7 +127,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       if (!qrData) {
         Alert.alert(
           'Invalid QR Code',
-          'This QR code is not a valid RUNSTR challenge, event, or wallet connection.',
+          'This QR code is not a valid NWC wallet connection string.',
           [
             {
               text: 'Try Again',
@@ -156,7 +166,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   };
 
   /**
-   * Fallback handler for continuous camera scanning (older iOS / web)
+   * Fallback handler for continuous camera scanning (Android and older iOS)
    */
   const handleBarCodeScanned = ({ data }: { data: string }) => {
     console.log('[QRScanner] Barcode scanned callback fired, data:', data?.substring(0, 50) + '...');
@@ -232,10 +242,9 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       >
         <View style={styles.overlay}>
           <View style={styles.nativeScannerContainer}>
-            <Text style={styles.nativeScannerTitle}>Scan QR Code</Text>
+            <Text style={styles.nativeScannerTitle}>Connect Wallet</Text>
             <Text style={styles.nativeScannerText}>
-              Open your device's camera to scan QR codes for challenges, events,
-              or wallet connections
+              Scan your NWC wallet QR code to connect your Lightning wallet
             </Text>
 
             <TouchableOpacity
@@ -265,7 +274,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     );
   }
 
-  // Fallback continuous camera scanner (older iOS / web)
+  // Fallback continuous camera scanner (Android and older iOS)
   return (
     <Modal
       visible={visible}
@@ -298,7 +307,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
             <View style={styles.bottomOverlay}>
               <Text style={styles.instructionText}>
-                Scan QR code to join challenges, events, or connect your wallet
+                Scan your NWC wallet QR code to connect your Lightning wallet
               </Text>
 
               <TouchableOpacity
