@@ -1,7 +1,6 @@
 /**
  * Nostr Authentication Provider
  * Pure Nostr-based authentication using nsec private keys
- * Supabase integration disabled for immediate crash fix - will be re-enabled for optional sync
  */
 
 import {
@@ -22,9 +21,8 @@ import { NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
 
 export class NostrAuthProvider {
   /**
-   * Pure Nostr authentication - bypasses Supabase entirely
+   * Pure Nostr authentication
    * Uses DirectNostrProfileService for complete Nostr-native authentication
-   * This is the ONLY active authentication method for crash fix
    */
   async signInPureNostr(nsecInput: string): Promise<AuthResult> {
     try {
@@ -168,8 +166,6 @@ export class NostrAuthProvider {
         banner: directUser.banner,
         lud16: directUser.lud16,
         displayName: directUser.displayName,
-        // Hybrid model flag - will be used for future Supabase sync
-        isSupabaseSynced: false, // Pure Nostr users start unsynced
       };
 
       console.log(
@@ -180,7 +176,6 @@ export class NostrAuthProvider {
           npub: user.npub.slice(0, 20) + '...',
           hasPicture: !!user.picture,
           hasLightning: !!user.lud16,
-          isSupabaseSynced: user.isSupabaseSynced,
         }
       );
 
@@ -475,8 +470,6 @@ export class NostrAuthProvider {
           'https://blossom.primal.net/4517738732ccb674e856c000a5f77975fb7770038ce9719815189aca9fb3642b.jpg',
         lud16: '',
         displayName: displayName,
-        // Hybrid model flag
-        isSupabaseSynced: false,
       };
 
       console.log(
@@ -529,17 +522,6 @@ export class NostrAuthProvider {
       };
     }
   }
-
-  /*
-   * FUTURE SUPABASE INTEGRATION METHODS
-   * These will be re-enabled when user opts in via Profile → Account → "Enable Enhanced Features"
-   *
-   * TODO: Add these methods for optional Supabase sync:
-   * - signInWithSupabaseSync(nsecInput: string) - Creates Supabase user record
-   * - updateUserWithProfileData(user: User, nostrProfile: NostrProfile) - Updates existing Supabase record
-   * - createUserProfileWithNostrData(userData: CreateUserData, nostrProfile: NostrProfile) - New Supabase record
-   * - syncUserToSupabase(user: User) - One-time sync of existing Nostr user to Supabase
-   */
 }
 
 export default NostrAuthProvider;

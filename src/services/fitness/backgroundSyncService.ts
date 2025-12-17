@@ -14,7 +14,6 @@ import healthKitService from './healthKitService';
 // import workoutDataProcessor from './workoutDataProcessor';  // REMOVED: Pure Nostr - workouts processed via kind 1301 events
 // import teamLeaderboardService from './teamLeaderboardService';  // REMOVED: Pure Nostr - leaderboards query kind 1301 events directly
 import nostrWorkoutSyncService from './nostrWorkoutSyncService';
-// import { supabase } from '../supabase';  // REMOVED: Project now uses pure Nostr
 import { AuthService } from '../auth/authService';
 
 export interface SyncResult {

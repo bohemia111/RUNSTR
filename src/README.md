@@ -1,6 +1,6 @@
 # Source Directory
 
-Main application source code for RUNSTR.APP - React Native fitness competition app with hybrid Nostr + Supabase architecture.
+Main application source code for RUNSTR.APP - React Native fitness competition app with pure Nostr architecture.
 
 ## Files
 

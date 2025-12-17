@@ -245,9 +245,9 @@ export class AuthFlowTester {
       );
     }
 
-    // Note: Real authentication test would require actual Supabase connection
+    // Note: Real authentication test would require actual Nostr relay connection
     console.log(
-      '   📝 Note: Full authentication test requires Supabase database connection'
+      '   📝 Note: Full authentication test requires Nostr relay connection'
     );
   }
 

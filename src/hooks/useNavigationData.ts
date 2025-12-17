@@ -181,7 +181,7 @@ export const useNavigationData = (): NavigationData => {
           await appCache.set('nav_user_data', userData, 5 * 60 * 1000);
           return userData;
         }
-      } catch (supabaseError) {
+      } catch (fetchError) {
         // Silent fail
       }
 

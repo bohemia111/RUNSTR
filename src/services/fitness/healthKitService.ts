@@ -7,7 +7,6 @@
 
 import { Platform, InteractionManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// import { supabase } from '../supabase';  // REMOVED: Project now uses pure Nostr
 import type { WorkoutData, WorkoutType } from '../../types/workout';
 import { DailyRewardService } from '../rewards/DailyRewardService';
 

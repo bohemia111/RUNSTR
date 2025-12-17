@@ -10,7 +10,7 @@ This guide verifies that our Phase 1 (Real NPUB Usage) and Phase 2 (Direct Navig
 ### Prerequisites
 1. ✅ App running on simulator/device: `npm run ios` or `npm run android`
 2. ✅ Valid Nostr nsec for testing (don't use production keys!)
-3. ✅ Database connection working (Supabase)
+3. ✅ Nostr relay connections working
 4. ✅ Console logs visible for debugging
 
 ### Test Data

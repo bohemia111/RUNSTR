@@ -157,7 +157,6 @@ export class AmberAuthProvider {
         banner: directUser.banner,
         lud16: directUser.lud16,
         displayName: directUser.displayName,
-        isSupabaseSynced: false,
       };
 
       console.log('✅ AmberAuthProvider: Amber authentication successful:', {

@@ -1,7 +1,6 @@
 /**
  * Nostr Competition Context Service
  * Pure Nostr implementation for competition context management
- * Replaces Supabase-dependent CompetitionContextService with Nostr-native approach
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';

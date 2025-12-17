@@ -8,7 +8,6 @@ Core application services handling business logic and external integrations for 
 - **coinosService.ts** - Bitcoin/Lightning Network payments via CoinOS API
 - **notificationDemoService.ts** - Development service for testing push notification functionality
 - **notificationService.ts** - Main push notification service and device token management
-- **supabase.ts** - Supabase client configuration and database connection
 - **teamService.ts** - Team data operations, membership, and Nostr team management
 - **userService.ts** - User profile operations and account management
 

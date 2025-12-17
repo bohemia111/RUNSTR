@@ -93,7 +93,7 @@ export const createNavigationHandlers = (): NavigationHandlers => {
           team.name
         );
 
-        // Use NostrTeamService for pure Nostr joining (no Supabase)
+        // Use NostrTeamService for pure Nostr joining
         const nostrTeamService = getNostrTeamService();
         const cachedTeams = Array.from(
           nostrTeamService.getDiscoveredTeams().values()

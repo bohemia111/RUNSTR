@@ -159,7 +159,7 @@ export const useUserStore = create<UserStoreState>()(
             fitnessProfile: userProfile.fitnessProfile || undefined,
           });
 
-          // Skip additional data loading for now to avoid more Supabase calls
+          // Skip additional data loading for now to avoid legacy service calls
           console.log(
             'ℹ️  UserStore: Skipping additional data loading to avoid legacy service calls'
           );

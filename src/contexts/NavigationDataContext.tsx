@@ -194,7 +194,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
           }
           return userData;
         }
-      } catch (supabaseError) {}
+      } catch (fetchError) {}
 
       if (fallbackUser) {
         // ✅ Cache in UnifiedNostrCache

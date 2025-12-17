@@ -1,6 +1,6 @@
 /**
  * Direct Nostr Profile Service
- * Pure Nostr profile data retrieval that bypasses Supabase entirely
+ * Pure Nostr profile data retrieval
  * Uses only stored npub + NostrProfileService for complete profile display
  */
 
