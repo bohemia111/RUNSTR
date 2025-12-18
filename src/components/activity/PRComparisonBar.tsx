@@ -35,7 +35,7 @@ export const PRComparisonBar: React.FC<PRComparisonBarProps> = ({
   };
 
   const statusText = isAhead ? 'ahead of PR' : 'behind PR';
-  const statusColor = isAhead ? '#22c55e' : '#ef4444'; // green or red
+  const statusColor = isAhead ? theme.colors.orangeBright : '#ef4444'; // orange or red
 
   return (
     <View style={styles.container}>

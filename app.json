@@ -2,7 +2,7 @@
   "expo": {
     "name": "RUNSTR",
     "slug": "runstr.project",
-    "version": "1.0.5",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/adaptive-icon.png",
     "scheme": "runstr",
@@ -52,7 +52,7 @@
       "appleTeamId": "SF8967F5M9"
     },
     "android": {
-      "versionCode": 105,
+      "versionCode": 110,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
@@ -181,7 +181,15 @@
         }
       ],
       ["expo-health-connect", { "requestPermissionsOnLaunch": false }],
-      "./plugins/withHealthConnect"
+      "./plugins/withHealthConnect",
+      [
+        "expo-android-pedometer",
+        {
+          "notificationTitle": "RUNSTR Step Tracking",
+          "notificationContent": "Counting your steps...",
+          "notificationIcon": "@mipmap/ic_launcher"
+        }
+      ]
     ],
     "main": "index.js"
   }

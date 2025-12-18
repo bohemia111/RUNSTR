@@ -83,7 +83,7 @@ export const SpeedGauge: React.FC<SpeedGaugeProps> = ({
         {currentSpeed > 0 && (
           <Path
             d={speedArcPath}
-            stroke={currentSpeed > avgSpeed * 1.2 ? '#22c55e' : theme.colors.accent}
+            stroke={currentSpeed > avgSpeed * 1.2 ? theme.colors.orangeBright : theme.colors.accent}
             strokeWidth={strokeWidth}
             fill="none"
             strokeLinecap="round"
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   maxValue: {
-    color: '#22c55e', // Green for max speed
+    color: theme.colors.orangeBright, // Bright orange for max speed
   },
   statDivider: {
     width: 1,

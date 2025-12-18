@@ -4,6 +4,8 @@ import LocalWorkoutStorageService, {
 } from '../fitness/LocalWorkoutStorageService';
 import FitnessTestService from '../fitness/FitnessTestService';
 import type { FitnessTestResult } from '../../types/fitnessTest';
+import { BodyCompositionAnalytics } from '../analytics/BodyCompositionAnalytics';
+import type { HealthProfile } from '../../types/analytics';
 
 const CONTEXT_STORAGE_KEY = '@runstr:ai_context';
 const CONTEXT_TIMESTAMP_KEY = '@runstr:ai_context_timestamp';
@@ -12,7 +14,7 @@ const MAX_MEMORY_ENTRIES = 10;
 
 export interface ConversationMemory {
   timestamp: string;
-  type: 'weekly' | 'trends' | 'tips';
+  type: 'weekly' | 'trends' | 'tips' | 'bmi' | 'vo2max' | 'fitness_age';
   query: string;
   summary: string;
 }
@@ -33,6 +35,12 @@ export class RunstrContextGenerator {
     const physicalProfile = await this.getPhysicalProfile();
     if (physicalProfile) {
       sections.push(physicalProfile);
+    }
+
+    // Body Composition Data (BMI, VO2 Max, Fitness Age)
+    const bodyComposition = await this.getBodyCompositionData();
+    if (bodyComposition) {
+      sections.push(bodyComposition);
     }
 
     // Goals & Habits
@@ -106,7 +114,7 @@ export class RunstrContextGenerator {
    * Append conversation to memory
    */
   static async appendMemory(
-    type: 'weekly' | 'trends' | 'tips',
+    type: 'weekly' | 'trends' | 'tips' | 'bmi' | 'vo2max' | 'fitness_age',
     query: string,
     response: string
   ): Promise<void> {
@@ -164,35 +172,158 @@ export class RunstrContextGenerator {
 
   private static async getPhysicalProfile(): Promise<string | null> {
     try {
-      // Try to get height/weight from AsyncStorage
-      // Keys based on Settings screen implementation
-      const heightFt = await AsyncStorage.getItem('@runstr:height_ft');
-      const heightIn = await AsyncStorage.getItem('@runstr:height_in');
-      const weight = await AsyncStorage.getItem('@runstr:weight');
+      // Get health profile from AsyncStorage (stored as JSON object)
+      const profileData = await AsyncStorage.getItem('@runstr:health_profile');
 
-      if (!heightFt && !weight) {
+      if (!profileData) {
+        return null;
+      }
+
+      const profile = JSON.parse(profileData);
+
+      if (!profile.height && !profile.weight) {
         return null;
       }
 
       const lines: string[] = ['## Physical Profile'];
 
-      if (heightFt) {
-        const ft = parseInt(heightFt);
-        const inches = heightIn ? parseInt(heightIn) : 0;
-        const totalInches = ft * 12 + inches;
-        const cm = Math.round(totalInches * 2.54);
-        lines.push(`- Height: ${ft}'${inches}" (${cm}cm)`);
+      if (profile.height) {
+        lines.push(`- Height: ${profile.height} cm`);
       }
 
-      if (weight) {
-        const lbs = parseInt(weight);
-        const kg = Math.round(lbs * 0.453592);
-        lines.push(`- Weight: ${lbs} lbs (${kg}kg)`);
+      if (profile.weight) {
+        lines.push(`- Weight: ${profile.weight} kg`);
+      }
+
+      if (profile.age) {
+        lines.push(`- Age: ${profile.age} years`);
       }
 
       lines.push('');
       return lines.join('\n');
     } catch (error) {
+      return null;
+    }
+  }
+
+  private static async getBodyCompositionData(): Promise<string | null> {
+    try {
+      // Get health profile data from AsyncStorage (stored as JSON object)
+      const profileData = await AsyncStorage.getItem('@runstr:health_profile');
+
+      if (!profileData) {
+        return null;
+      }
+
+      const profile = JSON.parse(profileData);
+      const heightCm = profile.height; // Already in cm
+      const weightKg = profile.weight; // Already in kg
+      const age = profile.age;
+
+      // Need at least height and weight for BMI
+      if (!heightCm || !weightKg) {
+        return null;
+      }
+
+      const lines: string[] = ['## Body Composition Data'];
+
+      // Create health profile for calculations
+      const healthProfile: HealthProfile = {
+        height: heightCm,
+        weight: weightKg,
+        age: age,
+        biologicalSex: profile.biologicalSex,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // BMI Calculation
+      const bmi = BodyCompositionAnalytics.calculateBMI(weightKg, heightCm);
+      const healthyRange = BodyCompositionAnalytics.getHealthyWeightRange(heightCm);
+
+      lines.push('');
+      lines.push('### BMI Analysis');
+      lines.push(`- Height: ${heightCm} cm`);
+      lines.push(`- Weight: ${weightKg} kg`);
+      lines.push(`- BMI: ${bmi.value} (${bmi.category})`);
+      lines.push(`- Healthy Weight Range: ${healthyRange.min} - ${healthyRange.max} kg`);
+      lines.push(`- Note: BMI does not account for muscle mass - athletes may show "overweight" despite being fit`);
+
+      // Get workouts for VO2 Max estimation
+      const allWorkouts = await LocalWorkoutStorageService.getAllWorkouts();
+
+      // VO2 Max Estimation (now returns extended VO2MaxResult with confidence/method)
+      const vo2MaxData = BodyCompositionAnalytics.estimateVO2Max(allWorkouts, healthProfile);
+
+      lines.push('');
+      lines.push('### VO2 Max Estimation');
+
+      if (vo2MaxData) {
+        lines.push(`- Estimated VO2 Max: ${vo2MaxData.estimate} ml/kg/min`);
+        lines.push(`- Fitness Category: ${vo2MaxData.category}`);
+        lines.push(`- Percentile: ${vo2MaxData.percentile}th percentile for age/sex`);
+        lines.push(`- Confidence: ${vo2MaxData.confidence.toUpperCase()}`);
+        lines.push(`- Method: ${vo2MaxData.methodDescription}`);
+
+        // Formula reference for transparency
+        if (vo2MaxData.method === '5k' || vo2MaxData.method === '10k') {
+          lines.push(`- Formula: Jack Daniels' VDOT (industry standard for race-based VO2 Max)`);
+        } else {
+          lines.push(`- Formula: Léger & Mercier running economy (pace-based estimate)`);
+          lines.push(`- Recommendation: Complete a timed 5K or 10K for more accurate results`);
+        }
+
+        // Activity Level for Fitness Age
+        const avgWeeklyWorkouts = BodyCompositionAnalytics.getAverageWeeklyWorkouts(allWorkouts, 4);
+        let activityLevel = 'Sedentary';
+        if (avgWeeklyWorkouts >= 5) activityLevel = 'Very Active (5+ workouts/week)';
+        else if (avgWeeklyWorkouts >= 3) activityLevel = 'Active (3-4 workouts/week)';
+        else if (avgWeeklyWorkouts >= 1) activityLevel = 'Moderate (1-2 workouts/week)';
+
+        // Fitness Age
+        if (age) {
+          lines.push('');
+          lines.push('### Fitness Age');
+          lines.push(`- Chronological Age: ${age} years`);
+          lines.push(`- Fitness Age: ${vo2MaxData.fitnessAge} years`);
+
+          const ageDiff = age - vo2MaxData.fitnessAge;
+          if (ageDiff > 0) {
+            lines.push(`- Result: ${ageDiff} years younger than actual age`);
+          } else if (ageDiff < 0) {
+            lines.push(`- Result: ${Math.abs(ageDiff)} years older than actual age`);
+          } else {
+            lines.push(`- Result: Fitness age matches chronological age`);
+          }
+
+          // Explain new formula components (no more BMI penalty)
+          lines.push(`- VO2 Max Component (85% weight): Based on cardiovascular fitness`);
+          lines.push(`- Activity Level Component (15% weight): ${activityLevel}`);
+          lines.push(`- Formula: NTNU methodology (Nes et al., 2013) - BMI penalties removed`);
+        } else {
+          lines.push('');
+          lines.push('### Fitness Age');
+          lines.push('- Age not provided in Health Profile - cannot calculate fitness age');
+        }
+
+        // Add workout frequency context
+        lines.push('');
+        lines.push('### Activity Summary');
+        lines.push(`- Average Workouts per Week (last 4 weeks): ${avgWeeklyWorkouts.toFixed(1)}`);
+        lines.push(`- Activity Level: ${activityLevel}`);
+
+      } else {
+        lines.push('- No running/walking workouts found');
+        lines.push('- Complete a timed 5K or 10K run to get VO2 Max estimate');
+        lines.push('');
+        lines.push('### Fitness Age');
+        lines.push('- Cannot calculate without VO2 Max data');
+      }
+
+      lines.push('');
+      return lines.join('\n');
+    } catch (error) {
+      console.error('Error generating body composition data:', error);
       return null;
     }
   }

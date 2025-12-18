@@ -235,7 +235,7 @@ export function NWCDebugScreen() {
         <TouchableOpacity
           style={[
             styles.button,
-            { marginBottom: 10, backgroundColor: '#4CAF50' },
+            { marginBottom: 10, backgroundColor: theme.colors.accent },
           ]}
           onPress={testNWCConnection}
           disabled={isLoading}

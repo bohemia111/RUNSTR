@@ -204,6 +204,9 @@ export function useCoachRunstr() {
         `${CACHE_PREFIX}weekly`,
         `${CACHE_PREFIX}trends`,
         `${CACHE_PREFIX}tips`,
+        `${CACHE_PREFIX}bmi`,
+        `${CACHE_PREFIX}vo2max`,
+        `${CACHE_PREFIX}fitness_age`,
       ]);
 
       // Clear in-memory cache

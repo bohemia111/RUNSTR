@@ -17,6 +17,7 @@ import {
 import { AuthFlowTester, TestResult } from '../../utils/testAuthFlow';
 import { AuthService } from '../../services/auth/authService';
 import { generateNostrKeyPair, validateNsec } from '../../utils/nostr';
+import { theme } from '../../styles/theme';
 import type { AuthResult } from '../../types';
 
 interface TestState {
@@ -282,7 +283,7 @@ export const AuthFlowTestScreen: React.FC = () => {
             backgroundColor:
               state.isRunning || !validateNsec(state.testNsec)
                 ? '#333'
-                : '#4CAF50',
+                : theme.colors.accent,
             padding: 15,
             borderRadius: 8,
             alignItems: 'center',

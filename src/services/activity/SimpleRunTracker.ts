@@ -202,10 +202,12 @@ export class SimpleRunTracker {
   private startTime: number = 0;
 
   // MEMORY-ONLY ARCHITECTURE: GPS points stored in memory only, never persisted
-  // Distance is calculated incrementally as points arrive
-  private cachedGpsPoints: GPSPoint[] = []; // Only last 100 points for elevation/route display
+  // Distance and elevation are calculated incrementally as points arrive
+  private cachedGpsPoints: GPSPoint[] = []; // Only last 100 points for route display
   private lastGpsPoint: GPSPoint | null = null; // Last point for incremental distance
   private runningDistance: number = 0; // Incrementally calculated distance (meters)
+  private runningElevationGain: number = 0; // Incrementally calculated elevation gain (meters)
+  private lastAltitude: number | null = null; // Last valid altitude for incremental elevation
 
   // Periodic metrics save for crash recovery (every 30 seconds)
   private metricsSaveInterval: NodeJS.Timeout | null = null;
@@ -269,6 +271,8 @@ export class SimpleRunTracker {
     this.cachedGpsPoints = []; // Clear cache immediately
     this.lastGpsPoint = null; // Reset last point
     this.runningDistance = 0; // Reset incremental distance
+    this.runningElevationGain = 0; // Reset incremental elevation gain
+    this.lastAltitude = null; // Reset last altitude
 
     // CRITICAL: Prevent Android from suspending the app (Doze Mode)
     // Reference implementation uses this exact pattern - required for background GPS
@@ -512,9 +516,9 @@ export class SimpleRunTracker {
     // Android: No-op
     await stopNativeWorkoutSession();
 
-    // MEMORY-ONLY ARCHITECTURE: Use incrementally calculated distance (already computed)
+    // MEMORY-ONLY ARCHITECTURE: Use incrementally calculated values (already computed)
     const distance = this.runningDistance;
-    const elevationGain = this.calculateElevationGain(this.cachedGpsPoints);
+    const elevationGain = Math.round(this.runningElevationGain);
 
     // Get splits for running activities
     const splits =
@@ -553,6 +557,8 @@ export class SimpleRunTracker {
     this.cachedGpsPoints = [];
     this.lastGpsPoint = null;
     this.runningDistance = 0;
+    this.runningElevationGain = 0;
+    this.lastAltitude = null;
     this.lastGPSUpdate = Date.now();
 
     // Reset GPS recovery state
@@ -580,15 +586,15 @@ export class SimpleRunTracker {
 
   /**
    * Get current session data (for live UI updates)
-   * MEMORY-ONLY ARCHITECTURE: Uses incrementally calculated distance
+   * MEMORY-ONLY ARCHITECTURE: Uses incrementally calculated distance and elevation
    */
   getCurrentSession(): Partial<RunSession> | null {
     if (!this.isTracking) {
       return null;
     }
 
-    // MEMORY-ONLY: Use pre-calculated running distance (instant, no recalculation)
-    const elevationGain = this.calculateElevationGain(this.cachedGpsPoints);
+    // MEMORY-ONLY: Use pre-calculated running values (instant, no recalculation)
+    const elevationGain = Math.round(this.runningElevationGain);
 
     // Get splits for running activities
     const splits =
@@ -733,7 +739,21 @@ export class SimpleRunTracker {
       this.lastGpsPoint = point;
     }
 
-    // Keep only last 100 points for elevation calculation (not full history)
+    // MEMORY-ONLY ARCHITECTURE: Calculate incremental elevation gain for each point
+    for (const point of points) {
+      if (point.altitude !== undefined && point.altitude !== null) {
+        if (this.lastAltitude !== null) {
+          const delta = point.altitude - this.lastAltitude;
+          // Only count gains > 2m to filter GPS altitude noise (matches existing threshold)
+          if (delta > 2) {
+            this.runningElevationGain += delta;
+          }
+        }
+        this.lastAltitude = point.altitude;
+      }
+    }
+
+    // Keep only last 100 points for route display (not full history)
     this.cachedGpsPoints.push(...points);
     if (this.cachedGpsPoints.length > 100) {
       this.cachedGpsPoints = this.cachedGpsPoints.slice(-100);
@@ -815,6 +835,7 @@ export class SimpleRunTracker {
     try {
       const metrics = {
         distance: this.runningDistance,
+        elevationGain: this.runningElevationGain,
         duration: this.durationTracker.getDuration(),
         splits: this.activityType === 'running' ? this.splitTracker.getSplits() : [],
         pauseCount: this.pauseCount,
@@ -1161,12 +1182,13 @@ export class SimpleRunTracker {
         pauseStartTime: sessionState.trackerPauseStartTime,
       });
 
-      // MEMORY-ONLY ARCHITECTURE: Restore metrics (distance, splits) from periodic save
+      // MEMORY-ONLY ARCHITECTURE: Restore metrics (distance, elevation, splits) from periodic save
       try {
         const metricsStr = await AsyncStorage.getItem(ACTIVE_METRICS_KEY);
         if (metricsStr) {
           const metrics = JSON.parse(metricsStr);
           this.runningDistance = metrics.distance || 0;
+          this.runningElevationGain = metrics.elevationGain || 0;
           this.pauseCount = metrics.pauseCount || this.pauseCount;
 
           // Restore splits if available
@@ -1177,7 +1199,7 @@ export class SimpleRunTracker {
           console.log(
             `[SimpleRunTracker] 📊 Restored metrics: ${(
               this.runningDistance / 1000
-            ).toFixed(2)} km`
+            ).toFixed(2)} km, ${Math.round(this.runningElevationGain)}m elevation`
           );
         }
       } catch (metricsError) {
@@ -1185,8 +1207,11 @@ export class SimpleRunTracker {
       }
 
       // Reset GPS state fresh (no coordinates to restore - memory-only)
+      // Note: lastAltitude reset to null means first new GPS point won't add elevation delta
+      // This is correct behavior - we don't know altitude change during crash recovery gap
       this.cachedGpsPoints = [];
       this.lastGpsPoint = null;
+      this.lastAltitude = null;
 
       // Restart GPS tracking if session was active
       if (this.isTracking && !this.isPaused) {

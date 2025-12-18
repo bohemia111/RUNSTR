@@ -1,11 +1,14 @@
 /**
  * CoachRunstrCard - AI-Powered Fitness Coach Insights
  *
- * Displays 3 prompt buttons that generate personalized fitness insights
+ * Displays 6 prompt buttons (2 rows of 3) that generate personalized fitness insights
  * using PPQ.AI's Claude Haiku API. Users configure their own API key.
+ *
+ * Row 1: Weekly Summary, Trends, Tips (workout insights)
+ * Row 2: BMI, VO2 Max, Fitness Age (body composition metrics)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +16,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../../styles/theme';
@@ -22,6 +26,16 @@ import {
   type CoachInsight,
 } from '../../services/ai/useCoachRunstr';
 import type { LocalWorkout } from '../../services/fitness/LocalWorkoutStorageService';
+import { BodyCompositionAnalytics } from '../../services/analytics/BodyCompositionAnalytics';
+import { RunstrContextGenerator } from '../../services/ai/RunstrContextGenerator';
+import type { HealthProfile } from '../../types/analytics';
+
+// Calculated metrics to display
+interface CalculatedMetrics {
+  bmi?: { value: number; category: string };
+  vo2max?: { estimate: number; category: string; percentile: number };
+  fitnessAge?: { age: number; chronologicalAge: number };
+}
 
 interface CoachRunstrCardProps {
   workouts: LocalWorkout[];
@@ -31,13 +45,30 @@ interface PromptButton {
   type: PromptType;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
+  requiresHealthProfile?: boolean;
+  requiresAge?: boolean;
 }
 
-const PROMPTS: PromptButton[] = [
-  { type: 'weekly', label: 'Weekly Summary', icon: 'calendar' },
+// Row 1: Workout insights
+const INSIGHT_PROMPTS: PromptButton[] = [
+  { type: 'weekly', label: 'Weekly\nSummary', icon: 'calendar' },
   { type: 'trends', label: 'Trends', icon: 'trending-up' },
   { type: 'tips', label: 'Tips', icon: 'bulb' },
 ];
+
+// Row 2: Body composition metrics
+const METRIC_PROMPTS: PromptButton[] = [
+  { type: 'bmi', label: 'BMI', icon: 'body', requiresHealthProfile: true },
+  { type: 'vo2max', label: 'VO2 Max', icon: 'fitness', requiresHealthProfile: true },
+  { type: 'fitness_age', label: 'Fitness\nAge', icon: 'ribbon', requiresHealthProfile: true, requiresAge: true },
+];
+
+// Health profile data structure
+interface HealthProfileStatus {
+  hasHeight: boolean;
+  hasWeight: boolean;
+  hasAge: boolean;
+}
 
 export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
   workouts,
@@ -45,6 +76,14 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
   const navigation = useNavigation();
   const [selectedPrompt, setSelectedPrompt] = useState<PromptType | null>(null);
   const [insight, setInsight] = useState<CoachInsight | null>(null);
+  const [healthProfileStatus, setHealthProfileStatus] = useState<HealthProfileStatus>({
+    hasHeight: false,
+    hasWeight: false,
+    hasAge: false,
+  });
+  const [showHealthProfilePrompt, setShowHealthProfilePrompt] = useState(false);
+  const [missingDataMessage, setMissingDataMessage] = useState<string>('');
+  const [calculatedMetrics, setCalculatedMetrics] = useState<CalculatedMetrics>({});
 
   // Use the CoachRunstr hook
   const {
@@ -55,8 +94,101 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
   } = useCoachRunstr();
   const [error, setError] = useState<string | null>(null);
 
+  // Check health profile status and calculate metrics on mount
+  useEffect(() => {
+    const checkHealthProfileAndCalculate = async () => {
+      try {
+        const profileData = await AsyncStorage.getItem('@runstr:health_profile');
+        if (profileData) {
+          const profile = JSON.parse(profileData);
+          setHealthProfileStatus({
+            hasHeight: !!profile.height,
+            hasWeight: !!profile.weight,
+            hasAge: !!profile.age,
+          });
+
+          // Calculate metrics if we have the data
+          if (profile.height && profile.weight) {
+            const metrics: CalculatedMetrics = {};
+
+            // Calculate BMI
+            const bmiResult = BodyCompositionAnalytics.calculateBMI(profile.weight, profile.height);
+            metrics.bmi = bmiResult;
+
+            // Create health profile for VO2 Max calculation
+            const healthProfile: HealthProfile = {
+              height: profile.height,
+              weight: profile.weight,
+              age: profile.age,
+              biologicalSex: profile.biologicalSex,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            // Calculate VO2 Max from workouts
+            const vo2MaxData = BodyCompositionAnalytics.estimateVO2Max(workouts, healthProfile);
+            if (vo2MaxData) {
+              metrics.vo2max = {
+                estimate: vo2MaxData.estimate,
+                category: vo2MaxData.category,
+                percentile: vo2MaxData.percentile,
+              };
+
+              // Calculate Fitness Age if we have age
+              if (profile.age) {
+                metrics.fitnessAge = {
+                  age: vo2MaxData.fitnessAge,
+                  chronologicalAge: profile.age,
+                };
+              }
+            }
+
+            setCalculatedMetrics(metrics);
+
+            // Update the AI context with fresh data
+            await RunstrContextGenerator.updateContext();
+          }
+        } else {
+          setHealthProfileStatus({
+            hasHeight: false,
+            hasWeight: false,
+            hasAge: false,
+          });
+        }
+      } catch (err) {
+        console.error('[CoachRunstrCard] Failed to check health profile:', err);
+      }
+    };
+
+    checkHealthProfileAndCalculate();
+  }, [workouts]);
+
   const handlePromptPress = async (type: PromptType) => {
+    // Find the button config
+    const allPrompts = [...INSIGHT_PROMPTS, ...METRIC_PROMPTS];
+    const promptConfig = allPrompts.find(p => p.type === type);
+
+    // Check if this prompt requires health profile data
+    if (promptConfig?.requiresHealthProfile) {
+      if (!healthProfileStatus.hasHeight || !healthProfileStatus.hasWeight) {
+        setSelectedPrompt(type);
+        setShowHealthProfilePrompt(true);
+        setMissingDataMessage('Height and weight are required. Please configure your Health Profile.');
+        setInsight(null);
+        return;
+      }
+
+      if (promptConfig.requiresAge && !healthProfileStatus.hasAge) {
+        setSelectedPrompt(type);
+        setShowHealthProfilePrompt(true);
+        setMissingDataMessage('Age is required for Fitness Age calculation. Please configure your Health Profile.');
+        setInsight(null);
+        return;
+      }
+    }
+
     setSelectedPrompt(type);
+    setShowHealthProfilePrompt(false);
     setError(null);
 
     try {
@@ -71,9 +203,9 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
     }
   };
 
-  const renderPromptButtons = () => (
-    <View style={styles.buttonsContainer}>
-      {PROMPTS.map((prompt) => (
+  const renderButtonRow = (prompts: PromptButton[]) => (
+    <View style={styles.buttonsRow}>
+      {prompts.map((prompt) => (
         <TouchableOpacity
           key={prompt.type}
           style={[
@@ -101,12 +233,46 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
     </View>
   );
 
+  const renderPromptButtons = () => (
+    <View style={styles.buttonsContainer}>
+      {renderButtonRow(INSIGHT_PROMPTS)}
+      {renderButtonRow(METRIC_PROMPTS)}
+    </View>
+  );
+
   const renderInsightResult = () => {
     if (loading) {
       return (
         <View style={styles.resultContainer}>
           <ActivityIndicator size="small" color="#FF9D42" />
-          <Text style={styles.loadingText}>Analyzing your workouts...</Text>
+          <Text style={styles.loadingText}>Analyzing your data...</Text>
+        </View>
+      );
+    }
+
+    // Show health profile prompt if required data is missing
+    if (showHealthProfilePrompt) {
+      return (
+        <View style={styles.resultContainer}>
+          <Ionicons
+            name="person-outline"
+            size={32}
+            color="#FF9D42"
+            style={{ marginBottom: 12 }}
+          />
+          <Text style={styles.setupText}>{missingDataMessage}</Text>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => navigation.navigate('HealthProfile' as never)}
+          >
+            <Ionicons
+              name="body-outline"
+              size={16}
+              color="#000"
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.settingsButtonText}>Go to Health Profile</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -142,8 +308,43 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
     }
 
     if (insight) {
+      // Render metric header for BMI/VO2 Max/Fitness Age
+      const renderMetricHeader = () => {
+        if (selectedPrompt === 'bmi' && calculatedMetrics.bmi) {
+          return (
+            <View style={styles.metricHeader}>
+              <Text style={styles.metricValue}>{calculatedMetrics.bmi.value}</Text>
+              <Text style={styles.metricLabel}>BMI</Text>
+              <Text style={styles.metricCategory}>{calculatedMetrics.bmi.category}</Text>
+            </View>
+          );
+        }
+        if (selectedPrompt === 'vo2max' && calculatedMetrics.vo2max) {
+          return (
+            <View style={styles.metricHeader}>
+              <Text style={styles.metricValue}>{calculatedMetrics.vo2max.estimate}</Text>
+              <Text style={styles.metricLabel}>VO2 Max (ml/kg/min)</Text>
+              <Text style={styles.metricCategory}>{calculatedMetrics.vo2max.category} - {calculatedMetrics.vo2max.percentile}th percentile</Text>
+            </View>
+          );
+        }
+        if (selectedPrompt === 'fitness_age' && calculatedMetrics.fitnessAge) {
+          const diff = calculatedMetrics.fitnessAge.chronologicalAge - calculatedMetrics.fitnessAge.age;
+          const diffText = diff > 0 ? `${diff} years younger` : diff < 0 ? `${Math.abs(diff)} years older` : 'Same as actual';
+          return (
+            <View style={styles.metricHeader}>
+              <Text style={styles.metricValue}>{calculatedMetrics.fitnessAge.age}</Text>
+              <Text style={styles.metricLabel}>Fitness Age</Text>
+              <Text style={styles.metricCategory}>{diffText} than your actual age ({calculatedMetrics.fitnessAge.chronologicalAge})</Text>
+            </View>
+          );
+        }
+        return null;
+      };
+
       return (
         <View style={styles.resultContainer}>
+          {renderMetricHeader()}
           {insight.bullets.map((bullet, index) => (
             <View key={index} style={styles.bulletRow}>
               <Text style={styles.bulletPoint}>•</Text>
@@ -242,23 +443,28 @@ const styles = StyleSheet.create({
   },
 
   buttonsContainer: {
-    flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
   },
 
+  buttonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
   promptButton: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: '#1a1a1a',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#2a2a2a',
     paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
+    minHeight: 52,
   },
 
   promptButtonActive: {
@@ -267,9 +473,10 @@ const styles = StyleSheet.create({
   },
 
   promptButtonText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.text,
+    textAlign: 'center',
   },
 
   promptButtonTextActive: {
@@ -279,6 +486,35 @@ const styles = StyleSheet.create({
   resultContainer: {
     minHeight: 80,
     justifyContent: 'center',
+  },
+
+  metricHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+
+  metricValue: {
+    fontSize: 48,
+    fontWeight: theme.typography.weights.bold,
+    color: '#FF9D42',
+  },
+
+  metricLabel: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.textMuted,
+    marginTop: 4,
+  },
+
+  metricCategory: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.semiBold,
+    color: '#FFB366',
+    marginTop: 4,
+    textTransform: 'capitalize',
   },
 
   loadingText: {

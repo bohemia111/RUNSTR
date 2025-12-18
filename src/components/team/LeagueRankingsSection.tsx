@@ -618,13 +618,13 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#22c55e',
+    backgroundColor: theme.colors.accent,
   },
 
   liveText: {
     fontSize: 9,
     fontWeight: theme.typography.weights.semiBold,
-    color: '#22c55e',
+    color: theme.colors.accent,
   },
 
   actionBtn: {

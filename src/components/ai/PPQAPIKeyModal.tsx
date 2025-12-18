@@ -180,7 +180,7 @@ export const PPQAPIKeyModal: React.FC<PPQAPIKeyModalProps> = ({
           {/* Status */}
           {apiKeyConfigured && (
             <View style={styles.statusContainer}>
-              <Ionicons name="checkmark-circle" size={16} color="#4ade80" />
+              <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
               <Text style={styles.statusText}>API Key Configured</Text>
             </View>
           )}
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
 
   statusText: {
     fontSize: 14,
-    color: '#4ade80',
+    color: theme.colors.accent,
     marginLeft: 8,
     fontWeight: theme.typography.weights.medium,
   },

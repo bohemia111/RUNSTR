@@ -39,13 +39,13 @@ export const HolisticHealthScoreCard: React.FC<
   };
 
   const getTrendColor = () => {
-    if (healthScore.trend === 'improving') return '#4CAF50';
+    if (healthScore.trend === 'improving') return theme.colors.orangeBright;
     if (healthScore.trend === 'declining') return '#FF5722';
     return theme.colors.textMuted;
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return '#4CAF50'; // Excellent - Green
+    if (score >= 80) return theme.colors.orangeBright; // Excellent - Orange
     if (score >= 60) return '#FF9D42'; // Good - Orange
     if (score >= 40) return '#FFB366'; // Fair - Light Orange
     return '#FF5722'; // Needs Work - Red
@@ -113,7 +113,7 @@ export const HolisticHealthScoreCard: React.FC<
         <CategoryBar
           label="Nutrition"
           score={healthScore.nutrition}
-          color="#4CAF50"
+          color={theme.colors.orangeBright}
           icon="restaurant-outline"
         />
       </View>

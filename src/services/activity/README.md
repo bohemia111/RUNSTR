@@ -23,6 +23,21 @@ Services for managing live workout tracking, location services, and text-to-spee
 **BackgroundLocationTask.ts** - Background location tracking when app is minimized
 **BatteryOptimizationService.ts** - Battery-aware location tracking optimization
 
+### Step Counting (Android)
+
+**NativeStepCounterService.ts** - Native Android step counting via expo-android-pedometer (~230 lines)
+- Uses Android's TYPE_STEP_COUNTER sensor directly
+- Background step counting with foreground service notification
+- Only activates on stock Android (not on GrapheneOS/CalyxOS)
+- Respects privacy ROM users by falling back to Health Connect
+- Start/stop tracking during workouts for accurate step counts
+
+**DailyStepCounterService.ts** - Cross-platform daily step counting
+- iOS: Uses HealthKit via expo-sensors Pedometer
+- Android priority: Native sensor → Health Connect → Local tracked steps
+- 5-minute caching for performance
+- Integrated with DailyStepGoalCard component
+
 ### Text-to-Speech (NEW)
 
 **TTSAnnouncementService.ts** - Voice announcements for workout summaries with audio ducking (~350 lines)
@@ -132,6 +147,7 @@ const stats = splitTrackingService.getStatistics();
 - **expo-av** - Audio session management for ducking
 - **expo-location** - GPS and location tracking
 - **expo-task-manager** - Background task execution
+- **expo-android-pedometer** - Native Android step counting with background support
 - **@react-native-async-storage/async-storage** - Settings persistence
 
 ## Architecture Notes

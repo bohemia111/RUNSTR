@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4CAF50', // Green dot
+    backgroundColor: theme.colors.statusConnected, // Orange dot
   },
   statusText: {
     color: theme.colors.textSecondary,

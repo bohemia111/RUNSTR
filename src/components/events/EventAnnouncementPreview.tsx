@@ -695,7 +695,7 @@ const styles = StyleSheet.create({
   },
 
   buttonSuccess: {
-    backgroundColor: theme.colors.success || '#10B981',
+    backgroundColor: theme.colors.success,
   },
 
   helperTextContainer: {

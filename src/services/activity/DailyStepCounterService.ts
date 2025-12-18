@@ -1,12 +1,16 @@
 /**
  * DailyStepCounterService - Cross-platform daily step counting
  * iOS: Uses Expo Pedometer API (HealthKit) for auto-counting
- * Android: Uses LocalWorkoutStorageService (tracked workouts only - more reliable than Health Connect)
+ * Android: Uses Health Connect aggregation API first (like iOS uses HealthKit),
+ *          falls back to local tracked workout steps if Health Connect unavailable
  */
 
 import { Pedometer } from 'expo-sensors';
 import { Platform, Linking } from 'react-native';
 import LocalWorkoutStorageService from '../fitness/LocalWorkoutStorageService';
+import healthConnectService from '../fitness/healthConnectService';
+import { privacyROMDetectionService } from '../platform/PrivacyROMDetectionService';
+import { nativeStepCounterService } from './NativeStepCounterService';
 
 export interface DailyStepData {
   steps: number;
@@ -23,7 +27,7 @@ export class DailyStepCounterService {
   private constructor() {
     console.log(`[DailyStepCounterService] Initialized for ${Platform.OS}`);
     if (Platform.OS === 'android') {
-      console.log('[DailyStepCounterService] Will use local workout storage for tracked steps');
+      console.log('[DailyStepCounterService] Android priority: Native sensor → Health Connect → Local tracked steps');
     } else {
       console.log('[DailyStepCounterService] Will use Pedometer (HealthKit) for auto-counted steps');
     }
@@ -39,13 +43,13 @@ export class DailyStepCounterService {
   /**
    * Check if step counting is available on the device
    * iOS: Uses Pedometer (HealthKit)
-   * Android: Always available (uses local workout storage)
+   * Android: Always available (Health Connect or local tracked steps fallback)
    */
   async isAvailable(): Promise<boolean> {
     try {
       if (Platform.OS === 'android') {
-        // Android: Always available since we use local workout storage
-        console.log('[DailyStepCounterService] Android: Using local workout storage (always available)');
+        // Android: Always available - Health Connect or local tracked steps
+        console.log('[DailyStepCounterService] Android: Step counting available (Health Connect or local fallback)');
         return true;
       } else {
         // iOS: Check Pedometer availability
@@ -176,18 +180,83 @@ export class DailyStepCounterService {
   }
 
   /**
-   * Android-specific step fetching from local workout storage
-   * Shows "Tracked Steps" - only steps from in-app tracked workouts
+   * Android-specific step fetching
+   * Priority: Native sensor (stock Android) → Health Connect (privacy ROMs) → Local tracked workouts
+   *
+   * Stock Android: Uses native step sensor via expo-android-pedometer (no Google Fit needed)
+   * Privacy ROMs: Uses Health Connect aggregation (respects user's privacy choices)
+   * Fallback: Local tracked workout steps
    */
   private async getTodayStepsAndroid(): Promise<DailyStepData | null> {
-    console.log('[DailyStepCounterService] Android: Querying tracked steps from local storage');
-
-    const result = await LocalWorkoutStorageService.getTodayTrackedSteps();
-
     // Calculate time bounds for today
     const startTime = new Date();
     startTime.setHours(0, 0, 0, 0); // Midnight today
     const endTime = new Date(); // Now
+
+    // 1. Try native step counter for stock Android (highest priority)
+    const shouldUseNative = await nativeStepCounterService.shouldUseNativeSteps();
+    if (shouldUseNative) {
+      try {
+        console.log('[DailyStepCounterService] Android: Trying native step sensor...');
+        const nativeSteps = await nativeStepCounterService.getTodaySteps();
+
+        if (nativeSteps > 0) {
+          console.log(`[DailyStepCounterService] Android ✅ Native sensor steps: ${nativeSteps}`);
+
+          const stepData: DailyStepData = {
+            steps: nativeSteps,
+            startTime,
+            endTime,
+            lastUpdated: new Date(),
+          };
+
+          // Update cache
+          this.cachedSteps = stepData;
+          return stepData;
+        }
+        console.log('[DailyStepCounterService] Native sensor returned 0, trying Health Connect...');
+      } catch (error) {
+        console.log('[DailyStepCounterService] Native step counter error:', error);
+      }
+    }
+
+    // 2. Try Health Connect (for privacy ROMs or if native unavailable)
+    try {
+      console.log('[DailyStepCounterService] Android: Trying Health Connect for steps...');
+      const healthConnectSteps = await healthConnectService.getTodaySteps();
+
+      if (healthConnectSteps && healthConnectSteps.steps > 0) {
+        console.log(`[DailyStepCounterService] Android ✅ Health Connect steps: ${healthConnectSteps.steps}`);
+
+        const stepData: DailyStepData = {
+          steps: healthConnectSteps.steps,
+          startTime: healthConnectSteps.startTime,
+          endTime: healthConnectSteps.endTime,
+          lastUpdated: new Date(),
+        };
+
+        // Update cache
+        this.cachedSteps = stepData;
+        return stepData;
+      }
+
+      // Health Connect returned 0 or null - check if privacy ROM
+      if (healthConnectSteps?.steps === 0) {
+        const rom = await privacyROMDetectionService.detectROM();
+        if (rom.isPrivacyROM) {
+          console.log(`[DailyStepCounterService] ${rom.romType} detected - Health Connect returned 0 steps`);
+          if (rom.sensorNotes) {
+            console.log(`[DailyStepCounterService] Note: ${rom.sensorNotes}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.log('[DailyStepCounterService] Health Connect not available:', error);
+    }
+
+    // 3. Fall back to local tracked workout steps
+    console.log('[DailyStepCounterService] Android: Falling back to local tracked steps...');
+    const result = await LocalWorkoutStorageService.getTodayTrackedSteps();
 
     const stepData: DailyStepData = {
       steps: result.steps,
@@ -199,7 +268,7 @@ export class DailyStepCounterService {
     // Update cache
     this.cachedSteps = stepData;
 
-    console.log(`[DailyStepCounterService] Android ✅ Tracked steps: ${result.steps} from ${result.workoutCount} workouts`);
+    console.log(`[DailyStepCounterService] Android ✅ Local tracked steps: ${result.steps} from ${result.workoutCount} workouts`);
     return stepData;
   }
 
