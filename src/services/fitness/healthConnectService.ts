@@ -743,7 +743,7 @@ export class HealthConnectService {
 
   // Cache for daily steps (separate from workout cache)
   private cachedDailySteps: { steps: number; startTime: Date; endTime: Date; lastUpdated: Date } | null = null;
-  private readonly stepsCacheExpiry = 5 * 60 * 1000; // 5 minutes
+  private readonly stepsCacheExpiry = 30 * 1000; // 30 seconds (was 5 minutes)
 
   /**
    * Get today's total step count from Health Connect
@@ -840,7 +840,7 @@ export class HealthConnectService {
   }
 
   /**
-   * Check if step cache is still valid (less than 5 minutes old)
+   * Check if step cache is still valid (less than 30 seconds old)
    */
   private isStepsCacheValid(): boolean {
     if (!this.cachedDailySteps) return false;

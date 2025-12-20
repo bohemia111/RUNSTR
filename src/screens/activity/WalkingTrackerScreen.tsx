@@ -25,6 +25,7 @@ import { activityMetricsService } from '../../services/activity/ActivityMetricsS
 import type { RunSession } from '../../services/activity/SimpleRunTracker';
 import { WorkoutSummaryModal } from '../../components/activity/WorkoutSummaryModal';
 import LocalWorkoutStorageService from '../../services/fitness/LocalWorkoutStorageService';
+import healthConnectService from '../../services/fitness/healthConnectService';
 import { RouteSelectionModal } from '../../components/routes/RouteSelectionModal';
 import routeStorageService from '../../services/routes/RouteStorageService';
 import {
@@ -489,8 +490,16 @@ export const WalkingTrackerScreen: React.FC = () => {
 
       // For Android, poll nativeStepCounterService for live steps
       if (Platform.OS === 'android') {
-        const androidSteps = await nativeStepCounterService.getStepsSinceStart();
-        liveStepsRef.current = androidSteps;
+        try {
+          const androidSteps = await nativeStepCounterService.getStepsSinceStart();
+          // Only update if steps increased (avoid flickering with stale data)
+          if (androidSteps > liveStepsRef.current) {
+            console.log(`[WalkingTracker] Android steps: ${liveStepsRef.current} → ${androidSteps}`);
+            liveStepsRef.current = androidSteps;
+          }
+        } catch (e) {
+          // Silently continue with GPS estimate if native counter fails
+        }
       }
 
       // Use real pedometer steps, fall back to GPS estimate if pedometer unavailable
@@ -610,6 +619,10 @@ export const WalkingTrackerScreen: React.FC = () => {
       }
 
       // Refresh daily step count to include newly tracked steps
+      // Clear both caches on Android to ensure fresh data
+      if (Platform.OS === 'android') {
+        healthConnectService.clearStepsCache();
+      }
       dailyStepCounterService.clearCache();
       const updatedSteps = await dailyStepCounterService.getTodaySteps();
       if (updatedSteps) {
