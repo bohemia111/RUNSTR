@@ -48,6 +48,8 @@ export const RewardNotificationProvider: React.FC<
       <RewardEarnedModal
         visible={notificationState.visible}
         amount={notificationState.amount}
+        donationSplit={notificationState.donationSplit}
+        pledgeInfo={notificationState.pledgeInfo}
         onClose={handleClose}
       />
     </>

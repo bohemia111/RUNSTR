@@ -114,6 +114,25 @@ export interface SatlantisEvent {
     name: string;
     picture?: string;
   };
+
+  // ============================================================================
+  // Pledge/Commitment System Fields
+  // ============================================================================
+
+  /** Number of daily workouts to commit (1, 3, 5, 7) */
+  pledgeCost?: number;
+
+  /** Where committed rewards are sent */
+  pledgeDestination?: 'captain' | 'charity';
+
+  /** Captain's Lightning address (for reward routing when destination is 'captain') */
+  captainLightningAddress?: string;
+
+  /** Charity's Lightning address (when destination is 'charity') */
+  pledgeCharityAddress?: string;
+
+  /** Charity display name */
+  pledgeCharityName?: string;
 }
 
 /**

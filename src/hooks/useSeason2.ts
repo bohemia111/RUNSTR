@@ -47,9 +47,11 @@ export function useSeason2Leaderboard(
   const [error, setError] = useState<string | null>(null);
   const isMounted = useRef(true);
 
-  // Use a ref to always have the latest activityType to avoid stale closure
+  // Use refs to always have the latest values to avoid stale closures
   const activityTypeRef = useRef(activityType);
   activityTypeRef.current = activityType;
+  const leaderboardRef = useRef(leaderboard);
+  leaderboardRef.current = leaderboard;
 
   const loadLeaderboard = useCallback(async (forceRefresh = false) => {
     setError(null);
@@ -79,8 +81,13 @@ export function useSeason2Leaderboard(
         }
       }
 
-      // No cache or force refresh - show loading state and fetch
-      setIsLoading(true);
+      // SILENT REFRESH: Only show loading on first-ever load (no existing data)
+      // Pull-to-refresh should NOT show spinner - just update silently
+      const hasExistingData = leaderboardRef.current !== null;
+      if (!hasExistingData) {
+        setIsLoading(true);
+      }
+
       const data = await Season2Service.getLeaderboard(
         currentActivityType,
         userPubkey || undefined,

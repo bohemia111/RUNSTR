@@ -35,8 +35,8 @@ export interface UseWorkoutEventStoreResult {
   getByUser: (pubkey: string) => StoredWorkout[];
   /** Get today's workouts */
   getTodaysWorkouts: () => StoredWorkout[];
-  /** Get this week's workouts (last 7 days) */
-  getThisWeeksWorkouts: () => StoredWorkout[];
+  /** Get recent workouts (last 2 days - matches fetch window) */
+  getRecentWorkouts: () => StoredWorkout[];
   /** Get today's workouts for a specific team */
   getTodaysTeamWorkouts: (teamId: string) => StoredWorkout[];
   /** Unix timestamp of last fetch */
@@ -112,8 +112,8 @@ export function useWorkoutEventStore(): UseWorkoutEventStoreResult {
     [workouts]
   );
 
-  const getThisWeeksWorkouts = useCallback(
-    () => store.getThisWeeksWorkouts(),
+  const getRecentWorkouts = useCallback(
+    () => store.getRecentWorkouts(),
     [workouts]
   );
 
@@ -140,7 +140,7 @@ export function useWorkoutEventStore(): UseWorkoutEventStoreResult {
     getByTeam,
     getByUser,
     getTodaysWorkouts,
-    getThisWeeksWorkouts,
+    getRecentWorkouts,
     getTodaysTeamWorkouts,
     lastFetchTime,
     stats,

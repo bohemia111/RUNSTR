@@ -1,7 +1,7 @@
 /**
  * RewardEarnedModal - Display when user earns daily workout reward
  * Uses CustomAlert-style black/orange theme matching app style
- * Shows amount earned (21 sats for qualifying workouts >= 1km)
+ * Shows amount earned with optional breakdown (user/charity/pledge)
  */
 
 import React from 'react';
@@ -15,16 +15,24 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
+import type {
+  DonationSplit,
+  PledgeInfo,
+} from '../../services/rewards/RewardNotificationManager';
 
 interface RewardEarnedModalProps {
   visible: boolean;
   amount: number;
+  donationSplit?: DonationSplit;
+  pledgeInfo?: PledgeInfo;
   onClose: () => void;
 }
 
 export const RewardEarnedModal: React.FC<RewardEarnedModalProps> = ({
   visible,
   amount,
+  donationSplit,
+  pledgeInfo,
   onClose,
 }) => {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -43,6 +51,70 @@ export const RewardEarnedModal: React.FC<RewardEarnedModalProps> = ({
 
   if (!visible) return null;
 
+  // Determine if this is a pledge notification
+  const isPledgeReward = !!pledgeInfo;
+
+  // Determine if we should show a split breakdown
+  const hasCharitySplit = donationSplit && donationSplit.charityAmount > 0;
+
+  // Render the appropriate content
+  const renderContent = () => {
+    // Pledge/commitment reward notification
+    if (isPledgeReward) {
+      const progressText = `${pledgeInfo.completedWorkouts}/${pledgeInfo.totalWorkouts}`;
+      return (
+        <>
+          <Text style={styles.title}>
+            {pledgeInfo.isComplete ? 'Commitment Complete!' : 'Daily Reward Committed'}
+          </Text>
+          <Text style={styles.message}>
+            {amount} sats sent to {pledgeInfo.recipientName}
+          </Text>
+          <Text style={styles.eventName}>{pledgeInfo.eventName}</Text>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressText}>
+              {pledgeInfo.isComplete
+                ? 'All workouts complete!'
+                : `Progress: ${progressText} days`}
+            </Text>
+          </View>
+        </>
+      );
+    }
+
+    // Normal reward with charity split
+    if (hasCharitySplit) {
+      return (
+        <>
+          <Text style={styles.title}>Reward Earned</Text>
+          <Text style={styles.message}>You earned {amount} sats!</Text>
+          <View style={styles.splitContainer}>
+            <View style={styles.splitRow}>
+              <Text style={styles.splitLine}>{'├─'}</Text>
+              <Text style={styles.splitText}>
+                {donationSplit.userAmount} sats to your wallet
+              </Text>
+            </View>
+            <View style={styles.splitRow}>
+              <Text style={styles.splitLine}>{'└─'}</Text>
+              <Text style={styles.splitText}>
+                {donationSplit.charityAmount} sats to {donationSplit.charityName}
+              </Text>
+            </View>
+          </View>
+        </>
+      );
+    }
+
+    // Normal reward without split
+    return (
+      <>
+        <Text style={styles.title}>Reward Earned</Text>
+        <Text style={styles.message}>You earned {amount} sats!</Text>
+      </>
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -55,17 +127,14 @@ export const RewardEarnedModal: React.FC<RewardEarnedModalProps> = ({
           {/* Lightning bolt icon */}
           <View style={styles.iconContainer}>
             <Ionicons
-              name="flash"
+              name={isPledgeReward ? 'flag' : 'flash'}
               size={48}
               color={theme.colors.orangeBright}
             />
           </View>
 
-          {/* Title */}
-          <Text style={styles.title}>Reward Earned</Text>
-
-          {/* Amount text */}
-          <Text style={styles.message}>You earned {amount} sats!</Text>
+          {/* Dynamic content */}
+          {renderContent()}
 
           {/* Close button */}
           <TouchableOpacity
@@ -73,7 +142,9 @@ export const RewardEarnedModal: React.FC<RewardEarnedModalProps> = ({
             style={styles.button}
             activeOpacity={0.7}
           >
-            <Text style={styles.buttonText}>Nice!</Text>
+            <Text style={styles.buttonText}>
+              {isPledgeReward && pledgeInfo?.isComplete ? 'Awesome!' : 'Got it'}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -118,7 +189,49 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.text,
     lineHeight: 22,
-    marginBottom: 24,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  // Charity split breakdown
+  splitContainer: {
+    width: '100%',
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  splitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 2,
+  },
+  splitLine: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    fontFamily: 'monospace',
+    marginRight: 6,
+  },
+  splitText: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+  },
+  // Pledge-specific styles
+  eventName: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  progressRow: {
+    backgroundColor: 'rgba(255, 157, 66, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  progressText: {
+    fontSize: 14,
+    color: theme.colors.orangeBright,
+    fontWeight: theme.typography.weights.semiBold,
     textAlign: 'center',
   },
   button: {

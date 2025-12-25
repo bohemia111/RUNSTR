@@ -31,6 +31,7 @@ import { RewardLightningAddressService } from './RewardLightningAddressService';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import { RewardNotificationManager, DonationSplit } from './RewardNotificationManager';
 import { getCharityById, Charity } from '../../constants/charities';
+import { PledgeService } from '../pledge/PledgeService';
 // Note: Team donations disabled - teams don't have lightning addresses yet
 
 // Storage keys for donation settings
@@ -393,6 +394,119 @@ class DailyRewardServiceClass {
   }
 
   /**
+   * Send reward to pledge destination (captain or charity)
+   * Called when user has an active pledge - bypasses normal charity split
+   *
+   * PLEDGE FLOW:
+   * 1. Request invoice from pledge destination's Lightning address
+   * 2. Pay full reward amount (no split - user's charity % is paused)
+   * 3. Increment pledge progress
+   * 4. Show pledge-specific notification
+   * 5. If pledge complete, show completion notification
+   *
+   * @param userPubkey - User's public key
+   * @param pledge - Active pledge from PledgeService
+   */
+  private async sendPledgeReward(
+    userPubkey: string,
+    pledge: import('../../types/pledge').Pledge
+  ): Promise<RewardResult> {
+    try {
+      const totalAmount = REWARD_CONFIG.DAILY_WORKOUT_REWARD;
+
+      console.log(
+        `[Reward] Sending ${totalAmount} sats to pledge destination:`,
+        pledge.destinationName
+      );
+
+      if (DEBUG_REWARDS) {
+        Alert.alert(
+          'Pledge Reward Debug',
+          `Routing ${totalAmount} sats to:\n` +
+            `Destination: ${pledge.destinationName}\n` +
+            `Address: ${pledge.destinationAddress}\n` +
+            `Progress: ${pledge.completedWorkouts + 1}/${pledge.totalWorkouts}`
+        );
+      }
+
+      // Request invoice from pledge destination
+      const invoice = await this.requestInvoiceFromUserAddress(
+        pledge.destinationAddress,
+        totalAmount
+      );
+
+      if (!invoice) {
+        console.log('[Reward] Failed to get invoice from pledge destination');
+        return {
+          success: false,
+          reason: 'pledge_invoice_failed',
+        };
+      }
+
+      // Pay the invoice
+      const paymentResult = await RewardSenderWallet.sendRewardPayment(invoice);
+
+      if (!paymentResult.success) {
+        console.log('[Reward] Failed to pay pledge invoice');
+        return {
+          success: false,
+          reason: 'pledge_payment_failed',
+        };
+      }
+
+      // Increment pledge progress
+      const updatedPledge = await PledgeService.incrementPledgeProgress(
+        userPubkey
+      );
+
+      // Record the reward (for stats - counts as earned even though routed to pledge)
+      await this.recordReward(userPubkey, totalAmount);
+
+      // Show notification
+      const newCompletedCount = updatedPledge
+        ? updatedPledge.completedWorkouts
+        : pledge.completedWorkouts + 1;
+      const isComplete = newCompletedCount >= pledge.totalWorkouts;
+
+      if (isComplete) {
+        console.log('[Reward] Pledge completed!');
+        RewardNotificationManager.showPledgeRewardSent(
+          totalAmount,
+          pledge.eventName,
+          pledge.destinationName,
+          newCompletedCount,
+          pledge.totalWorkouts
+        );
+      } else {
+        RewardNotificationManager.showPledgeRewardSent(
+          totalAmount,
+          pledge.eventName,
+          pledge.destinationName,
+          newCompletedCount,
+          pledge.totalWorkouts
+        );
+      }
+
+      console.log(
+        `[Reward] ✅ Pledge reward sent:`,
+        `${totalAmount} sats to ${pledge.destinationName}`,
+        `(${newCompletedCount}/${pledge.totalWorkouts})`
+      );
+
+      return {
+        success: true,
+        amount: totalAmount,
+      };
+    } catch (error) {
+      console.error('[Reward] Error sending pledge reward:', error);
+      return {
+        success: false,
+        reason: 'pledge_error',
+      };
+    }
+  }
+
+  /**
    * Send reward to user (and optionally team/charity based on donation settings)
    * Main entry point for reward system
    *
@@ -414,6 +528,9 @@ class DailyRewardServiceClass {
    * 3. Pay user their portion
    * 4. Pay charity (if selected and donation > 0)
    * 5. Pay team (if has Lightning address and donation > 0)
+   *
+   * PLEDGE OVERRIDE:
+   * If user has an active pledge, bypasses this flow entirely and calls sendPledgeReward()
    */
   async sendReward(userPubkey: string): Promise<RewardResult> {
     try {
@@ -453,6 +570,18 @@ class DailyRewardServiceClass {
           reason: 'no_lightning_address',
         };
       }
+
+      // ===== PLEDGE CHECK =====
+      // If user has active pledge, route reward to pledge destination
+      const activePledge = await PledgeService.getActivePledge(userPubkey);
+      if (activePledge) {
+        console.log(
+          '[Reward] Active pledge found, routing to:',
+          activePledge.destinationName
+        );
+        return this.sendPledgeReward(userPubkey, activePledge);
+      }
+      // ===== END PLEDGE CHECK =====
 
       // Load donation settings and calculate split (charity only - no team payments)
       const { donationPercentage, charity } = await this.getDonationSettings();

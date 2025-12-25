@@ -2,6 +2,26 @@
 
 All notable changes to RUNSTR will be documented in this file.
 
+## [1.2.3] - 2025-12-23
+
+### New Features
+- **Workout Pledge System**: Join paid events by pledging future workout rewards instead of paying upfront
+  - Commit N daily workouts and rewards go to event destination (captain or charity)
+  - One active pledge at a time, no cancellation once committed
+  - Progress tracking with ActivePledgeCard on Rewards screen
+- **SimpleEventWizardV2**: Redesigned single-page event creation - all options on one screen
+- **Enhanced Event Join Flow**: Join events with pledge payment option
+
+### Improvements
+- Improved reward earned modal with enhanced UI
+- Better frozen event caching with additional utility methods
+- Enhanced Season 2 and Satlantis event hooks
+- Updated event creation and publishing flow
+
+### Bug Fixes
+- Share modal stability improvements
+- Workout event store refinements
+
 ## [1.2.2] - 2025-12-23
 
 ### Bug Fixes

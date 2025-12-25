@@ -10,7 +10,6 @@ import type {
   RunstrActivityType,
   RunstrScoringType,
   RunstrPayoutScheme,
-  RunstrJoinMethod,
   RunstrDuration,
   ValidationError,
 } from '../types/runstrEvent';
@@ -49,7 +48,6 @@ export interface UseRunstrEventCreationReturn {
   // Helpers
   showDistanceInput: boolean;
   showDurationInput: boolean;
-  showDonationInput: boolean;
   showFixedPayoutInput: boolean;
 }
 
@@ -102,7 +100,6 @@ export function useRunstrEventCreation(): UseRunstrEventCreationReturn {
   // Conditional field visibility
   const showDistanceInput = form.scoringType === 'fastest_time';
   const showDurationInput = form.scoringType === 'most_distance';
-  const showDonationInput = form.joinMethod === 'donation';
   const showFixedPayoutInput = form.payoutScheme === 'fixed_amount';
 
   // Submit event
@@ -161,7 +158,6 @@ export function useRunstrEventCreation(): UseRunstrEventCreationReturn {
     submitEvent,
     showDistanceInput,
     showDurationInput,
-    showDonationInput,
     showFixedPayoutInput,
   };
 }
@@ -189,9 +185,11 @@ export const DURATION_OPTIONS: { value: RunstrDuration; label: string }[] = [
   { value: '1m', label: '1 Month' },
 ];
 
-export const JOIN_OPTIONS: { value: RunstrJoinMethod; label: string }[] = [
-  { value: 'open', label: 'Free' },
-  { value: 'donation', label: 'Donation' },
+export const PLEDGE_COST_OPTIONS = [
+  { value: 1, label: '1' },
+  { value: 3, label: '3' },
+  { value: 5, label: '5' },
+  { value: 7, label: '7' },
 ];
 
 export const PAYOUT_OPTIONS: { value: RunstrPayoutScheme; label: string }[] = [

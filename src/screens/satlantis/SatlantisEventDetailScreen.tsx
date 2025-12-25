@@ -496,6 +496,25 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
                     </Text>
                   </View>
                 )}
+                {/* Pledge/Commitment System Info */}
+                {event.pledgeCost && event.pledgeCost > 0 && (
+                  <View style={styles.runstrInfoItem}>
+                    <Text style={styles.runstrInfoLabel}>Entry Cost</Text>
+                    <Text style={styles.runstrInfoValue}>
+                      {event.pledgeCost} daily workout{event.pledgeCost > 1 ? 's' : ''} ({event.pledgeCost * 50} sats)
+                    </Text>
+                  </View>
+                )}
+                {event.pledgeCost && event.pledgeCost > 0 && (
+                  <View style={styles.runstrInfoItem}>
+                    <Text style={styles.runstrInfoLabel}>Rewards Go To</Text>
+                    <Text style={styles.runstrInfoValue}>
+                      {event.pledgeDestination === 'charity'
+                        ? event.pledgeCharityName || 'Charity'
+                        : event.creatorProfile?.name || 'Event Creator'}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           )}

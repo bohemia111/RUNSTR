@@ -57,21 +57,24 @@ export class FrozenEventStore {
    */
   static async initializeMemoryCache(): Promise<void> {
     if (this.isInitialized) {
-      console.log('[FrozenEventStore] Already initialized, skipping');
+      console.log('[Perf] FrozenEventStore - Already initialized');
       return;
     }
 
+    const startTime = Date.now();
+    console.log('[Perf] FrozenEventStore.initializeMemoryCache() START');
+
     try {
-      const startTime = Date.now();
       const frozenIds = await this.getFrozenEventIds();
+      console.log(`[Perf] FrozenEventStore - Found ${frozenIds.length} frozen event IDs`);
 
       if (frozenIds.length === 0) {
-        console.log('[FrozenEventStore] No frozen events to load');
         this.isInitialized = true;
+        console.log(`[Perf] FrozenEventStore.initializeMemoryCache() COMPLETE in ${Date.now() - startTime}ms (empty)`);
         return;
       }
 
-      // Load all frozen events into memory
+      // Load all frozen events into memory in parallel
       const loadPromises = frozenIds.map(async (eventId) => {
         const data = await this.getFromStorage(eventId);
         if (data) {
@@ -81,13 +84,13 @@ export class FrozenEventStore {
 
       await Promise.all(loadPromises);
 
-      const elapsed = Date.now() - startTime;
-      console.log(
-        `[FrozenEventStore] ✅ Initialized ${this.memoryCache.size} frozen events in ${elapsed}ms`
-      );
       this.isInitialized = true;
+      console.log(
+        `[Perf] FrozenEventStore.initializeMemoryCache() ✅ COMPLETE in ${Date.now() - startTime}ms ` +
+        `(${this.memoryCache.size} events loaded)`
+      );
     } catch (error) {
-      console.error('[FrozenEventStore] Initialization error:', error);
+      console.error('[Perf] FrozenEventStore initialization ERROR:', error);
       this.isInitialized = true; // Continue anyway
     }
   }
@@ -111,9 +114,13 @@ export class FrozenEventStore {
    * Returns null if event is not frozen
    */
   static async get(eventId: string): Promise<FrozenEventData | null> {
+    const startTime = Date.now();
+
     // Check memory cache first (instant)
     if (this.memoryCache.has(eventId)) {
-      return this.memoryCache.get(eventId)!;
+      const data = this.memoryCache.get(eventId)!;
+      console.log(`[Perf] FrozenEventStore.get() - MEMORY HIT in ${Date.now() - startTime}ms`);
+      return data;
     }
 
     // Try loading from storage
@@ -121,6 +128,9 @@ export class FrozenEventStore {
     if (data) {
       // Promote to memory cache
       this.memoryCache.set(eventId, data);
+      console.log(`[Perf] FrozenEventStore.get() - STORAGE HIT in ${Date.now() - startTime}ms (promoted to memory)`);
+    } else {
+      console.log(`[Perf] FrozenEventStore.get() - MISS in ${Date.now() - startTime}ms`);
     }
 
     return data;
@@ -137,9 +147,11 @@ export class FrozenEventStore {
     leaderboard: SatlantisLeaderboardEntry[],
     eventEndTime: number
   ): Promise<void> {
+    const startTime = Date.now();
+
     // Don't re-freeze if already frozen
     if (this.memoryCache.has(eventId)) {
-      console.log(`[FrozenEventStore] Event ${eventId.slice(0, 8)}... already frozen, skipping`);
+      console.log(`[Perf] FrozenEventStore.freeze() - Already frozen, skipping`);
       return;
     }
 
@@ -155,19 +167,24 @@ export class FrozenEventStore {
     try {
       // Store in AsyncStorage
       const key = `${STORAGE_PREFIX}${eventId}`;
+      const storageStart = Date.now();
       await AsyncStorage.setItem(key, JSON.stringify(data));
+      console.log(`[Perf] FrozenEventStore - AsyncStorage write: ${Date.now() - storageStart}ms`);
 
       // Add to index
+      const indexStart = Date.now();
       await this.addToIndex(eventId);
+      console.log(`[Perf] FrozenEventStore - Index update: ${Date.now() - indexStart}ms`);
 
       // Add to memory cache
       this.memoryCache.set(eventId, data);
 
       console.log(
-        `[FrozenEventStore] ❄️ Froze event ${eventId.slice(0, 8)}... with ${participants.length} participants, ${leaderboard.length} leaderboard entries`
+        `[Perf] FrozenEventStore.freeze() ❄️ COMPLETE in ${Date.now() - startTime}ms ` +
+        `(${participants.length} participants, ${leaderboard.length} entries)`
       );
     } catch (error) {
-      console.error('[FrozenEventStore] Error freezing event:', error);
+      console.error('[Perf] FrozenEventStore.freeze() ERROR:', error);
     }
   }
 

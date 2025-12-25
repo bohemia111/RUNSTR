@@ -1,21 +1,22 @@
 /**
  * useSatlantisEvents - React hooks for Satlantis event discovery and detail
  *
- * Provides hooks for:
- * - Discovery feed (list of sports events)
- * - Event detail with participant list and leaderboard
+ * INSTANT LEADERBOARDS: Uses WorkoutEventStore cache for instant leaderboard display
+ * - WorkoutEventStore fetches 2 days of workouts at app startup
+ * - Leaderboards read from cache (instant) instead of querying Nostr (5-8s)
+ * - Falls back to direct query if store not initialized
+ * - Keep FrozenEventStore for ended events only
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { SatlantisEventService } from '../services/satlantis/SatlantisEventService';
 import { SatlantisRSVPService } from '../services/satlantis/SatlantisRSVPService';
-import { Competition1301QueryService, WorkoutMetrics } from '../services/competition/Competition1301QueryService';
+import { WorkoutMetrics } from '../services/competition/Competition1301QueryService';
 import { SatlantisEventScoringService } from '../services/scoring/SatlantisEventScoringService';
 import { UnifiedCacheService } from '../services/cache/UnifiedCacheService';
 import { FrozenEventStore } from '../services/cache/FrozenEventStore';
 import { AppStateManager } from '../services/core/AppStateManager';
 import { WorkoutEventStore, StoredWorkout } from '../services/fitness/WorkoutEventStore';
-import { hexToNpub } from '../utils/ndkConversion';
 import type {
   SatlantisEvent,
   SatlantisEventFilter,
@@ -28,94 +29,120 @@ import {
 } from '../types/satlantis';
 
 // ============================================================================
-// Helper: Convert StoredWorkout[] to WorkoutMetrics Map
+// Helper: Normalize pubkey to hex format (fixes duplicate entries)
+// ============================================================================
+
+/**
+ * Normalize any pubkey format (npub or hex) to hex
+ * This prevents duplicate entries when mixing npub and hex formats
+ */
+function normalizeToHex(pubkey: string): string {
+  if (!pubkey) return pubkey;
+  if (pubkey.startsWith('npub')) {
+    try {
+      const { nip19 } = require('@nostr-dev-kit/ndk');
+      const decoded = nip19.decode(pubkey);
+      return decoded.data as string;
+    } catch (err) {
+      console.warn(`[normalizeToHex] Failed to decode npub: ${pubkey.slice(0, 16)}...`);
+      return pubkey;
+    }
+  }
+  return pubkey;
+}
+
+/**
+ * Normalize array of pubkeys to hex format and deduplicate
+ */
+function normalizeAndDeduplicatePubkeys(pubkeys: string[]): string[] {
+  const normalized = pubkeys.map(normalizeToHex);
+  return [...new Set(normalized)];
+}
+
+// ============================================================================
+// Helper: Convert StoredWorkout[] to WorkoutMetrics Map for scoring service
 // ============================================================================
 
 /**
  * Convert StoredWorkout[] from WorkoutEventStore to Map<string, WorkoutMetrics>
- * This enables Satlantis events to use the unified workout cache
+ * format that SatlantisEventScoringService.buildLeaderboard() expects
  */
 function convertStoredWorkoutsToMetrics(
-  workouts: StoredWorkout[],
+  storedWorkouts: StoredWorkout[],
   activityType: string
 ): Map<string, WorkoutMetrics> {
-  const metricsMap = new Map<string, WorkoutMetrics>();
+  const metrics = new Map<string, WorkoutMetrics>();
 
-  // Filter by activity type
-  const filteredWorkouts = workouts.filter(
-    (w) => w.activityType?.toLowerCase() === activityType.toLowerCase()
-  );
-
-  // Group by pubkey
-  const workoutsByUser = new Map<string, StoredWorkout[]>();
-  for (const workout of filteredWorkouts) {
-    const existing = workoutsByUser.get(workout.pubkey) || [];
-    existing.push(workout);
-    workoutsByUser.set(workout.pubkey, existing);
-  }
-
-  // Build WorkoutMetrics for each user
-  for (const [pubkey, userWorkouts] of workoutsByUser) {
-    const npub = hexToNpub(pubkey) || pubkey;
-
-    // Calculate aggregated metrics
-    let totalDistance = 0; // km
-    let totalDuration = 0; // minutes
-    let totalCalories = 0;
-    let longestDistance = 0;
-    let longestDuration = 0;
-    const activeDaysSet = new Set<string>();
-
-    for (const w of userWorkouts) {
-      const distanceKm = (w.distance || 0) / 1000;
-      const durationMin = (w.duration || 0) / 60;
-
-      totalDistance += distanceKm;
-      totalDuration += durationMin;
-      totalCalories += w.calories || 0;
-      longestDistance = Math.max(longestDistance, distanceKm);
-      longestDuration = Math.max(longestDuration, durationMin);
-
-      // Track unique days
-      const date = new Date(w.createdAt * 1000).toDateString();
-      activeDaysSet.add(date);
+  // Group workouts by pubkey
+  const grouped = new Map<string, StoredWorkout[]>();
+  for (const workout of storedWorkouts) {
+    // Filter by activity type
+    if (workout.activityType.toLowerCase() !== activityType.toLowerCase()) {
+      continue;
     }
 
-    // Convert StoredWorkout to scoring-compatible format
-    // The scoring service will use parseSplitsFromWorkout() which now accepts pre-parsed splits
-    const scoringWorkouts = userWorkouts.map((w) => ({
-      id: w.id,
-      nostrPubkey: w.pubkey,
-      distance: w.distance || 0, // meters
-      duration: w.duration || 0, // seconds
-      calories: w.calories || 0,
-      splits: w.splits, // Pre-parsed Map<number, number> - scoring service now accepts this
-      startTime: new Date(w.createdAt * 1000).toISOString(),
-      source: 'nostr' as const,
-      nostrEventId: w.id,
-      nostrCreatedAt: w.createdAt,
-      unitSystem: 'metric' as const,
-    }));
-
-    const metrics: WorkoutMetrics = {
-      npub,
-      totalDistance,
-      totalDuration,
-      totalCalories,
-      workoutCount: userWorkouts.length,
-      activeDays: activeDaysSet.size,
-      longestDistance,
-      longestDuration,
-      averagePace: totalDistance > 0 ? totalDuration / totalDistance : undefined,
-      averageSpeed: totalDuration > 0 ? (totalDistance / totalDuration) * 60 : undefined,
-      streakDays: 0, // Not calculated for simplicity
-      workouts: scoringWorkouts as any, // Cast to any since we're providing a compatible subset
-    };
-
-    metricsMap.set(npub, metrics);
+    const pubkey = workout.pubkey;
+    if (!grouped.has(pubkey)) {
+      grouped.set(pubkey, []);
+    }
+    grouped.get(pubkey)!.push(workout);
   }
 
-  return metricsMap;
+  // Convert each group to WorkoutMetrics format
+  for (const [pubkey, workouts] of grouped) {
+    // Convert StoredWorkout to NostrWorkout-like format for scoring service
+    const nostrWorkouts = workouts.map(stored => ({
+      id: stored.id,
+      source: 'nostr' as const,
+      type: stored.activityType,
+      activityType: stored.activityType,
+      startTime: new Date(stored.createdAt * 1000).toISOString(),
+      endTime: new Date((stored.createdAt + (stored.duration || 0)) * 1000).toISOString(),
+      duration: stored.duration || 0,        // seconds
+      distance: stored.distance || 0,        // meters
+      calories: stored.calories || 0,
+      averageHeartRate: 0,
+      maxHeartRate: 0,
+      nostrEventId: stored.id,
+      nostrPubkey: stored.pubkey,
+      nostrCreatedAt: stored.createdAt,
+      unitSystem: 'metric' as const,
+      dataSource: 'RUNSTR' as const,
+      // Pre-parsed splits from WorkoutEventStore (Map<km, seconds>)
+      // Scoring service can use this directly
+      splits: stored.splits,
+    }));
+
+    // Calculate aggregated metrics
+    let totalDistance = 0;
+    let totalDuration = 0;
+    const activeDaysSet = new Set<string>();
+
+    for (const workout of nostrWorkouts) {
+      totalDistance += (workout.distance || 0) / 1000;  // Convert to km
+      totalDuration += (workout.duration || 0) / 60;     // Convert to minutes
+      const workoutDate = new Date(workout.startTime).toDateString();
+      activeDaysSet.add(workoutDate);
+    }
+
+    metrics.set(pubkey, {
+      npub: pubkey,
+      totalDistance,
+      totalDuration,
+      totalCalories: workouts.reduce((sum, w) => sum + (w.calories || 0), 0),
+      workoutCount: workouts.length,
+      activeDays: activeDaysSet.size,
+      longestDistance: Math.max(...nostrWorkouts.map(w => (w.distance || 0) / 1000)),
+      longestDuration: Math.max(...nostrWorkouts.map(w => (w.duration || 0) / 60)),
+      averagePace: totalDistance > 0 ? totalDuration / totalDistance : 0,
+      averageSpeed: totalDuration > 0 ? (totalDistance / totalDuration) * 60 : 0,
+      lastActivityDate: nostrWorkouts[0]?.startTime,
+      streakDays: 0,
+      workouts: nostrWorkouts as any, // Cast to avoid complex type issues
+    });
+  }
+
+  return metrics;
 }
 
 // ============================================================================
@@ -140,8 +167,17 @@ export function useSatlantisEvents(
   const [error, setError] = useState<string | null>(null);
   const isMounted = useRef(true);
 
+  // Ref to track current events for silent refresh pattern
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+
   const loadEvents = useCallback(async (forceRefresh: boolean = false) => {
-    setIsLoading(true);
+    // SILENT REFRESH: Only show loading on first-ever load (no existing data)
+    // Pull-to-refresh and foreground return should NOT show spinner
+    const hasExistingData = eventsRef.current.length > 0;
+    if (!hasExistingData) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -227,27 +263,41 @@ export function useSatlantisEventDetail(
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isMounted = useRef(true);
+  // Refs for silent refresh pattern (avoid stale closures)
+  const eventRef = useRef(event);
+  eventRef.current = event;
+  const leaderboardRef = useRef(leaderboard);
+  leaderboardRef.current = leaderboard;
 
   // Merge fetched and local participants (for optimistic UI)
+  // IMPORTANT: Normalize all pubkeys to hex to prevent duplicates
   const participants = useMemo(() => {
-    return [...new Set([...fetchedParticipants, ...localParticipants])];
+    const merged = [...fetchedParticipants, ...localParticipants];
+    const normalized = normalizeAndDeduplicatePubkeys(merged);
+    if (merged.length !== normalized.length) {
+      console.log(`[Participants] Deduped ${merged.length} → ${normalized.length} (normalized to hex)`);
+    }
+    return normalized;
   }, [fetchedParticipants, localParticipants]);
 
-  // Add local participant for optimistic UI
+  // Add local participant for optimistic UI (normalize to hex)
   const addLocalParticipant = useCallback((pubkey: string) => {
+    const normalizedPubkey = normalizeToHex(pubkey);
     setLocalParticipants(prev => {
-      if (prev.includes(pubkey)) return prev;
-      return [...prev, pubkey];
+      if (prev.includes(normalizedPubkey)) return prev;
+      console.log(`[Participants] Added local participant: ${normalizedPubkey.slice(0, 16)}...`);
+      return [...prev, normalizedPubkey];
     });
   }, []);
 
   const loadEventDetail = useCallback(async (forceRefresh: boolean = false) => {
     if (!eventPubkey || !eventId) return;
 
-    console.log(`[useSatlantisEventDetail] 🚀 Loading event detail...`);
-    console.log(`[useSatlantisEventDetail]   - eventPubkey: ${eventPubkey.slice(0, 16)}...`);
-    console.log(`[useSatlantisEventDetail]   - eventId: ${eventId}`);
-    console.log(`[useSatlantisEventDetail]   - forceRefresh: ${forceRefresh}`);
+    const totalStartTime = Date.now();
+    console.log(`[Perf] 🚀 START loadEventDetail`);
+    console.log(`[Perf]   - eventPubkey: ${eventPubkey.slice(0, 16)}...`);
+    console.log(`[Perf]   - eventId: ${eventId}`);
+    console.log(`[Perf]   - forceRefresh: ${forceRefresh}`);
 
     // NOTE: Do NOT clear local participants on refresh
     // The useMemo merge already deduplicates, and clearing causes RSVP to "disappear"
@@ -260,11 +310,15 @@ export function useSatlantisEventDetail(
       // FROZEN EVENT CHECK: Return permanently stored data for ended events
       // ============================================================================
       if (!forceRefresh) {
+        const frozenCheckStart = Date.now();
         const frozenData = await FrozenEventStore.get(eventId);
+        console.log(`[Perf] ❄️ FrozenEventStore.get() took ${Date.now() - frozenCheckStart}ms`);
+
         if (frozenData) {
-          console.log(`[useSatlantisEventDetail] ❄️ Using frozen data for ended event`);
-          console.log(`[useSatlantisEventDetail]   - Participants: ${frozenData.participants.length}`);
-          console.log(`[useSatlantisEventDetail]   - Leaderboard entries: ${frozenData.leaderboard.length}`);
+          console.log(`[Perf] ❄️ HIT! Using frozen data for ended event`);
+          console.log(`[Perf]   - Participants: ${frozenData.participants.length}`);
+          console.log(`[Perf]   - Leaderboard entries: ${frozenData.leaderboard.length}`);
+          console.log(`[Perf] ✅ TOTAL loadEventDetail: ${Date.now() - totalStartTime}ms (frozen path)`);
 
           // Load event metadata from cache (just for display, frozen data is authoritative)
           const cachedEvent = await SatlantisEventService.getEventById(eventId, eventPubkey, false);
@@ -287,20 +341,26 @@ export function useSatlantisEventDetail(
 
       // Step 1: Try to load cached data immediately (no network, instant display)
       if (!forceRefresh) {
-        console.log(`[useSatlantisEventDetail] 📦 Checking cache...`);
+        console.log(`[Perf] 📦 Checking event cache...`);
+        const cacheCheckStart = Date.now();
         const cachedEvent = await SatlantisEventService.getEventById(eventId, eventPubkey, false);
+        console.log(`[Perf] 📦 Event cache check took ${Date.now() - cacheCheckStart}ms`);
 
         if (cachedEvent) {
-          console.log(`[useSatlantisEventDetail] ✅ Cache hit! Showing cached data instantly`);
+          console.log(`[Perf] ✅ Event cache HIT! Showing cached data instantly`);
           setEvent(cachedEvent);
           setEventStatus(getEventStatus(cachedEvent));
 
-          // Load cached participants in parallel
-          const cachedParticipants = await SatlantisRSVPService.getEventParticipants(
+          // Load cached participants (normalized)
+          const rsvpStart = Date.now();
+          const rawParticipants = await SatlantisRSVPService.getEventParticipants(
             eventPubkey,
             eventId,
             false // Don't skip cache
           );
+          const cachedParticipants = normalizeAndDeduplicatePubkeys(rawParticipants);
+          console.log(`[Perf] 👥 RSVP cache took ${Date.now() - rsvpStart}ms (${cachedParticipants.length} participants)`);
+
           setFetchedParticipants(cachedParticipants);
           setIsLoading(false); // Stop spinner - user sees cached data immediately!
 
@@ -313,12 +373,13 @@ export function useSatlantisEventDetail(
           // IMPORTANT: If participants is empty, trigger background refresh
           // This handles the case where relay was down when RSVPs were initially fetched
           if (cachedParticipants.length === 0) {
-            console.log(`[useSatlantisEventDetail] ⚠️ Cached participants empty - triggering background refresh`);
+            console.log(`[Perf] ⚠️ Cached participants empty - triggering background refresh`);
             // Don't await - let it run in background while user sees cached event data
             SatlantisRSVPService.getEventParticipants(eventPubkey, eventId, true)
-              .then((freshParticipants) => {
+              .then((rawFresh) => {
+                const freshParticipants = normalizeAndDeduplicatePubkeys(rawFresh);
                 if (isMounted.current && freshParticipants.length > 0) {
-                  console.log(`[useSatlantisEventDetail] 🔄 Background refresh found ${freshParticipants.length} participants!`);
+                  console.log(`[Perf] 🔄 Background refresh found ${freshParticipants.length} participants!`);
                   setFetchedParticipants(freshParticipants);
                   // Also refresh leaderboard with new participants
                   if (now >= cachedEvent.startTime) {
@@ -327,82 +388,87 @@ export function useSatlantisEventDetail(
                 }
               })
               .catch((err) => {
-                console.warn(`[useSatlantisEventDetail] Background refresh failed:`, err);
+                console.warn(`[Perf] Background refresh failed:`, err);
               });
           }
 
-          console.log(`[useSatlantisEventDetail] 🎉 Cached data displayed${cachedParticipants.length === 0 ? ' (background refresh in progress)' : ''}`);
+          console.log(`[Perf] ✅ TOTAL loadEventDetail: ${Date.now() - totalStartTime}ms (cache path)`);
           return; // Done! User sees cached data instantly
         }
       }
 
       // Step 2: No cache or forceRefresh - need to load fresh data
-      console.log(`[useSatlantisEventDetail] 🌐 Loading fresh data from Nostr...`);
-      setIsLoading(true);
+      console.log(`[Perf] 🌐 Loading fresh data from Nostr...`);
+      // SILENT REFRESH: Only show loading on first-ever load (no existing event data)
+      // Pull-to-refresh and foreground return should NOT show spinner
+      if (!eventRef.current) {
+        setIsLoading(true);
+      }
 
       // Load event details with retry logic for relay latency
-      console.log(`[useSatlantisEventDetail] 📥 Fetching event data...`);
+      const eventFetchStart = Date.now();
+      console.log(`[Perf] 📥 Fetching event data...`);
       let eventData = await SatlantisEventService.getEventById(eventId, eventPubkey, true);
 
       // Retry up to 3 times with exponential backoff if event not found
       if (!eventData) {
         const retryDelays = [1000, 2000, 4000]; // 1s, 2s, 4s
         for (let i = 0; i < retryDelays.length && !eventData; i++) {
-          console.log(`[useSatlantisEventDetail] ⏳ Event not found, retry ${i + 1}/3 in ${retryDelays[i]}ms...`);
+          console.log(`[Perf] ⏳ Event not found, retry ${i + 1}/3 in ${retryDelays[i]}ms...`);
           await new Promise(resolve => setTimeout(resolve, retryDelays[i]));
           if (!isMounted.current) return;
           eventData = await SatlantisEventService.getEventById(eventId, eventPubkey, true);
         }
       }
 
+      console.log(`[Perf] 📥 Event fetch took ${Date.now() - eventFetchStart}ms`);
       if (!isMounted.current) return;
 
       if (!eventData) {
-        console.log(`[useSatlantisEventDetail] ❌ Event not found after retries!`);
+        console.log(`[Perf] ❌ Event not found after retries!`);
         setError('Event not found');
         setIsLoading(false);
         return;
       }
 
-      console.log(`[useSatlantisEventDetail] ✅ Event found: "${eventData.title}"`);
+      console.log(`[Perf] ✅ Event found: "${eventData.title}"`);
       setEvent(eventData);
       setEventStatus(getEventStatus(eventData));
 
-      // Load participants from RSVPs (fresh data)
-      console.log(`[useSatlantisEventDetail] 👥 Loading participants...`);
-      const participantPubkeys = await SatlantisRSVPService.getEventParticipants(
+      // Load participants from RSVPs (fresh data) - NORMALIZE to hex
+      const rsvpFetchStart = Date.now();
+      console.log(`[Perf] 👥 Loading participants (fresh)...`);
+      const rawParticipants = await SatlantisRSVPService.getEventParticipants(
         eventPubkey,
         eventId,
         true // Skip cache for fresh data
       );
-      if (!isMounted.current) return;
+      const participantPubkeys = normalizeAndDeduplicatePubkeys(rawParticipants);
+      console.log(`[Perf] 👥 RSVP fetch took ${Date.now() - rsvpFetchStart}ms`);
+      console.log(`[Perf] 👥 Participants: ${rawParticipants.length} raw → ${participantPubkeys.length} normalized`);
 
-      console.log(`[useSatlantisEventDetail] 👥 Participants found: ${participantPubkeys.length}`);
-      if (participantPubkeys.length > 0) {
-        console.log(`[useSatlantisEventDetail]   - Participant pubkeys:`, participantPubkeys.map(p => p.slice(0, 16) + '...'));
-      }
+      if (!isMounted.current) return;
 
       setFetchedParticipants(participantPubkeys);
       setIsLoading(false);
 
       // Load leaderboard if event has started/ended
       const now = Math.floor(Date.now() / 1000);
+      const hasStarted = now >= eventData.startTime;
 
-      console.log(`[useSatlantisEventDetail] 📊 Event timing check:`);
-      console.log(`   - Now: ${new Date(now * 1000).toISOString()}`);
-      console.log(`   - Event start: ${new Date(eventData.startTime * 1000).toISOString()}`);
-      console.log(`   - Event end: ${new Date(eventData.endTime * 1000).toISOString()}`);
-      console.log(`   - Has started: ${now >= eventData.startTime}`);
-      console.log(`   - Participants from RSVPs + local: ${participantPubkeys.length}`);
+      console.log(`[Perf] 📊 Event timing: started=${hasStarted}, participants=${participantPubkeys.length}`);
 
-      if (now >= eventData.startTime) {
-        console.log(`[useSatlantisEventDetail] ⏱️ Event has started - loading leaderboard...`);
+      if (hasStarted) {
+        console.log(`[Perf] ⏱️ Event has started - loading leaderboard...`);
         await loadLeaderboard(eventData, participantPubkeys, true);
       } else {
-        console.log(`[useSatlantisEventDetail] ⏳ Event hasn't started yet, skipping leaderboard load`);
+        console.log(`[Perf] ⏳ Event hasn't started yet, skipping leaderboard load`);
       }
+
+      console.log(`[Perf] ✅ TOTAL loadEventDetail: ${Date.now() - totalStartTime}ms (fresh path)`);
     } catch (err) {
-      console.error('[useSatlantisEventDetail] ❌ Error:', err);
+      console.error('[Perf] ❌ Error:', err);
+      console.log(`[Perf] ❌ TOTAL loadEventDetail: ${Date.now() - totalStartTime}ms (error)`);
       if (isMounted.current) {
         setError(err instanceof Error ? err.message : 'Failed to load event');
         setIsLoading(false);
@@ -410,145 +476,118 @@ export function useSatlantisEventDetail(
     }
   }, [eventPubkey, eventId]);
 
+  /**
+   * V1.0-STYLE LEADERBOARD: Direct Nostr queries (simplified, no WorkoutEventStore)
+   */
   const loadLeaderboard = async (
     eventData: SatlantisEvent,
     participantPubkeys: string[],
     forceRefresh: boolean = false
   ) => {
     if (!isMounted.current) return;
-    setIsLoadingLeaderboard(true);
+    // SILENT REFRESH: Only show loading on first-ever load (no existing leaderboard data)
+    // Pull-to-refresh should NOT show spinner
+    const hasExistingLeaderboard = leaderboardRef.current.length > 0;
+    if (!hasExistingLeaderboard) {
+      setIsLoadingLeaderboard(true);
+    }
 
+    const leaderboardStartTime = Date.now();
     const cacheKey = `satlantis_leaderboard_${eventData.id}`;
     const now = Math.floor(Date.now() / 1000);
     const isCompleted = eventData.endTime < now;
 
-    console.log(`[useSatlantisEventDetail] 🏁 loadLeaderboard called`);
-    console.log(`[useSatlantisEventDetail]   - Event: "${eventData.title}"`);
-    console.log(`[useSatlantisEventDetail]   - Participants count: ${participantPubkeys.length}`);
-    console.log(`[useSatlantisEventDetail]   - Sport type: ${eventData.sportType}`);
-    console.log(`[useSatlantisEventDetail]   - Scoring type: ${eventData.scoringType || 'fastest_time'}`);
-    console.log(`[useSatlantisEventDetail]   - Target distance: ${eventData.distance || 'none'}`);
-    console.log(`[useSatlantisEventDetail]   - Event completed: ${isCompleted}`);
-    console.log(`[useSatlantisEventDetail]   - Force refresh: ${forceRefresh}`);
+    console.log(`[Perf] 🏁 loadLeaderboard START`);
+    console.log(`[Perf]   - Event: "${eventData.title}"`);
+    console.log(`[Perf]   - Participants: ${participantPubkeys.length}`);
+    console.log(`[Perf]   - Scoring: ${eventData.scoringType || 'fastest_time'}`);
+    console.log(`[Perf]   - Completed: ${isCompleted}, ForceRefresh: ${forceRefresh}`);
 
     try {
       // Check cache first (unless forceRefresh)
-      // Now accepts empty arrays too (with shorter TTL) to prevent relay spam
       if (!forceRefresh) {
+        const cacheCheckStart = Date.now();
         const cached = await UnifiedCacheService.get<SatlantisLeaderboardEntry[]>(cacheKey);
+        console.log(`[Perf] 💾 Leaderboard cache check: ${Date.now() - cacheCheckStart}ms`);
+
         if (cached !== null && cached !== undefined) {
-          console.log(`[useSatlantisEventDetail] 💾 Leaderboard cache hit: ${cached.length} entries`);
+          console.log(`[Perf] 💾 CACHE HIT: ${cached.length} entries`);
+          console.log(`[Perf] ✅ loadLeaderboard TOTAL: ${Date.now() - leaderboardStartTime}ms (cache)`);
           setLeaderboard(cached);
           setIsLoadingLeaderboard(false);
           return;
         }
-        console.log(`[useSatlantisEventDetail] 📭 Leaderboard cache miss - fetching from Nostr...`);
-      } else {
-        console.log(`[useSatlantisEventDetail] 🔄 Force refresh - bypassing cache`);
+        console.log(`[Perf] 📭 Cache miss - querying Nostr directly...`);
       }
 
       // Map Satlantis sport type to RUNSTR activity type
       const activityType = mapSportToActivityType(eventData.sportType);
-      console.log(`[useSatlantisEventDetail]   - Mapped activity type: ${activityType}`);
 
-      // Query workouts from RSVPed participants only
-      // Satlantis events require RSVP to appear on leaderboard
+      // INSTANT LEADERBOARDS: Read from WorkoutEventStore cache
       let metrics: Map<string, WorkoutMetrics>;
 
       if (participantPubkeys.length > 0) {
-        console.log(`[useSatlantisEventDetail] 📋 Querying ${participantPubkeys.length} participants' workouts`);
-        console.log(`[useSatlantisEventDetail]   - Date range: ${new Date(eventData.startTime * 1000).toISOString()} to ${new Date(eventData.endTime * 1000).toISOString()}`);
+        // Ensure all pubkeys are normalized to hex before querying
+        const normalizedPubkeys = normalizeAndDeduplicatePubkeys(participantPubkeys);
 
-        // Check if event is within WorkoutEventStore's 7-day window (reduced from 14 for speed)
-        const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
-        const eventIsRecent = eventData.startTime >= sevenDaysAgo;
+        console.log(`[Perf] 🔍 Reading workouts from WorkoutEventStore (instant cache)`);
+        console.log(`[Perf]   - Activity: ${activityType}`);
+        console.log(`[Perf]   - Participants: ${normalizedPubkeys.length}`);
+        console.log(`[Perf]   - Date range: ${new Date(eventData.startTime * 1000).toISOString().split('T')[0]} to ${new Date(eventData.endTime * 1000).toISOString().split('T')[0]}`);
 
-        if (eventIsRecent) {
-          // Use WorkoutEventStore (unified cache) for recent events
-          console.log(`[useSatlantisEventDetail] 📦 Using WorkoutEventStore (event within 7-day window)`);
-          const store = WorkoutEventStore.getInstance();
+        const workoutQueryStart = Date.now();
 
-          // Convert npubs to hex pubkeys for store query
-          const hexPubkeys = participantPubkeys.map((npub) => {
-            // participantPubkeys might be npub or hex - handle both
-            if (npub.startsWith('npub')) {
-              try {
-                const { nip19 } = require('@nostr-dev-kit/ndk');
-                const decoded = nip19.decode(npub);
-                return decoded.data as string;
-              } catch {
-                return npub;
-              }
-            }
-            return npub;
-          });
+        // Read from WorkoutEventStore cache (instant)
+        const workoutStore = WorkoutEventStore.getInstance();
+        const storedWorkouts = workoutStore.getEventWorkouts(
+          eventData.startTime,     // unix timestamp seconds
+          eventData.endTime,       // unix timestamp seconds
+          normalizedPubkeys        // hex pubkeys
+        );
 
-          // Get workouts from unified cache
-          const storedWorkouts = store.getEventWorkouts(
-            eventData.startTime,
-            eventData.endTime,
-            hexPubkeys
-          );
-          console.log(`[useSatlantisEventDetail] 📊 WorkoutEventStore returned ${storedWorkouts.length} workouts`);
+        console.log(`[Perf] 📦 Store returned ${storedWorkouts.length} workouts in ${Date.now() - workoutQueryStart}ms`);
 
-          // Convert to WorkoutMetrics format (with pre-parsed splits)
-          metrics = convertStoredWorkoutsToMetrics(storedWorkouts, activityType);
-          console.log(`[useSatlantisEventDetail] 📊 Converted to ${metrics.size} users with workouts`);
-        } else {
-          // Event is older than 7 days - use direct Nostr query
-          console.log(`[useSatlantisEventDetail] 🔍 Using direct Nostr query (event older than 7 days)`);
-          const queryService = Competition1301QueryService.getInstance();
-          const result = await queryService.queryMemberWorkouts({
-            memberNpubs: participantPubkeys,
-            activityType: activityType as any,
-            startDate: new Date(eventData.startTime * 1000),
-            endDate: new Date(eventData.endTime * 1000),
-          });
-          metrics = result.metrics;
-          console.log(`[useSatlantisEventDetail] 📊 queryMemberWorkouts returned ${metrics.size} users with workouts`);
-        }
+        // Convert to WorkoutMetrics format (filters by activity type internally)
+        metrics = convertStoredWorkoutsToMetrics(storedWorkouts, activityType);
+
+        console.log(`[Perf] 🔍 Converted to ${metrics.size} users with ${activityType} workouts`);
       } else {
-        // No RSVPs yet - empty leaderboard
-        console.log('[useSatlantisEventDetail] ⚠️ No participants yet - empty leaderboard');
+        console.log(`[Perf] ⚠️ No participants - empty leaderboard`);
         metrics = new Map();
       }
 
       if (!isMounted.current) return;
 
       // Build leaderboard entries using scoring service
-      // Supports: fastest_time, most_distance, participation
       // Pass all participants so 0-workout participants are included
-      console.log(`[useSatlantisEventDetail] 🧮 Building leaderboard with ${metrics.size} users, ${participantPubkeys.length} total participants...`);
+      const buildStart = Date.now();
       const entries = SatlantisEventScoringService.buildLeaderboard(
         metrics,
         eventData.scoringType || 'fastest_time',
         eventData.distance,
         participantPubkeys  // Include all registered participants (even with 0 workouts)
       );
-
-      console.log(
-        `[useSatlantisEventDetail] 🏆 Leaderboard built with ${entries.length} entries ` +
-          `(scoring: ${eventData.scoringType || 'fastest_time'})`
-      );
+      console.log(`[Perf] 🧮 Leaderboard build took ${Date.now() - buildStart}ms`);
+      console.log(`[Perf] 🏆 Result: ${entries.length} entries`);
 
       if (entries.length > 0) {
-        console.log(`[useSatlantisEventDetail] 📋 Leaderboard entries:`);
+        console.log(`[Perf] 📋 Top 5 entries:`);
         entries.slice(0, 5).forEach((e, i) => {
           console.log(`   ${i + 1}. ${e.npub.slice(0, 16)}... - ${e.formattedScore} (${e.workoutCount} workouts)`);
         });
-      } else {
-        console.log(`[useSatlantisEventDetail] ⚠️ No leaderboard entries! Check workout query.`);
       }
 
       // Cache the leaderboard result
       // Completed events: 24 hours | Active events: 5 minutes (live competition)
+      const cacheStart = Date.now();
       const cacheTTL = isCompleted ? 86400 : 300;
       await UnifiedCacheService.setWithCustomTTL(cacheKey, entries, cacheTTL);
-      console.log(`[useSatlantisEventDetail] 💾 Leaderboard cached (TTL: ${isCompleted ? '24 hours' : '5 minutes'})`);
+      console.log(`[Perf] 💾 Cache write: ${Date.now() - cacheStart}ms (TTL: ${isCompleted ? '24h' : '5min'})`);
 
       // FREEZE completed events permanently (never re-query)
       if (isCompleted && !await FrozenEventStore.isFrozen(eventData.id)) {
-        console.log(`[useSatlantisEventDetail] ❄️ Freezing completed event permanently...`);
+        const freezeStart = Date.now();
+        console.log(`[Perf] ❄️ Freezing completed event...`);
         await FrozenEventStore.freeze(
           eventData.id,
           eventData.pubkey,
@@ -556,11 +595,14 @@ export function useSatlantisEventDetail(
           entries,
           eventData.endTime
         );
+        console.log(`[Perf] ❄️ Freeze took ${Date.now() - freezeStart}ms`);
       }
 
+      console.log(`[Perf] ✅ loadLeaderboard TOTAL: ${Date.now() - leaderboardStartTime}ms`);
       setLeaderboard(entries);
     } catch (err) {
-      console.error('[useSatlantisEventDetail] ❌ Leaderboard error:', err);
+      console.error('[Perf] ❌ Leaderboard error:', err);
+      console.log(`[Perf] ❌ loadLeaderboard TOTAL: ${Date.now() - leaderboardStartTime}ms (error)`);
     } finally {
       if (isMounted.current) {
         setIsLoadingLeaderboard(false);
@@ -569,34 +611,31 @@ export function useSatlantisEventDetail(
   };
 
   /**
-   * Refresh workouts only (for pull-to-refresh)
-   * Does NOT re-fetch event metadata or RSVPs - those are cached
-   * Only refreshes the WorkoutEventStore and rebuilds leaderboard
+   * V1.0-STYLE: Pull-to-refresh with direct Nostr queries
+   * Queries fresh workouts directly from relays (no WorkoutEventStore)
    */
   const refreshWorkoutsOnly = useCallback(async () => {
     if (!event) {
-      console.log('[useSatlantisEventDetail] ⚠️ No event cached - doing full refresh');
+      console.log('[Perf] ⚠️ No event cached - doing full refresh');
       await loadEventDetail(true);
       return;
     }
 
-    console.log('[useSatlantisEventDetail] 🔄 Pull-to-refresh: Workouts only');
+    const refreshStart = Date.now();
+    console.log('[Perf] 🔄 Pull-to-refresh START');
 
-    // Refresh WorkoutEventStore (fetch fresh 1301 events from Nostr)
-    const store = WorkoutEventStore.getInstance();
-    await store.refresh();
-
-    // Reload leaderboard with fresh workout data (using cached participants)
+    // V1.0-STYLE: Direct Nostr query for workouts (skip cache)
     const now = Math.floor(Date.now() / 1000);
     if (now >= event.startTime) {
-      await loadLeaderboard(event, participants, true);
+      await loadLeaderboard(event, participants, true); // forceRefresh = true
     }
 
     // Background RSVP check (non-blocking) - catches new registrations
     SatlantisRSVPService.getEventParticipants(eventPubkey, eventId, true)
-      .then((freshParticipants) => {
+      .then((rawParticipants) => {
+        const freshParticipants = normalizeAndDeduplicatePubkeys(rawParticipants);
         if (isMounted.current && freshParticipants.length !== fetchedParticipants.length) {
-          console.log(`[useSatlantisEventDetail] 🔔 Background RSVP check: ${fetchedParticipants.length} → ${freshParticipants.length} participants`);
+          console.log(`[Perf] 🔔 Background RSVP: ${fetchedParticipants.length} → ${freshParticipants.length} participants`);
           setFetchedParticipants(freshParticipants);
           // Rebuild leaderboard with updated participant list
           if (now >= event.startTime) {
@@ -605,10 +644,10 @@ export function useSatlantisEventDetail(
         }
       })
       .catch((err) => {
-        console.warn('[useSatlantisEventDetail] Background RSVP check failed:', err);
+        console.warn('[Perf] Background RSVP check failed:', err);
       });
 
-    console.log('[useSatlantisEventDetail] ✅ Workout refresh complete');
+    console.log(`[Perf] ✅ Pull-to-refresh TOTAL: ${Date.now() - refreshStart}ms`);
   }, [event, participants, fetchedParticipants, eventPubkey, eventId, loadEventDetail]);
 
   useEffect(() => {

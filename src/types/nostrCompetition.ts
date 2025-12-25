@@ -166,6 +166,17 @@ export interface NostrEventDefinition {
   // Location (NEW)
   location?: string; // Optional: Event location (e.g., "Central Park, NYC")
 
+  // Pledge System (costs X daily workouts to join)
+  pledgeCost?: number; // Number of daily workouts required (e.g., 5 = 250 sats worth)
+  pledgeDestination?: 'captain' | 'charity'; // Where pledged rewards go
+  pledgeCharityId?: string; // If destination is charity, the charity ID
+  pledgeCharityName?: string; // Charity name for display
+  pledgeCharityAddress?: string; // Charity Lightning address
+
+  // Rank Gating (require minimum RUNSTR rank to join)
+  minimumRank?: number; // Minimum RUNSTR rank score (e.g., 0.0001 for 'Known')
+  minimumRankTier?: string; // Human-readable tier ('Emerging' | 'New' | 'Known' | 'Trusted' | 'Elite')
+
   // Status
   status: 'upcoming' | 'active' | 'completed' | 'cancelled';
   createdAt: number; // Unix timestamp

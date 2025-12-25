@@ -5,6 +5,7 @@
  * Usage:
  *   // From any service:
  *   RewardNotificationManager.showRewardEarned(21);
+ *   RewardNotificationManager.showPledgeRewardSent(50, 'Saturday 5K', 'OpenSats', 3, 7);
  */
 
 export interface DonationSplit {
@@ -14,10 +15,23 @@ export interface DonationSplit {
   // Note: Team donations disabled until teams have lightning addresses configured
 }
 
+/**
+ * Pledge progress info for reward notifications
+ */
+export interface PledgeInfo {
+  eventName: string;
+  recipientName: string;
+  completedWorkouts: number;
+  totalWorkouts: number;
+  isComplete: boolean;
+}
+
 export interface RewardNotificationState {
   visible: boolean;
   amount: number;
   donationSplit?: DonationSplit;
+  /** If set, this is a pledge reward notification */
+  pledgeInfo?: PledgeInfo;
 }
 
 type NotificationCallback = (state: RewardNotificationState) => void;
@@ -63,6 +77,67 @@ class RewardNotificationManagerClass {
     if (this.callback) {
       this.callback({ visible: false, amount: 0 });
     }
+  }
+
+  /**
+   * Show a pledge reward notification
+   * Called when a daily reward is routed to a pledge destination
+   *
+   * @param amount - Amount of sats sent (usually 50)
+   * @param eventName - Name of the event the pledge is for
+   * @param recipientName - Name of recipient (captain or charity name)
+   * @param completedWorkouts - Number of workouts completed after this one
+   * @param totalWorkouts - Total workouts required for pledge
+   */
+  showPledgeRewardSent(
+    amount: number,
+    eventName: string,
+    recipientName: string,
+    completedWorkouts: number,
+    totalWorkouts: number
+  ): void {
+    const isComplete = completedWorkouts >= totalWorkouts;
+
+    if (this.callback) {
+      this.callback({
+        visible: true,
+        amount,
+        pledgeInfo: {
+          eventName,
+          recipientName,
+          completedWorkouts,
+          totalWorkouts,
+          isComplete,
+        },
+      });
+    } else {
+      console.warn(
+        '[RewardNotification] Provider not registered - pledge notification not shown'
+      );
+    }
+  }
+
+  /**
+   * Show a pledge completion notification
+   * Called when user completes all pledged workouts
+   *
+   * @param eventName - Name of the event
+   * @param totalSats - Total sats sent over all pledge workouts
+   * @param recipientName - Name of recipient
+   */
+  showPledgeCompleted(
+    eventName: string,
+    totalSats: number,
+    recipientName: string
+  ): void {
+    // Use the same notification but with isComplete flag
+    this.showPledgeRewardSent(
+      totalSats,
+      eventName,
+      recipientName,
+      1, // Completed
+      1 // Of 1 (100%)
+    );
   }
 }
 

@@ -38,6 +38,7 @@ import type {
 import nostrTeamService from '../../services/nostr/NostrTeamService';
 import unifiedCache from '../../services/cache/UnifiedNostrCache';
 import { CacheKeys } from '../../constants/cacheTTL';
+import { CHARITIES, getCharityById } from '../../constants/charities';
 
 // Event Preset Interface
 interface EventPreset {
@@ -89,6 +90,15 @@ const EVENT_PRESETS: EventPreset[] = [
   },
 ];
 
+// Rank tier options for gating
+const RANK_TIER_OPTIONS = [
+  { tier: 'Emerging', score: 0, label: 'Any Rank' },
+  { tier: 'New', score: 0.00001, label: 'New+' },
+  { tier: 'Known', score: 0.0001, label: 'Known+' },
+  { tier: 'Trusted', score: 0.001, label: 'Trusted+' },
+  { tier: 'Elite', score: 0.01, label: 'Elite' },
+] as const;
+
 // Form Data Interface (all fields in one place!)
 interface EventFormData {
   selectedPreset: EventPreset | null;
@@ -106,6 +116,14 @@ interface EventFormData {
     | 'saturday'
     | 'sunday'
     | null;
+  // Pledge fields
+  pledgeCost: number; // 0 = free, 1-30 = workout count
+  pledgeDestination: 'captain' | 'charity';
+  pledgeCharityId: string | null;
+  // Rank requirement
+  requireRank: boolean;
+  minimumRankTier: string;
+  minimumRankScore: number;
 }
 
 interface Props {
@@ -132,6 +150,14 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
     eventTime: '09:00',
     isRecurring: false,
     recurrenceDay: null,
+    // Pledge defaults
+    pledgeCost: 0, // Free by default
+    pledgeDestination: 'captain',
+    pledgeCharityId: null,
+    // Rank defaults
+    requireRank: false,
+    minimumRankTier: 'Emerging',
+    minimumRankScore: 0,
   });
 
   const [isPublishingEvent, setIsPublishingEvent] = useState(false);
@@ -284,6 +310,14 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
       setGeneratedEventId(eventId);
       console.log(`📝 Generated event ID: ${eventId}`);
 
+      // Get charity details if pledging to charity
+      const pledgeCharity =
+        formData.pledgeCost > 0 &&
+        formData.pledgeDestination === 'charity' &&
+        formData.pledgeCharityId
+          ? getCharityById(formData.pledgeCharityId)
+          : undefined;
+
       // Prepare event data
       const eventCreationData = {
         id: eventId,
@@ -304,6 +338,18 @@ export const SimpleEventWizardV2: React.FC<Props> = ({
         recurrence: formData.isRecurring ? 'weekly' : undefined,
         recurrenceDay: formData.recurrenceDay || undefined,
         recurrenceStartDate: eventDateTime.toISOString(),
+        // Pledge system fields
+        pledgeCost: formData.pledgeCost > 0 ? formData.pledgeCost : undefined,
+        pledgeDestination:
+          formData.pledgeCost > 0 ? formData.pledgeDestination : undefined,
+        pledgeCharityId: pledgeCharity?.id,
+        pledgeCharityName: pledgeCharity?.name,
+        pledgeCharityAddress: pledgeCharity?.lightningAddress,
+        // Rank gating fields
+        minimumRank: formData.requireRank ? formData.minimumRankScore : undefined,
+        minimumRankTier: formData.requireRank
+          ? formData.minimumRankTier
+          : undefined,
       };
 
       // ===== PUBLISH PARTICIPANT LIST (kind 30000) =====
@@ -926,6 +972,200 @@ Team: ${team?.name || 'RUNSTR'}
               </View>
             )}
           </View>
+
+          {/* Entry Cost (Pledge) Section */}
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Entry Cost</Text>
+            <View style={styles.pledgeCostRow}>
+              <TouchableOpacity
+                style={[
+                  styles.pledgeCostOption,
+                  formData.pledgeCost === 0 && styles.pledgeCostOptionSelected,
+                ]}
+                onPress={() => updateField('pledgeCost', 0)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.pledgeCostOptionText,
+                    formData.pledgeCost === 0 &&
+                      styles.pledgeCostOptionTextSelected,
+                  ]}
+                >
+                  Free
+                </Text>
+              </TouchableOpacity>
+              {[3, 5, 7, 10].map((cost) => (
+                <TouchableOpacity
+                  key={cost}
+                  style={[
+                    styles.pledgeCostOption,
+                    formData.pledgeCost === cost &&
+                      styles.pledgeCostOptionSelected,
+                  ]}
+                  onPress={() => updateField('pledgeCost', cost)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.pledgeCostOptionText,
+                      formData.pledgeCost === cost &&
+                        styles.pledgeCostOptionTextSelected,
+                    ]}
+                  >
+                    {cost}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {formData.pledgeCost > 0 && (
+              <Text style={styles.formHelper}>
+                Users pledge {formData.pledgeCost} daily workouts (
+                {formData.pledgeCost * 50} sats) to join
+              </Text>
+            )}
+
+            {/* Pledge Destination (only shown if cost > 0) */}
+            {formData.pledgeCost > 0 && (
+              <View style={styles.pledgeDestinationContainer}>
+                <Text style={styles.subLabel}>Rewards go to:</Text>
+                <View style={styles.pledgeDestinationRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.pledgeDestOption,
+                      formData.pledgeDestination === 'captain' &&
+                        styles.pledgeDestOptionSelected,
+                    ]}
+                    onPress={() => updateField('pledgeDestination', 'captain')}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.pledgeDestOptionText,
+                        formData.pledgeDestination === 'captain' &&
+                          styles.pledgeDestOptionTextSelected,
+                      ]}
+                    >
+                      You (Captain)
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.pledgeDestOption,
+                      formData.pledgeDestination === 'charity' &&
+                        styles.pledgeDestOptionSelected,
+                    ]}
+                    onPress={() => updateField('pledgeDestination', 'charity')}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.pledgeDestOptionText,
+                        formData.pledgeDestination === 'charity' &&
+                          styles.pledgeDestOptionTextSelected,
+                      ]}
+                    >
+                      Charity
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Charity selector (only if charity destination) */}
+                {formData.pledgeDestination === 'charity' && (
+                  <View style={styles.charitySelector}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.charityScroll}
+                    >
+                      {CHARITIES.slice(0, 4).map((charity) => (
+                        <TouchableOpacity
+                          key={charity.id}
+                          style={[
+                            styles.charityChip,
+                            formData.pledgeCharityId === charity.id &&
+                              styles.charityChipSelected,
+                          ]}
+                          onPress={() =>
+                            updateField('pledgeCharityId', charity.id)
+                          }
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.charityChipText,
+                              formData.pledgeCharityId === charity.id &&
+                                styles.charityChipTextSelected,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {charity.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Rank Requirement Section */}
+          <View style={styles.formGroup}>
+            <View style={styles.recurringRow}>
+              <Text style={styles.formLabel}>Require Rank?</Text>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  formData.requireRank && styles.toggleButtonActive,
+                ]}
+                onPress={() => updateField('requireRank', !formData.requireRank)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.toggleButtonText,
+                    formData.requireRank && styles.toggleButtonTextActive,
+                  ]}
+                >
+                  {formData.requireRank ? 'Yes' : 'No'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {formData.requireRank && (
+              <View style={styles.rankTierContainer}>
+                <Text style={styles.subLabel}>Minimum rank:</Text>
+                <View style={styles.rankTierRow}>
+                  {RANK_TIER_OPTIONS.slice(1).map((option) => (
+                    <TouchableOpacity
+                      key={option.tier}
+                      style={[
+                        styles.rankTierOption,
+                        formData.minimumRankTier === option.tier &&
+                          styles.rankTierOptionSelected,
+                      ]}
+                      onPress={() => {
+                        updateField('minimumRankTier', option.tier);
+                        updateField('minimumRankScore', option.score);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.rankTierOptionText,
+                          formData.minimumRankTier === option.tier &&
+                            styles.rankTierOptionTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
         </ScrollView>
 
         {/* Fixed Bottom Action Buttons */}
@@ -1316,5 +1556,122 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
     color: theme.colors.text,
+  },
+
+  // Pledge Cost Section
+  pledgeCostRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  pledgeCostOption: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  pledgeCostOptionSelected: {
+    backgroundColor: theme.colors.orangeDeep,
+    borderColor: theme.colors.orangeDeep,
+  },
+  pledgeCostOptionText: {
+    fontSize: 14,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.textMuted,
+  },
+  pledgeCostOptionTextSelected: {
+    color: theme.colors.accentText,
+  },
+  pledgeDestinationContainer: {
+    marginTop: 16,
+  },
+  subLabel: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    marginBottom: 8,
+  },
+  pledgeDestinationRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  pledgeDestOption: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  pledgeDestOptionSelected: {
+    backgroundColor: theme.colors.orangeDeep,
+    borderColor: theme.colors.orangeDeep,
+  },
+  pledgeDestOptionText: {
+    fontSize: 13,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.textMuted,
+  },
+  pledgeDestOptionTextSelected: {
+    color: theme.colors.accentText,
+  },
+  charitySelector: {
+    marginTop: 12,
+  },
+  charityScroll: {
+    flexGrow: 0,
+  },
+  charityChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginRight: 8,
+  },
+  charityChipSelected: {
+    backgroundColor: theme.colors.orangeDeep,
+    borderColor: theme.colors.orangeDeep,
+  },
+  charityChipText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.textMuted,
+  },
+  charityChipTextSelected: {
+    color: theme.colors.accentText,
+  },
+
+  // Rank Requirement Section
+  rankTierContainer: {
+    marginTop: 4,
+  },
+  rankTierRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  rankTierOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  rankTierOptionSelected: {
+    backgroundColor: theme.colors.orangeDeep,
+    borderColor: theme.colors.orangeDeep,
+  },
+  rankTierOptionText: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.textMuted,
+  },
+  rankTierOptionTextSelected: {
+    color: theme.colors.accentText,
   },
 });

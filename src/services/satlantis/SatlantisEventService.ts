@@ -517,6 +517,19 @@ class SatlantisEventServiceClass {
     const creatorNWCRaw = getTag('creator_nwc');
     const creatorHasNWC = creatorNWCRaw === 'true';
 
+    // Parse pledge/commitment system tags
+    const pledgeCostRaw = getTag('pledge_cost');
+    const pledgeCost = pledgeCostRaw ? parseInt(pledgeCostRaw, 10) : undefined;
+
+    const pledgeDestinationRaw = getTag('pledge_destination');
+    const pledgeDestination = this.isValidPledgeDestination(pledgeDestinationRaw)
+      ? pledgeDestinationRaw
+      : undefined;
+
+    const captainLightningAddress = getTag('captain_lightning_address');
+    const pledgeCharityAddress = getTag('pledge_charity_address');
+    const pledgeCharityName = getTag('pledge_charity_name');
+
     return {
       scoringType,
       payoutScheme,
@@ -527,7 +540,17 @@ class SatlantisEventServiceClass {
       prizePoolSats: isNaN(prizePoolSats!) ? undefined : prizePoolSats,
       fixedPayoutSats: isNaN(fixedPayoutSats!) ? undefined : fixedPayoutSats,
       creatorHasNWC,
+      // Pledge/commitment system fields
+      pledgeCost: isNaN(pledgeCost!) ? undefined : pledgeCost,
+      pledgeDestination,
+      captainLightningAddress,
+      pledgeCharityAddress,
+      pledgeCharityName,
     };
+  }
+
+  private isValidPledgeDestination(value?: string): value is 'captain' | 'charity' {
+    return ['captain', 'charity'].includes(value || '');
   }
 
   // Type guards for RUNSTR enum values

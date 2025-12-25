@@ -37,6 +37,9 @@ import { StreakRewardsCard } from '../components/rewards/StreakRewardsCard';
 import localWorkoutStorage from '../services/fitness/LocalWorkoutStorageService';
 import type { LocalWorkout } from '../services/fitness/LocalWorkoutStorageService';
 import { DailyRewardService } from '../services/rewards/DailyRewardService';
+import { PledgeService } from '../services/pledge/PledgeService';
+import { ActivePledgeCard } from '../components/pledge/ActivePledgeCard';
+import type { Pledge } from '../types/pledge';
 
 // Storage keys for donation settings
 // Note: Team donations disabled until teams have lightning addresses
@@ -75,6 +78,9 @@ export const RewardsScreen: React.FC = () => {
   // Streak rewards state
   const [workouts, setWorkouts] = useState<LocalWorkout[]>([]);
   const [weeklyRewardsEarned, setWeeklyRewardsEarned] = useState(0);
+
+  // Active pledge state
+  const [activePledge, setActivePledge] = useState<Pledge | null>(null);
 
   // Alert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -128,11 +134,15 @@ export const RewardsScreen: React.FC = () => {
       const allWorkouts = await localWorkoutStorage.getAllWorkouts();
       setWorkouts(allWorkouts);
 
-      // Load weekly rewards earned
+      // Load weekly rewards earned and active pledge
       const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
       if (pubkey) {
         const weeklyRewards = await DailyRewardService.getWeeklyRewardsEarned(pubkey);
         setWeeklyRewardsEarned(weeklyRewards);
+
+        // Load active pledge
+        const pledge = await PledgeService.getActivePledge(pubkey);
+        setActivePledge(pledge);
       }
     } catch (error) {
       console.error('[RewardsScreen] Error loading settings:', error);
@@ -411,6 +421,14 @@ export const RewardsScreen: React.FC = () => {
             )}
           </Card>
         </View>
+
+        {/* Active Pledge Section (only shown if user has active pledge) */}
+        {activePledge && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>ACTIVE PLEDGE</Text>
+            <ActivePledgeCard pledge={activePledge} />
+          </View>
+        )}
 
         {/* Streak Rewards Section */}
         <View style={styles.section}>

@@ -1,12 +1,14 @@
 /**
- * EventJoinButton - Smart join/donate button for Satlantis events
+ * EventJoinButton - Smart join/commit button for Satlantis events
  *
  * Shows different states based on event configuration and user status:
- * - "Join Event" for free events
- * - "Donate & Join (X sats)" for donation events (soft requirement)
+ * - "Join Event" for free events (no pledge cost)
+ * - "Commit X Days & Join" for events with pledge cost
+ * - "Donate & Join (X sats)" for legacy donation events
  * - "Joined" if user already RSVPd
  * - Disabled for ended events
  *
+ * Creates a pledge via PledgeService when user joins a paid event.
  * Uses ExternalZapModal pattern for donations - any Lightning wallet can pay.
  */
 
@@ -17,12 +19,16 @@ import {
   StyleSheet,
   ActivityIndicator,
   View,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { SatlantisEventJoinService } from '../../services/satlantis/SatlantisEventJoinService';
 import { ExternalZapModal } from '../nutzap/ExternalZapModal';
 import { ProfileService } from '../../services/user/profileService';
+import { PledgeService } from '../../services/pledge/PledgeService';
+import { getNpubFromStorage } from '../../utils/nostr';
+import { nip19 } from 'nostr-tools';
 import type { SatlantisEvent } from '../../types/satlantis';
 
 interface EventJoinButtonProps {
@@ -34,7 +40,8 @@ interface EventJoinButtonProps {
 type ButtonState =
   | 'loading'
   | 'join_free'
-  | 'join_donation' // Shows donation modal
+  | 'join_pledge' // Events with pledge cost - commits daily rewards
+  | 'join_donation' // Legacy donation events
   | 'joined'
   | 'ended'
   | 'error';
@@ -86,7 +93,13 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
         return;
       }
 
-      // Determine join type based on event configuration
+      // Check if event has pledge/commitment cost (new system)
+      if (event.pledgeCost && event.pledgeCost > 0) {
+        setState('join_pledge');
+        return;
+      }
+
+      // Determine join type based on event configuration (legacy system)
       const requirements = SatlantisEventJoinService.getJoinRequirements(event);
       if (!requirements.canJoin) {
         setState('ended');
@@ -124,11 +137,108 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
     }
   }, [event, onJoinSuccess, onError]);
 
+  // Handle pledge-based join (events with pledge cost)
+  const handlePledgeJoin = useCallback(async () => {
+    setIsProcessing(true);
+    setOptimisticJoined(true);
+
+    try {
+      // Get user's pubkey
+      const storedNpub = await getNpubFromStorage();
+      if (!storedNpub) {
+        setOptimisticJoined(false);
+        onError?.('Not logged in');
+        return;
+      }
+
+      // Convert npub to hex pubkey
+      let userPubkey: string;
+      try {
+        const decoded = nip19.decode(storedNpub);
+        userPubkey = decoded.data as string;
+      } catch {
+        setOptimisticJoined(false);
+        onError?.('Invalid user credentials');
+        return;
+      }
+
+      // Check if user can create a pledge
+      const eligibility = await PledgeService.canCreatePledge(userPubkey);
+      if (!eligibility.allowed) {
+        setOptimisticJoined(false);
+        Alert.alert(
+          'Cannot Join Event',
+          eligibility.message || 'You have an active commitment. Complete it first.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Join the event first
+      const result = await SatlantisEventJoinService.joinEvent(event, false);
+
+      if (!result.success) {
+        setOptimisticJoined(false);
+        onError?.(result.error || 'Failed to join event');
+        return;
+      }
+
+      // Determine destination address
+      const destinationAddress =
+        event.pledgeDestination === 'charity'
+          ? event.pledgeCharityAddress
+          : event.captainLightningAddress || creatorLightningAddress;
+
+      const destinationName =
+        event.pledgeDestination === 'charity'
+          ? event.pledgeCharityName || 'Charity'
+          : event.creatorProfile?.name || 'Event Creator';
+
+      if (!destinationAddress) {
+        console.warn('[EventJoinButton] No destination address for pledge - joined without pledge');
+        setState('joined');
+        onJoinSuccess?.();
+        return;
+      }
+
+      // Create the pledge
+      const pledge = await PledgeService.createPledge({
+        eventId: event.id,
+        eventName: event.title,
+        totalWorkouts: event.pledgeCost!,
+        destination: {
+          type: event.pledgeDestination || 'captain',
+          lightningAddress: destinationAddress,
+          name: destinationName,
+        },
+        userPubkey,
+      });
+
+      if (pledge) {
+        console.log('[EventJoinButton] Pledge created:', pledge.id);
+        setState('joined');
+        onJoinSuccess?.();
+      } else {
+        // Pledge creation failed but join succeeded - still mark as joined
+        console.warn('[EventJoinButton] Pledge creation failed, but join succeeded');
+        setState('joined');
+        onJoinSuccess?.();
+      }
+    } catch (error) {
+      setOptimisticJoined(false);
+      onError?.(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [event, creatorLightningAddress, onJoinSuccess, onError]);
+
   const handlePress = useCallback(async () => {
     if (isProcessing) return;
 
     if (state === 'join_free') {
       await handleJoinEvent();
+    } else if (state === 'join_pledge') {
+      await handlePledgeJoin();
     } else if (state === 'join_donation') {
       // Show donation modal
       if (creatorLightningAddress) {
@@ -139,7 +249,7 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
         await handleJoinEvent(false);
       }
     }
-  }, [state, isProcessing, creatorLightningAddress, handleJoinEvent]);
+  }, [state, isProcessing, creatorLightningAddress, handleJoinEvent, handlePledgeJoin]);
 
   // Handle donation success - join event after donation
   const handleDonationSuccess = useCallback(async () => {
@@ -192,6 +302,19 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
       case 'join_free':
         return <Text style={styles.buttonText}>Join Event</Text>;
 
+      case 'join_pledge': {
+        // Show pledge commitment button
+        const pledgeDays = event.pledgeCost || 1;
+        return (
+          <View style={styles.donationContent}>
+            <Ionicons name="fitness" size={18} color={theme.colors.background} />
+            <Text style={styles.buttonText}>
+              {`Commit ${pledgeDays} Day${pledgeDays > 1 ? 's' : ''} & Join`}
+            </Text>
+          </View>
+        );
+      }
+
       case 'join_donation':
         return (
           <View style={styles.donationContent}>
@@ -223,6 +346,7 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
     styles.button,
     isJoined && styles.buttonJoined,
     state === 'ended' && styles.buttonEnded,
+    state === 'join_pledge' && styles.buttonPledge,
     state === 'join_donation' && styles.buttonDonation,
     isDisabled && !isJoined && styles.buttonDisabled,
   ];
@@ -281,6 +405,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
+  },
+  buttonPledge: {
+    backgroundColor: theme.colors.accent, // Orange for pledge/commitment
   },
   buttonDonation: {
     backgroundColor: theme.colors.orangeBright,

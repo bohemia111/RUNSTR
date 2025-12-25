@@ -49,15 +49,24 @@ export function getValidPayoutSchemes(scoringType: RunstrScoringType): RunstrPay
 }
 
 // ============================================================================
-// Join Methods
+// Pledge System (Entry Cost)
 // ============================================================================
 
 /**
- * Event join methods
- * - open: Free to join, anyone can participate
- * - paid: Legacy - entry fee required (Lightning invoice)
- * - donation: Suggested donation (soft requirement, any wallet)
+ * Pledge cost options for event entry
+ * Users pledge X daily workout rewards to join an event
+ * Each workout = 50 sats, so 5 workouts = 250 sats pledged
  */
+export type RunstrPledgeCost = 1 | 3 | 5 | 7;
+
+/**
+ * Where pledged rewards go
+ * - captain: Event creator receives the pledged sats
+ * - charity: A selected charity receives the pledged sats
+ */
+export type RunstrPledgeDestination = 'captain' | 'charity';
+
+// Legacy join method type - kept for backward compatibility
 export type RunstrJoinMethod = 'open' | 'paid' | 'donation';
 
 // ============================================================================
@@ -154,9 +163,15 @@ export interface RunstrEventConfig {
   prizePoolSats: number;
   fixedPayoutAmount?: number; // sats per person (for fixed_amount scheme)
 
-  // Join method
+  // Entry cost (Pledge system)
+  pledgeCost?: number; // Number of daily workouts to commit (1, 3, 5, 7)
+  pledgeDestination?: RunstrPledgeDestination; // 'captain' or 'charity'
+  pledgeCharityAddress?: string; // Lightning address for charity (if destination is 'charity')
+  pledgeCharityName?: string; // Display name for charity
+
+  // Legacy join method (kept for backward compatibility)
   joinMethod: RunstrJoinMethod;
-  suggestedDonationSats?: number; // suggested donation for 'donation' join method
+  suggestedDonationSats?: number; // Legacy: suggested donation for 'donation' join method
 
   // Duration
   duration: RunstrDuration;
@@ -195,12 +210,15 @@ export interface RunstrEventFormState {
   scoringType: RunstrScoringType;
   targetDistance: string; // String for input field
   duration: RunstrDuration;
-  joinMethod: RunstrJoinMethod;
-  suggestedDonation: string; // String for input field (suggested donation amount in sats)
+  pledgeCost: number; // Number of daily workouts to pledge (1, 3, 5, 7)
+  pledgeDestination: RunstrPledgeDestination; // 'captain' or 'charity'
   payoutScheme: RunstrPayoutScheme;
   prizePool: string; // String for input field
   fixedPayout: string; // String for input field
   bannerImageUrl: string; // URL of uploaded banner image
+  // Legacy fields - kept for backward compatibility
+  joinMethod?: RunstrJoinMethod;
+  suggestedDonation?: string;
 }
 
 /**
@@ -213,8 +231,8 @@ export const DEFAULT_FORM_STATE: RunstrEventFormState = {
   scoringType: 'fastest_time',
   targetDistance: '5',
   duration: '1d',
-  joinMethod: 'open',
-  suggestedDonation: '',
+  pledgeCost: 1, // Default: 1 daily workout pledge (50 sats)
+  pledgeDestination: 'captain', // Default: rewards go to event creator
   payoutScheme: 'winner_takes_all',
   prizePool: '',
   fixedPayout: '',

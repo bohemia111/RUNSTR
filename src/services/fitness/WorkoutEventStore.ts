@@ -52,7 +52,7 @@ type WorkoutSubscriber = (workouts: StoredWorkout[]) => void;
 // ============================================================================
 
 const CACHE_KEY = '@runstr:workout_event_store_v1';
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000; // Fetch window for events (reduced from 14 days for speed)
+const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000; // Fetch window for events (reduced from 7 days for faster loading)
 const QUERY_TIMEOUT_MS = 8000;
 const RELAY_CONNECT_TIMEOUT_MS = 4000;
 
@@ -207,11 +207,11 @@ export class WorkoutEventStore {
   }
 
   /**
-   * Get this week's workouts (last 7 days)
+   * Get recent workouts (last 2 days - matches fetch window)
    */
-  getThisWeeksWorkouts(): StoredWorkout[] {
-    const sevenDaysAgo = Math.floor((Date.now() - SEVEN_DAYS_MS) / 1000);
-    return this.getAllWorkouts().filter((w) => w.createdAt >= sevenDaysAgo);
+  getRecentWorkouts(): StoredWorkout[] {
+    const twoDaysAgo = Math.floor((Date.now() - TWO_DAYS_MS) / 1000);
+    return this.getAllWorkouts().filter((w) => w.createdAt >= twoDaysAgo);
   }
 
   /**
@@ -340,18 +340,18 @@ export class WorkoutEventStore {
         `[WorkoutEventStore] Relay Status: ${relayStatus.connectedRelays}/${relayStatus.relayCount} connected`
       );
 
-      // Query last 7 days of workouts (reduced from 14 for faster loading)
-      // Events older than 7 days fall back to direct Nostr query
-      const sevenDaysAgo = Math.floor((Date.now() - SEVEN_DAYS_MS) / 1000);
+      // Query last 2 days of workouts (reduced from 7 for faster loading)
+      // Events older than 2 days fall back to direct Nostr query
+      const twoDaysAgo = Math.floor((Date.now() - TWO_DAYS_MS) / 1000);
       const filter: NDKFilter = {
         kinds: [1301 as any],
-        since: sevenDaysAgo,
-        limit: 1500, // Reduced from 3000 for faster parsing
+        since: twoDaysAgo,
+        limit: 500, // Reduced limit since we're only fetching 2 days
       };
 
       console.log('[WorkoutEventStore] Querying with filter:', {
-        since: new Date(sevenDaysAgo * 1000).toISOString(),
-        limit: 1500,
+        since: new Date(twoDaysAgo * 1000).toISOString(),
+        limit: 500,
       });
 
       // Query with hard timeout (prevents infinite hang)

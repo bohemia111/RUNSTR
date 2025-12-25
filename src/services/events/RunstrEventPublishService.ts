@@ -20,6 +20,7 @@ import { DISTANCE_PRESETS, getDurationSeconds } from '../../types/runstrEvent';
 import { NWCWalletService } from '../wallet/NWCWalletService';
 import { UnifiedCacheService } from '../cache/UnifiedCacheService';
 import type { SatlantisEvent, SatlantisSportType } from '../../types/satlantis';
+import { nostrProfileService } from '../nostr/NostrProfileService';
 
 // NIP-52 Calendar Event kind
 const KIND_CALENDAR_EVENT = 31923;
@@ -64,8 +65,39 @@ class RunstrEventPublishServiceClass {
       // Check if creator has NWC configured
       const hasNWC = await NWCWalletService.hasNWCConfigured();
 
+      // Fetch creator's Lightning address from their profile (for pledge routing)
+      let creatorLightningAddress: string | undefined;
+      if (config.pledgeCost && config.pledgeCost > 0 && config.pledgeDestination === 'captain') {
+        try {
+          // Get the signer's pubkey to fetch their profile
+          let signerPubkey: string | undefined;
+          if (typeof signerOrPrivateKey === 'string') {
+            const { NDKPrivateKeySigner } = await import('@nostr-dev-kit/ndk');
+            const tempSigner = new NDKPrivateKeySigner(signerOrPrivateKey);
+            const user = await tempSigner.user();
+            signerPubkey = user.pubkey;
+          } else {
+            const user = await signerOrPrivateKey.user();
+            signerPubkey = user.pubkey;
+          }
+
+          if (signerPubkey) {
+            console.log('🔍 [RunstrEventPublish] Fetching creator Lightning address...');
+            const creatorProfile = await nostrProfileService.getProfile(signerPubkey);
+            creatorLightningAddress = creatorProfile?.lud16;
+            if (creatorLightningAddress) {
+              console.log(`✅ [RunstrEventPublish] Creator Lightning address: ${creatorLightningAddress}`);
+            } else {
+              console.warn('⚠️ [RunstrEventPublish] Creator has no Lightning address in profile');
+            }
+          }
+        } catch (profileError) {
+          console.warn('⚠️ [RunstrEventPublish] Failed to fetch creator profile:', profileError);
+        }
+      }
+
       // Build NIP-52 compliant tags
-      const tags = this.buildEventTags(config, dTag, hasNWC);
+      const tags = this.buildEventTags(config, dTag, hasNWC, creatorLightningAddress);
 
       // Create event content (description or empty)
       const content = config.description || '';
@@ -106,7 +138,7 @@ class RunstrEventPublishServiceClass {
         );
 
         // Optimistic cache: Add to local cache immediately
-        await this.addToLocalCache(config, dTag, ndkEvent.pubkey);
+        await this.addToLocalCache(config, dTag, ndkEvent.pubkey, creatorLightningAddress);
 
         return {
           success: true,
@@ -148,7 +180,8 @@ class RunstrEventPublishServiceClass {
   private buildEventTags(
     config: RunstrEventConfig,
     dTag: string,
-    hasNWC: boolean
+    hasNWC: boolean,
+    creatorLightningAddress?: string
   ): string[][] {
     const tags: string[][] = [];
 
@@ -194,7 +227,30 @@ class RunstrEventPublishServiceClass {
     tags.push(['join_method', config.joinMethod]);
     tags.push(['duration_type', config.duration]);
 
-    // Suggested donation (if donation event)
+    // Pledge system tags (workout commitment for event entry)
+    if (config.pledgeCost && config.pledgeCost > 0) {
+      tags.push(['pledge_cost', config.pledgeCost.toString()]);
+      tags.push(['pledge_destination', config.pledgeDestination || 'captain']);
+
+      // Include captain's Lightning address for reward routing
+      if (config.pledgeDestination === 'captain' && creatorLightningAddress) {
+        tags.push(['captain_lightning_address', creatorLightningAddress]);
+      }
+
+      // For charity destination (future feature)
+      if (config.pledgeDestination === 'charity') {
+        if (config.pledgeCharityAddress) {
+          tags.push(['pledge_charity_address', config.pledgeCharityAddress]);
+        }
+        if (config.pledgeCharityName) {
+          tags.push(['pledge_charity_name', config.pledgeCharityName]);
+        }
+      }
+
+      console.log(`[RunstrEventPublish] 📝 Added pledge tags: cost=${config.pledgeCost}, destination=${config.pledgeDestination}`);
+    }
+
+    // Suggested donation (if donation event) - legacy
     if (config.joinMethod === 'donation' && config.suggestedDonationSats) {
       tags.push(['suggested_donation', config.suggestedDonationSats.toString()]);
     }
@@ -273,7 +329,8 @@ class RunstrEventPublishServiceClass {
   private async addToLocalCache(
     config: RunstrEventConfig,
     dTag: string,
-    pubkey: string
+    pubkey: string,
+    captainLightningAddress?: string
   ): Promise<void> {
     try {
       // Build SatlantisEvent from config
@@ -299,6 +356,12 @@ class RunstrEventPublishServiceClass {
         durationType: config.duration,
         activityType: config.activityType,
         creatorHasNWC: config.creatorHasNWC,
+        // Pledge/Commitment system fields
+        pledgeCost: config.pledgeCost,
+        pledgeDestination: config.pledgeDestination,
+        captainLightningAddress: captainLightningAddress,
+        pledgeCharityAddress: config.pledgeCharityAddress,
+        pledgeCharityName: config.pledgeCharityName,
       };
 
       // Cache single event (7 days)
@@ -363,12 +426,15 @@ class RunstrEventPublishServiceClass {
       scoringType: RunstrScoringType;
       targetDistance: string;
       duration: RunstrDuration;
-      joinMethod: RunstrJoinMethod;
-      suggestedDonation: string;
+      pledgeCost: number;
+      pledgeDestination: 'captain' | 'charity';
       payoutScheme: RunstrPayoutScheme;
       prizePool: string;
       fixedPayout: string;
       bannerImageUrl: string;
+      // Legacy fields (optional)
+      joinMethod?: RunstrJoinMethod;
+      suggestedDonation?: string;
     },
     startTime?: number
   ): RunstrEventConfig {
@@ -392,11 +458,10 @@ class RunstrEventPublishServiceClass {
         formState.payoutScheme === 'fixed_amount'
           ? parseInt(formState.fixedPayout, 10) || undefined
           : undefined,
-      joinMethod: formState.joinMethod,
-      suggestedDonationSats:
-        formState.joinMethod === 'donation'
-          ? parseInt(formState.suggestedDonation, 10) || undefined
-          : undefined,
+      // Use pledge system instead of legacy joinMethod
+      joinMethod: 'open', // Legacy: default to open
+      pledgeCost: formState.pledgeCost,
+      pledgeDestination: formState.pledgeDestination,
       duration: formState.duration,
       startTime: start,
       endTime: start + durationSeconds,

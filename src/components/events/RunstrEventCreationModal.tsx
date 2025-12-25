@@ -28,7 +28,7 @@ import {
   ACTIVITY_OPTIONS,
   SCORING_OPTIONS,
   DURATION_OPTIONS,
-  JOIN_OPTIONS,
+  PLEDGE_COST_OPTIONS,
   PAYOUT_OPTIONS,
   DISTANCE_OPTIONS,
 } from '../../hooks/useRunstrEventCreation';
@@ -55,7 +55,6 @@ export const RunstrEventCreationModal: React.FC<
     submitEvent,
     showDistanceInput,
     showDurationInput,
-    showDonationInput,
     showFixedPayoutInput,
   } = useRunstrEventCreation();
 
@@ -361,25 +360,25 @@ export const RunstrEventCreationModal: React.FC<
               </View>
             )}
 
-            {/* Join Method */}
+            {/* Entry Cost (Pledge) */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Join Method</Text>
+              <Text style={styles.label}>Entry Cost (workouts)</Text>
               <View style={styles.buttonRow}>
-                {JOIN_OPTIONS.map((opt) => (
+                {PLEDGE_COST_OPTIONS.map((opt) => (
                   <TouchableOpacity
                     key={opt.value}
                     style={[
                       styles.optionButton,
-                      form.joinMethod === opt.value &&
+                      form.pledgeCost === opt.value &&
                         styles.optionButtonSelected,
                     ]}
-                    onPress={() => updateField('joinMethod', opt.value)}
+                    onPress={() => updateField('pledgeCost', opt.value)}
                     activeOpacity={0.7}
                   >
                     <Text
                       style={[
                         styles.optionButtonText,
-                        form.joinMethod === opt.value &&
+                        form.pledgeCost === opt.value &&
                           styles.optionButtonTextSelected,
                       ]}
                     >
@@ -388,22 +387,10 @@ export const RunstrEventCreationModal: React.FC<
                   </TouchableOpacity>
                 ))}
               </View>
+              <Text style={styles.helper}>
+                Users commit next {form.pledgeCost} day{form.pledgeCost > 1 ? 's' : ''} of daily workout rewards ({form.pledgeCost * 50} sats) to join
+              </Text>
             </View>
-
-            {/* Suggested Donation (for donation events) */}
-            {showDonationInput && (
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Suggested Donation (sats)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={form.suggestedDonation}
-                  onChangeText={(text) => updateField('suggestedDonation', text)}
-                  placeholder="e.g., 2100"
-                  placeholderTextColor={theme.colors.textMuted}
-                  keyboardType="numeric"
-                />
-              </View>
-            )}
 
             {/* Payout Scheme */}
             <View style={styles.formGroup}>
