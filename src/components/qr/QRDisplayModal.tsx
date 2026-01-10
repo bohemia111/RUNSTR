@@ -1,5 +1,5 @@
 /**
- * QRDisplayModal - Display QR codes for challenges and events
+ * QRDisplayModal - Display QR codes for events
  * Clean black and white minimalistic design
  */
 
@@ -15,7 +15,6 @@ import {
 import QRCode from 'react-native-qrcode-svg';
 import { theme } from '../../styles/theme';
 import type { QRData } from '../../services/qr/QRCodeService';
-import QRCodeService from '../../services/qr/QRCodeService';
 
 interface QRDisplayModalProps {
   visible: boolean;
@@ -31,41 +30,8 @@ export const QRDisplayModal: React.FC<QRDisplayModalProps> = ({
   const qrString = JSON.stringify(data);
 
   const renderDetails = () => {
-    if (data.type === 'challenge') {
-      return (
-        <View style={styles.detailsContainer}>
-          <Text style={styles.title}>{data.name}</Text>
-          <Text style={styles.subtitle}>Challenge Invitation</Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Activity</Text>
-            <Text style={styles.value}>
-              {QRCodeService.formatActivity(data.activity)}
-            </Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Metric</Text>
-            <Text style={styles.value}>
-              {QRCodeService.formatMetric(data.metric)}
-            </Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Duration</Text>
-            <Text style={styles.value}>
-              {QRCodeService.formatDuration(data.duration)}
-            </Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Wager</Text>
-            <Text style={styles.value}>
-              {QRCodeService.formatWager(data.wager)}
-            </Text>
-          </View>
-        </View>
-      );
+    if (data.type !== 'event') {
+      return null; // Only handle event type
     }
 
     return (

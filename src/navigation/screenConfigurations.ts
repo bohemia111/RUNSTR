@@ -59,12 +59,6 @@ export const screenConfigurations = {
     animationEnabled: true,
     ...slideFromRightAnimation,
   } as StackNavigationOptions,
-
-  // Challenge Detail Screen - slide from right
-  ChallengeDetail: {
-    animationEnabled: true,
-    ...slideFromRightAnimation,
-  } as StackNavigationOptions,
 };
 
 // Default navigator options

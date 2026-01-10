@@ -6,7 +6,6 @@ export * from './bitcoinUtils';
 export * from './bolt11Parser';
 export * from './cache';
 export * from './captainCache';
-export * from './challengeDeepLink';
 export * from './distanceFormatter';
 export * from './eventDeepLink';
 export * from './eventRecurrence';

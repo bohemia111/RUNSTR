@@ -1,22 +1,7 @@
 /**
  * QRCodeService
- * Service for generating and parsing QR codes for challenges and events
+ * Service for generating and parsing QR codes for events and NWC connections
  */
-
-import type { ChallengeMetadata } from '../../types/challenge';
-
-export interface ChallengeQRData {
-  type: 'challenge';
-  id: string;
-  creator_npub: string;
-  name: string;
-  activity: string;
-  metric: string;
-  duration: number;
-  wager: number;
-  startsAt: number;
-  expiresAt: number;
-}
 
 export interface EventQRData {
   type: 'event';
@@ -34,7 +19,7 @@ export interface NWCQRData {
   connectionString: string;
 }
 
-export type QRData = ChallengeQRData | EventQRData | NWCQRData;
+export type QRData = EventQRData | NWCQRData;
 
 class QRCodeService {
   private static instance: QRCodeService;
@@ -44,27 +29,6 @@ class QRCodeService {
       QRCodeService.instance = new QRCodeService();
     }
     return QRCodeService.instance;
-  }
-
-  /**
-   * Generate QR code data for a challenge
-   */
-  generateChallengeQR(challenge: ChallengeMetadata): string {
-    const data: ChallengeQRData = {
-      type: 'challenge',
-      id: challenge.id,
-      creator_npub: challenge.challengerPubkey,
-      name: challenge.name,
-      activity: challenge.activity,
-      metric: challenge.metric,
-      duration: Math.floor(
-        (challenge.expiresAt - challenge.startsAt) / (24 * 60 * 60)
-      ),
-      wager: challenge.wager,
-      startsAt: challenge.startsAt,
-      expiresAt: challenge.expiresAt,
-    };
-    return JSON.stringify(data);
   }
 
   /**
@@ -126,20 +90,6 @@ class QRCodeService {
   private validateQRData(data: any): data is QRData {
     if (!data || typeof data !== 'object') {
       return false;
-    }
-
-    if (data.type === 'challenge') {
-      return !!(
-        data.id &&
-        data.creator_npub &&
-        data.name &&
-        data.activity &&
-        data.metric &&
-        typeof data.duration === 'number' &&
-        typeof data.wager === 'number' &&
-        typeof data.startsAt === 'number' &&
-        typeof data.expiresAt === 'number'
-      );
     }
 
     if (data.type === 'event') {

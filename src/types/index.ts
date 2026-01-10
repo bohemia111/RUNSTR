@@ -18,9 +18,6 @@ export * from './bitcoin';
 // Re-export Notification Types
 export * from './notifications';
 
-// Re-export Wizard Types
-export * from './wizards';
-
 // Re-export Team Matching Algorithm Types (from utils/teamMatching)
 export type {
   TeamMatch,
@@ -34,7 +31,6 @@ export interface RootStackParamList extends Record<string, object | undefined> {
   Team: undefined;
   Profile: undefined;
   Wallet: undefined;
-  ChallengeDetail: { challengeId: string };
   EventDetail: {
     eventId: string;
     eventData?: any;
