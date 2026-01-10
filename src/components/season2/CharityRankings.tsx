@@ -87,9 +87,9 @@ export const CharityRankings: React.FC<CharityRankingsProps> = ({
                 </Text>
               </View>
 
-              {/* Distance */}
+              {/* Distance - convert from meters to km */}
               <Text style={styles.distanceText}>
-                {formatDistance(charity.totalDistance)}
+                {formatDistance(charity.totalDistance / 1000)}
               </Text>
             </View>
           ))}

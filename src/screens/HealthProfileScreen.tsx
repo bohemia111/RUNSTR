@@ -38,6 +38,20 @@ export const HealthProfileScreen: React.FC = () => {
   const [height, setHeight] = useState('');
   const [age, setAge] = useState('');
 
+  // Debug: log when values change
+  const handleWeightChange = (text: string) => {
+    console.log('[HealthProfile] Weight changed to:', text);
+    setWeight(text);
+  };
+  const handleHeightChange = (text: string) => {
+    console.log('[HealthProfile] Height changed to:', text);
+    setHeight(text);
+  };
+  const handleAgeChange = (text: string) => {
+    console.log('[HealthProfile] Age changed to:', text);
+    setAge(text);
+  };
+
   useEffect(() => {
     loadProfile();
   }, []);
@@ -62,6 +76,8 @@ export const HealthProfileScreen: React.FC = () => {
     try {
       setSaving(true);
 
+      console.log('[HealthProfile] Saving with values - weight:', weight, 'height:', height, 'age:', age);
+
       const profile: HealthProfile = {
         weight: weight ? parseFloat(weight) : undefined,
         height: height ? parseFloat(height) : undefined,
@@ -69,8 +85,9 @@ export const HealthProfileScreen: React.FC = () => {
         lastUpdated: new Date().toISOString(),
       };
 
+      console.log('[HealthProfile] Profile to save:', JSON.stringify(profile));
       await AsyncStorage.setItem(HEALTH_PROFILE_KEY, JSON.stringify(profile));
-      console.log('✅ Health profile saved');
+      console.log('[HealthProfile] ✅ Profile saved successfully');
       navigation.goBack();
     } catch (error) {
       console.error('❌ Failed to save health profile:', error);
@@ -146,7 +163,7 @@ export const HealthProfileScreen: React.FC = () => {
             <TextInput
               style={styles.input}
               value={weight}
-              onChangeText={setWeight}
+              onChangeText={handleWeightChange}
               placeholder="70"
               placeholderTextColor={theme.colors.textMuted}
               keyboardType="decimal-pad"
@@ -165,7 +182,7 @@ export const HealthProfileScreen: React.FC = () => {
             <TextInput
               style={styles.input}
               value={height}
-              onChangeText={setHeight}
+              onChangeText={handleHeightChange}
               placeholder="170"
               placeholderTextColor={theme.colors.textMuted}
               keyboardType="decimal-pad"
@@ -184,7 +201,7 @@ export const HealthProfileScreen: React.FC = () => {
             <TextInput
               style={styles.input}
               value={age}
-              onChangeText={setAge}
+              onChangeText={handleAgeChange}
               placeholder="30"
               placeholderTextColor={theme.colors.textMuted}
               keyboardType="number-pad"

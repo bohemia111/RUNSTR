@@ -7,9 +7,12 @@
 
 import { Pedometer } from 'expo-sensors';
 import { Platform, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import healthConnectService from '../fitness/healthConnectService';
 import { privacyROMDetectionService } from '../platform/PrivacyROMDetectionService';
 import { nativeStepCounterService } from './NativeStepCounterService';
+
+const STORAGE_KEY_BACKGROUND_TRACKING = '@runstr:background_step_tracking_enabled';
 
 export interface DailyStepData {
   steps: number;
@@ -110,6 +113,37 @@ export class DailyStepCounterService {
   }
 
   /**
+   * Set background step tracking enabled/disabled
+   * Persists the user's preference to AsyncStorage
+   */
+  async setBackgroundTrackingEnabled(enabled: boolean): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY_BACKGROUND_TRACKING, JSON.stringify(enabled));
+      console.log(`[DailyStepCounterService] Background tracking ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('[DailyStepCounterService] Error saving background tracking setting:', error);
+    }
+  }
+
+  /**
+   * Check if background step tracking is enabled
+   * Returns true by default if no preference is saved (backwards compatible)
+   */
+  async isBackgroundTrackingEnabled(): Promise<boolean> {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY_BACKGROUND_TRACKING);
+      if (stored === null) {
+        // Default to true for backwards compatibility
+        return true;
+      }
+      return JSON.parse(stored);
+    } catch (error) {
+      console.error('[DailyStepCounterService] Error reading background tracking setting:', error);
+      return true; // Default to enabled on error
+    }
+  }
+
+  /**
    * Open device settings for manual permission grant
    * Opens app settings on both platforms
    */
@@ -140,7 +174,9 @@ export class DailyStepCounterService {
         return await this.getTodayStepsIOS();
       }
     } catch (error) {
-      console.error('[DailyStepCounterService] Error getting steps:', error);
+      // Use warn instead of error - this is expected on simulators and when permissions are denied
+      // CMErrorDomain error 104 = pedometer not available (simulator/no hardware)
+      console.warn('[DailyStepCounterService] Steps unavailable:', error);
       return null;
     }
   }

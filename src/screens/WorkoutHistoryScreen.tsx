@@ -1,11 +1,10 @@
 /**
- * WorkoutHistoryScreen - Two-Tab Workout View
- * Public Tab: 1301 notes from Nostr (cache-first instant display)
- * Private Tab: Local Activity Tracker workouts (zero loading time)
- * Simple architecture with no merge complexity
+ * WorkoutHistoryScreen - Workout History View
+ * Local Tab: Local Activity Tracker workouts (zero loading time)
+ * Apple Health Tab: HealthKit workouts with post buttons (iOS)
+ * Health Connect Tab: Health Connect workouts (Android)
  *
- * IMPORTANT: This replaced the old complex merge-based screen
- * Old features removed: WorkoutCacheService, HealthKit, filter tabs, "Sync Now" button
+ * Tabs are displayed in the header row next to the back button.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -16,7 +15,6 @@ import { useNavigation } from '@react-navigation/native';
 import { theme } from '../styles/theme';
 import { WorkoutPublishingService } from '../services/nostr/workoutPublishingService';
 import localWorkoutStorage from '../services/fitness/LocalWorkoutStorageService';
-import Nostr1301ImportService from '../services/fitness/Nostr1301ImportService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UnifiedSigningService } from '../services/auth/UnifiedSigningService';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
@@ -30,18 +28,12 @@ import { EnhancedSocialShareModal } from '../components/profile/shared/EnhancedS
 import { ToggleButtons } from '../components/ui/ToggleButtons';
 
 // Two-Tab Workout Components
-import { WorkoutTabNavigator } from '../components/profile/WorkoutTabNavigator';
+import {
+  WorkoutTabNavigator,
+  getWorkoutTabOptions,
+  type WorkoutTabType,
+} from '../components/profile/WorkoutTabNavigator';
 
-// Analytics Content (embeddable)
-import { AdvancedAnalyticsContent } from '../components/analytics/AdvancedAnalyticsContent';
-
-// Stats screen top-level tabs
-type StatsTab = 'history' | 'advanced';
-
-const STATS_TABS = [
-  { key: 'history', label: 'Workout History' },
-  { key: 'advanced', label: 'Advanced' },
-];
 // Import type from the service file (not from the default export)
 import type { LocalWorkout } from '../services/fitness/LocalWorkoutStorageService';
 
@@ -58,7 +50,7 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
   route,
 }) => {
   const navigation = useNavigation<any>();
-  const [activeStatsTab, setActiveStatsTab] = useState<StatsTab>('history');
+  const [activeWorkoutTab, setActiveWorkoutTab] = useState<WorkoutTabType>('private');
   const [pubkey, setPubkey] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
   const [signer, setSigner] = useState<NDKSigner | null>(null);
@@ -66,15 +58,6 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<NostrProfile | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState<{
-    current: number;
-    total: number;
-  } | null>(null);
-  const [importStats, setImportStats] = useState<{
-    totalImported: number;
-    importedAt: string;
-  } | null>(null);
 
   // Services - localWorkoutStorage is already a singleton instance
   const publishingService = WorkoutPublishingService.getInstance();
@@ -391,75 +374,6 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
     }
   };
 
-  /**
-   * Handle importing public Nostr workout history (kind 1301 events)
-   */
-  const handleImportNostrHistory = async () => {
-    try {
-      setImporting(true);
-      setImportProgress({ current: 0, total: 0 }); // Initialize progress UI
-
-      // Get user's pubkey
-      const userPubkey = await AsyncStorage.getItem('@runstr:npub');
-      const hexPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
-      const userKey = hexPubkey || userPubkey;
-
-      if (!userKey) {
-        console.error('[WorkoutHistory] No pubkey found - cannot import workouts');
-        setImporting(false);
-        setImportProgress(null);
-        return;
-      }
-
-      console.log('[WorkoutHistory] Starting Nostr workout import...');
-
-      // Import workouts with progress tracking
-      const result = await Nostr1301ImportService.importUserHistory(
-        userKey,
-        (progress) => {
-          console.log(
-            `[Import Progress] ${progress.imported}/${progress.total} - ${progress.current}`
-          );
-          // Update visible progress UI
-          setImportProgress({
-            current: progress.imported,
-            total: progress.total,
-          });
-          // Update import stats to show progress
-          setImportStats({
-            totalImported: progress.imported,
-            importedAt: new Date().toISOString(),
-          });
-        }
-      );
-
-      if (result.success) {
-        console.log(
-          `[WorkoutHistory] ✅ Import successful: ${result.totalImported} workouts`
-        );
-        setImportStats({
-          totalImported: result.totalImported,
-          importedAt: new Date().toISOString(),
-        });
-        CustomAlertManager.alert(
-          'Import Complete',
-          `Imported ${result.totalImported} workouts from Nostr`
-        );
-      } else {
-        console.error('[WorkoutHistory] Import failed:', result.error);
-        CustomAlertManager.alert('Import Failed', result.error || 'Unknown error');
-      }
-
-      setImporting(false);
-      setImportProgress(null); // Clear progress UI
-    } catch (error) {
-      console.error('[WorkoutHistory] Import error:', error);
-      setImporting(false);
-      setImportProgress(null);
-      CustomAlertManager.alert('Import Error', 'Failed to import workouts');
-    }
-  };
-
   const handleGoBack = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
@@ -501,71 +415,35 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header - back button only */}
+      {/* Header with back button and Local/Apple Health tabs */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      {/* Top-Level Stats Toggle */}
-      <View style={styles.topToggleContainer}>
-        <ToggleButtons
-          options={STATS_TABS}
-          activeKey={activeStatsTab}
-          onSelect={(key) => setActiveStatsTab(key as StatsTab)}
-        />
-      </View>
-
-      {/* Workout History Tab Content */}
-      {activeStatsTab === 'history' && (
-        <>
-          {/* Import Banner (styled like Create Event) */}
-          <TouchableOpacity
-            style={[styles.importBanner, importing && styles.importBannerDisabled]}
-            onPress={handleImportNostrHistory}
-            activeOpacity={0.7}
-            disabled={importing}
-          >
-            <Ionicons
-              name={importing ? 'sync' : 'cloud-download-outline'}
-              size={20}
-              color={importing ? theme.colors.textMuted : theme.colors.text}
-            />
-            <Text style={[styles.importBannerText, importing && styles.importBannerTextDisabled]}>
-              {importing
-                ? importProgress?.total === 0
-                  ? 'Connecting to Nostr relays...'
-                  : `Syncing: ${importProgress?.current || 0} / ${importProgress?.total || 0}`
-                : 'Import from Nostr'}
-            </Text>
-            {!importing && (
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-            )}
-          </TouchableOpacity>
-
-          {/* Phone/Watch Toggle + Workout List */}
-          <WorkoutTabNavigator
-            userId={userId}
-            pubkey={pubkey}
-            onPostToNostr={handlePostToNostr}
-            onPostToSocial={handlePostToSocial}
-            onCompeteHealthKit={handleCompeteHealthKit}
-            onSocialShareHealthKit={handleSocialShareHealthKit}
-            onCompeteHealthConnect={handleCompeteHealthConnect}
-            onSocialShareHealthConnect={handleSocialShareHealthConnect}
-            onNavigateToAnalytics={handleNavigateToAnalytics}
+        <View style={styles.headerTabs}>
+          <ToggleButtons
+            options={getWorkoutTabOptions()}
+            activeKey={activeWorkoutTab}
+            onSelect={(key) => setActiveWorkoutTab(key as WorkoutTabType)}
           />
-        </>
-      )}
+        </View>
+      </View>
 
-      {/* Advanced Tab Content */}
-      {activeStatsTab === 'advanced' && (
-        <AdvancedAnalyticsContent
-          onPrivacyDeclined={() => setActiveStatsTab('history')}
-        />
-      )}
+      {/* Workout List - tabs are controlled externally from header */}
+      <WorkoutTabNavigator
+        userId={userId}
+        pubkey={pubkey}
+        activeTab={activeWorkoutTab}
+        onActiveTabChange={setActiveWorkoutTab}
+        hideInternalTabBar={true}
+        onPostToNostr={handlePostToNostr}
+        onPostToSocial={handlePostToSocial}
+        onCompeteHealthKit={handleCompeteHealthKit}
+        onSocialShareHealthKit={handleSocialShareHealthKit}
+        onCompeteHealthConnect={handleCompeteHealthConnect}
+        onSocialShareHealthConnect={handleSocialShareHealthConnect}
+        onNavigateToAnalytics={handleNavigateToAnalytics}
+      />
 
       {/* Enhanced Social Share Modal */}
       <EnhancedSocialShareModal
@@ -597,52 +475,20 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     backgroundColor: theme.colors.cardBackground,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+    gap: 12,
   },
 
   backButton: {
     padding: 8,
   },
 
-  headerSpacer: {
+  headerTabs: {
     flex: 1,
-  },
-
-  topToggleContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-
-  importBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.cardBackground,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: theme.borderRadius.medium,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    gap: 12,
-  },
-
-  importBannerDisabled: {
-    opacity: 0.7,
-  },
-
-  importBannerText: {
-    flex: 1,
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: theme.typography.weights.medium,
-  },
-
-  importBannerTextDisabled: {
-    color: theme.colors.textMuted,
   },
 
   errorContainer: {

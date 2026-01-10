@@ -192,6 +192,11 @@ export const PLEDGE_COST_OPTIONS = [
   { value: 7, label: '7' },
 ];
 
+export const PLEDGE_DESTINATION_OPTIONS = [
+  { value: 'captain' as const, label: 'You (Captain)' },
+  { value: 'charity' as const, label: 'Team' },
+];
+
 export const PAYOUT_OPTIONS: { value: RunstrPayoutScheme; label: string }[] = [
   { value: 'winner_takes_all', label: 'Top 1' },
   { value: 'top_3_split', label: 'Top 3' },
@@ -205,5 +210,22 @@ export const DISTANCE_OPTIONS = [
   { label: '21K', value: '21.1' },
   { label: '42K', value: '42.2' },
 ];
+
+// Impact Level tier options for event gating (donation-based)
+export const IMPACT_TIER_OPTIONS = [
+  { value: 'Supporter', level: 5, label: 'Supporter (5+)' },
+  { value: 'Contributor', level: 10, label: 'Contributor (10+)' },
+  { value: 'Champion', level: 20, label: 'Champion (20+)' },
+  { value: 'Legend', level: 50, label: 'Legend (50+)' },
+  { value: 'Philanthropist', level: 100, label: 'Philanthropist (100+)' },
+] as const;
+
+// @deprecated - Use IMPACT_TIER_OPTIONS instead
+export const RANK_TIER_OPTIONS = [
+  { value: 'New', score: 0.00001, label: 'New+' },
+  { value: 'Known', score: 0.0001, label: 'Known+' },
+  { value: 'Trusted', score: 0.001, label: 'Trusted+' },
+  { value: 'Elite', score: 0.01, label: 'Elite' },
+] as const;
 
 export default useRunstrEventCreation;

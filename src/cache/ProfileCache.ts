@@ -130,11 +130,9 @@ export class ProfileCache {
             const parsed = parseProfileContent(event.content);
 
             if (parsed && event.pubkey) {
-              // Only cache if name or picture exists
-              if (parsed.name || parsed.picture) {
-                profileCache.set(event.pubkey, parsed);
-                fetchedProfilesMap.set(event.pubkey, parsed);
-              }
+              // Cache all profiles - display components handle missing names via fallback
+              profileCache.set(event.pubkey, parsed);
+              fetchedProfilesMap.set(event.pubkey, parsed);
               fetchingStatus.set(event.pubkey, 'fetched');
             } else if (event.pubkey) {
               fetchingStatus.set(event.pubkey, 'error');

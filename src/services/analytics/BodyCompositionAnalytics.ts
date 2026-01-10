@@ -65,6 +65,25 @@ export interface VO2MaxResult {
   methodDescription: string;
 }
 
+/**
+ * RUNSTR Fitness Age Result
+ * A more encouraging, activity-focused fitness age calculation
+ * that rewards consistency, variety, and showing up
+ */
+export interface RunstrFitnessAgeResult {
+  fitnessAge: number;
+  chronologicalAge: number;
+  breakdown: {
+    consistencyBonus: number;      // Up to -5 years (workout frequency)
+    volumeBonus: number;           // Up to -5 years (weekly distance/time)
+    varietyBonus: number;          // Up to -3 years (activity types)
+    cardioBonus: number;           // Up to -5 years (cardio performance)
+    inactivityPenalty: number;     // Up to +5 years (only if sedentary)
+  };
+  summary: string;
+  encouragement: string;
+}
+
 export class BodyCompositionAnalytics {
   /**
    * Calculate all body composition metrics
@@ -389,6 +408,246 @@ export class BodyCompositionAnalytics {
     });
 
     return recentWorkouts.length / weeks;
+  }
+
+  /**
+   * Calculate RUNSTR Fitness Age
+   * A more encouraging, activity-focused fitness age that rewards:
+   * - Consistency (showing up regularly)
+   * - Volume (total weekly activity)
+   * - Variety (different workout types)
+   * - Cardio capacity (any running/cardio effort)
+   *
+   * Philosophy: Most people who exercise regularly are healthier than average.
+   * This calculation rewards the act of consistent movement rather than
+   * comparing against elite athletic standards.
+   */
+  static calculateRunstrFitnessAge(
+    chronologicalAge: number,
+    workouts: LocalWorkout[]
+  ): RunstrFitnessAgeResult {
+    // Start with chronological age
+    let fitnessAge = chronologicalAge;
+
+    // Get recent workouts (last 4 weeks, excluding daily step accumulations)
+    const fourWeeksAgo = new Date();
+    fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+
+    const recentWorkouts = workouts.filter((w) => {
+      const workoutDate = new Date(w.startTime);
+      return workoutDate >= fourWeeksAgo && w.source !== 'daily_steps';
+    });
+
+    // === CONSISTENCY BONUS (up to -5 years) ===
+    // Based on average workouts per week over last 4 weeks
+    const avgWeeklyWorkouts = recentWorkouts.length / 4;
+    let consistencyBonus = 0;
+
+    if (avgWeeklyWorkouts >= 6) {
+      consistencyBonus = -5; // Elite consistency
+    } else if (avgWeeklyWorkouts >= 5) {
+      consistencyBonus = -4;
+    } else if (avgWeeklyWorkouts >= 4) {
+      consistencyBonus = -3;
+    } else if (avgWeeklyWorkouts >= 3) {
+      consistencyBonus = -2;
+    } else if (avgWeeklyWorkouts >= 2) {
+      consistencyBonus = -1;
+    } else if (avgWeeklyWorkouts >= 1) {
+      consistencyBonus = 0; // At least showing up
+    }
+
+    // === VOLUME BONUS (up to -5 years) ===
+    // Based on weekly distance (running/walking/cycling) or time (other activities)
+    const totalDistanceKm = recentWorkouts.reduce((sum, w) => {
+      if (w.distance && (w.type === 'running' || w.type === 'walking' || w.type === 'cycling' || w.type === 'hiking')) {
+        return sum + w.distance / 1000;
+      }
+      return sum;
+    }, 0);
+    const weeklyDistanceKm = totalDistanceKm / 4;
+
+    const totalActiveMinutes = recentWorkouts.reduce((sum, w) => {
+      return sum + (w.duration || 0) / 60;
+    }, 0);
+    const weeklyActiveMinutes = totalActiveMinutes / 4;
+
+    let volumeBonus = 0;
+    // Distance-based (for cardio activities)
+    if (weeklyDistanceKm >= 40) {
+      volumeBonus = Math.min(volumeBonus, -5); // 40+ km/week
+    } else if (weeklyDistanceKm >= 30) {
+      volumeBonus = Math.min(volumeBonus, -4);
+    } else if (weeklyDistanceKm >= 20) {
+      volumeBonus = Math.min(volumeBonus, -3);
+    } else if (weeklyDistanceKm >= 10) {
+      volumeBonus = Math.min(volumeBonus, -2);
+    } else if (weeklyDistanceKm >= 5) {
+      volumeBonus = Math.min(volumeBonus, -1);
+    }
+
+    // Time-based fallback (for strength, meditation, etc.)
+    if (volumeBonus === 0 && weeklyActiveMinutes > 0) {
+      if (weeklyActiveMinutes >= 300) {
+        volumeBonus = -4; // 5+ hours/week
+      } else if (weeklyActiveMinutes >= 200) {
+        volumeBonus = -3;
+      } else if (weeklyActiveMinutes >= 150) {
+        volumeBonus = -2; // WHO recommendation
+      } else if (weeklyActiveMinutes >= 75) {
+        volumeBonus = -1;
+      }
+    }
+
+    // === VARIETY BONUS (up to -3 years) ===
+    // Reward diverse training (cardio + strength + flexibility)
+    const activityTypes = new Set(recentWorkouts.map(w => w.type));
+    let varietyBonus = 0;
+
+    const hasCardio = activityTypes.has('running') || activityTypes.has('walking') ||
+                      activityTypes.has('cycling') || activityTypes.has('hiking');
+    const hasStrength = activityTypes.has('strength');
+    const hasMindfulness = activityTypes.has('meditation') || activityTypes.has('yoga');
+
+    if (hasCardio && hasStrength && hasMindfulness) {
+      varietyBonus = -3; // Complete athlete
+    } else if ((hasCardio && hasStrength) || (hasCardio && hasMindfulness) || (hasStrength && hasMindfulness)) {
+      varietyBonus = -2; // Balanced training
+    } else if (activityTypes.size >= 2) {
+      varietyBonus = -1; // Some variety
+    }
+
+    // === CARDIO PERFORMANCE BONUS (up to -5 years) ===
+    // Based on actual cardio capacity - but more generous than VO2 Max calculation
+    // Completing any timed cardio is an achievement!
+    const cardioWorkouts = recentWorkouts.filter(w =>
+      (w.type === 'running' || w.type === 'walking' || w.type === 'cycling') &&
+      w.distance && w.distance > 0 && w.duration > 0
+    );
+
+    let cardioBonus = 0;
+
+    if (cardioWorkouts.length > 0) {
+      // Find best 5K effort (if any)
+      const fiveKWorkouts = cardioWorkouts.filter(w =>
+        w.distance && w.distance >= 4800 && w.distance <= 5200
+      );
+
+      if (fiveKWorkouts.length > 0) {
+        const fastest5K = fiveKWorkouts.reduce((best, w) => {
+          const pace = w.duration / (w.distance! / 1000);
+          const bestPace = best.duration / (best.distance! / 1000);
+          return pace < bestPace ? w : best;
+        });
+
+        const time5KMinutes = fastest5K.duration / 60;
+
+        // More generous 5K time brackets
+        if (time5KMinutes <= 20) {
+          cardioBonus = -5; // Elite
+        } else if (time5KMinutes <= 25) {
+          cardioBonus = -4; // Very fast
+        } else if (time5KMinutes <= 30) {
+          cardioBonus = -3; // Fast
+        } else if (time5KMinutes <= 35) {
+          cardioBonus = -2; // Good - this includes 31:25!
+        } else if (time5KMinutes <= 40) {
+          cardioBonus = -1; // Completed a 5K - that's an achievement!
+        } else {
+          cardioBonus = -1; // Any 5K completion gets credit
+        }
+      } else {
+        // No 5K, but has cardio workouts - give credit for effort
+        const avgPaceMinPerKm = cardioWorkouts.reduce((sum, w) => {
+          return sum + (w.duration / 60) / (w.distance! / 1000);
+        }, 0) / cardioWorkouts.length;
+
+        // Generous pace-based bonus
+        if (avgPaceMinPerKm <= 5) {
+          cardioBonus = -3; // Fast runner
+        } else if (avgPaceMinPerKm <= 6) {
+          cardioBonus = -2; // Good pace
+        } else if (avgPaceMinPerKm <= 8) {
+          cardioBonus = -1; // Active
+        } else {
+          cardioBonus = -1; // Any cardio is good cardio!
+        }
+      }
+    }
+
+    // === INACTIVITY PENALTY (up to +5 years) ===
+    // Only applies if truly sedentary (no workouts in 4 weeks)
+    let inactivityPenalty = 0;
+
+    if (recentWorkouts.length === 0) {
+      // Check longer history
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
+
+      const olderWorkouts = workouts.filter((w) => {
+        const workoutDate = new Date(w.startTime);
+        return workoutDate >= threeMonthsAgo && w.source !== 'daily_steps';
+      });
+
+      if (olderWorkouts.length === 0) {
+        inactivityPenalty = 5; // No activity in 3 months
+      } else if (olderWorkouts.length < 5) {
+        inactivityPenalty = 3; // Very low activity
+      } else {
+        inactivityPenalty = 1; // Recently inactive
+      }
+    }
+
+    // === CALCULATE FINAL FITNESS AGE ===
+    fitnessAge = chronologicalAge +
+                 consistencyBonus +
+                 volumeBonus +
+                 varietyBonus +
+                 cardioBonus +
+                 inactivityPenalty;
+
+    // Cap at reasonable bounds (can't be younger than 18 or older than age + 10)
+    fitnessAge = Math.max(18, Math.min(chronologicalAge + 10, fitnessAge));
+    fitnessAge = Math.round(fitnessAge);
+
+    // Generate summary and encouragement
+    const totalBonus = consistencyBonus + volumeBonus + varietyBonus + cardioBonus + inactivityPenalty;
+    let summary = '';
+    let encouragement = '';
+
+    if (totalBonus <= -10) {
+      summary = 'Elite fitness level';
+      encouragement = 'Your dedication is exceptional. Keep inspiring others!';
+    } else if (totalBonus <= -6) {
+      summary = 'Excellent fitness level';
+      encouragement = 'You\'re in great shape. Your consistency is paying off!';
+    } else if (totalBonus <= -3) {
+      summary = 'Good fitness level';
+      encouragement = 'You\'re doing great! Every workout counts.';
+    } else if (totalBonus < 0) {
+      summary = 'Above average fitness';
+      encouragement = 'You\'re ahead of most people. Keep it up!';
+    } else if (totalBonus === 0) {
+      summary = 'Average fitness level';
+      encouragement = 'You\'re on the right track. Small improvements add up!';
+    } else {
+      summary = 'Room to grow';
+      encouragement = 'Every journey starts somewhere. Your next workout awaits!';
+    }
+
+    return {
+      fitnessAge,
+      chronologicalAge,
+      breakdown: {
+        consistencyBonus,
+        volumeBonus,
+        varietyBonus,
+        cardioBonus,
+        inactivityPenalty,
+      },
+      summary,
+      encouragement,
+    };
   }
 
   /**

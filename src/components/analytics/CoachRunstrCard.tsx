@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { theme } from '../../styles/theme';
 import {
   useCoachRunstr,
@@ -94,74 +94,92 @@ export const CoachRunstrCard: React.FC<CoachRunstrCardProps> = ({
   } = useCoachRunstr();
   const [error, setError] = useState<string | null>(null);
 
-  // Check health profile status and calculate metrics on mount
-  useEffect(() => {
-    const checkHealthProfileAndCalculate = async () => {
-      try {
-        const profileData = await AsyncStorage.getItem('@runstr:health_profile');
-        if (profileData) {
-          const profile = JSON.parse(profileData);
-          setHealthProfileStatus({
-            hasHeight: !!profile.height,
-            hasWeight: !!profile.weight,
-            hasAge: !!profile.age,
-          });
+  // Function to check health profile and calculate metrics
+  const checkHealthProfileAndCalculate = React.useCallback(async () => {
+    try {
+      console.log('[CoachRunstrCard] Checking health profile...');
+      const profileData = await AsyncStorage.getItem('@runstr:health_profile');
+      console.log('[CoachRunstrCard] Raw profile data:', profileData);
 
-          // Calculate metrics if we have the data
-          if (profile.height && profile.weight) {
-            const metrics: CalculatedMetrics = {};
+      if (profileData) {
+        const profile = JSON.parse(profileData);
+        console.log('[CoachRunstrCard] Parsed profile:', JSON.stringify(profile));
+        console.log('[CoachRunstrCard] height:', profile.height, 'weight:', profile.weight, 'age:', profile.age);
 
-            // Calculate BMI
-            const bmiResult = BodyCompositionAnalytics.calculateBMI(profile.weight, profile.height);
-            metrics.bmi = bmiResult;
+        const status = {
+          hasHeight: !!profile.height,
+          hasWeight: !!profile.weight,
+          hasAge: !!profile.age,
+        };
+        console.log('[CoachRunstrCard] Setting status:', status);
+        setHealthProfileStatus(status);
 
-            // Create health profile for VO2 Max calculation
-            const healthProfile: HealthProfile = {
-              height: profile.height,
-              weight: profile.weight,
-              age: profile.age,
-              biologicalSex: profile.biologicalSex,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+        // Calculate metrics if we have the data
+        if (profile.height && profile.weight) {
+          const metrics: CalculatedMetrics = {};
+
+          // Calculate BMI
+          const bmiResult = BodyCompositionAnalytics.calculateBMI(profile.weight, profile.height);
+          metrics.bmi = bmiResult;
+
+          // Create health profile for VO2 Max calculation
+          const healthProfile: HealthProfile = {
+            height: profile.height,
+            weight: profile.weight,
+            age: profile.age,
+            biologicalSex: profile.biologicalSex,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          // Calculate VO2 Max from workouts
+          const vo2MaxData = BodyCompositionAnalytics.estimateVO2Max(workouts, healthProfile);
+          if (vo2MaxData) {
+            metrics.vo2max = {
+              estimate: vo2MaxData.estimate,
+              category: vo2MaxData.category,
+              percentile: vo2MaxData.percentile,
             };
 
-            // Calculate VO2 Max from workouts
-            const vo2MaxData = BodyCompositionAnalytics.estimateVO2Max(workouts, healthProfile);
-            if (vo2MaxData) {
-              metrics.vo2max = {
-                estimate: vo2MaxData.estimate,
-                category: vo2MaxData.category,
-                percentile: vo2MaxData.percentile,
+            // Calculate Fitness Age if we have age
+            if (profile.age) {
+              metrics.fitnessAge = {
+                age: vo2MaxData.fitnessAge,
+                chronologicalAge: profile.age,
               };
-
-              // Calculate Fitness Age if we have age
-              if (profile.age) {
-                metrics.fitnessAge = {
-                  age: vo2MaxData.fitnessAge,
-                  chronologicalAge: profile.age,
-                };
-              }
             }
-
-            setCalculatedMetrics(metrics);
-
-            // Update the AI context with fresh data
-            await RunstrContextGenerator.updateContext();
           }
-        } else {
-          setHealthProfileStatus({
-            hasHeight: false,
-            hasWeight: false,
-            hasAge: false,
-          });
-        }
-      } catch (err) {
-        console.error('[CoachRunstrCard] Failed to check health profile:', err);
-      }
-    };
 
-    checkHealthProfileAndCalculate();
+          setCalculatedMetrics(metrics);
+
+          // Update the AI context with fresh data
+          await RunstrContextGenerator.updateContext();
+        }
+      } else {
+        console.log('[CoachRunstrCard] No health profile found in AsyncStorage');
+        setHealthProfileStatus({
+          hasHeight: false,
+          hasWeight: false,
+          hasAge: false,
+        });
+      }
+    } catch (err) {
+      console.error('[CoachRunstrCard] Failed to check health profile:', err);
+    }
   }, [workouts]);
+
+  // Check health profile status and calculate metrics on mount and when workouts change
+  useEffect(() => {
+    checkHealthProfileAndCalculate();
+  }, [checkHealthProfileAndCalculate]);
+
+  // Re-check health profile when screen regains focus (after returning from HealthProfileScreen)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('[CoachRunstrCard] useFocusEffect triggered - reloading health profile');
+      checkHealthProfileAndCalculate();
+    }, [checkHealthProfileAndCalculate])
+  );
 
   const handlePromptPress = async (type: PromptType) => {
     // Find the button config

@@ -5,19 +5,33 @@
 
 export const REWARD_CONFIG = {
   /**
-   * Sender NWC Connection String
+   * Sender NWC Connection String (Fallback only)
    * This is the wallet that sends automated rewards to users
-   * TESTING: Using coinos.io NWC for reward distribution
+   *
+   * SECURITY: For production builds, use encrypted NWC:
+   * 1. Set REWARD_SENDER_NWC in .env (plaintext)
+   * 2. Run: node scripts/encrypt-nwc-openssl.cjs
+   * 3. Add ENCRYPTED_REWARD_NWC to .env
+   * 4. The app will decrypt it at runtime using crypto-js
+   *
+   * This fallback is only used if ENCRYPTED_REWARD_NWC is not set.
+   * Never commit actual NWC strings to this file!
    */
-  SENDER_NWC:
-    process.env.REWARD_SENDER_NWC ||
-    'nostr+walletconnect://72bdbc57bdd6dfc4e62685051de8041d148c3c68fe42bf301f71aa6cf53e52fb?relay=wss%3A%2F%2Frelay.coinos.io&secret=a50e5e32b590939a3cea777ab87cf3591f9dbde3841395900c5d723e64f1934f&lud16=RUNSTR@coinos.io',
+  SENDER_NWC: 'nostr+walletconnect://YOUR_NWC_STRING_HERE',
 
   /**
    * Daily Workout Reward Amount
    * Amount in satoshis sent for first workout of the day
    */
   DAILY_WORKOUT_REWARD: 50,
+
+  /**
+   * Step Milestone Rewards
+   * Automated rewards for reaching step milestones throughout the day
+   */
+  STEP_MILESTONE_REWARD: 5,        // sats per 1k steps milestone
+  STEP_MILESTONE_INCREMENT: 1000,  // reward every 1,000 steps
+  STEP_REWARDS_ENABLED: true,      // toggle to disable step rewards
 
   /**
    * Minimum Workout Distance for Reward

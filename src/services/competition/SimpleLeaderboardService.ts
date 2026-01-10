@@ -14,6 +14,7 @@ import {
 } from '@nostr-dev-kit/ndk';
 import { nip19 } from 'nostr-tools';
 import type { League, CompetitionEvent } from './SimpleCompetitionService';
+import { NostrFetchLogger } from '../../utils/NostrFetchLogger';
 
 export interface LeaderboardEntry {
   rank: number;
@@ -37,6 +38,7 @@ export interface Workout {
   splits?: Map<number, number>; // km -> elapsed time in seconds (e.g., km 5 -> 1440s)
   splitPaces?: Map<number, number>; // km -> pace in seconds per km
   lightningAddress?: string; // User's reward lightning address from ["lightning", "..."] tag
+  steps?: number; // Step count from ["steps", "..."] tag
 }
 
 export class SimpleLeaderboardService {
@@ -455,8 +457,11 @@ export class SimpleLeaderboardService {
     startDate: Date,
     endDate: Date
   ): Promise<Workout[]> {
+    NostrFetchLogger.start('Leaderboard.getWorkouts', { members: memberNpubs.length, activityType });
+
     if (memberNpubs.length === 0) {
       console.log('No members to query workouts for');
+      NostrFetchLogger.end('Leaderboard.getWorkouts', 0, 'no members');
       return [];
     }
 
@@ -473,8 +478,12 @@ export class SimpleLeaderboardService {
       console.log(
         `💾 Returning ${cachedWorkouts.length} cached workouts (instant load)`
       );
+      NostrFetchLogger.cacheHit('Leaderboard.getWorkouts');
+      NostrFetchLogger.end('Leaderboard.getWorkouts', cachedWorkouts.length, 'cached');
       return cachedWorkouts;
     }
+
+    NostrFetchLogger.cacheMiss('Leaderboard.getWorkouts');
 
     // Cache miss - fetch from Nostr
     const startTimestamp = Math.floor(startDate.getTime() / 1000);
@@ -623,6 +632,7 @@ export class SimpleLeaderboardService {
         );
       }
 
+      NostrFetchLogger.end('Leaderboard.getWorkouts', workouts.length, 'fresh');
       return workouts;
     } catch (error) {
       if (error instanceof Error && error.message === 'Workout fetch timeout') {
@@ -632,9 +642,11 @@ export class SimpleLeaderboardService {
         console.warn(
           '   This may indicate slow relay connections or large result set'
         );
+        NostrFetchLogger.timeout('Leaderboard.getWorkouts', 5000);
         return [];
       }
       console.error('Failed to fetch workouts:', error);
+      NostrFetchLogger.error('Leaderboard.getWorkouts', error instanceof Error ? error : String(error));
       return [];
     }
   }
@@ -700,6 +712,10 @@ export class SimpleLeaderboardService {
       // Get user's lightning address from workout event
       const lightningAddress = getTag('lightning');
 
+      // Parse step count from ["steps", "..."] tag
+      const stepsStr = getTag('steps');
+      const steps = stepsStr ? parseInt(stepsStr) : undefined;
+
       return {
         id: event.id,
         npub: npubFormat, // Now stores npub1... format instead of hex
@@ -711,6 +727,7 @@ export class SimpleLeaderboardService {
         splits: splits.size > 0 ? splits : undefined,
         splitPaces: splitPaces.size > 0 ? splitPaces : undefined,
         lightningAddress,
+        steps,
       };
     } catch (error) {
       console.error('Failed to parse workout event:', error);
@@ -747,9 +764,13 @@ export class SimpleLeaderboardService {
     workout: Workout,
     targetDistanceKm: number
   ): number {
-    // If no splits available, estimate target time from average pace
+    // FIX: Defensive check - ensure splits is a Map before using Map methods
+    // This prevents "undefined is not a function" crash when cached data has plain object
+    const splitsIsMap = workout.splits instanceof Map;
+
+    // If no splits available or not a Map, estimate target time from average pace
     // This supports Health Connect/HealthKit workouts that don't have per-km splits
-    if (!workout.splits || workout.splits.size === 0) {
+    if (!workout.splits || !splitsIsMap || workout.splits.size === 0) {
       if (workout.distance && workout.distance > 0) {
         // Calculate estimated target time based on average pace
         // e.g., 5.18km in 31:15 → avgPace = 361.9 sec/km → 5K time = 30:10
@@ -1199,6 +1220,7 @@ export class SimpleLeaderboardService {
     leaderboard10k: LeaderboardEntry[];
     leaderboardHalf: LeaderboardEntry[];
     leaderboardMarathon: LeaderboardEntry[];
+    leaderboardSteps: LeaderboardEntry[];
   }> {
     const todayMidnight = this.getTodayMidnightLocal(); // Use LOCAL timezone to include today's workouts
     const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -1325,8 +1347,15 @@ export class SimpleLeaderboardService {
       return isRunning(w) && (hasSplits || hasDistance);
     });
 
+    // Filter for steps leaderboard - walking workouts with step count
+    const isWalking = (w: Workout) =>
+      w.activityType?.toLowerCase() === 'walking';
+    const eligibleSteps = workouts.filter(
+      (w) => isWalking(w) && w.steps && w.steps > 0
+    );
+
     console.log(
-      `📊 [GlobalLeaderboard] 🏆 Eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}`
+      `📊 [GlobalLeaderboard] 🏆 Eligible: 5K=${eligible5k.length}, 10K=${eligible10k.length}, Half=${eligibleHalf.length}, Marathon=${eligibleMarathon.length}, Steps=${eligibleSteps.length}`
     );
 
     // Calculate global leaderboards
@@ -1336,6 +1365,7 @@ export class SimpleLeaderboardService {
       leaderboard10k: this.buildLeaderboard(eligible10k, 10),
       leaderboardHalf: this.buildLeaderboard(eligibleHalf, 21.1),
       leaderboardMarathon: this.buildLeaderboard(eligibleMarathon, 42.2),
+      leaderboardSteps: this.buildStepsLeaderboard(eligibleSteps),
     };
 
     // Cache for 5 minutes
@@ -1393,6 +1423,57 @@ export class SimpleLeaderboardService {
         ...entry,
         rank: index + 1,
       }));
+  }
+
+  /**
+   * Build steps leaderboard
+   * Groups by user and keeps MAX steps (not sum - prevents duplicate posting)
+   * Sorted by highest steps DESCENDING (most steps = best)
+   *
+   * Why MAX instead of SUM:
+   * - Daily steps are cumulative (10,000 at 6pm includes 5,000 from noon)
+   * - Prevents gaming by posting the same step count multiple times
+   * - The highest value represents the user's actual daily total
+   */
+  private buildStepsLeaderboard(workouts: Workout[]): LeaderboardEntry[] {
+    // Group by user and keep MAX steps (deduplication)
+    const stepsByUser = new Map<
+      string,
+      { maxSteps: number; workoutCount: number; workout: Workout }
+    >();
+
+    for (const workout of workouts) {
+      if (!workout.steps || workout.steps <= 0) continue;
+
+      const existing = stepsByUser.get(workout.npub);
+      const currentMax = existing?.maxSteps || 0;
+
+      // Only update if this workout has more steps (keep the max)
+      if (workout.steps > currentMax) {
+        stepsByUser.set(workout.npub, {
+          maxSteps: workout.steps,
+          workoutCount: (existing?.workoutCount || 0) + 1,
+          workout: workout, // Keep workout with highest steps for lightning address
+        });
+      } else if (existing) {
+        // Still count the workout even if not the max
+        existing.workoutCount += 1;
+      }
+    }
+
+    // Sort by steps DESCENDING (most steps = best)
+    return Array.from(stepsByUser.values())
+      .map(({ maxSteps, workoutCount, workout }) => ({
+        npub: workout.npub,
+        name: '', // Let ZappableUserRow handle fallback
+        score: maxSteps,
+        formattedScore: `${maxSteps.toLocaleString()} steps`,
+        workoutCount,
+        rank: 0, // Will be set after sorting
+        lightningAddress: workout.lightningAddress,
+      }))
+      .sort((a, b) => b.score - a.score) // Most steps first
+      .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
   }
 
   /**

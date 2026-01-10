@@ -258,7 +258,7 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Stats</Text>
+        <Text style={styles.headerTitle}>Experimental</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -347,24 +347,6 @@ export const AdvancedAnalyticsScreen: React.FC = () => {
 
         {/* COACH RUNSTR - AI-Powered Insights */}
         <CoachRunstrCard workouts={workouts} />
-
-        {/* View Workout History Link */}
-        <TouchableOpacity
-          style={styles.historyLink}
-          onPress={async () => {
-            const userPubkey = await AsyncStorage.getItem('@runstr:npub');
-            const hexPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
-            (navigation as any).navigate('WorkoutHistory', {
-              userId: hexPubkey || userPubkey || '',
-              pubkey: userPubkey || '',
-            });
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="list-outline" size={20} color={theme.colors.orangeBright} />
-          <Text style={styles.historyLinkText}>View Workout History</Text>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-        </TouchableOpacity>
 
         {/* Last Updated */}
         {analytics && (

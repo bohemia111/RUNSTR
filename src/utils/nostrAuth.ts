@@ -2,21 +2,27 @@
  * Unified Authentication System for Nostr
  * Provides reliable storage and retrieval of authentication data
  * with verification, fallback mechanisms, and migration support
+ *
+ * v3.0: Migrated from XOR+AsyncStorage to SecureStore (hardware-backed encryption)
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NDKPrivateKeySigner, NDKUser } from '@nostr-dev-kit/ndk';
+import { SecureNsecStorage } from '../services/auth/SecureNsecStorage';
 
 const STORAGE_KEYS = {
-  NSEC_PLAIN: '@runstr:user_nsec',
-  NSEC_ENCRYPTED: '@runstr:nsec_encrypted',
+  // Public keys can stay in AsyncStorage (they're public by design)
   NPUB: '@runstr:npub',
   HEX_PUBKEY: '@runstr:hex_pubkey',
-  ENCRYPTION_KEY: '@runstr:encryption_key', // Store the key used for encryption
-  AUTH_VERSION: '@runstr:auth_version', // Track storage version for migrations
+  AUTH_VERSION: '@runstr:auth_version',
+  AUTH_METHOD: '@runstr:auth_method',
+  // Legacy keys - only used for migration
+  NSEC_PLAIN: '@runstr:user_nsec',
+  NSEC_ENCRYPTED: '@runstr:nsec_encrypted',
+  ENCRYPTION_KEY: '@runstr:encryption_key',
 };
 
-const CURRENT_AUTH_VERSION = '2.0';
+const CURRENT_AUTH_VERSION = '3.0'; // Bumped for SecureStore migration
 
 export interface AuthStorage {
   nsec: string;
@@ -26,14 +32,15 @@ export interface AuthStorage {
 
 /**
  * Stores authentication data with verification
- * Returns true if all storage operations succeeded and were verified
+ * Uses SecureStore for nsec (hardware-backed encryption)
+ * Returns true if all storage operations succeeded
  */
 export async function storeAuthenticationData(
   nsec: string,
   userId: string
 ): Promise<boolean> {
   try {
-    console.log('[Auth] Starting authentication storage...');
+    console.log('[Auth] Starting authentication storage (SecureStore v3.0)...');
     console.log('[Auth] nsec format check:', {
       startsWithNsec: nsec?.startsWith('nsec1'),
       length: nsec?.length,
@@ -68,164 +75,77 @@ export async function storeAuthenticationData(
       hexPubkey: hexPubkey.slice(0, 16) + '...',
     });
 
-    // Store all authentication data in a transaction-like manner
+    // Store nsec in SecureStore (hardware-backed encryption)
+    console.log('[Auth] Storing nsec in SecureStore...');
+    const nsecStored = await SecureNsecStorage.storeNsec(nsec);
+    if (!nsecStored) {
+      console.error('[Auth] Failed to store nsec in SecureStore');
+      return false;
+    }
+
+    // Store public keys in AsyncStorage (they're public by design)
     const storageOperations = [
-      // Store plain nsec for wallet operations
-      AsyncStorage.setItem(STORAGE_KEYS.NSEC_PLAIN, nsec),
-
-      // Store encrypted version with consistent key
-      AsyncStorage.setItem(
-        STORAGE_KEYS.NSEC_ENCRYPTED,
-        encryptNsec(nsec, userId)
-      ),
-
-      // Store the encryption key reference (critical for decryption)
-      AsyncStorage.setItem(STORAGE_KEYS.ENCRYPTION_KEY, userId),
-
-      // Store public key data
       AsyncStorage.setItem(STORAGE_KEYS.NPUB, npub),
       AsyncStorage.setItem(STORAGE_KEYS.HEX_PUBKEY, hexPubkey),
-
-      // Store version for future migrations
       AsyncStorage.setItem(STORAGE_KEYS.AUTH_VERSION, CURRENT_AUTH_VERSION),
     ];
 
-    // Execute all storage operations
-    console.log('[Auth] Executing storage operations...');
+    console.log('[Auth] Executing public key storage...');
     await Promise.all(storageOperations);
 
-    // Verify storage succeeded by reading back
-    console.log('[Auth] Verifying storage...');
-    // TEMPORARILY DISABLED: Aggressive verification was deleting valid keys
-    // const verification = await verifyAuthenticationStorage();
-
-    // if (!verification) {
-    //   console.error(
-    //     '[Auth] Storage verification failed - clearing invalid data'
-    //   );
-    //   await clearAuthenticationStorage();
-    //   return false;
-    // }
-
-    console.log(
-      '[Auth] ✅ Authentication stored successfully (verification skipped)'
-    );
+    console.log('[Auth] ✅ Authentication stored securely');
     console.log('[Auth] Stored for npub:', npub.slice(0, 20) + '...');
 
     return true;
   } catch (error) {
     console.error('[Auth] Storage error:', error);
-    // Don't clear on error - might be temporary
     return false;
   }
 }
 
 /**
- * Retrieves authentication data with multiple fallback mechanisms
+ * Retrieves authentication data from SecureStore
+ * Includes backwards-compatible migration from AsyncStorage
  */
 export async function getAuthenticationData(): Promise<AuthStorage | null> {
   try {
-    console.log('[Auth] Retrieving authentication data...');
+    console.log('[Auth] Retrieving authentication data (SecureStore v3.0)...');
 
-    // Try plain storage first (fastest)
-    const plainNsec = await AsyncStorage.getItem(STORAGE_KEYS.NSEC_PLAIN);
-    console.log(
-      '[Auth] Plain nsec retrieved:',
-      plainNsec ? `${plainNsec.slice(0, 10)}...` : 'null'
-    );
+    // Get nsec from SecureStore (with automatic AsyncStorage migration)
+    const nsec = await SecureNsecStorage.getNsec();
 
-    if (plainNsec && plainNsec.startsWith('nsec1')) {
-      console.log('[Auth] Retrieved valid nsec from plain storage');
-
-      // Get associated public key data
-      const npub = await AsyncStorage.getItem(STORAGE_KEYS.NPUB);
-      const hexPubkey = await AsyncStorage.getItem(STORAGE_KEYS.HEX_PUBKEY);
-
-      if (npub && hexPubkey) {
-        return {
-          nsec: plainNsec,
-          npub,
-          hexPubkey,
-        };
-      } else {
-        console.log('[Auth] Missing public key data, deriving from nsec...');
-        // Derive missing data from nsec
-        const signer = new NDKPrivateKeySigner(plainNsec);
-        const user = await signer.user();
-
-        // Store the derived data for next time
-        await AsyncStorage.setItem(STORAGE_KEYS.NPUB, user.npub);
-        await AsyncStorage.setItem(STORAGE_KEYS.HEX_PUBKEY, user.pubkey);
-
-        return {
-          nsec: plainNsec,
-          npub: user.npub,
-          hexPubkey: user.pubkey,
-        };
-      }
-    }
-
-    // Fallback to encrypted storage
-    console.log('[Auth] Plain storage invalid, trying encrypted fallback...');
-
-    const encryptedNsec = await AsyncStorage.getItem(
-      STORAGE_KEYS.NSEC_ENCRYPTED
-    );
-    const encryptionKey = await AsyncStorage.getItem(
-      STORAGE_KEYS.ENCRYPTION_KEY
-    );
-
-    console.log(
-      '[Auth] Encrypted data found:',
-      !!encryptedNsec,
-      'Key found:',
-      !!encryptionKey
-    );
-
-    if (!encryptedNsec || !encryptionKey) {
-      console.log('[Auth] No encrypted data or key found');
+    if (!nsec || !nsec.startsWith('nsec1')) {
+      console.log('[Auth] No valid nsec found in any storage');
       return null;
     }
 
-    const nsec = decryptNsec(encryptedNsec, encryptionKey);
-    console.log(
-      '[Auth] Decrypted nsec:',
-      nsec ? `${nsec.slice(0, 10)}...` : 'null'
-    );
+    console.log('[Auth] Retrieved valid nsec from SecureStore');
 
-    if (!nsec.startsWith('nsec1')) {
-      console.error('[Auth] Decryption produced invalid nsec');
-      return null;
-    }
-
-    // Restore plain storage for future use
-    await AsyncStorage.setItem(STORAGE_KEYS.NSEC_PLAIN, nsec);
-    console.log('[Auth] Restored plain storage from encrypted');
-
-    // Get public key data
+    // Get associated public key data from AsyncStorage (public keys are safe there)
     const npub = await AsyncStorage.getItem(STORAGE_KEYS.NPUB);
     const hexPubkey = await AsyncStorage.getItem(STORAGE_KEYS.HEX_PUBKEY);
 
-    if (!npub || !hexPubkey) {
-      console.log('[Auth] Deriving public keys from decrypted nsec...');
-      // Derive from nsec if missing
-      const signer = new NDKPrivateKeySigner(nsec);
-      const user = await signer.user();
-
-      await AsyncStorage.setItem(STORAGE_KEYS.NPUB, user.npub);
-      await AsyncStorage.setItem(STORAGE_KEYS.HEX_PUBKEY, user.pubkey);
-
+    if (npub && hexPubkey) {
       return {
         nsec,
-        npub: user.npub,
-        hexPubkey: user.pubkey,
+        npub,
+        hexPubkey,
       };
     }
 
+    // Derive missing public key data from nsec
+    console.log('[Auth] Missing public key data, deriving from nsec...');
+    const signer = new NDKPrivateKeySigner(nsec);
+    const user = await signer.user();
+
+    // Store the derived data for next time
+    await AsyncStorage.setItem(STORAGE_KEYS.NPUB, user.npub);
+    await AsyncStorage.setItem(STORAGE_KEYS.HEX_PUBKEY, user.pubkey);
+
     return {
       nsec,
-      npub,
-      hexPubkey,
+      npub: user.npub,
+      hexPubkey: user.pubkey,
     };
   } catch (error) {
     console.error('[Auth] Retrieval error:', error);
@@ -284,7 +204,9 @@ async function verifyAuthenticationStorage(): Promise<boolean> {
 }
 
 /**
- * Simple XOR encryption (should be replaced with proper encryption)
+ * @deprecated XOR encryption is no longer used for new storage.
+ * Kept only for backwards compatibility during migration from v2.0 to v3.0
+ * SecureStore now handles encryption via hardware-backed security.
  */
 function encryptNsec(nsec: string, key: string): string {
   // Use consistent 32-char key
@@ -375,12 +297,22 @@ export function decryptNsec(encrypted: string, key: string): string {
 }
 
 /**
- * Clears all authentication data
+ * Clears all authentication data from SecureStore and AsyncStorage
  */
 export async function clearAuthenticationStorage(): Promise<void> {
-  const keys = Object.values(STORAGE_KEYS);
+  // Clear nsec from SecureStore
+  await SecureNsecStorage.clearNsec();
+
+  // Clear public keys and metadata from AsyncStorage
+  const keys = [
+    STORAGE_KEYS.NPUB,
+    STORAGE_KEYS.HEX_PUBKEY,
+    STORAGE_KEYS.AUTH_VERSION,
+    STORAGE_KEYS.AUTH_METHOD,
+  ];
   await AsyncStorage.multiRemove(keys);
-  console.log('[Auth] Cleared all authentication data');
+
+  console.log('[Auth] Cleared all authentication data (SecureStore + AsyncStorage)');
 }
 
 /**

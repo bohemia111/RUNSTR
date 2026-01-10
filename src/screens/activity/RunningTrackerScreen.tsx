@@ -59,6 +59,11 @@ import {
 import { SplitsBar } from '../../components/activity/SplitsBar';
 import { CountdownOverlay } from '../../components/activity/CountdownOverlay';
 import { LastActivityCard } from '../../components/activity/LastActivityCard';
+// Debug overlay for GPS diagnosis
+import { ActivityDebugOverlay } from '../../components/debug/ActivityDebugOverlay';
+
+// DEBUG MODE - Set to true for debug APK builds, false for production
+const DEBUG_MODE = false;
 
 // Constants
 const TIMER_INTERVAL_MS = 1000; // Update timer every second
@@ -694,9 +699,10 @@ export const RunningTrackerScreen: React.FC = () => {
       };
 
       // Open social share modal
+      // Note: State stays as 'posting' while modal is open to prevent double-tap
+      // State is reset in modal's onClose (cancelled) or onSuccess (posted) callbacks
       setPreparedWorkout(publishableWorkout);
       setShowSocialModal(true);
-      setDistancePostingState('idle');
 
       console.log(
         `[RunningTrackerScreen] ✅ Opening social share modal for weekly distance`
@@ -771,53 +777,18 @@ export const RunningTrackerScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
-        {/* IDLE STATE - Show when not tracking and no countdown */}
+        {/* IDLE STATE - Minimalist centered start button */}
         {!isTracking && !countdown && (
-          <ScrollView
-          style={styles.scrollableContent}
-          contentContainerStyle={styles.idleScrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Weekly Distance Goal Card */}
-          <WeeklyDistanceGoalCard
-            activityType="running"
-            distance={weeklyDistance}
-            progress={distanceProgress}
-            loading={distanceLoading}
-            onPost={handlePostWeeklyDistance}
-            onSetGoal={handleSetGoal}
-            postingState={distancePostingState}
-          />
-
-          {/* Last Activity Stats */}
-          <LastActivityCard activityType="running" />
-
-          {/* Route Picker */}
-          <TouchableOpacity
-            style={styles.routePickerButton}
-            onPress={() => setShowRouteSelectionModal(true)}
-          >
-            <Ionicons
-              name={selectedRoute ? 'map' : 'map-outline'}
-              size={20}
-              color={selectedRoute ? theme.colors.accent : theme.colors.text}
+          <View style={styles.idleCenteredContainer}>
+            <HoldToStartButton
+              label="Start Run"
+              onHoldComplete={handleHoldComplete}
+              disabled={false}
+              holdDuration={2000}
+              size="large"
             />
-            <Text
-              style={[
-                styles.routePickerText,
-                selectedRoute && { color: theme.colors.accent },
-              ]}
-            >
-              {selectedRoute ? selectedRoute.name : 'Routes'}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={18}
-              color={theme.colors.textMuted}
-            />
-          </TouchableOpacity>
-        </ScrollView>
-      )}
+          </View>
+        )}
 
       {/* ACTIVE TRACKING STATE */}
       {isTracking && (
@@ -855,47 +826,38 @@ export const RunningTrackerScreen: React.FC = () => {
       {/* Countdown Overlay */}
       <CountdownOverlay countdown={countdown} />
 
-      {/* Fixed Control Buttons */}
-      <View style={styles.fixedControlsWrapper}>
-        <View style={styles.controlsContainer}>
-          {!isTracking && !countdown ? (
-            <HoldToStartButton
-              label="Start Run"
-              onHoldComplete={handleHoldComplete}
-              disabled={false}
-              holdDuration={2000}
-            />
-          ) : isTracking ? (
-            <>
-              {!isPaused ? (
-                <TouchableOpacity
-                  style={styles.pauseButton}
-                  onPress={pauseTracking}
-                >
-                  <Ionicons name="pause" size={30} color={theme.colors.text} />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={styles.resumeButton}
-                  onPress={resumeTracking}
-                >
-                  <Ionicons
-                    name="play"
-                    size={30}
-                    color={theme.colors.background}
-                  />
-                </TouchableOpacity>
-              )}
+      {/* Fixed Control Buttons - Only show when tracking */}
+      {isTracking && (
+        <View style={styles.fixedControlsWrapper}>
+          <View style={styles.controlsContainer}>
+            {!isPaused ? (
               <TouchableOpacity
-                style={styles.stopButton}
-                onPress={stopTracking}
+                style={styles.pauseButton}
+                onPress={pauseTracking}
               >
-                <Ionicons name="stop" size={30} color={theme.colors.text} />
+                <Ionicons name="pause" size={30} color={theme.colors.text} />
               </TouchableOpacity>
-            </>
-          ) : null}
+            ) : (
+              <TouchableOpacity
+                style={styles.resumeButton}
+                onPress={resumeTracking}
+              >
+                <Ionicons
+                  name="play"
+                  size={30}
+                  color={theme.colors.background}
+                />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.stopButton}
+              onPress={stopTracking}
+            >
+              <Ionicons name="stop" size={30} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Workout Summary Modal */}
       {workoutData && (
@@ -949,6 +911,8 @@ export const RunningTrackerScreen: React.FC = () => {
         onClose={() => {
           setShowSocialModal(false);
           setPreparedWorkout(null);
+          // Reset to idle if user cancels - allows retry
+          setDistancePostingState('idle');
         }}
         onSuccess={() => {
           setShowSocialModal(false);
@@ -960,6 +924,9 @@ export const RunningTrackerScreen: React.FC = () => {
         }}
       />
       </View>
+
+      {/* Debug Overlay - GPS death diagnosis (only in DEBUG_MODE and while tracking) */}
+      {DEBUG_MODE && isTracking && <ActivityDebugOverlay />}
     </View>
   );
 };
@@ -980,6 +947,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 0,
     paddingBottom: 160, // Space for fixed controls
+  },
+  idleCenteredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 120, // Shift button up from true center
   },
   trackingScrollContent: {
     paddingTop: 12,

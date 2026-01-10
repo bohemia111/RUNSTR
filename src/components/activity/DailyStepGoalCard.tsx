@@ -26,6 +26,8 @@ interface DailyStepGoalCardProps {
   onPostSteps?: () => void;
   onSetGoal?: () => void;
   postingState?: PostingState;
+  onCompeteSteps?: () => void;
+  competeState?: PostingState;
   onRequestPermission?: () => void;
   onOpenSettings?: () => void;
   showBackgroundBanner?: boolean;
@@ -41,6 +43,8 @@ export const DailyStepGoalCard: React.FC<DailyStepGoalCardProps> = ({
   onPostSteps,
   onSetGoal,
   postingState = 'idle',
+  onCompeteSteps,
+  competeState = 'idle',
   onRequestPermission,
   onOpenSettings,
   showBackgroundBanner = false,
@@ -135,6 +139,46 @@ export const DailyStepGoalCard: React.FC<DailyStepGoalCardProps> = ({
                 color={theme.colors.accent}
               />
               <Text style={styles.goalButtonText}>Set Goal</Text>
+            </TouchableOpacity>
+          )}
+          {onCompeteSteps && (
+            <TouchableOpacity
+              style={[
+                styles.competeButton,
+                competeState === 'posted' && styles.postButtonDisabled,
+              ]}
+              onPress={onCompeteSteps}
+              disabled={competeState === 'posting' || competeState === 'posted'}
+              activeOpacity={0.7}
+            >
+              {competeState === 'posting' ? (
+                <ActivityIndicator size="small" color={theme.colors.background} />
+              ) : (
+                <>
+                  <Ionicons
+                    name={
+                      competeState === 'posted'
+                        ? 'checkmark-circle'
+                        : 'flash'
+                    }
+                    size={14}
+                    color={
+                      competeState === 'posted'
+                        ? theme.colors.textMuted
+                        : theme.colors.background
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.competeButtonText,
+                      competeState === 'posted' &&
+                        styles.postButtonTextDisabled,
+                    ]}
+                  >
+                    {competeState === 'posted' ? 'Entered!' : 'Compete'}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
           {onPostSteps && (
@@ -362,6 +406,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: theme.typography.weights.semiBold,
     color: theme.colors.text,
+  },
+  competeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.accent,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  competeButtonText: {
+    fontSize: 11,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.background,
   },
   compactPostButton: {
     flexDirection: 'row',

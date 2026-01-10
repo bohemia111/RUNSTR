@@ -15,6 +15,8 @@ import {
   Switch,
   Modal,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,6 +28,7 @@ import { WorkoutPublishingService } from '../../services/nostr/workoutPublishing
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import { EnhancedSocialShareModal } from '../../components/profile/shared/EnhancedSocialShareModal';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
+import { RewardNotificationManager } from '../../services/rewards/RewardNotificationManager';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import type { Workout, WorkoutType } from '../../types/workout';
 
@@ -314,6 +317,10 @@ export const ManualEntryScreen: React.FC<ManualEntryScreenProps> = ({
     setShowSummary(false);
     setShowShareModal(false);
     setSavedWorkout(null);
+
+    // Show pending reward toast now that modal is closing
+    RewardNotificationManager.showPendingRewardToast();
+
     navigation.goBack();
   };
 
@@ -327,10 +334,12 @@ export const ManualEntryScreen: React.FC<ManualEntryScreenProps> = ({
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-    >
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+      >
       {/* Header */}
       <View style={styles.iconContainer}>
         <Ionicons name={config.icon} size={64} color={theme.colors.text} />
@@ -609,6 +618,7 @@ export const ManualEntryScreen: React.FC<ManualEntryScreenProps> = ({
         onClose={() => setAlertVisible(false)}
       />
     </ScrollView>
+    </TouchableWithoutFeedback>
   );
 };
 

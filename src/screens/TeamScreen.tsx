@@ -5,7 +5,6 @@ import { TeamHeader } from '../components/team/TeamHeader';
 import { AboutPrizeSection } from '../components/team/AboutPrizeSection';
 import { LeaderboardCard } from '../components/team/LeaderboardCard';
 import { EventsCard } from '../components/team/EventsCard';
-import { ChallengesCard } from '../components/team/ChallengesCard';
 import { TeamScreenData } from '../types';
 import { theme } from '../styles/theme';
 
@@ -13,9 +12,7 @@ interface TeamScreenProps {
   data: TeamScreenData;
   onMenuPress: () => void;
   onCaptainDashboard: () => void;
-  onAddChallenge: () => void;
   onEventPress?: (eventId: string) => void;
-  onChallengePress?: (challengeId: string) => void;
   onNavigateToProfile: () => void;
   onLeaveTeam: () => void;
   onTeamDiscovery: () => void;
@@ -29,9 +26,7 @@ export const TeamScreen: React.FC<TeamScreenProps> = ({
   data,
   onMenuPress,
   onCaptainDashboard,
-  onAddChallenge,
   onEventPress,
-  onChallengePress,
   onNavigateToProfile,
   onLeaveTeam,
   onTeamDiscovery,
@@ -40,7 +35,7 @@ export const TeamScreen: React.FC<TeamScreenProps> = ({
   showJoinButton = false,
   userIsMember = true,
 }) => {
-  const { team, leaderboard, events, challenges } = data;
+  const { team, leaderboard, events } = data;
 
   // Format data for display components
   const formattedLeaderboard = leaderboard.map((entry) => ({
@@ -60,20 +55,6 @@ export const TeamScreen: React.FC<TeamScreenProps> = ({
       day: 'numeric',
     }),
     details: event.description,
-  }));
-
-  const formattedChallenges = challenges.map((challenge) => ({
-    id: challenge.id,
-    name: challenge.name,
-    date: new Date(challenge.deadline).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    }),
-    details: challenge.description,
-    prize: `${challenge.prizePool.toLocaleString()} sats`,
-    participant1: 'Alice',
-    participant2: 'Bob',
-    type: 'p2p' as const,
   }));
 
   return (
@@ -100,12 +81,6 @@ export const TeamScreen: React.FC<TeamScreenProps> = ({
 
           <View style={styles.bottomSection}>
             <EventsCard events={formattedEvents} onEventPress={onEventPress} />
-
-            <ChallengesCard
-              challenges={formattedChallenges}
-              onAddChallenge={onAddChallenge}
-              onChallengePress={onChallengePress}
-            />
           </View>
         </View>
       </ScrollView>

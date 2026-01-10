@@ -1,26 +1,25 @@
 /**
- * YourCompetitionsBox Component (renamed to Rewards)
- * Simple navigation box for Profile screen - shows "REWARDS"
- * Navigates to RewardsScreen for wallet/earnings management
+ * FitnessHistoryBox Component
+ * Simple navigation box for Profile screen - shows "FITNESS HISTORY"
+ * Navigates to WorkoutHistoryScreen for workout history and stats
  */
 
 import React from 'react';
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 
-export const YourCompetitionsBox: React.FC = () => {
+export const FitnessHistoryBox: React.FC = () => {
   const navigation = useNavigation<any>();
 
   const handlePress = () => {
-    // Navigate to Rewards screen (wallet/earnings)
-    // Use parent navigator since Rewards is in the stack, not the tab navigator
+    // Navigate to WorkoutHistory screen (workout history/stats)
+    // Use parent navigator since WorkoutHistory is in the stack, not the tab navigator
     const parentNav = navigation.getParent();
     if (parentNav) {
-      parentNav.navigate('Rewards');
+      parentNav.navigate('WorkoutHistory');
     } else {
-      navigation.navigate('Rewards');
+      navigation.navigate('WorkoutHistory');
     }
   };
 
@@ -30,8 +29,7 @@ export const YourCompetitionsBox: React.FC = () => {
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      <Ionicons name="wallet-outline" size={24} color={theme.colors.text} />
-      <Text style={styles.title}>REWARDS</Text>
+      <Text style={styles.title}>VIEW HISTORY</Text>
     </TouchableOpacity>
   );
 };
@@ -43,10 +41,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1a1a1a',
     flex: 1,
-    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
   },
   title: {
     fontSize: 16,

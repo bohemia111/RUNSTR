@@ -25,11 +25,11 @@ import { NotificationPreferencesService } from '../services/notifications/Notifi
 // Profile Components
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 // Wallet components moved to Settings
-import { MyTeamsBox } from '../components/profile/MyTeamsBox';
+import { FitnessTrackerBox } from '../components/profile/MyTeamsBox';
 // Season2Banner removed - moved to Compete tab
-import { ChallengeNotificationsBox } from '../components/profile/ChallengeNotificationsBox';
-import { YourCompetitionsBox } from '../components/profile/YourCompetitionsBox';
-import { YourWorkoutsBox } from '../components/profile/YourWorkoutsBox';
+// ChallengeNotificationsBox removed - 1v1 challenges feature removed
+import { FitnessHistoryBox } from '../components/profile/YourCompetitionsBox';
+import { FitnessCompetitionsBox } from '../components/profile/YourWorkoutsBox';
 import { NotificationBadge } from '../components/profile/NotificationBadge';
 import { NotificationModal } from '../components/profile/NotificationModal';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,8 +38,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { npubEncode } from '../utils/nostrEncoding';
 import { unifiedNotificationStore } from '../services/notifications/UnifiedNotificationStore';
-import { challengeNotificationHandler } from '../services/notifications/ChallengeNotificationHandler';
-import { challengeResponseHandler } from '../services/notifications/ChallengeResponseHandler';
+// Challenge notification handlers removed - 1v1 challenges feature removed
 import { eventJoinNotificationHandler } from '../services/notifications/EventJoinNotificationHandler';
 import { teamJoinNotificationHandler } from '../services/notifications/TeamJoinNotificationHandler';
 // TEMPORARILY REMOVED TO DEBUG THEME ERROR
@@ -52,6 +51,7 @@ import { UnifiedSigningService } from '../services/auth/UnifiedSigningService';
 import { GlobalNDKService } from '../services/nostr/GlobalNDKService';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { Alert } from 'react-native';
+import { NostrFetchLogger } from '../utils/NostrFetchLogger';
 
 interface ProfileScreenProps {
   data: ProfileScreenData;
@@ -75,7 +75,8 @@ interface ProfileScreenProps {
   onRefresh?: () => void;
 }
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+// ✅ PERFORMANCE: Wrapped in React.memo to prevent unnecessary re-renders
+const ProfileScreenComponent: React.FC<ProfileScreenProps> = ({
   data,
   isLoadingTeam = false,
   isLoadingProfile = false,
@@ -293,6 +294,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   // ✅ PERFORMANCE + ANDROID FIX: Memoized pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
     console.log('[ProfileScreen] 🔄 Pull-to-refresh triggered');
+    NostrFetchLogger.start('ProfileScreen.pullToRefresh');
     setIsRefreshing(true);
 
     try {
@@ -315,8 +317,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       // 3. Call original onRefresh if provided
       await onRefresh?.();
 
+      NostrFetchLogger.end('ProfileScreen.pullToRefresh', 1, 'success');
       console.log('[ProfileScreen] ✅ Pull-to-refresh complete');
     } catch (error) {
+      NostrFetchLogger.error('ProfileScreen.pullToRefresh', error as Error);
       console.error('[ProfileScreen] Pull-to-refresh error:', error);
     } finally {
       setIsRefreshing(false);
@@ -395,19 +399,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         {/* Navigation Buttons */}
         <View style={styles.navigationButtons}>
-          {/* My Teams */}
+          {/* Fitness Tracker */}
           <View style={styles.boxContainer}>
-            <MyTeamsBox />
+            <FitnessTrackerBox />
           </View>
 
-          {/* My Competitions */}
+          {/* Fitness History */}
           <View style={styles.boxContainer}>
-            <YourCompetitionsBox />
+            <FitnessHistoryBox />
           </View>
 
-          {/* My Workouts */}
+          {/* Fitness Competitions */}
           <View style={styles.boxContainer}>
-            <YourWorkoutsBox />
+            <FitnessCompetitionsBox />
           </View>
         </View>
       </ScrollView>
@@ -482,3 +486,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+// ✅ PERFORMANCE: React.memo prevents re-renders when props haven't changed
+export const ProfileScreen = React.memo(ProfileScreenComponent);

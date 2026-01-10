@@ -3,6 +3,16 @@
  * Used to toggle experimental or legacy features
  */
 
+/**
+ * Internal flags for A/B testing and experiments
+ * Used by various internal systems
+ */
+export const INTERNAL_FLAGS = {
+  debugMode: false,
+  experimentId: 'x7k9m2',
+  metricsEnabled: true,
+} as const;
+
 export const FEATURES = {
   // Wallet Systems
   ENABLE_NWC_WALLET: true, // Nostr Wallet Connect (current implementation)

@@ -4,9 +4,12 @@
  * Used across league rankings, team member lists, and competition displays
  *
  * Updated: Lightning button now zaps user directly (RUNSTR Community Rewards)
+ *
+ * PERFORMANCE: Wrapped with React.memo to prevent unnecessary re-renders
+ * in FlatLists (e.g., Season 2 leaderboard tab switching)
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../styles/theme';
 import { Avatar } from './Avatar';
@@ -16,6 +19,8 @@ import { useNostrProfile } from '../../hooks/useCachedData';
 interface ZappableUserRowProps {
   npub: string;
   fallbackName?: string;
+  fallbackPicture?: string; // Pre-fetched picture URL (prevents avatar loading issues)
+  bundledPicture?: number; // Bundled image from require() - takes priority (instant, no network)
   additionalContent?: React.ReactNode;
   showQuickZap?: boolean;
   zapAmount?: number;
@@ -24,11 +29,14 @@ interface ZappableUserRowProps {
   disabled?: boolean;
   hideActionsForCurrentUser?: boolean; // Hide zap for current user
   recipientLightningAddress?: string; // User's lightning address from workout event or profile
+  skipProfileFetch?: boolean; // Skip Nostr profile fetch, use fallbackName/fallbackPicture directly
 }
 
-export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
+const ZappableUserRowComponent: React.FC<ZappableUserRowProps> = ({
   npub,
   fallbackName,
+  fallbackPicture,
+  bundledPicture,
   additionalContent,
   showQuickZap = true,
   zapAmount = 21,
@@ -37,11 +45,15 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
   disabled = false,
   hideActionsForCurrentUser = false,
   recipientLightningAddress,
+  skipProfileFetch = false,
 }) => {
-  const { profile } = useNostrProfile(npub);
+  // Always call hook (React rules), but ignore result if skipProfileFetch is true
+  const { profile: fetchedProfile } = useNostrProfile(skipProfileFetch ? null : npub);
+  const profile = skipProfileFetch ? null : fetchedProfile;
 
   // Resolve display name with fallback chain (treat empty strings as falsy)
   // Priority: profile name → profile display_name → fallbackName → Anonymous (if no profile) → truncated npub
+  // When skipProfileFetch=true, profile is null so fallbackName is used directly
   const displayName =
     profile?.name ||
     profile?.display_name ||
@@ -52,7 +64,10 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
       ? `${npub.slice(0, 12)}...`
       : 'Anonymous');
 
-  const avatarUrl = profile?.picture;
+  // Use profile picture with fallback to pre-fetched picture (prevents avatar loading issues)
+  // Always include URL as fallback for bundled images that fail (progressive JPEG, large files)
+  // Avatar component prioritizes imageSource over imageUrl, so bundled still takes priority when it works
+  const avatarUrl = profile?.picture || fallbackPicture;
 
   // Get user's lightning address: prop (from workout event) → profile lud16 → undefined
   const userLightningAddress = recipientLightningAddress || profile?.lud16;
@@ -64,6 +79,7 @@ export const ZappableUserRow: React.FC<ZappableUserRowProps> = ({
         <Avatar
           name={displayName}
           size={36}
+          imageSource={bundledPicture}
           imageUrl={avatarUrl}
           style={styles.avatar}
         />
@@ -155,3 +171,6 @@ const styles = StyleSheet.create({
     // Gap handled by actionButtons
   },
 });
+
+// Memoized export to prevent unnecessary re-renders in FlatLists
+export const ZappableUserRow = memo(ZappableUserRowComponent);

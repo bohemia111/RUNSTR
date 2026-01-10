@@ -29,9 +29,12 @@ import {
   SCORING_OPTIONS,
   DURATION_OPTIONS,
   PLEDGE_COST_OPTIONS,
+  PLEDGE_DESTINATION_OPTIONS,
   PAYOUT_OPTIONS,
   DISTANCE_OPTIONS,
+  IMPACT_TIER_OPTIONS,
 } from '../../hooks/useRunstrEventCreation';
+import { CHARITIES } from '../../constants/charities';
 import ImageUploadService from '../../services/media/ImageUploadService';
 import UnifiedSigningService from '../../services/auth/UnifiedSigningService';
 
@@ -65,6 +68,26 @@ export const RunstrEventCreationModal: React.FC<
 
   // Image upload state
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  // Quick date options helper
+  const getQuickDateOptions = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // This weekend (next Saturday)
+    const weekend = new Date(today);
+    const daysUntilSaturday = (6 - today.getDay() + 7) % 7 || 7;
+    weekend.setDate(weekend.getDate() + daysUntilSaturday);
+
+    return [
+      { label: 'Today', date: today },
+      { label: 'Tomorrow', date: tomorrow },
+      { label: 'Weekend', date: weekend },
+    ];
+  };
 
   const handleClose = () => {
     resetForm();
@@ -213,6 +236,18 @@ export const RunstrEventCreationModal: React.FC<
               />
             </View>
 
+            {/* Location */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Location (optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={form.location}
+                onChangeText={(text) => updateField('location', text)}
+                placeholder="e.g., Austin, TX or Virtual"
+                placeholderTextColor={theme.colors.textMuted}
+              />
+            </View>
+
             {/* Event Banner Image */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Event Banner (optional)</Text>
@@ -238,6 +273,44 @@ export const RunstrEventCreationModal: React.FC<
                   </View>
                 )}
               </TouchableOpacity>
+            </View>
+
+            {/* Start Date */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Start Date</Text>
+              <View style={styles.buttonRow}>
+                {getQuickDateOptions().map((opt) => (
+                  <TouchableOpacity
+                    key={opt.label}
+                    style={[
+                      styles.optionButton,
+                      form.startDate?.toDateString() === opt.date.toDateString() &&
+                        styles.optionButtonSelected,
+                    ]}
+                    onPress={() => updateField('startDate', opt.date)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.optionButtonText,
+                        form.startDate?.toDateString() === opt.date.toDateString() &&
+                          styles.optionButtonTextSelected,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {form.startDate && (
+                <Text style={styles.helper}>
+                  {form.startDate.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+              )}
             </View>
 
             {/* Activity Type */}
@@ -392,6 +465,68 @@ export const RunstrEventCreationModal: React.FC<
               </Text>
             </View>
 
+            {/* Pledge Destination - only show when Entry Cost > 0 */}
+            {form.pledgeCost > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Rewards Go To</Text>
+                <View style={styles.buttonRow}>
+                  {PLEDGE_DESTINATION_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[
+                        styles.optionButton,
+                        form.pledgeDestination === opt.value &&
+                          styles.optionButtonSelected,
+                      ]}
+                      onPress={() => updateField('pledgeDestination', opt.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.optionButtonText,
+                          form.pledgeDestination === opt.value &&
+                            styles.optionButtonTextSelected,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Team Selector - only show when destination is 'charity' */}
+            {form.pledgeCost > 0 && form.pledgeDestination === 'charity' && (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Select Team</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {CHARITIES.map((charity) => (
+                    <TouchableOpacity
+                      key={charity.id}
+                      style={[
+                        styles.charityButton,
+                        form.pledgeCharityId === charity.id &&
+                          styles.charityButtonSelected,
+                      ]}
+                      onPress={() => updateField('pledgeCharityId', charity.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.charityButtonText,
+                          form.pledgeCharityId === charity.id &&
+                            styles.charityButtonTextSelected,
+                        ]}
+                      >
+                        {charity.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             {/* Payout Scheme */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Payout</Text>
@@ -450,6 +585,127 @@ export const RunstrEventCreationModal: React.FC<
                 />
               </View>
             )}
+
+            {/* Impact Level Requirement */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Require Impact Level?</Text>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.optionButton,
+                    !form.requireImpactLevel && styles.optionButtonSelected,
+                  ]}
+                  onPress={() => updateField('requireImpactLevel', false)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.optionButtonText,
+                      !form.requireImpactLevel && styles.optionButtonTextSelected,
+                    ]}
+                  >
+                    No
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.optionButton,
+                    form.requireImpactLevel && styles.optionButtonSelected,
+                  ]}
+                  onPress={() => updateField('requireImpactLevel', true)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.optionButtonText,
+                      form.requireImpactLevel && styles.optionButtonTextSelected,
+                    ]}
+                  >
+                    Yes
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Minimum Impact Level Tier (only shown if requireImpactLevel is true) */}
+            {form.requireImpactLevel && (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Minimum Impact Level</Text>
+                <View style={styles.buttonRowWrap}>
+                  {IMPACT_TIER_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[
+                        styles.optionButtonSmall,
+                        form.minimumImpactTier === opt.value &&
+                          styles.optionButtonSelected,
+                      ]}
+                      onPress={() => {
+                        updateField('minimumImpactTier', opt.value);
+                        updateField('minimumImpactLevel', opt.level);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.optionButtonTextSmall,
+                          form.minimumImpactTier === opt.value &&
+                            styles.optionButtonTextSelected,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Team Competition Toggle */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Team Competition</Text>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.optionButton,
+                    !form.isTeamCompetition && styles.optionButtonSelected,
+                  ]}
+                  onPress={() => updateField('isTeamCompetition', false)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.optionButtonText,
+                      !form.isTeamCompetition && styles.optionButtonTextSelected,
+                    ]}
+                  >
+                    Individual
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.optionButton,
+                    form.isTeamCompetition && styles.optionButtonSelected,
+                  ]}
+                  onPress={() => updateField('isTeamCompetition', true)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.optionButtonText,
+                      form.isTeamCompetition && styles.optionButtonTextSelected,
+                    ]}
+                  >
+                    Team
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.helper}>
+                {form.isTeamCompetition
+                  ? 'Teams compete - scores aggregated by team'
+                  : 'Individuals compete against each other'}
+              </Text>
+            </View>
 
             {/* Error display */}
             {submitError && (
@@ -630,6 +886,27 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   optionButtonTextSelected: {
+    color: theme.colors.background,
+  },
+  charityButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginRight: 8,
+  },
+  charityButtonSelected: {
+    backgroundColor: '#FFB366',
+    borderColor: '#FFB366',
+  },
+  charityButtonText: {
+    fontSize: 13,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text,
+  },
+  charityButtonTextSelected: {
     color: theme.colors.background,
   },
   errorContainer: {

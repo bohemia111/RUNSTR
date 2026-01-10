@@ -11,6 +11,9 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Keyboard,
+  TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
@@ -63,6 +66,8 @@ export const ManualWorkoutScreen: React.FC = () => {
   const [sets, setSets] = useState('');
   const [distance, setDistance] = useState('');
   const [notes, setNotes] = useState('');
+  const [isLogging, setIsLogging] = useState(false);
+  const [logged, setLogged] = useState(false);
 
   // Alert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -113,6 +118,7 @@ export const ManualWorkoutScreen: React.FC = () => {
 
     const mappedType = workoutTypeMapping[workoutType] || 'other';
 
+    setIsLogging(true);
     try {
       // Preserve specific exercise name in notes for better publishing
       const exerciseNotes =
@@ -135,6 +141,7 @@ export const ManualWorkoutScreen: React.FC = () => {
         `✅ Manual workout saved locally: ${workoutId} (${workoutType})`
       );
 
+      setLogged(true);
       setAlertConfig({
         title: 'Workout Saved!',
         message: `${workoutType} has been logged successfully. Visit Workout History to post or compete.`,
@@ -149,6 +156,8 @@ export const ManualWorkoutScreen: React.FC = () => {
         buttons: [{ text: 'OK', style: 'default' }],
       });
       setAlertVisible(true);
+    } finally {
+      setIsLogging(false);
     }
   };
 
@@ -160,10 +169,16 @@ export const ManualWorkoutScreen: React.FC = () => {
     setSets('');
     setDistance('');
     setNotes('');
+    setLogged(false);
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
       {/* Preset Workouts */}
       <Text style={styles.sectionTitle}>Select Workout Type</Text>
       <View style={styles.presetsGrid}>
@@ -278,8 +293,28 @@ export const ManualWorkoutScreen: React.FC = () => {
       />
 
       {/* Save Button */}
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Log Workout</Text>
+      <TouchableOpacity
+        style={[styles.saveButton, (isLogging || logged) && styles.saveButtonDisabled]}
+        onPress={handleSave}
+        disabled={isLogging || logged}
+      >
+        {isLogging ? (
+          <ActivityIndicator size="small" color={theme.colors.background} />
+        ) : (
+          <>
+            {logged && (
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={theme.colors.background}
+                style={{ marginRight: 8 }}
+              />
+            )}
+            <Text style={styles.saveButtonText}>
+              {logged ? 'Logged!' : 'Log Workout'}
+            </Text>
+          </>
+        )}
       </TouchableOpacity>
 
       {/* Custom Alert */}
@@ -291,6 +326,7 @@ export const ManualWorkoutScreen: React.FC = () => {
         onClose={() => setAlertVisible(false)}
       />
     </ScrollView>
+    </TouchableWithoutFeedback>
   );
 };
 
@@ -375,8 +411,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
     marginTop: 24,
     marginBottom: 40,
+  },
+  saveButtonDisabled: {
+    opacity: 0.5,
   },
   saveButtonText: {
     color: theme.colors.background,

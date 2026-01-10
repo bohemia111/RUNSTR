@@ -296,9 +296,9 @@ export class GarminActivityService {
     userId: string
   ): WorkoutData | null {
     try {
-      // Map Garmin activity type to RUNSTR workout type
+      // Map Garmin activity type to RUNSTR workout type (default to running, never 'other')
       const workoutType = (GARMIN_ACTIVITY_TYPE_MAP[activity.activityType] ||
-        'other') as WorkoutType;
+        'running') as WorkoutType;
 
       // Skip very short activities (< 60 seconds)
       if (activity.durationInSeconds < 60) {

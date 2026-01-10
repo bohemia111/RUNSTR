@@ -133,6 +133,33 @@ export interface SatlantisEvent {
 
   /** Charity display name */
   pledgeCharityName?: string;
+
+  // ============================================================================
+  // Impact Level Gating Fields (donation-based)
+  // ============================================================================
+
+  /** Minimum Impact Level required to join (e.g., 5 for 'Supporter') */
+  minimumImpactLevel?: number;
+
+  /** Human-readable Impact tier name ('Supporter' | 'Contributor' | 'Champion' | 'Legend' | 'Philanthropist') */
+  minimumImpactTier?: string;
+
+  // ============================================================================
+  // Rank Gating Fields (DEPRECATED - kept for backward compatibility)
+  // ============================================================================
+
+  /** @deprecated Use minimumImpactLevel - Minimum RUNSTR rank score required to join */
+  minimumRank?: number;
+
+  /** @deprecated Use minimumImpactTier - Human-readable rank tier name */
+  minimumRankTier?: string;
+
+  // ============================================================================
+  // Team Competition Fields
+  // ============================================================================
+
+  /** Whether this event uses team competition mode (aggregates scores by team) */
+  isTeamCompetition?: boolean;
 }
 
 /**
@@ -181,6 +208,9 @@ export interface SatlantisLeaderboardEntry {
 
   /** Reference to the qualifying workout event ID */
   workoutId?: string;
+
+  /** True if entry is only visible to the participant themselves (non-Season II) */
+  isPrivate?: boolean;
 }
 
 /**

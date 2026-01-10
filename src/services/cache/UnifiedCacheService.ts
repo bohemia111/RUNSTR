@@ -63,18 +63,34 @@ export class UnifiedCacheService {
     // Check memory cache first (instant)
     const memoryCached = this.memoryCache.get(key);
     if (memoryCached && !this.isExpired(memoryCached)) {
-      console.log(`⚡ UnifiedCache: Memory cache hit for ${key}`);
-      return memoryCached.data;
+      // Reject cached null profiles - force fresh fetch
+      if (memoryCached.data === null && key.startsWith('profile:')) {
+        console.log(`⚠️ UnifiedCache: Rejecting cached null profile from memory for ${key}`);
+        this.memoryCache.delete(key);
+        // Fall through to check storage or fresh fetch
+      } else {
+        console.log(`⚡ UnifiedCache: Memory cache hit for ${key}`);
+        return memoryCached.data;
+      }
     }
 
     // Check persistent cache (fast)
     try {
       const storageCached = await this.getFromStorage<T>(key);
       if (storageCached && !this.isExpired(storageCached)) {
-        console.log(`💾 UnifiedCache: Storage cache hit for ${key}`);
-        // Promote to memory cache
-        this.memoryCache.set(key, storageCached);
-        return storageCached.data;
+        // Reject cached null profiles - force fresh fetch
+        // This auto-clears bad entries from before the write-side fix
+        if (storageCached.data === null && key.startsWith('profile:')) {
+          console.log(`⚠️ UnifiedCache: Rejecting cached null profile for ${key}`);
+          // Remove the bad entry from storage
+          this.removeFromStorage(key).catch(() => {});
+          // Fall through to fresh fetch below
+        } else {
+          console.log(`💾 UnifiedCache: Storage cache hit for ${key}`);
+          // Promote to memory cache
+          this.memoryCache.set(key, storageCached);
+          return storageCached.data;
+        }
       }
     } catch (error) {
       console.warn(`UnifiedCache: Storage read error for ${key}:`, error);
@@ -86,6 +102,14 @@ export class UnifiedCacheService {
 
     const promise = fetcher()
       .then((data) => {
+        // DON'T cache null profiles - they should be retried on next request
+        // This prevents failed profile fetches from being cached with 2-hour TTL
+        if (data === null && key.startsWith('profile:')) {
+          console.log(`⚠️ UnifiedCache: NOT caching null profile for ${key}`);
+          this.loading.delete(key);
+          return data;
+        }
+
         const entry: CacheEntry<T> = {
           data,
           timestamp: Date.now(),

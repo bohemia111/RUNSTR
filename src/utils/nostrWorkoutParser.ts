@@ -201,7 +201,7 @@ export class NostrWorkoutParser {
       });
 
       return {
-        type: contentData.type || tagData.type || 'other',
+        type: contentData.type || tagData.type || 'running',
         duration: tagData.duration || contentData.duration || 0,
         distance: tagData.distance || contentData.distance,
         pace: contentData.pace,
@@ -563,7 +563,7 @@ export class NostrWorkoutParser {
    */
   private static mapActivityType(activityString: string): WorkoutType {
     const normalized = activityString.toLowerCase().trim();
-    return ACTIVITY_TYPE_MAP[normalized] || 'other';
+    return ACTIVITY_TYPE_MAP[normalized] || 'running';
   }
 
   /**

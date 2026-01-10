@@ -158,59 +158,59 @@ export const GARMIN_ACTIVITY_TYPE_MAP: Record<string, string> = {
   // Meditation
   MEDITATION: 'meditation',
 
-  // Swimming
-  SWIMMING: 'other', // Could add 'swimming' type to RUNSTR
-  LAP_SWIMMING: 'other',
-  OPEN_WATER_SWIMMING: 'other',
+  // Swimming - map to running (no swimming type in RUNSTR)
+  SWIMMING: 'running',
+  LAP_SWIMMING: 'running',
+  OPEN_WATER_SWIMMING: 'running',
 
-  // Winter sports
-  WINTER_SPORTS: 'other',
-  BACKCOUNTRY_SKIING: 'other',
-  CROSS_COUNTRY_SKIING_WS: 'other',
-  RESORT_SKIING: 'other',
-  SNOWBOARDING_WS: 'other',
-  SKATING_WS: 'other',
-  SNOW_SHOE_WS: 'other',
+  // Winter sports - map to running
+  WINTER_SPORTS: 'running',
+  BACKCOUNTRY_SKIING: 'running',
+  CROSS_COUNTRY_SKIING_WS: 'running',
+  RESORT_SKIING: 'running',
+  SNOWBOARDING_WS: 'running',
+  SKATING_WS: 'running',
+  SNOW_SHOE_WS: 'running',
 
-  // Water sports
-  WATER_SPORTS: 'other',
-  BOATING: 'other',
-  KAYAKING: 'other',
-  ROWING_V2: 'other',
-  SAILING_V2: 'other',
-  SURFING_V2: 'other',
+  // Water sports - map to running
+  WATER_SPORTS: 'running',
+  BOATING: 'running',
+  KAYAKING: 'running',
+  ROWING_V2: 'running',
+  SAILING_V2: 'running',
+  SURFING_V2: 'running',
 
-  // Team sports
-  TEAM_SPORTS: 'other',
-  AMERICAN_FOOTBALL: 'other',
-  BASEBALL: 'other',
-  BASKETBALL: 'other',
-  CRICKET: 'other',
-  SOCCER: 'other',
-  VOLLEYBALL: 'other',
+  // Team sports - map to running
+  TEAM_SPORTS: 'running',
+  AMERICAN_FOOTBALL: 'running',
+  BASEBALL: 'running',
+  BASKETBALL: 'running',
+  CRICKET: 'running',
+  SOCCER: 'running',
+  VOLLEYBALL: 'running',
 
-  // Racket sports
-  RACKET_SPORTS: 'other',
-  TENNIS: 'other',
-  BADMINTON: 'other',
-  PICKLEBALL: 'other',
-  TABLE_TENNIS: 'other',
+  // Racket sports - map to running
+  RACKET_SPORTS: 'running',
+  TENNIS: 'running',
+  BADMINTON: 'running',
+  PICKLEBALL: 'running',
+  TABLE_TENNIS: 'running',
 
-  // Other activities
-  ROCK_CLIMBING: 'other',
-  INDOOR_CLIMBING: 'other',
-  GOLF: 'other',
-  DANCE: 'other',
-  BOXING: 'other',
-  MIXED_MARTIAL_ARTS: 'other',
-  JUMP_ROPE: 'other',
+  // Other activities - map to running
+  ROCK_CLIMBING: 'running',
+  INDOOR_CLIMBING: 'running',
+  GOLF: 'running',
+  DANCE: 'running',
+  BOXING: 'running',
+  MIXED_MARTIAL_ARTS: 'running',
+  JUMP_ROPE: 'running',
 
   // Wheelchair activities
   WHEELCHAIR_PUSH_RUN: 'running',
   WHEELCHAIR_PUSH_WALK: 'walking',
 
-  // Default fallback
-  OTHER: 'other',
+  // Default fallback - always running (never 'other')
+  OTHER: 'running',
 };
 
 /**

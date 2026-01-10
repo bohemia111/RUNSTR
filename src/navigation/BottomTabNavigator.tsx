@@ -18,23 +18,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../styles/theme';
 import { PerformanceLogger } from '../utils/PerformanceLogger';
 
-// ✅ PERFORMANCE: Load Profile immediately, lazy load Activity only when needed
+// ✅ PERFORMANCE: Load Profile immediately, lazy load others when needed
 // FIX: Loading multiple lazy screens simultaneously was causing freeze on first launch
 import { ProfileScreen } from '../screens/ProfileScreen';
 
-// Removed TeamDiscoveryScreen - not used in current navigation
-
-// Keep Activity lazy since it's not the initial tab
-const ActivityTrackerScreen = React.lazy(() =>
-  import('../screens/activity/ActivityTrackerScreen').then((m) => ({
-    default: m.ActivityTrackerScreen,
+// Lazy load Teams and Rewards since they're not the initial tab
+const TeamsScreen = React.lazy(() =>
+  import('../screens/TeamsScreen').then((m) => ({
+    default: m.TeamsScreen,
   }))
 );
 
-// Lazy load Compete (Season2) screen
-const Season2Screen = React.lazy(() =>
-  import('../screens/season2/Season2Screen').then((m) => ({
-    default: m.Season2Screen,
+const RewardsScreen = React.lazy(() =>
+  import('../screens/RewardsScreen').then((m) => ({
+    default: m.RewardsScreen,
   }))
 );
 
@@ -60,10 +57,9 @@ import { createNavigationHandlers } from './navigationHandlers';
 
 // Types
 export type BottomTabParamList = {
-  Teams: undefined;
-  Exercise: undefined;
-  Compete: undefined;
   Profile: undefined;
+  Teams: undefined;
+  Rewards: undefined;
 };
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
@@ -111,17 +107,16 @@ export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
         tabBarActiveTintColor: theme.colors.text,
         tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarLabelStyle: styles.tabBarLabel,
+        sceneContainerStyle: { backgroundColor: '#000' }, // Prevent white flash during tab transitions
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'help-outline';
 
-          if (route.name === 'Teams') {
-            iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Exercise') {
-            iconName = focused ? 'fitness' : 'fitness-outline';
-          } else if (route.name === 'Compete') {
-            iconName = focused ? 'trophy' : 'trophy-outline';
-          } else if (route.name === 'Profile') {
+          if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
+          } else if (route.name === 'Teams') {
+            iconName = focused ? 'people' : 'people-outline';
+          } else if (route.name === 'Rewards') {
+            iconName = focused ? 'wallet' : 'wallet-outline';
           }
 
           return (
@@ -136,36 +131,6 @@ export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
       })}
       initialRouteName="Profile"
     >
-      {/* Exercise Tab - Tracking + Manual Entry */}
-      <Tab.Screen
-        name="Exercise"
-        options={{
-          title: 'Exercise',
-          headerShown: false,
-        }}
-      >
-        {() => (
-          <Suspense fallback={<LoadingFallback />}>
-            <ActivityTrackerScreen />
-          </Suspense>
-        )}
-      </Tab.Screen>
-
-      {/* Compete Tab - Season II with Custom Events & Leaderboards */}
-      <Tab.Screen
-        name="Compete"
-        options={{
-          title: 'Compete',
-          headerShown: false,
-        }}
-      >
-        {({ navigation }) => (
-          <Suspense fallback={<LoadingFallback />}>
-            <Season2Screen navigation={navigation} />
-          </Suspense>
-        )}
-      </Tab.Screen>
-
       {/* Profile Tab */}
       <Tab.Screen
         name="Profile"
@@ -256,6 +221,36 @@ export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
             </View>
           )
         }
+      </Tab.Screen>
+
+      {/* Teams Tab - Team & Charity Selection */}
+      <Tab.Screen
+        name="Teams"
+        options={{
+          title: 'Teams',
+          headerShown: false,
+        }}
+      >
+        {() => (
+          <Suspense fallback={<LoadingFallback />}>
+            <TeamsScreen />
+          </Suspense>
+        )}
+      </Tab.Screen>
+
+      {/* Rewards Tab - Wallet & Earnings */}
+      <Tab.Screen
+        name="Rewards"
+        options={{
+          title: 'Rewards',
+          headerShown: false,
+        }}
+      >
+        {() => (
+          <Suspense fallback={<LoadingFallback />}>
+            <RewardsScreen />
+          </Suspense>
+        )}
       </Tab.Screen>
     </Tab.Navigator>
   );

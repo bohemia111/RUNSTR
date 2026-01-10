@@ -1,45 +1,24 @@
 /**
  * Screen Configurations
  * Animation configs and screen options for React Navigation
+ *
+ * ✅ PERFORMANCE FIX: Using native driver animations instead of JS interpolators
+ * Native animations run on the UI thread, not blocking the JS thread
  */
 
 import { StackNavigationOptions } from '@react-navigation/stack';
+import { TransitionPresets } from '@react-navigation/stack';
 
-// Common animation configurations
+// ✅ PERFORMANCE: Use native transition presets instead of custom JS interpolators
+// These use the native driver and don't block the JavaScript thread
 const slideFromRightAnimation = {
-  cardStyleInterpolator: ({ current, layouts }: any) => ({
-    cardStyle: {
-      transform: [
-        {
-          translateX: current.progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [layouts.screen.width, 0],
-          }),
-        },
-      ],
-    },
-  }),
+  ...TransitionPresets.SlideFromRightIOS,
+  cardStyle: { backgroundColor: '#000' }, // Prevents white flash
 };
 
 const modalSlideFromBottomAnimation = {
-  cardStyleInterpolator: ({ current, layouts }: any) => ({
-    cardStyle: {
-      transform: [
-        {
-          translateY: current.progress.interpolate({
-            inputRange: [0, 1],
-            outputRange: [layouts.screen.height, 0],
-          }),
-        },
-      ],
-    },
-    overlayStyle: {
-      opacity: current.progress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, 0.5],
-      }),
-    },
-  }),
+  ...TransitionPresets.ModalSlideFromBottomIOS,
+  cardStyle: { backgroundColor: '#000' }, // Prevents white flash
 };
 
 // Screen-specific configurations

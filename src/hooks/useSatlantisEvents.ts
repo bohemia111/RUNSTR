@@ -1,28 +1,30 @@
 /**
  * useSatlantisEvents - React hooks for Satlantis event discovery and detail
  *
- * INSTANT LEADERBOARDS: Uses WorkoutEventStore cache for instant leaderboard display
- * - WorkoutEventStore fetches 2 days of workouts at app startup
+ * INSTANT LEADERBOARDS: Uses UnifiedWorkoutCache for instant leaderboard display
+ * - UnifiedWorkoutCache fetches Season II participants + user workouts
  * - Leaderboards read from cache (instant) instead of querying Nostr (5-8s)
- * - Falls back to direct query if store not initialized
+ * - Pull-to-refresh updates the shared cache across all leaderboards
  * - Keep FrozenEventStore for ended events only
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { SatlantisEventService } from '../services/satlantis/SatlantisEventService';
 import { SatlantisRSVPService } from '../services/satlantis/SatlantisRSVPService';
+import { UnifiedEventParticipantService } from '../services/satlantis/UnifiedEventParticipantService';
 import { WorkoutMetrics } from '../services/competition/Competition1301QueryService';
 import { SatlantisEventScoringService } from '../services/scoring/SatlantisEventScoringService';
 import { UnifiedCacheService } from '../services/cache/UnifiedCacheService';
 import { FrozenEventStore } from '../services/cache/FrozenEventStore';
 import { AppStateManager } from '../services/core/AppStateManager';
-import { WorkoutEventStore, StoredWorkout } from '../services/fitness/WorkoutEventStore';
+import { UnifiedWorkoutCache, CachedWorkout } from '../services/cache/UnifiedWorkoutCache';
 import type {
   SatlantisEvent,
   SatlantisEventFilter,
   SatlantisLeaderboardEntry,
   SatlantisEventStatus,
 } from '../types/satlantis';
+import type { TeamLeaderboardEntry } from '../types/runstrEvent';
 import {
   getEventStatus,
   mapSportToActivityType,
@@ -60,26 +62,41 @@ function normalizeAndDeduplicatePubkeys(pubkeys: string[]): string[] {
 }
 
 // ============================================================================
-// Helper: Convert StoredWorkout[] to WorkoutMetrics Map for scoring service
+// Helper: Convert CachedWorkout[] from UnifiedWorkoutCache to WorkoutMetrics
 // ============================================================================
 
 /**
- * Convert StoredWorkout[] from WorkoutEventStore to Map<string, WorkoutMetrics>
+ * Convert CachedWorkout[] from UnifiedWorkoutCache to Map<string, WorkoutMetrics>
  * format that SatlantisEventScoringService.buildLeaderboard() expects
+ *
+ * Note: CachedWorkout has distance in km (not meters like StoredWorkout)
  */
-function convertStoredWorkoutsToMetrics(
-  storedWorkouts: StoredWorkout[],
+function convertCachedWorkoutsToMetrics(
+  cachedWorkouts: CachedWorkout[],
   activityType: string
 ): Map<string, WorkoutMetrics> {
   const metrics = new Map<string, WorkoutMetrics>();
 
   // Group workouts by pubkey
-  const grouped = new Map<string, StoredWorkout[]>();
-  for (const workout of storedWorkouts) {
+  const grouped = new Map<string, CachedWorkout[]>();
+  for (const workout of cachedWorkouts) {
     // Filter by activity type
-    if (workout.activityType.toLowerCase() !== activityType.toLowerCase()) {
-      continue;
+    const type = workout.activityType.toLowerCase();
+    const targetType = activityType.toLowerCase();
+
+    // Match activity type (same logic as UnifiedWorkoutCache.getWorkoutsByActivity)
+    let matches = false;
+    if (targetType === 'running') {
+      matches = type.includes('run') || type.includes('jog') || type === 'running';
+    } else if (targetType === 'walking') {
+      matches = type.includes('walk') || type.includes('hike') || type === 'walking';
+    } else if (targetType === 'cycling') {
+      matches = type.includes('cycl') || type.includes('bike') || type === 'cycling';
+    } else {
+      matches = type === targetType;
     }
+
+    if (!matches) continue;
 
     const pubkey = workout.pubkey;
     if (!grouped.has(pubkey)) {
@@ -90,27 +107,25 @@ function convertStoredWorkoutsToMetrics(
 
   // Convert each group to WorkoutMetrics format
   for (const [pubkey, workouts] of grouped) {
-    // Convert StoredWorkout to NostrWorkout-like format for scoring service
-    const nostrWorkouts = workouts.map(stored => ({
-      id: stored.id,
+    // Convert CachedWorkout to NostrWorkout-like format for scoring service
+    const nostrWorkouts = workouts.map(cached => ({
+      id: cached.id,
       source: 'nostr' as const,
-      type: stored.activityType,
-      activityType: stored.activityType,
-      startTime: new Date(stored.createdAt * 1000).toISOString(),
-      endTime: new Date((stored.createdAt + (stored.duration || 0)) * 1000).toISOString(),
-      duration: stored.duration || 0,        // seconds
-      distance: stored.distance || 0,        // meters
-      calories: stored.calories || 0,
+      type: cached.activityType,
+      activityType: cached.activityType,
+      startTime: new Date(cached.createdAt * 1000).toISOString(),
+      endTime: new Date((cached.createdAt + (cached.duration || 0)) * 1000).toISOString(),
+      duration: cached.duration || 0,                    // seconds
+      distance: (cached.distance || 0) * 1000,           // km → meters for NostrWorkout format
+      calories: 0,                                        // Not tracked in CachedWorkout
       averageHeartRate: 0,
       maxHeartRate: 0,
-      nostrEventId: stored.id,
-      nostrPubkey: stored.pubkey,
-      nostrCreatedAt: stored.createdAt,
+      nostrEventId: cached.id,
+      nostrPubkey: cached.pubkey,
+      nostrCreatedAt: cached.createdAt,
       unitSystem: 'metric' as const,
       dataSource: 'RUNSTR' as const,
-      // Pre-parsed splits from WorkoutEventStore (Map<km, seconds>)
-      // Scoring service can use this directly
-      splits: stored.splits,
+      splits: undefined,                                  // Not tracked in CachedWorkout
     }));
 
     // Calculate aggregated metrics
@@ -129,7 +144,7 @@ function convertStoredWorkoutsToMetrics(
       npub: pubkey,
       totalDistance,
       totalDuration,
-      totalCalories: workouts.reduce((sum, w) => sum + (w.calories || 0), 0),
+      totalCalories: 0, // Not tracked in CachedWorkout
       workoutCount: workouts.length,
       activeDays: activeDaysSet.size,
       longestDistance: Math.max(...nostrWorkouts.map(w => (w.distance || 0) / 1000)),
@@ -239,6 +254,7 @@ interface UseSatlantisEventDetailReturn {
   event: SatlantisEvent | null;
   participants: string[];
   leaderboard: SatlantisLeaderboardEntry[];
+  teamLeaderboard: TeamLeaderboardEntry[];
   eventStatus: SatlantisEventStatus;
   isLoading: boolean;
   isLoadingLeaderboard: boolean;
@@ -252,12 +268,14 @@ interface UseSatlantisEventDetailReturn {
  */
 export function useSatlantisEventDetail(
   eventPubkey: string,
-  eventId: string
+  eventId: string,
+  viewerPubkey?: string // Current user's hex pubkey for visibility filtering
 ): UseSatlantisEventDetailReturn {
   const [event, setEvent] = useState<SatlantisEvent | null>(null);
   const [fetchedParticipants, setFetchedParticipants] = useState<string[]>([]);
   const [localParticipants, setLocalParticipants] = useState<string[]>([]); // Optimistic UI
   const [leaderboard, setLeaderboard] = useState<SatlantisLeaderboardEntry[]>([]);
+  const [teamLeaderboard, setTeamLeaderboard] = useState<TeamLeaderboardEntry[]>([]);
   const [eventStatus, setEventStatus] = useState<SatlantisEventStatus>('upcoming');
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -268,6 +286,10 @@ export function useSatlantisEventDetail(
   eventRef.current = event;
   const leaderboardRef = useRef(leaderboard);
   leaderboardRef.current = leaderboard;
+  const teamLeaderboardRef = useRef(teamLeaderboard);
+  teamLeaderboardRef.current = teamLeaderboard;
+  const viewerPubkeyRef = useRef(viewerPubkey);
+  viewerPubkeyRef.current = viewerPubkey;
 
   // Merge fetched and local participants (for optimistic UI)
   // IMPORTANT: Normalize all pubkeys to hex to prevent duplicates
@@ -477,11 +499,14 @@ export function useSatlantisEventDetail(
   }, [eventPubkey, eventId]);
 
   /**
-   * V1.0-STYLE LEADERBOARD: Direct Nostr queries (simplified, no WorkoutEventStore)
+   * UNIFIED PARTICIPANT LEADERBOARD: Only shows users who clicked "Join"
+   * - Season II participants who joined = public (visible to all)
+   * - Non-Season II participants who joined = private (visible only to self)
+   * - Workouts filtered to only include joined participants
    */
   const loadLeaderboard = async (
     eventData: SatlantisEvent,
-    participantPubkeys: string[],
+    participantPubkeys: string[], // Legacy param, now uses UnifiedEventParticipantService
     forceRefresh: boolean = false
   ) => {
     if (!isMounted.current) return;
@@ -523,83 +548,143 @@ export function useSatlantisEventDetail(
       // Map Satlantis sport type to RUNSTR activity type
       const activityType = mapSportToActivityType(eventData.sportType);
 
-      // INSTANT LEADERBOARDS: Read from WorkoutEventStore cache
+      // UNIFIED PARTICIPANT SERVICE: Get pubkeys of users who clicked "Join"
+      // Only these users will appear on the leaderboard
+      const currentViewerPubkey = viewerPubkeyRef.current || '';
+      console.log(`[Perf] 🔐 Getting joined pubkeys for leaderboard (viewer: ${currentViewerPubkey.slice(0, 12)}...)`);
+
+      const joinedPubkeys = await UnifiedEventParticipantService.getJoinedPubkeys(
+        eventData.id,
+        currentViewerPubkey
+      );
+      console.log(`[Perf] 👥 Joined pubkeys: ${joinedPubkeys.length} users eligible for leaderboard`);
+
+      // INSTANT LEADERBOARDS: Read from UnifiedWorkoutCache (Season II participants + user)
       let metrics: Map<string, WorkoutMetrics>;
+      let cachedWorkouts: CachedWorkout[] = [];
 
-      if (participantPubkeys.length > 0) {
-        // Ensure all pubkeys are normalized to hex before querying
-        const normalizedPubkeys = normalizeAndDeduplicatePubkeys(participantPubkeys);
+      // UNIFIED CACHE: All workouts are pre-fetched from Season II participants + user
+      // This provides instant reads without any Nostr queries
+      console.log(`[Perf] 🔍 Reading workouts from UnifiedWorkoutCache (instant)`);
+      console.log(`[Perf]   - Event ID: ${eventData.id}`);
+      console.log(`[Perf]   - Activity: ${activityType}`);
+      console.log(`[Perf]   - Date range: ${new Date(eventData.startTime * 1000).toISOString().split('T')[0]} to ${new Date(eventData.endTime * 1000).toISOString().split('T')[0]}`);
 
-        console.log(`[Perf] 🔍 Reading workouts from WorkoutEventStore (instant cache)`);
-        console.log(`[Perf]   - Activity: ${activityType}`);
-        console.log(`[Perf]   - Participants: ${normalizedPubkeys.length}`);
-        console.log(`[Perf]   - Date range: ${new Date(eventData.startTime * 1000).toISOString().split('T')[0]} to ${new Date(eventData.endTime * 1000).toISOString().split('T')[0]}`);
+      const workoutQueryStart = Date.now();
 
-        const workoutQueryStart = Date.now();
+      // Read from UnifiedWorkoutCache (instant - pre-cached)
+      const cache = UnifiedWorkoutCache;
+      const allWorkoutsInRange = cache.getWorkoutsInDateRange(
+        eventData.startTime,     // unix timestamp seconds
+        eventData.endTime        // unix timestamp seconds
+      );
 
-        // Read from WorkoutEventStore cache (instant)
-        const workoutStore = WorkoutEventStore.getInstance();
-        const storedWorkouts = workoutStore.getEventWorkouts(
-          eventData.startTime,     // unix timestamp seconds
-          eventData.endTime,       // unix timestamp seconds
-          normalizedPubkeys        // hex pubkeys
-        );
+      console.log(`[Perf] 📦 All cached workouts in date range: ${allWorkoutsInRange.length} in ${Date.now() - workoutQueryStart}ms`);
 
-        console.log(`[Perf] 📦 Store returned ${storedWorkouts.length} workouts in ${Date.now() - workoutQueryStart}ms`);
+      // CRITICAL: Filter workouts to ONLY include users who clicked "Join"
+      // This is the key change - only joined participants appear on leaderboard
+      cachedWorkouts = allWorkoutsInRange.filter(w => joinedPubkeys.includes(w.pubkey));
+      console.log(`[Perf] 🔒 After join filter: ${cachedWorkouts.length} workouts from joined participants`);
 
-        // Convert to WorkoutMetrics format (filters by activity type internally)
-        metrics = convertStoredWorkoutsToMetrics(storedWorkouts, activityType);
-
-        console.log(`[Perf] 🔍 Converted to ${metrics.size} users with ${activityType} workouts`);
-      } else {
-        console.log(`[Perf] ⚠️ No participants - empty leaderboard`);
-        metrics = new Map();
+      // SECONDARY FILTER: Check for workouts tagged with this event ID (#e tag)
+      // Some workouts may be explicitly tagged with the event they belong to
+      const eventTaggedWorkouts = cachedWorkouts.filter(w =>
+        w.eventIds?.includes(eventData.id)
+      );
+      if (eventTaggedWorkouts.length > 0) {
+        console.log(`[Perf] 🏷️ Found ${eventTaggedWorkouts.length} event-tagged workouts`);
       }
+
+      // Convert to WorkoutMetrics format (filters by activity type internally)
+      metrics = convertCachedWorkoutsToMetrics(cachedWorkouts, activityType);
+
+      console.log(`[Perf] 🔍 Converted to ${metrics.size} users with ${activityType} workouts`);
 
       if (!isMounted.current) return;
 
       // Build leaderboard entries using scoring service
-      // Pass all participants so 0-workout participants are included
       const buildStart = Date.now();
-      const entries = SatlantisEventScoringService.buildLeaderboard(
-        metrics,
-        eventData.scoringType || 'fastest_time',
-        eventData.distance,
-        participantPubkeys  // Include all registered participants (even with 0 workouts)
-      );
-      console.log(`[Perf] 🧮 Leaderboard build took ${Date.now() - buildStart}ms`);
-      console.log(`[Perf] 🏆 Result: ${entries.length} entries`);
 
-      if (entries.length > 0) {
-        console.log(`[Perf] 📋 Top 5 entries:`);
-        entries.slice(0, 5).forEach((e, i) => {
-          console.log(`   ${i + 1}. ${e.npub.slice(0, 16)}... - ${e.formattedScore} (${e.workoutCount} workouts)`);
-        });
-      }
-
-      // Cache the leaderboard result
-      // Completed events: 24 hours | Active events: 5 minutes (live competition)
-      const cacheStart = Date.now();
-      const cacheTTL = isCompleted ? 86400 : 300;
-      await UnifiedCacheService.setWithCustomTTL(cacheKey, entries, cacheTTL);
-      console.log(`[Perf] 💾 Cache write: ${Date.now() - cacheStart}ms (TTL: ${isCompleted ? '24h' : '5min'})`);
-
-      // FREEZE completed events permanently (never re-query)
-      if (isCompleted && !await FrozenEventStore.isFrozen(eventData.id)) {
-        const freezeStart = Date.now();
-        console.log(`[Perf] ❄️ Freezing completed event...`);
-        await FrozenEventStore.freeze(
-          eventData.id,
-          eventData.pubkey,
-          participantPubkeys,
-          entries,
-          eventData.endTime
+      // TEAM COMPETITION: Build team leaderboard instead of individual
+      if (eventData.isTeamCompetition) {
+        console.log(`[Perf] 🏆 Building TEAM leaderboard for team competition`);
+        const teamEntries = SatlantisEventScoringService.buildTeamLeaderboard(
+          cachedWorkouts as any[], // CachedWorkout compatible with scoring service
+          eventData.scoringType || 'most_distance',
+          eventData.distance
         );
-        console.log(`[Perf] ❄️ Freeze took ${Date.now() - freezeStart}ms`);
-      }
+        console.log(`[Perf] 🧮 Team leaderboard build took ${Date.now() - buildStart}ms`);
+        console.log(`[Perf] 🏆 Result: ${teamEntries.length} team entries`);
 
-      console.log(`[Perf] ✅ loadLeaderboard TOTAL: ${Date.now() - leaderboardStartTime}ms`);
-      setLeaderboard(entries);
+        if (teamEntries.length > 0) {
+          console.log(`[Perf] 📋 Top 5 teams:`);
+          teamEntries.slice(0, 5).forEach((t, i) => {
+            console.log(`   ${i + 1}. ${t.teamName} - ${t.formattedScore} (${t.memberCount} members)`);
+          });
+        }
+
+        // Cache the team leaderboard
+        const cacheStart = Date.now();
+        const cacheTTL = isCompleted ? 86400 : 300;
+        await UnifiedCacheService.setWithCustomTTL(cacheKey + '_team', teamEntries, cacheTTL);
+        console.log(`[Perf] 💾 Team cache write: ${Date.now() - cacheStart}ms (TTL: ${isCompleted ? '24h' : '5min'})`);
+
+        console.log(`[Perf] ✅ loadLeaderboard TOTAL: ${Date.now() - leaderboardStartTime}ms`);
+        setTeamLeaderboard(teamEntries);
+        setLeaderboard([]); // Clear individual leaderboard for team competitions
+      } else {
+        // INDIVIDUAL COMPETITION: Standard leaderboard
+        // Pass joined pubkeys so only joined participants are included
+        const rawEntries = SatlantisEventScoringService.buildLeaderboard(
+          metrics,
+          eventData.scoringType || 'fastest_time',
+          eventData.distance,
+          joinedPubkeys  // Only include participants who clicked "Join"
+        );
+
+        // Add isPrivate flag to each entry
+        // Private = non-Season II user (only visible to themselves)
+        const entries: SatlantisLeaderboardEntry[] = rawEntries.map(entry => ({
+          ...entry,
+          isPrivate: !UnifiedEventParticipantService.isPublicParticipant(entry.npub),
+        }));
+
+        console.log(`[Perf] 🧮 Leaderboard build took ${Date.now() - buildStart}ms`);
+        console.log(`[Perf] 🏆 Result: ${entries.length} entries (${entries.filter(e => e.isPrivate).length} private)`);
+
+        if (entries.length > 0) {
+          console.log(`[Perf] 📋 Top 5 entries:`);
+          entries.slice(0, 5).forEach((e, i) => {
+            const privacyIcon = e.isPrivate ? '🔒' : '🌐';
+            console.log(`   ${i + 1}. ${privacyIcon} ${e.npub.slice(0, 16)}... - ${e.formattedScore} (${e.workoutCount} workouts)`);
+          });
+        }
+
+        // Cache the leaderboard result
+        // Completed events: 24 hours | Active events: 5 minutes (live competition)
+        const cacheStart = Date.now();
+        const cacheTTL = isCompleted ? 86400 : 300;
+        await UnifiedCacheService.setWithCustomTTL(cacheKey, entries, cacheTTL);
+        console.log(`[Perf] 💾 Cache write: ${Date.now() - cacheStart}ms (TTL: ${isCompleted ? '24h' : '5min'})`);
+
+        // FREEZE completed events permanently (never re-query)
+        if (isCompleted && !await FrozenEventStore.isFrozen(eventData.id)) {
+          const freezeStart = Date.now();
+          console.log(`[Perf] ❄️ Freezing completed event...`);
+          await FrozenEventStore.freeze(
+            eventData.id,
+            eventData.pubkey,
+            participantPubkeys,
+            entries,
+            eventData.endTime
+          );
+          console.log(`[Perf] ❄️ Freeze took ${Date.now() - freezeStart}ms`);
+        }
+
+        console.log(`[Perf] ✅ loadLeaderboard TOTAL: ${Date.now() - leaderboardStartTime}ms`);
+        setLeaderboard(entries);
+        setTeamLeaderboard([]); // Clear team leaderboard for individual competitions
+      }
     } catch (err) {
       console.error('[Perf] ❌ Leaderboard error:', err);
       console.log(`[Perf] ❌ loadLeaderboard TOTAL: ${Date.now() - leaderboardStartTime}ms (error)`);
@@ -611,8 +696,8 @@ export function useSatlantisEventDetail(
   };
 
   /**
-   * V1.0-STYLE: Pull-to-refresh with direct Nostr queries
-   * Queries fresh workouts directly from relays (no WorkoutEventStore)
+   * UNIFIED REFRESH: Refreshes UnifiedWorkoutCache then reloads leaderboard
+   * All events share the same workout cache for instant cross-event navigation
    */
   const refreshWorkoutsOnly = useCallback(async () => {
     if (!event) {
@@ -622,9 +707,14 @@ export function useSatlantisEventDetail(
     }
 
     const refreshStart = Date.now();
-    console.log('[Perf] 🔄 Pull-to-refresh START');
+    console.log('[Perf] 🔄 Pull-to-refresh START (UnifiedWorkoutCache)');
 
-    // V1.0-STYLE: Direct Nostr query for workouts (skip cache)
+    // UNIFIED REFRESH: Refresh the shared workout cache
+    // This updates all leaderboards across Season II and Satlantis events
+    await UnifiedWorkoutCache.refresh();
+    console.log(`[Perf] 🔄 UnifiedWorkoutCache refreshed in ${Date.now() - refreshStart}ms`);
+
+    // Now reload leaderboard from refreshed cache
     const now = Math.floor(Date.now() / 1000);
     if (now >= event.startTime) {
       await loadLeaderboard(event, participants, true); // forceRefresh = true
@@ -691,6 +781,7 @@ export function useSatlantisEventDetail(
     event,
     participants,
     leaderboard,
+    teamLeaderboard,
     eventStatus,
     isLoading,
     isLoadingLeaderboard,

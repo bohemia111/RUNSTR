@@ -1,23 +1,27 @@
 /**
  * Season2Screen - RUNSTR Season 2 Competition Screen
  *
- * Main screen for Season 2 with:
+ * Dedicated screen for Season 2 content:
  * - Info card (dates, prizes)
- * - 3 tabs (Running, Walking, Cycling)
- * - User leaderboard
+ * - 3 activity tabs (Running, Walking, Cycling)
+ * - User leaderboard (NOW POWERED BY SUPABASE)
  * - Charity rankings (collapsible)
  * - Signup section
+ *
+ * SUPABASE MIGRATION: Leaderboards now fetch from database instead of Nostr.
+ * Benefits: ~200ms response vs 3-5 seconds, workout verification built-in.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   RefreshControl,
-  SafeAreaView,
+  TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
@@ -29,22 +33,11 @@ import {
   Season2SignupSection,
 } from '../../components/season2';
 import { ToggleButtons } from '../../components/ui/ToggleButtons';
-import { EventsContent, LeaderboardsContent } from '../../components/compete';
-import { RunstrEventCreationModal } from '../../components/events/RunstrEventCreationModal';
-import { useSeason2Leaderboard, useSeason2Registration } from '../../hooks/useSeason2';
-import { useWorkoutEventStore } from '../../hooks/useWorkoutEventStore';
+import { useSeason2Registration } from '../../hooks/useSeason2';
+import { useSupabaseLeaderboard } from '../../hooks/useSupabaseLeaderboard';
 import { Season2PayoutService } from '../../services/season/Season2PayoutService';
 import { getSeason2Status } from '../../constants/season2';
-import type { Season2ActivityType } from '../../types/season2';
-import type { SatlantisEvent } from '../../types/satlantis';
-
-type CompeteTab = 'season2' | 'events' | 'leaderboards';
-
-const COMPETE_TABS = [
-  { key: 'season2', label: 'Season II' },
-  { key: 'events', label: 'Events' },
-  { key: 'leaderboards', label: 'Leaderboards' },
-];
+import type { Season2ActivityType, Season2Participant } from '../../types/season2';
 
 const TABS = [
   { key: 'running', label: 'Running' },
@@ -60,32 +53,93 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
   const hookNavigation = useNavigation<any>();
   const navigation = propNavigation || hookNavigation;
 
-  // Top-level tab state (Season II / Events / Leaderboards)
-  const [activeCompeteTab, setActiveCompeteTab] = useState<CompeteTab>('season2');
-
   // Season II activity tab state (Running / Walking / Cycling)
   const [activeTab, setActiveTab] = useState<Season2ActivityType>('running');
   const [showExplainer, setShowExplainer] = useState(false);
-  const [showCreationModal, setShowCreationModal] = useState(false);
-
-  // Lazy loading flags
-  const [eventsLoaded, setEventsLoaded] = useState(false);
-  const [leaderboardsLoaded, setLeaderboardsLoaded] = useState(false);
-
-  // Refresh trigger for LeaderboardsContent
-  const [leaderboardRefreshTrigger, setLeaderboardRefreshTrigger] = useState(0);
-
-  const { leaderboard, isLoading, refresh } = useSeason2Leaderboard(activeTab);
-  const { isRegistered } = useSeason2Registration();
-  const { refresh: refreshWorkoutStore } = useWorkoutEventStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // =========================================================================
+  // SUPABASE LEADERBOARDS - Fast database queries instead of Nostr
+  // =========================================================================
+  const {
+    leaderboard: runningLeaderboard,
+    charityRankings: runningCharityRankings,
+    isLoading: runningLoading,
+    refresh: refreshRunning,
+    currentUserPubkey,
+  } = useSupabaseLeaderboard('season2-running');
+
+  const {
+    leaderboard: walkingLeaderboard,
+    charityRankings: walkingCharityRankings,
+    isLoading: walkingLoading,
+    refresh: refreshWalking,
+  } = useSupabaseLeaderboard('season2-walking');
+
+  const {
+    leaderboard: cyclingLeaderboard,
+    charityRankings: cyclingCharityRankings,
+    isLoading: cyclingLoading,
+    refresh: refreshCycling,
+  } = useSupabaseLeaderboard('season2-cycling');
+
+  const { isRegistered } = useSeason2Registration();
+
+  // Transform Supabase data to Season2Participant format
+  const transformToParticipants = useCallback(
+    (leaderboard: typeof runningLeaderboard): Season2Participant[] => {
+      return leaderboard.map((entry) => ({
+        pubkey: entry.npub, // Use npub as pubkey (component handles both)
+        npub: entry.npub,
+        name: entry.name,
+        picture: entry.picture,
+        totalDistance: entry.score / 1000, // Convert meters to km (Supabase stores meters)
+        workoutCount: entry.workout_count || 0,
+        isLocalJoin: false,
+        isPrivateCompetitor: false,
+        // Charity from user's most recent workout
+        charityId: entry.charityId,
+        charityName: entry.charityName,
+      }));
+    },
+    []
+  );
+
+  // Memoized participants for each activity
+  const participants = useMemo(
+    () => ({
+      running: transformToParticipants(runningLeaderboard),
+      walking: transformToParticipants(walkingLeaderboard),
+      cycling: transformToParticipants(cyclingLeaderboard),
+    }),
+    [runningLeaderboard, walkingLeaderboard, cyclingLeaderboard, transformToParticipants]
+  );
+
+  // Get current leaderboard based on active tab
+  const currentParticipants = participants[activeTab];
+  const isLoading = activeTab === 'running' ? runningLoading : activeTab === 'walking' ? walkingLoading : cyclingLoading;
+
+  // Get current charity rankings based on active tab
+  const currentCharityRankings = useMemo(() => {
+    switch (activeTab) {
+      case 'running':
+        return runningCharityRankings;
+      case 'walking':
+        return walkingCharityRankings;
+      case 'cycling':
+        return cyclingCharityRankings;
+      default:
+        return [];
+    }
+  }, [activeTab, runningCharityRankings, walkingCharityRankings, cyclingCharityRankings]);
+
+  console.log(`[Season2Screen] Supabase leaderboard: ${activeTab} has ${currentParticipants.length} participants`);
 
   // Trigger automatic payouts when season ends
   useEffect(() => {
     const checkAndExecutePayouts = async () => {
       const status = getSeason2Status();
       if (status === 'ended') {
-        console.log('[Season2Screen] Season ended, checking payouts...');
         const results = await Season2PayoutService.executePayouts();
         if (results) {
           console.log('[Season2Screen] Payout results:', {
@@ -100,80 +154,39 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
     checkAndExecutePayouts();
   }, []);
 
-  // Lazy loading - mark tabs as loaded when first selected
-  useEffect(() => {
-    if (activeCompeteTab === 'events' && !eventsLoaded) {
-      setEventsLoaded(true);
-    }
-    if (activeCompeteTab === 'leaderboards' && !leaderboardsLoaded) {
-      setLeaderboardsLoaded(true);
-    }
-  }, [activeCompeteTab, eventsLoaded, leaderboardsLoaded]);
-
-  // Tab-aware refresh handler
+  // Refresh handler - now uses fast Supabase queries
   const handleRefresh = useCallback(async () => {
-    console.log('[Season2Screen] 🔄 handleRefresh called');
-    console.log(`[Season2Screen] activeCompeteTab: ${activeCompeteTab}`);
+    console.log(`[Season2Screen] Pull-to-refresh: refreshing all leaderboards from Supabase`);
     setIsRefreshing(true);
 
-    // ALWAYS refresh the central workout store first - this is the SINGLE SOURCE OF TRUTH
-    // All tabs read from this store with different filters
-    console.log('[Season2Screen] Refreshing central WorkoutEventStore...');
-    await refreshWorkoutStore();
-    console.log('[Season2Screen] WorkoutEventStore refresh completed');
-
-    // Tab-specific additional actions
-    if (activeCompeteTab === 'season2') {
-      // Refresh Season II leaderboard data (uses its own query for participant list)
-      console.log('[Season2Screen] Calling Season II refresh()...');
-      await refresh();
-      console.log('[Season2Screen] Season II refresh() completed');
-    } else if (activeCompeteTab === 'leaderboards') {
-      // Trigger LeaderboardsContent to re-render with updated store data
-      console.log('[Season2Screen] Triggering Leaderboards re-render...');
-      setLeaderboardRefreshTrigger(prev => prev + 1);
+    try {
+      // Refresh all three leaderboards in parallel
+      await Promise.all([refreshRunning(), refreshWalking(), refreshCycling()]);
+      console.log(`[Season2Screen] Refresh complete`);
+    } catch (err) {
+      console.error(`[Season2Screen] Refresh error:`, err);
+    } finally {
+      setIsRefreshing(false);
     }
-    // Events tab uses FlatList with its own RefreshControl
-
-    setIsRefreshing(false);
-    console.log('[Season2Screen] handleRefresh complete');
-  }, [activeCompeteTab, refresh, refreshWorkoutStore]);
+  }, [refreshRunning, refreshWalking, refreshCycling]);
 
   const handleTabChange = (tab: Season2ActivityType) => {
     setActiveTab(tab);
   };
 
-  // Handle event press - navigate to event detail
-  const handleEventPress = useCallback((event: SatlantisEvent) => {
-    const parentNav = navigation.getParent();
-    if (parentNav) {
-      parentNav.navigate('SatlantisEventDetail', {
-        eventId: event.id,
-        eventPubkey: event.pubkey,
-      });
-    } else {
-      navigation.navigate('SatlantisEventDetail', {
-        eventId: event.id,
-        eventPubkey: event.pubkey,
-      });
-    }
-  }, [navigation]);
-
-  // Handle event creation complete
-  const handleEventCreated = useCallback((eventId: string) => {
-    console.log('[Season2Screen] Event created:', eventId);
-    setShowCreationModal(false);
-  }, []);
-
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Top-Level Competition Toggle */}
-      <View style={styles.topToggleContainer}>
-        <ToggleButtons
-          options={COMPETE_TABS}
-          activeKey={activeCompeteTab}
-          onSelect={(key) => setActiveCompeteTab(key as CompeteTab)}
-        />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header with back button */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Season II</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView
@@ -188,64 +201,49 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
           />
         }
       >
-        {/* Season II Tab Content */}
-        {activeCompeteTab === 'season2' && (
-          <>
-            {/* Info Card */}
-            <Season2InfoCard onPress={() => setShowExplainer(true)} />
+        {/* Info Card */}
+        <Season2InfoCard onPress={() => setShowExplainer(true)} />
 
-            {/* Activity Tab Bar */}
-            <View style={styles.tabBarContainer}>
-              <ToggleButtons
-                options={TABS}
-                activeKey={activeTab}
-                onSelect={(key) => handleTabChange(key as Season2ActivityType)}
-              />
-            </View>
-
-            {/* Leaderboard */}
-            <Season2Leaderboard
-              participants={leaderboard?.participants || []}
-              isLoading={isLoading}
-              emptyMessage={`No ${activeTab} workouts yet`}
-            />
-
-            {/* Charity Rankings */}
-            <CharityRankings
-              rankings={leaderboard?.charityRankings || []}
-              isLoading={isLoading}
-            />
-
-            {/* Signup Section */}
-            {!isRegistered && <Season2SignupSection />}
-
-            {/* Registered Status */}
-            {isRegistered && (
-              <View style={styles.registeredInfo}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={20}
-                  color={theme.colors.success}
-                />
-                <Text style={styles.registeredText}>
-                  You're competing in SEASON II
-                </Text>
-              </View>
-            )}
-          </>
-        )}
-
-        {/* Events Tab Content */}
-        {activeCompeteTab === 'events' && eventsLoaded && (
-          <EventsContent
-            onEventPress={handleEventPress}
-            onCreateEvent={() => setShowCreationModal(true)}
+        {/* Activity Tab Bar */}
+        <View style={styles.tabBarContainer}>
+          <ToggleButtons
+            options={TABS}
+            activeKey={activeTab}
+            onSelect={(key) => handleTabChange(key as Season2ActivityType)}
           />
-        )}
+        </View>
 
-        {/* Leaderboards Tab Content */}
-        {activeCompeteTab === 'leaderboards' && leaderboardsLoaded && (
-          <LeaderboardsContent refreshTrigger={leaderboardRefreshTrigger} />
+        {/* Leaderboard - Now powered by Supabase */}
+        <Season2Leaderboard
+          participants={currentParticipants}
+          isLoading={isLoading && currentParticipants.length === 0}
+          emptyMessage={`No ${activeTab} workouts yet`}
+          currentUserPubkey={currentUserPubkey}
+          activityType={activeTab}
+          isBaselineOnly={false} // Supabase has real-time data
+          baselineDate={undefined}
+        />
+
+        {/* Charity Rankings - Now powered by Supabase */}
+        <CharityRankings
+          rankings={currentCharityRankings}
+          isLoading={isLoading || isRefreshing}
+        />
+
+        {/* Registration Closed / Registered Status */}
+        {isRegistered ? (
+          <View style={styles.registeredInfo}>
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={theme.colors.success}
+            />
+            <Text style={styles.registeredText}>
+              You're competing in SEASON II
+            </Text>
+          </View>
+        ) : (
+          <Season2SignupSection />
         )}
       </ScrollView>
 
@@ -253,13 +251,6 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
       <Season2ExplainerModal
         visible={showExplainer}
         onClose={() => setShowExplainer(false)}
-      />
-
-      {/* Event Creation Modal */}
-      <RunstrEventCreationModal
-        visible={showCreationModal}
-        onClose={() => setShowCreationModal(false)}
-        onEventCreated={handleEventCreated}
       />
     </SafeAreaView>
   );
@@ -280,18 +271,7 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  headerTitle: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: theme.typography.weights.bold,
-  },
-  headerSpacer: {
-    width: 40,
+    padding: 4,
   },
   scrollView: {
     flex: 1,
@@ -314,9 +294,13 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 14,
   },
-  topToggleContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.text,
+  },
+  headerSpacer: {
+    width: 32,
   },
 });
 

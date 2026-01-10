@@ -5,6 +5,7 @@
 
 import { nip19, getPublicKey } from 'nostr-tools';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SecureNsecStorage } from '../services/auth/SecureNsecStorage';
 
 // React Native polyfill for btoa/atob (Buffer-free implementation)
 const btoa = (str: string): string => {
@@ -236,7 +237,8 @@ export function decryptFromStorage(
 }
 
 /**
- * Store nsec locally (encrypted)
+ * Store nsec locally using SecureStore (hardware-backed encryption)
+ * Public keys stored in AsyncStorage (they're public by design)
  */
 export async function storeNsecLocally(
   nsec: string,
@@ -247,13 +249,11 @@ export async function storeNsecLocally(
       throw new Error('Invalid nsec format');
     }
 
-    const encryptedNsec = encryptForStorage(nsec, userId);
-    await AsyncStorage.setItem(STORAGE_KEYS.NSEC, encryptedNsec);
-
-    // ALSO store plain nsec for NutZap wallet service
-    // This is needed for wallet operations until we implement proper key derivation
-    await AsyncStorage.setItem('@runstr:user_nsec', nsec);
-    console.log('Stored plain nsec at @runstr:user_nsec for wallet operations');
+    // Store nsec in SecureStore (hardware-backed encryption)
+    const stored = await SecureNsecStorage.storeNsec(nsec);
+    if (!stored) {
+      throw new Error('Failed to store nsec in SecureStore');
+    }
 
     // Get the hex pubkey from nsec
     const decoded = nip19.decode(nsec);
@@ -262,14 +262,14 @@ export async function storeNsecLocally(
     }
     const publicKeyHex = getPublicKey(decoded.data as Uint8Array);
 
-    // Store the hex pubkey for easy access
+    // Store public keys in AsyncStorage (they're public by design)
     await AsyncStorage.setItem(STORAGE_KEYS.HEX_PUBKEY, publicKeyHex);
 
     // Also store the npub for quick access
     const npub = nip19.npubEncode(publicKeyHex);
     await AsyncStorage.setItem(STORAGE_KEYS.NPUB, npub);
 
-    console.log('Nostr keys stored locally for user:', userId);
+    console.log('Nostr keys stored securely for user:', userId);
     console.log('Stored hex pubkey:', publicKeyHex.slice(0, 16) + '...');
   } catch (error) {
     console.error('Error storing nsec locally:', error);
@@ -356,20 +356,27 @@ export async function getAuthMethod(): Promise<string | null> {
 
 /**
  * Clear all Nostr-related storage
+ * Clears both SecureStore (nsec) and AsyncStorage (public keys, metadata)
  */
 export async function clearNostrStorage(): Promise<void> {
   try {
+    // Clear nsec from SecureStore (hardware-backed)
+    await SecureNsecStorage.clearNsec();
+
+    // Clear public keys and metadata from AsyncStorage
     await AsyncStorage.multiRemove([
       STORAGE_KEYS.NSEC,
+      STORAGE_KEYS.NSEC_ENCRYPTED,
       STORAGE_KEYS.NPUB,
       STORAGE_KEYS.HEX_PUBKEY,
       STORAGE_KEYS.AUTH_METHOD,
-      '@runstr:user_nsec', // Also clear wallet nsec
+      STORAGE_KEYS.ENCRYPTION_KEY,
+      '@runstr:user_nsec', // Legacy plain text nsec
       '@runstr:amber_pubkey', // SECURITY: Clear Amber cached pubkey to force re-authentication
       '@runstr:auth_method', // SECURITY: Clear auth method to prevent cached login
     ]);
     console.log(
-      '✅ Nostr storage cleared (including Amber authentication data)'
+      '✅ Nostr storage cleared (SecureStore + AsyncStorage, including Amber data)'
     );
   } catch (error) {
     console.error('Error clearing Nostr storage:', error);
@@ -378,9 +385,15 @@ export async function clearNostrStorage(): Promise<void> {
 
 /**
  * Check if user has stored Nostr keys
+ * Checks SecureStore for nsec (primary) or AsyncStorage for npub (fallback)
  */
 export async function hasStoredNostrKeys(): Promise<boolean> {
   try {
+    // Check SecureStore first (primary source)
+    const hasNsec = await SecureNsecStorage.hasNsec();
+    if (hasNsec) return true;
+
+    // Fallback to npub in AsyncStorage (for migration scenarios)
     const npub = await getNpubFromStorage();
     return !!npub;
   } catch (error) {

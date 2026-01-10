@@ -18,7 +18,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { unifiedNotificationStore } from '../../services/notifications/UnifiedNotificationStore';
-import { challengeNotificationHandler } from '../../services/notifications/ChallengeNotificationHandler';
 import { NotificationItem } from './NotificationItem';
 import type {
   UnifiedNotification,

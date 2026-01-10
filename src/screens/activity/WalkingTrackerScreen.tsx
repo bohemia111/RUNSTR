@@ -51,7 +51,11 @@ import { LastActivityCard } from '../../components/activity/LastActivityCard';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { NostrProfile } from '../../services/nostr/NostrProfileService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { PublishableWorkout } from '../../services/nostr/workoutPublishingService';
+import {
+  WorkoutPublishingService,
+  type PublishableWorkout,
+} from '../../services/nostr/workoutPublishingService';
+import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import { theme } from '../../styles/theme';
 
 const STEP_UPDATE_INTERVAL = 5 * 1000; // Update every 5 seconds for near-real-time
@@ -114,6 +118,7 @@ export const WalkingTrackerScreen: React.FC = () => {
   const [stepCounterLoading, setStepCounterLoading] = useState(true);
   const [stepCounterError, setStepCounterError] = useState<string | null>(null);
   const [postingState, setPostingState] = useState<PostingState>('idle');
+  const [competeState, setCompeteState] = useState<PostingState>('idle');
   const stepUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Live pedometer step tracking (for summary modal after walk)
@@ -171,6 +176,17 @@ export const WalkingTrackerScreen: React.FC = () => {
       try {
         setStepCounterLoading(true);
         setStepCounterError(null);
+
+        // First check if user has enabled background tracking in Settings
+        const userEnabledTracking = await dailyStepCounterService.isBackgroundTrackingEnabled();
+        if (!userEnabledTracking) {
+          // User has disabled background tracking - don't show step counter
+          console.log('[WalkingTrackerScreen] Background tracking disabled by user');
+          setStepCounterLoading(false);
+          setShowBackgroundBanner(false);
+          setIsBackgroundActive(false);
+          return;
+        }
 
         // Check if step counting is available (HealthKit on iOS, Health Connect on Android)
         const available = await dailyStepCounterService.isAvailable();
@@ -775,11 +791,10 @@ export const WalkingTrackerScreen: React.FC = () => {
       };
 
       // Open social share modal directly (bypass WorkoutSummaryModal)
+      // Note: State stays as 'posting' while modal is open to prevent double-tap
+      // State is reset in modal's onClose (cancelled) or onSuccess (posted) callbacks
       setPreparedWorkout(publishableWorkout);
       setShowSocialModal(true);
-
-      // Reset posting state after opening modal
-      setPostingState('idle');
 
       console.log(
         `[WalkingTrackerScreen] ✅ Opening social share modal for ${dailySteps} steps`
@@ -795,6 +810,115 @@ export const WalkingTrackerScreen: React.FC = () => {
       setAlertConfig({
         title: 'Failed to Post Steps',
         message: 'Could not save daily steps. Please try again.',
+        buttons: [{ text: 'OK', style: 'default' }],
+      });
+      setAlertVisible(true);
+    }
+  };
+
+  const handleCompeteDailySteps = async () => {
+    if (!dailySteps || dailySteps === 0) {
+      console.warn('[WalkingTrackerScreen] Cannot compete - no steps available');
+      return;
+    }
+
+    if (competeState === 'posted') {
+      console.warn('[WalkingTrackerScreen] Steps already entered for competition today');
+      return;
+    }
+
+    try {
+      setCompeteState('posting');
+      console.log(
+        `[WalkingTrackerScreen] Publishing ${dailySteps} daily steps as kind 1301 for competition`
+      );
+
+      // Get signer (works for both nsec and Amber)
+      const signingService = UnifiedSigningService.getInstance();
+      const signer = await signingService.getSigner();
+      if (!signer) {
+        throw new Error('Not logged in - please log in again');
+      }
+
+      // Calculate time from midnight to now
+      const now = new Date();
+      const midnight = new Date();
+      midnight.setHours(0, 0, 0, 0);
+
+      const duration = Math.floor((now.getTime() - midnight.getTime()) / 1000); // seconds
+
+      // Estimate calories for walking steps (rough estimate: 0.04 cal per step)
+      const calories = Math.round(dailySteps * 0.04);
+
+      // Generate unique workout ID for today's steps
+      const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const workoutId = `daily-steps-${today}-${Date.now()}`;
+
+      // Create PublishableWorkout for kind 1301 publishing
+      const publishableWorkout: PublishableWorkout = {
+        id: workoutId,
+        userId: userId || 'unknown',
+        type: 'walking',
+        startTime: midnight.toISOString(),
+        endTime: now.toISOString(),
+        duration,
+        distance: 0, // No GPS distance for step counting
+        calories,
+        source: 'manual', // Device pedometer data
+        syncedAt: new Date().toISOString(),
+        sourceApp: 'RUNSTR',
+        unitSystem: 'metric',
+        canSyncToNostr: true,
+        metadata: {
+          title: 'Daily Steps',
+          sourceApp: 'RUNSTR',
+          notes: `${dailySteps.toLocaleString()} steps tracked today`,
+          steps: dailySteps, // Steps count for the steps tag
+        },
+      };
+
+      // Publish to Nostr as kind 1301
+      const publishService = WorkoutPublishingService.getInstance();
+      const result = await publishService.saveWorkoutToNostr(
+        publishableWorkout,
+        signer,
+        userId
+      );
+
+      if (result.success) {
+        setCompeteState('posted');
+        console.log(
+          `[WalkingTrackerScreen] ✅ Daily steps published to competition: ${result.eventId}`
+        );
+
+        // Show success alert
+        setAlertConfig({
+          title: 'Steps Entered!',
+          message: `${dailySteps.toLocaleString()} steps have been submitted to the competition.${
+            result.rewardEarned
+              ? ` You earned ${result.rewardAmount} sats!`
+              : ''
+          }`,
+          buttons: [{ text: 'OK', style: 'default' }],
+        });
+        setAlertVisible(true);
+      } else {
+        throw new Error(result.error || 'Failed to publish workout');
+      }
+    } catch (error) {
+      console.error(
+        '[WalkingTrackerScreen] ❌ Failed to publish daily steps for competition:',
+        error
+      );
+      setCompeteState('idle');
+
+      // Show error alert
+      setAlertConfig({
+        title: 'Failed to Enter',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Could not submit steps to competition. Please try again.',
         buttons: [{ text: 'OK', style: 'default' }],
       });
       setAlertVisible(true);
@@ -872,67 +996,21 @@ export const WalkingTrackerScreen: React.FC = () => {
 
           {/* Secondary Metrics Row */}
           <SecondaryMetricRow metrics={secondaryMetrics} />
-
-          {/* Spacer to push controls to bottom */}
-          <View style={{ flex: 1 }} />
-
-          {/* Control Bar - Fixed at bottom */}
-          <ControlBar
-            state={controlBarState}
-            startLabel="Start Walk"
-            onHoldComplete={handleHoldComplete}
-            onPause={pauseTracking}
-            onResume={resumeTracking}
-            onStop={stopTracking}
-          />
         </View>
       ) : (
         /* ============ IDLE STATE ============ */
-        <View style={styles.idleContainer}>
-          {/* Daily Step Goal Card (prominent in walking) */}
-          <DailyStepGoalCard
-            steps={dailySteps}
-            progress={stepProgress}
-            loading={stepCounterLoading}
-            error={stepCounterError}
-            onPostSteps={handlePostDailySteps}
-            onSetGoal={handleSetGoal}
-            postingState={postingState}
-            showBackgroundBanner={showBackgroundBanner}
-            onEnableBackground={handleRequestPermission}
-            isBackgroundActive={isBackgroundActive}
+        <View style={styles.idleCenteredContainer}>
+          <HoldToStartButton
+            label="Start Walk"
+            onHoldComplete={handleHoldComplete}
+            size="large"
           />
+        </View>
+      )}
 
-          {/* Last Activity & Weekly Stats */}
-          <LastActivityCard activityType="walking" />
-
-          {/* Route Selection */}
-          <TouchableOpacity
-            style={styles.routeSelector}
-            onPress={() => setRouteSelectionVisible(true)}
-          >
-            <Ionicons
-              name={selectedRoute ? 'map' : 'map-outline'}
-              size={20}
-              color={selectedRoute ? theme.colors.accent : theme.colors.text}
-            />
-            <Text style={[
-              styles.routeSelectorText,
-              selectedRoute && { color: theme.colors.accent }
-            ]}>
-              {selectedRoute ? selectedRoute.name : 'Routes'}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={18}
-              color={theme.colors.textMuted}
-            />
-          </TouchableOpacity>
-
-          {/* Spacer to push controls to bottom */}
-          <View style={{ flex: 1 }} />
-
-          {/* Control Bar - Fixed at bottom */}
+      {/* Fixed Control Bar - Only visible when tracking */}
+      {isTracking && (
+        <View style={styles.fixedControlsWrapper}>
           <ControlBar
             state={controlBarState}
             startLabel="Start Walk"
@@ -994,6 +1072,8 @@ export const WalkingTrackerScreen: React.FC = () => {
         onClose={() => {
           setShowSocialModal(false);
           setPreparedWorkout(null);
+          // Reset to idle if user cancels - allows retry
+          setPostingState('idle');
         }}
         onSuccess={() => {
           setShowSocialModal(false);
@@ -1024,12 +1104,25 @@ const styles = StyleSheet.create({
   activeContainer: {
     flex: 1,
     backgroundColor: theme.colors.background,
+    paddingBottom: 140, // Space for fixed controls
   },
-  // Idle state container
-  idleContainer: {
+  // Idle state container - centered HoldToStart button
+  idleCenteredContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: theme.colors.background,
-    paddingHorizontal: 16,
+    paddingBottom: 120, // Shift button up from true center
+  },
+  // Fixed controls wrapper - always visible at bottom
+  fixedControlsWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   // Route badge shown during tracking
   routeBadge: {
@@ -1057,22 +1150,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
   },
-  // Route selector in idle state
+  // Route selector in idle state (compact to fit above Start button)
   routeSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.card,
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    marginTop: 16,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginTop: 12,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    gap: 10,
+    gap: 8,
   },
   routeSelectorText: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.text,
     flex: 1,

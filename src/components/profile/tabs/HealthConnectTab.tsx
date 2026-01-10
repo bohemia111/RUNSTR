@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { CustomAlertManager } from '../../ui/CustomAlert';
 import { theme } from '../../../styles/theme';
@@ -39,6 +40,10 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
   const [hasPermission, setHasPermission] = useState(false);
   const [permissionRequested, setPermissionRequested] = useState(false);
   const [sdkAvailable, setSdkAvailable] = useState<boolean | null>(null);
+
+  // Button loading state - tracks which workout is being processed
+  const [postingWorkoutId, setPostingWorkoutId] = useState<string | null>(null);
+  const [postingType, setPostingType] = useState<'post' | 'compete' | null>(null);
 
   useEffect(() => {
     // Only check status on mount, don't auto-request permissions
@@ -282,6 +287,11 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
       return;
     }
 
+    // Prevent double-tap
+    if (postingWorkoutId === workout.id) return;
+
+    setPostingWorkoutId(workout.id);
+    setPostingType('compete');
     try {
       await onCompete(workout);
       CustomAlertManager.alert('Success', 'Workout entered into competition!');
@@ -291,6 +301,9 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
         'Error',
         'Failed to enter workout into competition'
       );
+    } finally {
+      setPostingWorkoutId(null);
+      setPostingType(null);
     }
   };
 
@@ -303,12 +316,20 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
       return;
     }
 
+    // Prevent double-tap
+    if (postingWorkoutId === workout.id) return;
+
+    setPostingWorkoutId(workout.id);
+    setPostingType('post');
     try {
       await onSocialShare(workout);
       // Success alert handled by the EnhancedSocialShareModal
     } catch (error) {
       console.error('Social share failed:', error);
       CustomAlertManager.alert('Error', 'Failed to share workout');
+    } finally {
+      setPostingWorkoutId(null);
+      setPostingType(null);
     }
   };
 
@@ -324,37 +345,65 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
     }
   };
 
-  const renderWorkout = ({ item }: { item: Workout }) => (
-    <WorkoutCard workout={item}>
-      <View style={styles.buttonContainer}>
-        {/* Post button - Kind 1 social sharing */}
-        <TouchableOpacity
-          style={[styles.actionButton, styles.postButton]}
-          onPress={() => handleSocialShare(item)}
-        >
-          <Ionicons
-            name="chatbubble-outline"
-            size={16}
-            color={theme.colors.accentText}
-          />
-          <Text style={styles.postButtonText}>Post</Text>
-        </TouchableOpacity>
+  const renderWorkout = ({ item }: { item: Workout }) => {
+    const isPostingThis = postingWorkoutId === item.id;
+    const isPostingPost = isPostingThis && postingType === 'post';
+    const isPostingCompete = isPostingThis && postingType === 'compete';
 
-        {/* Compete button - Kind 1301 competition entry */}
-        <TouchableOpacity
-          style={[styles.actionButton, styles.publicButton]}
-          onPress={() => handleCompete(item)}
-        >
-          <Ionicons
-            name="cloud-upload-outline"
-            size={16}
-            color={theme.colors.accentText}
-          />
-          <Text style={styles.publicButtonText}>Compete</Text>
-        </TouchableOpacity>
-      </View>
-    </WorkoutCard>
-  );
+    return (
+      <WorkoutCard workout={item}>
+        <View style={styles.buttonContainer}>
+          {/* Post button - Kind 1 social sharing */}
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.postButton,
+              isPostingPost && styles.buttonDisabled,
+            ]}
+            onPress={() => handleSocialShare(item)}
+            disabled={isPostingThis}
+          >
+            {isPostingPost ? (
+              <ActivityIndicator size="small" color={theme.colors.accentText} />
+            ) : (
+              <>
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={16}
+                  color={theme.colors.accentText}
+                />
+                <Text style={styles.postButtonText}>Post</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Compete button - Kind 1301 competition entry */}
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.publicButton,
+              isPostingCompete && styles.buttonDisabled,
+            ]}
+            onPress={() => handleCompete(item)}
+            disabled={isPostingThis}
+          >
+            {isPostingCompete ? (
+              <ActivityIndicator size="small" color={theme.colors.accentText} />
+            ) : (
+              <>
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={16}
+                  color={theme.colors.accentText}
+                />
+                <Text style={styles.publicButtonText}>Compete</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </WorkoutCard>
+    );
+  };
 
   // Don't show on iOS
   if (Platform.OS !== 'android') {
@@ -496,6 +545,9 @@ const styles = StyleSheet.create({
   },
   publicButton: {
     backgroundColor: theme.colors.accent,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   postButtonText: {
     color: theme.colors.accentText,

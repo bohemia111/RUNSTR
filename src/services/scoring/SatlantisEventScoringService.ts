@@ -17,10 +17,11 @@
  */
 
 import type { SatlantisLeaderboardEntry } from '../../types/satlantis';
-import type { RunstrScoringType } from '../../types/runstrEvent';
+import type { RunstrScoringType, TeamLeaderboardEntry } from '../../types/runstrEvent';
 import type { WorkoutMetrics } from '../competition/Competition1301QueryService';
 import type { NostrWorkout } from '../../types/nostrWorkout';
 import { formatDuration } from '../../types/satlantis';
+import { CHARITIES, getCharityById } from '../../constants/charities';
 
 class SatlantisEventScoringServiceClass {
   private static instance: SatlantisEventScoringServiceClass;
@@ -426,6 +427,152 @@ class SatlantisEventScoringServiceClass {
         return 'Workouts';
       default:
         return 'Score';
+    }
+  }
+
+  // ============================================================================
+  // Team Competition Leaderboard
+  // ============================================================================
+
+  /**
+   * Build TEAM leaderboard by aggregating individual workout metrics by team
+   *
+   * @param storedWorkouts - Raw workouts with team tags (from WorkoutEventStore or similar)
+   * @param scoringType - How to score: fastest_time, most_distance, participation
+   * @param targetDistance - Target distance in km (for fastest_time)
+   * @returns Array of TeamLeaderboardEntry sorted by score
+   */
+  buildTeamLeaderboard(
+    storedWorkouts: (NostrWorkout | any)[],
+    scoringType: RunstrScoringType = 'most_distance',
+    targetDistance?: number
+  ): TeamLeaderboardEntry[] {
+    console.log(
+      `[Scoring] Building TEAM leaderboard: ${storedWorkouts.length} workouts, scoring: ${scoringType}`
+    );
+
+    // Step 1: Group workouts by team tag
+    const teamWorkouts = new Map<string, (NostrWorkout | any)[]>();
+
+    for (const workout of storedWorkouts) {
+      // Extract team tag from workout's raw Nostr event
+      const teamTag = workout.rawNostrEvent?.tags?.find(
+        (t: string[]) => t[0] === 'team'
+      )?.[1];
+
+      if (!teamTag) {
+        // Skip workouts without team tags
+        continue;
+      }
+
+      if (!teamWorkouts.has(teamTag)) {
+        teamWorkouts.set(teamTag, []);
+      }
+      teamWorkouts.get(teamTag)!.push(workout);
+    }
+
+    console.log(`[Scoring] Found workouts for ${teamWorkouts.size} teams`);
+
+    // Step 2: Calculate team scores based on scoring type
+    const teamEntries: TeamLeaderboardEntry[] = [];
+
+    for (const [teamId, workouts] of teamWorkouts) {
+      // Look up team info from charities (charities ARE teams now)
+      const charity = getCharityById(teamId);
+      if (!charity) {
+        console.log(`[Scoring] Skipping unknown team: ${teamId.slice(0, 8)}...`);
+        continue;
+      }
+
+      // Group workouts by member (pubkey) for per-member calculations
+      const memberWorkouts = new Map<string, (NostrWorkout | any)[]>();
+      for (const workout of workouts) {
+        const pubkey = workout.pubkey || workout.author;
+        if (!pubkey) continue;
+
+        if (!memberWorkouts.has(pubkey)) {
+          memberWorkouts.set(pubkey, []);
+        }
+        memberWorkouts.get(pubkey)!.push(workout);
+      }
+
+      let totalScore = 0;
+
+      if (scoringType === 'most_distance') {
+        // Sum total distance from ALL team members (in km)
+        for (const [_pubkey, memberWs] of memberWorkouts) {
+          const memberDistanceKm = memberWs.reduce(
+            (sum, w) => sum + (w.distance || 0) / 1000,
+            0
+          );
+          totalScore += memberDistanceKm;
+        }
+      } else if (scoringType === 'fastest_time') {
+        // For team fastest time: sum of all members' best times at target distance
+        const targetKm = targetDistance || 5;
+
+        for (const [_pubkey, memberWs] of memberWorkouts) {
+          // Find best time for this member
+          let bestTime = Infinity;
+          for (const w of memberWs) {
+            const time = this.extractTargetDistanceTime(w, targetKm);
+            if (time < bestTime) bestTime = time;
+          }
+          if (bestTime < Infinity) {
+            totalScore += bestTime;
+          }
+        }
+      } else {
+        // Participation: count unique members who completed workouts
+        totalScore = memberWorkouts.size;
+      }
+
+      teamEntries.push({
+        rank: 0, // Assigned after sorting
+        teamId,
+        teamName: charity.name,
+        totalScore,
+        formattedScore: this.formatTeamScore(totalScore, scoringType),
+        memberCount: memberWorkouts.size,
+      });
+    }
+
+    // Step 3: Sort and rank teams
+    if (scoringType === 'fastest_time') {
+      // Lower total time = better (but 0 means no entries, push to end)
+      teamEntries.sort((a, b) => {
+        if (a.totalScore === 0) return 1;
+        if (b.totalScore === 0) return -1;
+        return a.totalScore - b.totalScore;
+      });
+    } else {
+      // Higher score = better (distance, participation count)
+      teamEntries.sort((a, b) => b.totalScore - a.totalScore);
+    }
+
+    // Assign ranks
+    teamEntries.forEach((entry, index) => {
+      entry.rank = index + 1;
+    });
+
+    console.log(`[Scoring] Team leaderboard: ${teamEntries.length} teams ranked`);
+    return teamEntries;
+  }
+
+  /**
+   * Format team score for display based on scoring type
+   */
+  private formatTeamScore(score: number, scoringType: RunstrScoringType): string {
+    switch (scoringType) {
+      case 'fastest_time':
+        if (score === 0) return '--:--';
+        return formatDuration(score);
+      case 'most_distance':
+        return this.formatDistance(score);
+      case 'participation':
+        return `${score} member${score !== 1 ? 's' : ''}`;
+      default:
+        return score.toFixed(2);
     }
   }
 }

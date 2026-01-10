@@ -28,6 +28,7 @@ import CalorieEstimationService, {
   type MealSize,
 } from '../../services/fitness/CalorieEstimationService';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
+import { RewardNotificationManager } from '../../services/rewards/RewardNotificationManager';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import type { Workout } from '../../types/workout';
 
@@ -495,6 +496,9 @@ export const DietTrackerScreen: React.FC<DietTrackerScreenProps> = ({
     setShowSummary(false);
     setShowShareModal(false);
     setSavedWorkout(null);
+
+    // Show pending reward toast now that modal is closing
+    RewardNotificationManager.showPendingRewardToast();
   };
 
   const formatDuration = (seconds: number): string => {

@@ -1,26 +1,25 @@
 /**
- * YourWorkoutsBox Component (renamed to Teams)
- * Simple navigation box for Profile screen - shows "TEAMS"
- * Navigates to TeamsScreen for hardcoded teams + charities selection
+ * FitnessCompetitionsBox Component
+ * Simple navigation box for Profile screen - shows "JOIN EVENTS"
+ * Navigates to Compete screen (CompeteScreen with all events)
  */
 
 import React from 'react';
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 
-export const YourWorkoutsBox: React.FC = () => {
+export const FitnessCompetitionsBox: React.FC = () => {
   const navigation = useNavigation<any>();
 
   const handlePress = () => {
-    // Navigate to Teams screen (hardcoded teams + charities)
-    // Use parent navigator since Teams is in the stack, not the tab navigator
+    // Navigate to Compete screen (CompeteScreen with all events)
+    // Use parent navigator since Compete is in the stack, not the tab navigator
     const parentNav = navigation.getParent();
     if (parentNav) {
-      parentNav.navigate('Teams');
+      parentNav.navigate('Compete');
     } else {
-      navigation.navigate('Teams');
+      navigation.navigate('Compete');
     }
   };
 
@@ -30,8 +29,7 @@ export const YourWorkoutsBox: React.FC = () => {
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      <Ionicons name="people-outline" size={24} color={theme.colors.text} />
-      <Text style={styles.title}>TEAMS</Text>
+      <Text style={styles.title}>JOIN EVENTS</Text>
     </TouchableOpacity>
   );
 };
@@ -43,10 +41,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1a1a1a',
     flex: 1,
-    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
   },
   title: {
     fontSize: 16,

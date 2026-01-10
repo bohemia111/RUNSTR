@@ -23,6 +23,9 @@ import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CalorieEstimationService from '../../services/fitness/CalorieEstimationService';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
+import { RewardNotificationManager } from '../../services/rewards/RewardNotificationManager';
+import { HoldToStartButton } from '../../components/activity/HoldToStartButton';
+import { CountdownOverlay } from '../../components/activity/CountdownOverlay';
 import type { HealthProfile } from '../HealthProfileScreen';
 import type { Workout } from '../../types/workout';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
@@ -60,6 +63,10 @@ export const MeditationTrackerScreen: React.FC<MeditationTrackerScreenProps> = (
   const [selectedType, setSelectedType] = useState<MeditationType>(initialType || 'unguided');
   const [userWeight, setUserWeight] = useState<number | undefined>(undefined);
   const [estimatedCalories, setEstimatedCalories] = useState<number>(0);
+
+  // New flow state: type selection -> ready to start -> active
+  const [readyToStart, setReadyToStart] = useState(!!initialType);
+  const [countdown, setCountdown] = useState<3 | 2 | 1 | 'GO' | null>(null);
 
   // Summary state
   const [showSummary, setShowSummary] = useState(false);
@@ -173,6 +180,27 @@ export const MeditationTrackerScreen: React.FC<MeditationTrackerScreenProps> = (
       if (interval) clearInterval(interval);
     };
   }, [isActive, isPaused]);
+
+  const handleHoldComplete = () => {
+    console.log('[MeditationTrackerScreen] Hold complete, starting countdown...');
+
+    // Start countdown: 3 → 2 → 1 → GO!
+    setCountdown(3);
+    setTimeout(() => {
+      setCountdown(2);
+      setTimeout(() => {
+        setCountdown(1);
+        setTimeout(() => {
+          setCountdown('GO');
+          setTimeout(() => {
+            setCountdown(null);
+            // Start meditation after countdown completes
+            startMeditation();
+          }, 500); // Show "GO!" for 0.5 seconds
+        }, 1000);
+      }, 1000);
+    }, 1000);
+  };
 
   const startMeditation = () => {
     setIsActive(true);
@@ -330,6 +358,9 @@ export const MeditationTrackerScreen: React.FC<MeditationTrackerScreenProps> = (
     setSessionNotes('');
     setElapsedSeconds(0);
     setSavedWorkout(null);
+
+    // Show pending reward toast now that modal is closing
+    RewardNotificationManager.showPendingRewardToast();
   };
 
   const handlePost = async () => {
@@ -358,6 +389,34 @@ export const MeditationTrackerScreen: React.FC<MeditationTrackerScreenProps> = (
 
   // Start screen (before session begins)
   if (!isActive && !showSummary) {
+    // If readyToStart, show centered HoldToStartButton
+    if (readyToStart) {
+      return (
+        <View style={styles.container}>
+          {/* Countdown Overlay */}
+          <CountdownOverlay countdown={countdown} />
+
+          <View style={styles.idleCenteredContainer}>
+            <HoldToStartButton
+              label={`Begin ${MEDITATION_TYPES.find(t => t.value === selectedType)?.label || 'Meditation'}`}
+              onHoldComplete={handleHoldComplete}
+              size="large"
+            />
+          </View>
+
+          {/* Custom Alert */}
+          <CustomAlert
+            visible={alertVisible}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            buttons={alertConfig.buttons}
+            onClose={() => setAlertVisible(false)}
+          />
+        </View>
+      );
+    }
+
+    // Type selection screen
     return (
       <ScrollView
         style={styles.container}
@@ -372,51 +431,43 @@ export const MeditationTrackerScreen: React.FC<MeditationTrackerScreenProps> = (
           />
         </View>
 
-        <Text style={styles.title}>
-          {initialType
-            ? MEDITATION_TYPES.find(t => t.value === initialType)?.label || 'Meditation Session'
-            : 'Meditation Session'}
-        </Text>
-        <Text style={styles.subtitle}>
-          {initialType ? 'Ready to begin' : 'Select your meditation type'}
-        </Text>
+        <Text style={styles.title}>Meditation Session</Text>
+        <Text style={styles.subtitle}>Select your meditation type</Text>
 
-        {/* Type Selector - only show if not pre-selected from menu */}
-        {!initialType && (
-          <View style={styles.typeGrid}>
-            {MEDITATION_TYPES.map((type) => (
-              <TouchableOpacity
-                key={type.value}
+        {/* Type Selector */}
+        <View style={styles.typeGrid}>
+          {MEDITATION_TYPES.map((type) => (
+            <TouchableOpacity
+              key={type.value}
+              style={[
+                styles.typeCard,
+                selectedType === type.value && styles.typeCardActive,
+              ]}
+              onPress={() => setSelectedType(type.value)}
+            >
+              <Ionicons
+                name={type.icon}
+                size={32}
+                color={
+                  selectedType === type.value
+                    ? theme.colors.text
+                    : theme.colors.textMuted
+                }
+              />
+              <Text
                 style={[
-                  styles.typeCard,
-                  selectedType === type.value && styles.typeCardActive,
+                  styles.typeLabel,
+                  selectedType === type.value && styles.typeLabelActive,
                 ]}
-                onPress={() => setSelectedType(type.value)}
               >
-                <Ionicons
-                  name={type.icon}
-                  size={32}
-                  color={
-                    selectedType === type.value
-                      ? theme.colors.text
-                      : theme.colors.textMuted
-                  }
-                />
-                <Text
-                  style={[
-                    styles.typeLabel,
-                    selectedType === type.value && styles.typeLabelActive,
-                  ]}
-                >
-                  {type.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+                {type.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        <TouchableOpacity style={styles.startButton} onPress={startMeditation}>
-          <Text style={styles.startButtonText}>Begin Meditation</Text>
+        <TouchableOpacity style={styles.startButton} onPress={() => setReadyToStart(true)}>
+          <Text style={styles.startButtonText}>Continue</Text>
         </TouchableOpacity>
         {/* Custom Alert */}
         <CustomAlert
@@ -596,6 +647,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 20,
     justifyContent: 'center',
+  },
+  // Idle state container - centered HoldToStart button
+  idleCenteredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    paddingBottom: 120, // Shift button up from true center
   },
   iconContainer: {
     alignSelf: 'center',

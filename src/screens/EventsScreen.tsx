@@ -3,7 +3,7 @@
  * Displays real-time daily leaderboards (5K, 10K, Half Marathon, Marathon) grouped by team
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -48,10 +48,15 @@ export const EventsScreen: React.FC = () => {
   const { profileData } = useNavigationData();
   const userTeams = profileData?.teams || [];
   const userNpub = profileData?.user?.npub;
-  const userHexPubkey = userNpub ? npubToHex(userNpub) || undefined : undefined; // Convert npub to hex for filtering
+  const userHexPubkey = userNpub ? npubToHex(userNpub) || undefined : undefined;
 
-  // Load leaderboards for all user's teams
-  const loadAllLeaderboards = async () => {
+  // ANDROID FIX: Use ref for isMounted to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+
+  // Load leaderboards function - accessible from both useEffect and handleRefresh
+  const loadAllLeaderboards = useCallback(async () => {
+    if (!isMountedRef.current) return;
+
     try {
       setIsLoading(true);
       console.log(
@@ -64,6 +69,8 @@ export const EventsScreen: React.FC = () => {
       const allTeamLeaderboards: TeamLeaderboards[] = [];
 
       for (const team of userTeams) {
+        if (!isMountedRef.current) return; // Check before each team fetch
+
         try {
           console.log(
             `[EventsScreen] 🔍 Fetching leaderboards for team: ${team.name} (${team.id})`
@@ -98,32 +105,43 @@ export const EventsScreen: React.FC = () => {
         }
       }
 
-      setTeamLeaderboards(allTeamLeaderboards);
+      if (isMountedRef.current) {
+        setTeamLeaderboards(allTeamLeaderboards);
+      }
     } catch (error) {
       console.error('[EventsScreen] ❌ Error loading leaderboards:', error);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [userTeams, userHexPubkey]);
 
   // Load leaderboards on mount and when user's teams change
   useEffect(() => {
+    isMountedRef.current = true;
+
     if (userTeams.length > 0) {
       loadAllLeaderboards();
     } else {
       setIsLoading(false);
     }
-  }, [userTeams.length]);
+
+    // Cleanup: prevent state updates after unmount
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [userTeams.length, loadAllLeaderboards]);
 
   // Handle pull-to-refresh
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     console.log('[EventsScreen] 🔄 Invalidating daily leaderboard caches...');
     // Clear all daily leaderboard caches to ensure fresh data
     await UnifiedCacheService.invalidate('team:*:daily:*');
     await loadAllLeaderboards();
     setRefreshing(false);
-  };
+  }, [loadAllLeaderboards]);
 
   // Calculate if there are any active leaderboards
   const hasAnyLeaderboards = teamLeaderboards.some(

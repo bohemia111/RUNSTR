@@ -5,8 +5,13 @@
  * - "Join Event" for free events (no pledge cost)
  * - "Commit X Days & Join" for events with pledge cost
  * - "Donate & Join (X sats)" for legacy donation events
- * - "Joined" if user already RSVPd
+ * - "Joined" if user already clicked join
  * - Disabled for ended events
+ *
+ * Uses UnifiedEventParticipantService for local-first join tracking:
+ * - No Nostr RSVP publishing (faster, more reliable)
+ * - Joins stored locally in AsyncStorage
+ * - Season II users visible to all, others private
  *
  * Creates a pledge via PledgeService when user joins a paid event.
  * Uses ExternalZapModal pattern for donations - any Lightning wallet can pay.
@@ -23,11 +28,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
+import { UnifiedEventParticipantService } from '../../services/satlantis/UnifiedEventParticipantService';
 import { SatlantisEventJoinService } from '../../services/satlantis/SatlantisEventJoinService';
 import { ExternalZapModal } from '../nutzap/ExternalZapModal';
 import { ProfileService } from '../../services/user/profileService';
 import { PledgeService } from '../../services/pledge/PledgeService';
-import { getNpubFromStorage } from '../../utils/nostr';
+import { WoTService } from '../../services/wot/WoTService';
+import { ImpactLevelService } from '../../services/impact/ImpactLevelService';
+import { getNpubFromStorage, getHexPubkeyFromStorage } from '../../utils/nostr';
 import { nip19 } from 'nostr-tools';
 import type { SatlantisEvent } from '../../types/satlantis';
 
@@ -44,6 +52,8 @@ type ButtonState =
   | 'join_donation' // Legacy donation events
   | 'joined'
   | 'ended'
+  | 'impact_level_required' // User doesn't meet minimum Impact Level (donation-based)
+  | 'rank_required' // Legacy: User doesn't meet minimum WoT rank requirement
   | 'error';
 
 export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
@@ -56,6 +66,8 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
   const [optimisticJoined, setOptimisticJoined] = useState(false);
   const [showDonationModal, setShowDonationModal] = useState(false);
   const [creatorLightningAddress, setCreatorLightningAddress] = useState<string>('');
+  const [requiredImpactTier, setRequiredImpactTier] = useState<string>('');
+  const [requiredRankTier, setRequiredRankTier] = useState<string>('');
 
   // Check initial state
   useEffect(() => {
@@ -78,6 +90,59 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
 
   const checkJoinStatus = useCallback(async () => {
     try {
+      // Check if event has Impact Level requirement (new donation-based system)
+      if (event.minimumImpactLevel && event.minimumImpactLevel > 0) {
+        const hexPubkey = await getHexPubkeyFromStorage();
+
+        if (hexPubkey) {
+          const impactStats = await ImpactLevelService.getImpactStats(hexPubkey);
+          const userLevel = impactStats.level.level;
+
+          // Check if user meets minimum impact level
+          if (userLevel < event.minimumImpactLevel) {
+            setRequiredImpactTier(event.minimumImpactTier || `Level ${event.minimumImpactLevel}+`);
+            setState('impact_level_required');
+            return;
+          }
+        } else {
+          // Not logged in - can't check impact level
+          setRequiredImpactTier(event.minimumImpactTier || `Level ${event.minimumImpactLevel}+`);
+          setState('impact_level_required');
+          return;
+        }
+      }
+
+      // Legacy: Check if event has rank requirement (for old events)
+      if (event.minimumRank && event.minimumRank > 0) {
+        const hexPubkey = await getHexPubkeyFromStorage();
+
+        if (hexPubkey) {
+          const wotService = WoTService.getInstance();
+          let score = await wotService.getCachedScore(hexPubkey);
+
+          // If no cached score, try to fetch it
+          if (score === null) {
+            try {
+              score = await wotService.fetchAndCacheScore(hexPubkey);
+            } catch {
+              score = 0;
+            }
+          }
+
+          // Check if user meets minimum rank
+          if (score === null || score < event.minimumRank) {
+            setRequiredRankTier(event.minimumRankTier || 'Required');
+            setState('rank_required');
+            return;
+          }
+        } else {
+          // Not logged in - can't check rank
+          setRequiredRankTier(event.minimumRankTier || 'Required');
+          setState('rank_required');
+          return;
+        }
+      }
+
       // Check if event has ended
       const now = Math.floor(Date.now() / 1000);
       if (now > event.endTime) {
@@ -85,12 +150,15 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
         return;
       }
 
-      // Check if user already joined
-      const hasJoined = await SatlantisEventJoinService.hasUserJoined(event);
-      if (hasJoined) {
-        setState('joined');
-        setOptimisticJoined(false);
-        return;
+      // Check if user already joined (using unified local storage)
+      const hexPubkey = await getHexPubkeyFromStorage();
+      if (hexPubkey) {
+        const hasJoined = await UnifiedEventParticipantService.hasJoined(event.id, hexPubkey);
+        if (hasJoined) {
+          setState('joined');
+          setOptimisticJoined(false);
+          return;
+        }
       }
 
       // Check if event has pledge/commitment cost (new system)
@@ -115,21 +183,31 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
   }, [event]);
 
   // Handle direct join (free events or after donation)
+  // Uses UnifiedEventParticipantService for local-first storage (no RSVP publishing)
   const handleJoinEvent = useCallback(async (donationMade?: boolean) => {
     setIsProcessing(true);
     setOptimisticJoined(true);
 
     try {
-      const result = await SatlantisEventJoinService.joinEvent(event, donationMade);
-
-      if (result.success) {
-        setState('joined');
-        onJoinSuccess?.();
-      } else {
+      // Get user's hex pubkey
+      const hexPubkey = await getHexPubkeyFromStorage();
+      if (!hexPubkey) {
         setOptimisticJoined(false);
-        onError?.(result.error || 'Failed to join event');
+        onError?.('Not logged in');
+        return;
       }
+
+      // Join via unified service (local storage only, no RSVP)
+      await UnifiedEventParticipantService.joinEvent(event.id, hexPubkey);
+      console.log('[EventJoinButton] Joined event via UnifiedEventParticipantService');
+
+      // Also save joined event context for workout tagging (legacy compatibility)
+      await SatlantisEventJoinService.saveJoinedEvent(event);
+
+      setState('joined');
+      onJoinSuccess?.();
     } catch (error) {
+      console.error('[EventJoinButton] Join error:', error);
       setOptimisticJoined(false);
       onError?.(error instanceof Error ? error.message : 'Unknown error');
     } finally {
@@ -174,14 +252,12 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
         return;
       }
 
-      // Join the event first
-      const result = await SatlantisEventJoinService.joinEvent(event, false);
+      // Join the event first using unified service (local storage, no RSVP)
+      await UnifiedEventParticipantService.joinEvent(event.id, userPubkey);
+      console.log('[EventJoinButton] Joined event via UnifiedEventParticipantService');
 
-      if (!result.success) {
-        setOptimisticJoined(false);
-        onError?.(result.error || 'Failed to join event');
-        return;
-      }
+      // Save joined event context for workout tagging (legacy compatibility)
+      await SatlantisEventJoinService.saveJoinedEvent(event);
 
       // Determine destination address
       const destinationAddress =
@@ -299,6 +375,20 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
       case 'ended':
         return <Text style={styles.endedText}>Event Ended</Text>;
 
+      case 'impact_level_required':
+        return (
+          <Text style={styles.impactLevelRequiredText}>
+            {requiredImpactTier} Impact Level required
+          </Text>
+        );
+
+      case 'rank_required':
+        return (
+          <Text style={styles.rankRequiredText}>
+            Minimum {requiredRankTier} rank required
+          </Text>
+        );
+
       case 'join_free':
         return <Text style={styles.buttonText}>Join Event</Text>;
 
@@ -339,6 +429,8 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
     state === 'loading' ||
     isJoined ||
     state === 'ended' ||
+    state === 'impact_level_required' ||
+    state === 'rank_required' ||
     state === 'error' ||
     isProcessing;
 
@@ -346,9 +438,11 @@ export const EventJoinButton: React.FC<EventJoinButtonProps> = ({
     styles.button,
     isJoined && styles.buttonJoined,
     state === 'ended' && styles.buttonEnded,
+    state === 'impact_level_required' && styles.buttonImpactLevelRequired,
+    state === 'rank_required' && styles.buttonRankRequired,
     state === 'join_pledge' && styles.buttonPledge,
     state === 'join_donation' && styles.buttonDonation,
-    isDisabled && !isJoined && styles.buttonDisabled,
+    isDisabled && !isJoined && state !== 'impact_level_required' && state !== 'rank_required' && styles.buttonDisabled,
   ];
 
   return (
@@ -422,6 +516,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
+  buttonImpactLevelRequired: {
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  buttonRankRequired: {
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
   buttonDisabled: {
     opacity: 0.5,
   },
@@ -444,6 +548,18 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 16,
     fontWeight: theme.typography.weights.medium,
+  },
+  impactLevelRequiredText: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    textAlign: 'center',
+  },
+  rankRequiredText: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
+    textAlign: 'center',
   },
   errorText: {
     color: '#FF3B30',

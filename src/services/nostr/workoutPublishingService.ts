@@ -21,8 +21,13 @@ import { FEATURES } from '../../config/features';
 import { ImageUploadService } from '../media/ImageUploadService';
 import { LocalTeamMembershipService } from '../team/LocalTeamMembershipService';
 import { CharitySelectionService } from '../charity/CharitySelectionService';
-import { HARDCODED_TEAMS } from '../../constants/hardcodedTeams';
-import type { Charity } from '../../constants/charities';
+import { CHARITIES, getCharityById, type Charity } from '../../constants/charities';
+import { SatlantisEventJoinService } from '../satlantis/SatlantisEventJoinService';
+import { withTimeout, fireAndForget, NOSTR_TIMEOUTS } from '../../utils/nostrTimeout';
+import { SupabaseCompetitionService } from '../backend/SupabaseCompetitionService';
+import { RunningBitcoinService } from '../challenge/RunningBitcoinService';
+import { isRunningBitcoinActive, isEligibleActivityType } from '../../constants/runningBitcoin';
+import { nip19 } from 'nostr-tools';
 
 // Import split type for race replay data
 import type { Split } from '../activity/SplitTrackingService';
@@ -149,14 +154,13 @@ export class WorkoutPublishingService {
         pubkey = user.pubkey;
       }
 
-      // Get user's selected team from TeamsScreen (defaults to RUNSTR if not set)
-      const RUNSTR_TEAM_ID = '87d30c8b-aa18-4424-a629-d41ea7f89078';
+      // Get user's selected team from TeamsScreen (charities ARE teams now)
+      // The selected_team_id now stores charity ID directly
       const selectedTeamId = await AsyncStorage.getItem('@runstr:selected_team_id');
-      const competitionTeam = workout.competitionTeam || selectedTeamId || RUNSTR_TEAM_ID;
 
-      // Get user's selected charity for tagging
-      const selectedCharity =
-        await CharitySelectionService.getSelectedCharity();
+      // Look up the charity data (team data) from the charity ID
+      // This provides both team ID for the team tag AND full charity data for the charity tag
+      const selectedCharity = selectedTeamId ? getCharityById(selectedTeamId) : null;
 
       // Get user's reward lightning address for tagging (for external reward scripts)
       const rewardLightningAddress =
@@ -169,8 +173,7 @@ export class WorkoutPublishingService {
       ndkEvent.tags = await this.createNIP101eWorkoutTags(
         workout,
         pubkey,
-        competitionTeam,
-        selectedCharity,
+        selectedCharity, // Charity provides both team ID and charity data
         rewardLightningAddress
       );
       ndkEvent.created_at = Math.floor(
@@ -188,44 +191,91 @@ export class WorkoutPublishingService {
         throw new Error('Event structure does not comply with runstr format');
       }
 
-      // Sign and publish
-      await ndkEvent.sign(signer);
-      await ndkEvent.publish();
+      // Sign and publish WITH TIMEOUT PROTECTION
+      // These operations can hang indefinitely without timeouts
+      await withTimeout(
+        ndkEvent.sign(signer),
+        NOSTR_TIMEOUTS.SIGN,
+        'Event signing'
+      );
+      await withTimeout(
+        ndkEvent.publish(),
+        NOSTR_TIMEOUTS.PUBLISH,
+        'Event publishing'
+      );
 
       console.log(`✅ Workout saved to Nostr (runstr format): ${ndkEvent.id}`);
 
-      // ✅ CRITICAL: Invalidate workout caches so user sees posted workout immediately
-      // This fixes the "I posted a workout but don't see it after refresh" bug
-      await CacheInvalidationService.invalidateWorkout(pubkey).catch((err) => {
-        console.warn('⚠️ Cache invalidation failed (non-blocking):', err);
-      });
+      // ============================================================================
+      // FIRE-AND-FORGET: Non-critical operations that should NEVER block UI
+      // ============================================================================
 
-      // 🎁 Check if user earned daily workout reward
-      let rewardEarned = false;
-      let rewardAmount: number | undefined;
+      // Cache invalidation (non-blocking) - user will see workout on next refresh
+      fireAndForget(
+        CacheInvalidationService.invalidateWorkout(pubkey),
+        'cacheInvalidation'
+      );
 
+      // 🎁 Reward check (non-blocking) - don't block publish for rewards
+      // Rewards are processed in background, user sees notification if successful
       if (FEATURES.ENABLE_DAILY_REWARDS) {
-        try {
-          const rewardResult = await DailyRewardService.sendReward(pubkey);
-          if (rewardResult.success) {
-            rewardEarned = true;
-            rewardAmount = rewardResult.amount;
-            console.log(`🎉 User earned ${rewardAmount} sats reward!`);
-          }
-        } catch (error) {
-          // Silent failure - reward system should never block workout publishing
-          console.log(
-            '[WorkoutPublishing] Reward check failed (silent):',
-            error
-          );
-        }
+        fireAndForget(
+          DailyRewardService.sendReward(pubkey).then((result) => {
+            if (result.success) {
+              console.log(`🎉 User earned ${result.amount} sats reward!`);
+            }
+          }),
+          'rewardCheck'
+        );
       }
 
+      // ============================================================================
+      // SUPABASE SUBMISSION: Submit workout to Supabase for competition tracking
+      // ============================================================================
+      const exerciseType = this.getExerciseVerb(workout.type);
+      const npub = nip19.npubEncode(pubkey);
+
+      fireAndForget(
+        (async () => {
+          try {
+            // Submit workout to Supabase Edge Function (anti-cheat validation)
+            const supabaseResult = await SupabaseCompetitionService.submitWorkoutSimple({
+              eventId: ndkEvent.id || '',
+              npub,
+              type: exerciseType,
+              distance: workout.distance,
+              duration: workout.duration,
+              calories: workout.calories,
+              startTime: workout.startTime,
+            });
+
+            if (supabaseResult.success && !supabaseResult.flagged) {
+              console.log(`✅ Workout submitted to Supabase: ${ndkEvent.id}`);
+
+              // Check Running Bitcoin auto-pay for eligible activity types
+              if (isRunningBitcoinActive() && isEligibleActivityType(exerciseType)) {
+                console.log('[WorkoutPublishing] Checking Running Bitcoin auto-pay...');
+                const autoPayResult = await RunningBitcoinService.checkAndAutoPayReward(npub);
+                if (autoPayResult.paid) {
+                  console.log('🏃⚡ Running Bitcoin: Auto-paid 1000 sats for 21km completion!');
+                }
+              }
+            } else if (supabaseResult.flagged) {
+              console.warn(`⚠️ Workout flagged by anti-cheat: ${supabaseResult.error}`);
+            }
+          } catch (error) {
+            console.warn('⚠️ Supabase submission failed (non-blocking):', error);
+          }
+        })(),
+        'supabaseSubmission'
+      );
+
+      // Return immediately - don't wait for non-critical operations
       return {
         success: true,
         eventId: ndkEvent.id,
-        rewardEarned,
-        rewardAmount,
+        rewardEarned: false, // Will be updated via notification if successful
+        rewardAmount: undefined,
       };
     } catch (error) {
       console.error('❌ Error saving workout to Nostr:', error);
@@ -344,9 +394,9 @@ export class WorkoutPublishingService {
         }
       }
 
-      // Get user's selected team and charity for tagging
+      // Get user's selected team (charity) for tagging
       const selectedTeamId = await AsyncStorage.getItem('@runstr:selected_team_id');
-      const selectedCharity = await CharitySelectionService.getSelectedCharity();
+      const selectedCharity = selectedTeamId ? getCharityById(selectedTeamId) : null;
 
       // Create unsigned NDKEvent
       const ndkEvent = new NDKEvent(ndk);
@@ -360,25 +410,31 @@ export class WorkoutPublishingService {
         workout,
         imageUrl,
         imageDimensions,
-        selectedTeamId,
-        selectedCharity
+        selectedCharity // Charity provides both team ID and charity data
       );
       ndkEvent.created_at = Math.floor(Date.now() / 1000);
 
-      // Sign and publish
-      await ndkEvent.sign(signer);
-      await ndkEvent.publish();
+      // Sign and publish WITH TIMEOUT PROTECTION
+      await withTimeout(
+        ndkEvent.sign(signer),
+        NOSTR_TIMEOUTS.SIGN,
+        'Social post signing'
+      );
+      await withTimeout(
+        ndkEvent.publish(),
+        NOSTR_TIMEOUTS.PUBLISH,
+        'Social post publishing'
+      );
 
       console.log(`✅ Workout posted to social: ${ndkEvent.id}`);
 
-      // ✅ CRITICAL: Invalidate workout caches so social post appears in feeds
-      // Get signer's pubkey for invalidation
-      const user = await signer.user();
-      await CacheInvalidationService.invalidateWorkout(user.pubkey).catch(
-        (err) => {
-          console.warn('⚠️ Cache invalidation failed (non-blocking):', err);
-        }
-      );
+      // Cache invalidation (fire-and-forget) - social post appears on next refresh
+      signer.user().then((user) => {
+        fireAndForget(
+          CacheInvalidationService.invalidateWorkout(user.pubkey),
+          'socialCacheInvalidation'
+        );
+      });
 
       return {
         success: true,
@@ -416,14 +472,12 @@ export class WorkoutPublishingService {
   /**
    * Create runstr-compatible tags for kind 1301 workout events
    * Matches the exact format used by runstr GitHub implementation
-   * ✅ UPDATED: Now includes competition team tag for leaderboard participation
-   * ✅ UPDATED: Now includes charity tag for external client parsing
+   * ✅ UPDATED: Charity is now the team - adds charity ID to BOTH team AND charity tags
    * ✅ UPDATED: Now includes lightning address tag for external reward scripts
    */
   private async createNIP101eWorkoutTags(
     workout: PublishableWorkout,
     pubkey: string,
-    competitionTeam: string | null,
     selectedCharity: Charity | null,
     rewardLightningAddress: string | null
   ): Promise<string[][]> {
@@ -487,6 +541,12 @@ export class WorkoutPublishingService {
     // Add calories if available
     if (workout.calories && workout.calories > 0) {
       tags.push(['calories', Math.round(workout.calories).toString()]);
+    }
+
+    // Add steps count for walking/step-based workouts (enables step-based competition scoring)
+    const steps = (workout.metadata as any)?.steps;
+    if (steps && typeof steps === 'number' && steps > 0) {
+      tags.push(['steps', steps.toString()]);
     }
 
     // Add sets and reps for strength training workouts (pushups, pullups, etc.)
@@ -601,14 +661,14 @@ export class WorkoutPublishingService {
       tags.push(['workout_start_time', startTimestamp]);
     }
 
-    // Add competition team tag (for daily leaderboards)
-    if (competitionTeam) {
-      tags.push(['team', competitionTeam]);
-      console.log(`   ✅ Added team tag: ${competitionTeam}`);
-    }
-
-    // Add charity tag (for external client parsing and donations)
+    // Add team AND charity tags (charities ARE teams now)
+    // Both tags use the same charity data for backwards compatibility
     if (selectedCharity) {
+      // Team tag for leaderboards and competition filtering
+      tags.push(['team', selectedCharity.id]);
+      console.log(`   ✅ Added team tag: ${selectedCharity.id}`);
+
+      // Charity tag for external client parsing and donations
       tags.push([
         'charity',
         selectedCharity.id,
@@ -622,6 +682,22 @@ export class WorkoutPublishingService {
     if (rewardLightningAddress) {
       tags.push(['lightning', rewardLightningAddress]);
       console.log(`   ✅ Added lightning address tag: ${rewardLightningAddress}`);
+    }
+
+    // Add event tags for active RUNSTR events (workout belongs to these events)
+    // This enables event leaderboards to query workouts by event ID without RSVP queries
+    try {
+      const activeEventIds = await SatlantisEventJoinService.getActiveEventIds();
+      for (const eventId of activeEventIds) {
+        tags.push(['e', eventId]);
+        console.log(`   ✅ Added event tag: ${eventId}`);
+      }
+      if (activeEventIds.length > 0) {
+        console.log(`   📋 Workout tagged with ${activeEventIds.length} active event(s)`);
+      }
+    } catch (error) {
+      console.warn('   ⚠️ Failed to get active events for tagging:', error);
+      // Non-blocking - workout publishing continues without event tags
     }
 
     return tags;
@@ -661,8 +737,8 @@ export class WorkoutPublishingService {
     // Nutrition activities
     if (type.includes('diet') || type.includes('meal')) return 'diet';
     if (type.includes('fasting') || type.includes('fast')) return 'fasting';
-    // Default to 'other' for unrecognized types
-    return 'other';
+    // Default to 'running' for unrecognized types (never 'other')
+    return 'running';
   }
 
   /**
@@ -1055,13 +1131,12 @@ export class WorkoutPublishingService {
 
   /**
    * Create tags for kind 1 social posts with NIP-94 image metadata
-   * ✅ UPDATED: Now includes team and charity tags from user's TeamsScreen selection
+   * ✅ UPDATED: Charity is now the team - adds charity ID to BOTH team AND charity tags
    */
   private createSocialPostTags(
     workout: PublishableWorkout,
     imageUrl?: string,
     imageDimensions?: { width: number; height: number },
-    selectedTeamId?: string | null,
     selectedCharity?: Charity | null
   ): string[][] {
     const tags: string[][] = [
@@ -1102,20 +1177,18 @@ export class WorkoutPublishingService {
       tags.push(['e', workout.nostrEventId]);
     }
 
-    // Add team tag if user has selected a team
-    if (selectedTeamId) {
-      tags.push(['team', selectedTeamId]);
-      // Add team name hashtag
-      const team = HARDCODED_TEAMS.find((t) => t.id === selectedTeamId);
-      if (team?.name) {
-        const teamHashtag = team.name.replace(/[^a-zA-Z0-9]/g, '');
-        tags.push(['t', teamHashtag]);
-      }
-      console.log(`   ✅ Added team tag to kind 1: ${selectedTeamId}`);
-    }
-
-    // Add charity tag if user has selected a charity
+    // Add team AND charity tags (charities ARE teams now)
     if (selectedCharity) {
+      // Team tag for leaderboards and competition filtering
+      tags.push(['team', selectedCharity.id]);
+
+      // Team name hashtag
+      const teamHashtag = selectedCharity.name.replace(/[^a-zA-Z0-9]/g, '');
+      tags.push(['t', teamHashtag]);
+
+      console.log(`   ✅ Added team tag to kind 1: ${selectedCharity.id}`);
+
+      // Charity tag for external client parsing and donations
       tags.push([
         'charity',
         selectedCharity.id,
@@ -1132,7 +1205,7 @@ export class WorkoutPublishingService {
    * Generate social post content with clean format
    * If imageUrl is provided, content is minimal (image + hashtags only)
    * Otherwise, full text stats are included
-   * ✅ UPDATED: Now includes competition team name and hashtag
+   * ✅ UPDATED: Now includes team mention (charities ARE teams)
    */
   private async generateSocialPostContent(
     workout: PublishableWorkout,
@@ -1142,19 +1215,38 @@ export class WorkoutPublishingService {
     let content = '';
     const activityHashtag = this.getActivityHashtag(workout.type);
 
-    // Get competition team ID and name
-    const competitionTeamId =
-      await LocalTeamMembershipService.getCompetitionTeam();
-    let teamName: string | null = null;
-    if (competitionTeamId) {
-      teamName = this.getTeamNameById(competitionTeamId);
-    }
+    // Get selected team (charity) from TeamsScreen selection
+    const selectedTeamId = await AsyncStorage.getItem('@runstr:selected_team_id');
+    const selectedCharity = selectedTeamId ? getCharityById(selectedTeamId) : null;
+    const teamName = selectedCharity?.name || null;
+
+    // Generate activity-specific team mention (e.g., "Running for Bitcoin Beach!")
+    const getTeamMention = () => {
+      if (!teamName) return null;
+      const exerciseVerb = this.getExerciseVerb(workout.type);
+      const verbMap: Record<string, string> = {
+        running: 'Running',
+        walking: 'Walking',
+        cycling: 'Cycling',
+        hiking: 'Hiking',
+        swimming: 'Swimming',
+        rowing: 'Rowing',
+        strength: 'Training',
+        yoga: 'Practicing yoga',
+        meditation: 'Meditating',
+        diet: 'Eating healthy',
+        fasting: 'Fasting',
+      };
+      const verb = verbMap[exerciseVerb] || 'Working out';
+      return `${verb} for ${teamName}!`;
+    };
 
     // If we have an image, keep it minimal - the card has all the stats
     if (imageUrl) {
       content = `${imageUrl}\n\n`;
-      if (teamName) {
-        content += `Team: ${teamName}\n\n`;
+      const teamMention = getTeamMention();
+      if (teamMention) {
+        content += `${teamMention}\n\n`;
       }
       content += `#RUNSTR #${activityHashtag}`;
       if (teamName) {
@@ -1201,12 +1293,13 @@ export class WorkoutPublishingService {
     // Add workout stats in vertical format
     content += this.formatWorkoutStats(workout);
 
-    // Add team name if selected
-    if (teamName) {
-      content += `\n\nTeam: ${teamName}`;
+    // Add team mention (activity-specific shout-out)
+    const teamMention = getTeamMention();
+    if (teamMention) {
+      content += `\n\n${teamMention}`;
     }
 
-    // Add hashtags (including team hashtag if user has competition team)
+    // Add hashtags (including team hashtag if user has selected a team)
     content += `\n\n#RUNSTR #${activityHashtag}`;
     if (teamName) {
       const teamHashtag = teamName.replace(/[^a-zA-Z0-9]/g, '');
@@ -1214,14 +1307,6 @@ export class WorkoutPublishingService {
     }
 
     return content.trim();
-  }
-
-  /**
-   * Get team name by ID from hardcoded teams
-   */
-  private getTeamNameById(teamId: string): string | null {
-    const team = HARDCODED_TEAMS.find((t) => t.id === teamId);
-    return team?.name || null;
   }
 
   /**

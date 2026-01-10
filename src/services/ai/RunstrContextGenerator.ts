@@ -273,21 +273,16 @@ export class RunstrContextGenerator {
           lines.push(`- Recommendation: Complete a timed 5K or 10K for more accurate results`);
         }
 
-        // Activity Level for Fitness Age
-        const avgWeeklyWorkouts = BodyCompositionAnalytics.getAverageWeeklyWorkouts(allWorkouts, 4);
-        let activityLevel = 'Sedentary';
-        if (avgWeeklyWorkouts >= 5) activityLevel = 'Very Active (5+ workouts/week)';
-        else if (avgWeeklyWorkouts >= 3) activityLevel = 'Active (3-4 workouts/week)';
-        else if (avgWeeklyWorkouts >= 1) activityLevel = 'Moderate (1-2 workouts/week)';
-
-        // Fitness Age
+        // RUNSTR Fitness Age (activity-focused, encouraging calculation)
         if (age) {
-          lines.push('');
-          lines.push('### Fitness Age');
-          lines.push(`- Chronological Age: ${age} years`);
-          lines.push(`- Fitness Age: ${vo2MaxData.fitnessAge} years`);
+          const runstrFitnessAge = BodyCompositionAnalytics.calculateRunstrFitnessAge(age, allWorkouts);
 
-          const ageDiff = age - vo2MaxData.fitnessAge;
+          lines.push('');
+          lines.push('### RUNSTR Fitness Age');
+          lines.push(`- Chronological Age: ${age} years`);
+          lines.push(`- RUNSTR Fitness Age: ${runstrFitnessAge.fitnessAge} years`);
+
+          const ageDiff = age - runstrFitnessAge.fitnessAge;
           if (ageDiff > 0) {
             lines.push(`- Result: ${ageDiff} years younger than actual age`);
           } else if (ageDiff < 0) {
@@ -296,17 +291,31 @@ export class RunstrContextGenerator {
             lines.push(`- Result: Fitness age matches chronological age`);
           }
 
-          // Explain new formula components (no more BMI penalty)
-          lines.push(`- VO2 Max Component (85% weight): Based on cardiovascular fitness`);
-          lines.push(`- Activity Level Component (15% weight): ${activityLevel}`);
-          lines.push(`- Formula: NTNU methodology (Nes et al., 2013) - BMI penalties removed`);
+          lines.push(`- Summary: ${runstrFitnessAge.summary}`);
+          lines.push('');
+          lines.push('#### Breakdown:');
+          lines.push(`- Consistency Bonus: ${runstrFitnessAge.breakdown.consistencyBonus} years (workout frequency)`);
+          lines.push(`- Volume Bonus: ${runstrFitnessAge.breakdown.volumeBonus} years (weekly distance/time)`);
+          lines.push(`- Variety Bonus: ${runstrFitnessAge.breakdown.varietyBonus} years (activity types)`);
+          lines.push(`- Cardio Bonus: ${runstrFitnessAge.breakdown.cardioBonus} years (cardio performance)`);
+          if (runstrFitnessAge.breakdown.inactivityPenalty > 0) {
+            lines.push(`- Inactivity Penalty: +${runstrFitnessAge.breakdown.inactivityPenalty} years`);
+          }
+          lines.push('');
+          lines.push(`- Formula: RUNSTR Activity-Based (rewards consistency and showing up)`);
         } else {
           lines.push('');
-          lines.push('### Fitness Age');
+          lines.push('### RUNSTR Fitness Age');
           lines.push('- Age not provided in Health Profile - cannot calculate fitness age');
         }
 
         // Add workout frequency context
+        const avgWeeklyWorkouts = BodyCompositionAnalytics.getAverageWeeklyWorkouts(allWorkouts, 4);
+        let activityLevel = 'Sedentary';
+        if (avgWeeklyWorkouts >= 5) activityLevel = 'Very Active (5+ workouts/week)';
+        else if (avgWeeklyWorkouts >= 3) activityLevel = 'Active (3-4 workouts/week)';
+        else if (avgWeeklyWorkouts >= 1) activityLevel = 'Moderate (1-2 workouts/week)';
+
         lines.push('');
         lines.push('### Activity Summary');
         lines.push(`- Average Workouts per Week (last 4 weeks): ${avgWeeklyWorkouts.toFixed(1)}`);
@@ -315,9 +324,18 @@ export class RunstrContextGenerator {
       } else {
         lines.push('- No running/walking workouts found');
         lines.push('- Complete a timed 5K or 10K run to get VO2 Max estimate');
-        lines.push('');
-        lines.push('### Fitness Age');
-        lines.push('- Cannot calculate without VO2 Max data');
+
+        // RUNSTR Fitness Age can still be calculated from any activity
+        if (age) {
+          const runstrFitnessAge = BodyCompositionAnalytics.calculateRunstrFitnessAge(age, allWorkouts);
+
+          lines.push('');
+          lines.push('### RUNSTR Fitness Age');
+          lines.push(`- Chronological Age: ${age} years`);
+          lines.push(`- RUNSTR Fitness Age: ${runstrFitnessAge.fitnessAge} years`);
+          lines.push(`- Summary: ${runstrFitnessAge.summary}`);
+          lines.push(`- Formula: RUNSTR Activity-Based (rewards consistency and showing up)`);
+        }
       }
 
       lines.push('');

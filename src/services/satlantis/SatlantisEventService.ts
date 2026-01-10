@@ -26,6 +26,7 @@ import type {
   RunstrDuration,
   RunstrActivityType,
 } from '../../types/runstrEvent';
+import { NostrFetchLogger } from '../../utils/NostrFetchLogger';
 
 // NIP-52 Calendar Event kind (not in NDK's standard kinds)
 const KIND_CALENDAR_EVENT = 31923 as NDKKind;
@@ -68,188 +69,23 @@ class SatlantisEventServiceClass {
   }
 
   /**
-   * Discover sports events from Satlantis/Nostr
-   * Uses progressive relay connectivity (2/3 relays minimum)
-   * @param filter - Optional filter for sport types, tags, etc.
-   * @param forceRefresh - If true, bypasses cache and queries relays directly
-   * @param _isRetry - Internal flag for retry mechanism
+   * Discover sports events - RETURNS EMPTY (events are hardcoded in UI)
+   *
+   * NOTE: Satlantis events are NOT fetched from Nostr.
+   * The app uses hardcoded event cards (RunningBitcoinEventCard, EinundzwanzigEventCard, etc.)
+   * displayed directly in EventsContent.tsx.
+   *
+   * This method returns an empty array to avoid unnecessary Nostr queries.
+   * The only Nostr fetches allowed are: Kind 0 (profiles) and Kind 1301 (workouts).
    */
   async discoverSportsEvents(
-    filter?: SatlantisEventFilter,
-    forceRefresh: boolean = false,
+    _filter?: SatlantisEventFilter,
+    _forceRefresh: boolean = false,
     _isRetry: boolean = false
   ): Promise<SatlantisEvent[]> {
-    const cacheKey = `satlantis_events_${JSON.stringify(filter || {})}`;
-
-    // Check cache first (5-minute TTL) unless forceRefresh
-    if (!forceRefresh) {
-      try {
-        const cached = await UnifiedCacheService.get<SatlantisEvent[]>(cacheKey);
-        if (cached) {
-          console.log(`[Satlantis] Cache hit: ${cached.length} events`);
-          return cached;
-        }
-      } catch (error) {
-        console.warn('[Satlantis] Cache read error:', error);
-      }
-    } else {
-      console.log('[Satlantis] Force refresh - bypassing cache');
-    }
-
-    // Wait for relay connectivity
-    const connected = await GlobalNDKService.waitForMinimumConnection(2, 4000);
-    if (!connected) {
-      console.warn('[Satlantis] Proceeding with minimal relay connectivity');
-    }
-
-    const ndk = await GlobalNDKService.getInstance();
-
-    // Check if relay.nostr.band is connected (primary source for NIP-52 calendar events)
-    // This relay keeps disconnecting, so we wait a bit if it's not ready
-    const checkNostrBand = () => {
-      const relays = Array.from(ndk.pool?.relays?.values() || []);
-      return relays.some(r => r.url.includes('nostr.band') && r.status === 1);
-    };
-
-    if (!checkNostrBand()) {
-      console.log('[Satlantis] relay.nostr.band not connected, waiting 2s...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      if (!checkNostrBand()) {
-        console.warn('[Satlantis] relay.nostr.band still not connected, proceeding anyway');
-      } else {
-        console.log('[Satlantis] relay.nostr.band connected after wait');
-      }
-    }
-
-    // Build filter for sports events
-    const tagsToQuery = filter?.tags || SPORTS_TAGS;
-
-    // IMPORTANT: Nostr 'since' filters by created_at (when event was published),
-    // NOT by event start time. We need to query events created in the past
-    // and then filter by their start/end tags locally.
-    const now = Math.floor(Date.now() / 1000);
-    const thirtyDaysAgo = now - 30 * 24 * 60 * 60;
-
-    // Query events created in the last 30 days (covers most active events)
-    const ndkFilter: NDKFilter = {
-      kinds: [KIND_CALENDAR_EVENT],
-      '#t': tagsToQuery,
-      since: thirtyDaysAgo, // Events created in last 30 days
-      limit: 100,
-    };
-
-    console.log('[Satlantis] Querying kind 31923 with filter:', {
-      tags: tagsToQuery.slice(0, 5),
-      since: new Date(thirtyDaysAgo * 1000).toISOString(),
-      tagsCount: tagsToQuery.length,
-    });
-
-    // EOSE-aware subscription pattern (replaces unreliable Promise.race)
-    const collectedEvents = new Set<NDKEvent>();
-    let eoseReceived = false;
-
-    const events = await new Promise<Set<NDKEvent>>((resolve) => {
-      try {
-        const subscription = ndk.subscribe(ndkFilter, { closeOnEose: false });
-
-        subscription.on('event', (event: NDKEvent) => {
-          collectedEvents.add(event);
-        });
-
-        subscription.on('eose', () => {
-          eoseReceived = true;
-          console.log(`[Satlantis] EOSE received - ${collectedEvents.size} events collected`);
-        });
-
-        // Check every 100ms if EOSE received, max wait 8s
-        const checkInterval = setInterval(() => {
-          if (eoseReceived) {
-            clearInterval(checkInterval);
-            subscription.stop();
-            console.log(`[Satlantis] ✅ Early exit on EOSE`);
-            resolve(collectedEvents);
-          }
-        }, 100);
-
-        // Hard timeout after 8s
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          subscription.stop();
-          if (!eoseReceived) {
-            console.log(`[Satlantis] ⚠️ Timeout (8s) - returning ${collectedEvents.size} events`);
-          }
-          resolve(collectedEvents);
-        }, 8000);
-      } catch (error) {
-        console.error('[Satlantis] Query error:', error);
-        resolve(new Set());
-      }
-    });
-
-    console.log(`[Satlantis] Fetched ${events.size} raw events from Nostr`);
-
-    // Retry once if 0 events and not already a retry
-    // This handles cases where relay.nostr.band disconnected mid-query
-    if (events.size === 0 && !_isRetry) {
-      console.log(`[Satlantis] ⚠️ 0 events received - retrying once after 1s...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return this.discoverSportsEvents(filter, forceRefresh, true);
-    }
-
-    // Parse events
-    const parsedEvents: SatlantisEvent[] = [];
-    const oneWeekAgo = now - 7 * 24 * 60 * 60; // Events ended more than 7 days ago are hidden
-
-    for (const event of events) {
-      const parsed = this.parseCalendarEvent(event);
-      if (parsed) {
-        // Filter out events that ended more than a week ago
-        if (parsed.endTime < oneWeekAgo) {
-          continue;
-        }
-
-        // Apply additional filters
-        if (
-          filter?.sportTypes &&
-          !filter.sportTypes.includes(parsed.sportType)
-        ) {
-          continue;
-        }
-        if (filter?.hasLocation && !parsed.location) {
-          continue;
-        }
-        parsedEvents.push(parsed);
-      }
-    }
-
-    // Sort by start time (soonest first)
-    parsedEvents.sort((a, b) => a.startTime - b.startTime);
-
-    // Batch fetch creator profiles for all events
-    console.log(`[Satlantis] Fetching creator profiles for ${parsedEvents.length} events...`);
-    const uniquePubkeys = [...new Set(parsedEvents.map((e) => e.pubkey))];
-    const profileMap = await this.batchFetchCreatorProfiles(uniquePubkeys);
-
-    // Attach profiles to events
-    for (const event of parsedEvents) {
-      event.creatorProfile = profileMap.get(event.pubkey);
-    }
-
-    // Cache results - use shorter TTL for empty results (relay might have disconnected)
-    // This prevents caching "0 events" for long when it's due to relay issues
-    try {
-      const cacheTTL = parsedEvents.length > 0 ? CACHE_TTL.EVENTS_LIST : 10; // 10 seconds for empty
-      await UnifiedCacheService.setWithCustomTTL(
-        cacheKey,
-        parsedEvents,
-        cacheTTL
-      );
-    } catch (error) {
-      console.warn('[Satlantis] Cache write error:', error);
-    }
-
-    console.log(`[Satlantis] Parsed ${parsedEvents.length} sports events with profiles`);
-    return parsedEvents;
+    // NO NOSTR FETCH - Events are hardcoded in the UI
+    console.log('[Satlantis] Using hardcoded events (no Nostr fetch)');
+    return [];
   }
 
   /**
@@ -530,6 +366,19 @@ class SatlantisEventServiceClass {
     const pledgeCharityAddress = getTag('pledge_charity_address');
     const pledgeCharityName = getTag('pledge_charity_name');
 
+    // Parse Impact Level gating tags (new donation-based system)
+    const minimumImpactLevelRaw = getTag('minimum_impact_level');
+    const minimumImpactLevel = minimumImpactLevelRaw ? parseInt(minimumImpactLevelRaw, 10) : undefined;
+    const minimumImpactTier = getTag('minimum_impact_tier');
+
+    // Parse rank gating tags (legacy - for backward compatibility)
+    const minimumRankRaw = getTag('minimum_rank');
+    const minimumRank = minimumRankRaw ? parseFloat(minimumRankRaw) : undefined;
+    const minimumRankTier = getTag('minimum_rank_tier');
+
+    // Parse team competition tag
+    const isTeamCompetition = getTag('team_competition') === 'true';
+
     return {
       scoringType,
       payoutScheme,
@@ -546,6 +395,14 @@ class SatlantisEventServiceClass {
       captainLightningAddress,
       pledgeCharityAddress,
       pledgeCharityName,
+      // Impact Level gating fields (new donation-based system)
+      minimumImpactLevel: isNaN(minimumImpactLevel!) ? undefined : minimumImpactLevel,
+      minimumImpactTier,
+      // Rank gating fields (legacy - for backward compatibility)
+      minimumRank: isNaN(minimumRank!) ? undefined : minimumRank,
+      minimumRankTier,
+      // Team competition
+      isTeamCompetition,
     };
   }
 
@@ -615,44 +472,17 @@ class SatlantisEventServiceClass {
       return 'hiking';
     }
 
-    return 'other';
+    // Default to running for unknown types (never 'other')
+    return 'running';
   }
 
   /**
-   * Prefetch all events and their details for instant navigation
-   * Called during app background initialization
-   * Caches: event list + individual event details + participant lists
+   * Prefetch events - NO-OP (events are hardcoded)
+   * Kept for backward compatibility with callers
    */
   async prefetchEventsForOfflineAccess(): Promise<void> {
-    console.log('[Satlantis] 🚀 Prefetching events for offline access...');
-
-    try {
-      // 1. Discover all sports events (populates events list cache)
-      const events = await this.discoverSportsEvents(undefined, false);
-
-      if (events.length === 0) {
-        console.log('[Satlantis] ⚠️ No events to prefetch');
-        return;
-      }
-
-      // 2. Cache each event individually (for instant detail screen navigation)
-      console.log(`[Satlantis] 📦 Caching ${events.length} individual event details...`);
-
-      for (const event of events) {
-        const cacheKey = `satlantis_event_${event.pubkey}_${event.id}`;
-        await UnifiedCacheService.setWithCustomTTL(cacheKey, event, CACHE_TTL.SINGLE_EVENT);
-      }
-
-      // 3. Prefetch participants for each event (for instant participant counts)
-      console.log(`[Satlantis] 👥 Prefetching participants for ${events.length} events...`);
-      const { SatlantisRSVPService } = await import('./SatlantisRSVPService');
-      await SatlantisRSVPService.prefetchParticipantsForEvents(events);
-
-      console.log('[Satlantis] ✅ Prefetch complete - all events and participants cached');
-    } catch (error) {
-      console.error('[Satlantis] ❌ Prefetch failed:', error);
-      // Don't throw - prefetch failure shouldn't block app initialization
-    }
+    // NO-OP: Events are hardcoded, no prefetch needed
+    console.log('[Satlantis] Skipping prefetch (events are hardcoded)');
   }
 
   /**

@@ -27,11 +27,12 @@ import { activityMetricsService } from '../../services/activity/ActivityMetricsS
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import WorkoutStatusTracker from '../../services/fitness/WorkoutStatusTracker';
 import { CustomAlert } from '../ui/CustomAlert';
-import { RewardEarnedModal } from '../rewards/RewardEarnedModal';
 import routeStorageService from '../../services/routes/RouteStorageService';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { NostrProfile } from '../../services/nostr/NostrProfileService';
 import { LocalTeamMembershipService } from '../../services/team/LocalTeamMembershipService';
+import { RewardNotificationManager } from '../../services/rewards/RewardNotificationManager';
+import { SupabaseCompetitionService } from '../../services/backend/SupabaseCompetitionService';
 
 interface WorkoutSummaryProps {
   visible: boolean;
@@ -70,10 +71,6 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
   const [preparedWorkout, setPreparedWorkout] =
     useState<PublishableWorkout | null>(null);
 
-  // Reward modal state
-  const [showRewardModal, setShowRewardModal] = useState(false);
-  const [rewardAmount, setRewardAmount] = useState(0);
-
   // Route achievement state
   const [routeAchievements, setRouteAchievements] = useState<{
     isNewPR: boolean;
@@ -84,6 +81,13 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
   }>({
     isNewPR: false,
   });
+
+  // Handle close with pending reward toast
+  const handleClose = () => {
+    onClose();
+    // Show any pending reward toast now that modal is closing
+    RewardNotificationManager.showPendingRewardToast();
+  };
 
   const [alertState, setAlertState] = useState<{
     visible: boolean;
@@ -117,19 +121,6 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
       loadProfileAndId();
     }
   }, [visible]);
-
-  // Show reward modal when a reward was sent with this workout
-  useEffect(() => {
-    if (visible && workout.rewardSent && workout.rewardAmount) {
-      // Small delay to let the summary modal render first
-      const timer = setTimeout(() => {
-        setRewardAmount(workout.rewardAmount!);
-        setShowRewardModal(true);
-        console.log(`[WorkoutSummaryModal] Showing reward modal: ${workout.rewardAmount} sats`);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [visible, workout.rewardSent, workout.rewardAmount]);
 
   // Check for route achievements when modal opens
   useEffect(() => {
@@ -372,21 +363,41 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
           }
         }
 
-        // 🎁 Check if user earned daily reward
-        if (result.rewardEarned && result.rewardAmount) {
-          // Show reward modal first
-          setRewardAmount(result.rewardAmount);
-          setShowRewardModal(true);
-
-          // Success message will show after reward modal is closed
-        } else {
-          // No reward, show success message immediately
-          setAlertState({
-            visible: true,
-            title: 'Saved to Nostr!',
-            message: 'Your workout has been saved to Nostr!',
-          });
+        // 🏆 Submit to Supabase for competition leaderboards (workout verification)
+        // This is what makes the workout count in our database-backed competitions
+        if (result.eventId && npub) {
+          try {
+            const supabaseResult = await SupabaseCompetitionService.submitWorkoutSimple({
+              eventId: result.eventId,
+              npub: npub,
+              type: publishableWorkout.type,
+              distance: publishableWorkout.distance,
+              duration: publishableWorkout.duration,
+              calories: publishableWorkout.calories,
+              startTime: publishableWorkout.startTime,
+            });
+            if (supabaseResult.success) {
+              console.log('✅ Workout submitted to competition backend');
+            } else {
+              console.warn('⚠️ Supabase submission failed:', supabaseResult.error);
+              // Non-critical - workout is still on Nostr, just won't appear in Supabase leaderboards
+            }
+          } catch (supabaseError) {
+            console.warn('⚠️ Failed to submit to Supabase:', supabaseError);
+            // Non-critical - workout is still on Nostr
+          }
         }
+
+        // 🎁 Show success message
+        // Note: If user earned a daily reward, the global RewardNotificationProvider
+        // will show the reward modal with donation split info (triggered by DailyRewardService)
+        setAlertState({
+          visible: true,
+          title: 'Saved to Nostr!',
+          message: result.rewardEarned
+            ? 'Your workout has been saved! Check your reward notification.'
+            : 'Your workout has been saved to Nostr!',
+        });
       } else {
         setAlertState({
           visible: true,
@@ -424,7 +435,7 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
       visible={visible}
       animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
@@ -455,10 +466,21 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
                 </View>
               )}
             </View>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
               <Ionicons name="close" size={24} color={theme.colors.textMuted} />
             </TouchableOpacity>
           </View>
+
+          {/* Reward Earned Banner */}
+          {workout.rewardSent && workout.rewardAmount && workout.rewardAmount > 0 && (
+            <View style={styles.rewardBanner}>
+              <Ionicons name="flash" size={24} color="#f7931a" />
+              <View style={styles.rewardTextContainer}>
+                <Text style={styles.rewardTitle}>Reward Earned!</Text>
+                <Text style={styles.rewardAmount}>+{workout.rewardAmount} sats</Text>
+              </View>
+            </View>
+          )}
 
           {/* Stats Grid */}
           <View style={styles.statsGrid}>
@@ -744,7 +766,7 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
           </View>
 
           {/* Dismiss Button */}
-          <TouchableOpacity style={styles.dismissButton} onPress={onClose}>
+          <TouchableOpacity style={styles.dismissButton} onPress={handleClose}>
             <Text style={styles.dismissButtonText}>Dismiss</Text>
           </TouchableOpacity>
           </ScrollView>
@@ -777,16 +799,6 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
           }
 
           setPreparedWorkout(null);
-        }}
-      />
-
-      {/* Reward Earned Modal */}
-      <RewardEarnedModal
-        visible={showRewardModal}
-        amount={rewardAmount}
-        onClose={() => {
-          setShowRewardModal(false);
-          // Just close the modal - user can continue with the summary
         }}
       />
 
@@ -1043,5 +1055,29 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
     marginTop: 4,
+  },
+  rewardBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(247, 147, 26, 0.15)',
+    borderRadius: theme.borderRadius.medium,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#f7931a',
+    gap: 12,
+  },
+  rewardTextContainer: {
+    flex: 1,
+  },
+  rewardTitle: {
+    fontSize: 16,
+    fontWeight: theme.typography.weights.bold,
+    color: '#f7931a',
+  },
+  rewardAmount: {
+    fontSize: 14,
+    color: theme.colors.text,
+    marginTop: 2,
   },
 });

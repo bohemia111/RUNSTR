@@ -269,6 +269,17 @@ export function useNostrProfile(npub: string | null | undefined) {
               'profiles'
             );
 
+        // Debug: Log profile data to help diagnose missing name issues
+        if (data) {
+          console.log(`[useNostrProfile] Profile for ${npub.slice(0, 20)}...:`, {
+            name: data.name || '(no name)',
+            display_name: data.display_name || '(no display_name)',
+            picture: data.picture ? 'yes' : 'no',
+          });
+        } else {
+          console.log(`[useNostrProfile] No profile returned for ${npub.slice(0, 20)}...`);
+        }
+
         setProfile(data);
       } catch (err) {
         console.error('useNostrProfile error:', err);

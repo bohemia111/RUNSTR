@@ -36,7 +36,8 @@ export const PPQAPIKeyModal: React.FC<PPQAPIKeyModalProps> = ({
   const [apiKey, setApiKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { setApiKey: saveApiKey, apiKeyConfigured } = useCoachRunstr();
+  const [showCustomKeySection, setShowCustomKeySection] = useState(false);
+  const { setApiKey: saveApiKey, resetToDefaultKey, isUsingDefaultKey } = useCoachRunstr();
 
   const handleGetApiKey = async () => {
     try {
@@ -76,7 +77,25 @@ export const PPQAPIKeyModal: React.FC<PPQAPIKeyModalProps> = ({
   const handleClose = () => {
     setApiKey('');
     setError(null);
+    setShowCustomKeySection(false);
     onClose();
+  };
+
+  const handleResetToDefault = async () => {
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      await resetToDefaultKey();
+      setApiKey('');
+      setShowCustomKeySection(false);
+      onSuccess();
+    } catch (err) {
+      console.error('Failed to reset to default key:', err);
+      setError('Failed to reset. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -103,85 +122,129 @@ export const PPQAPIKeyModal: React.FC<PPQAPIKeyModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Description */}
-          <Text style={styles.description}>
-            Get AI-powered workout insights with PPQ.AI. Pay anonymously with
-            Bitcoin. Your data, your control.
-          </Text>
+          {/* Default Key Active Status */}
+          {isUsingDefaultKey && (
+            <View style={styles.defaultActiveBox}>
+              <Ionicons name="checkmark-circle" size={20} color="#FF9D42" />
+              <Text style={styles.defaultActiveText}>
+                RUNSTR Premium is active. AI features are ready to use!
+              </Text>
+            </View>
+          )}
 
-          {/* Get API Key Button */}
+          {/* Custom Key Active Status */}
+          {!isUsingDefaultKey && (
+            <View style={styles.customActiveBox}>
+              <Ionicons name="key" size={20} color="#FF9D42" />
+              <Text style={styles.customActiveText}>
+                Using your custom PPQ.AI key
+              </Text>
+            </View>
+          )}
+
+          {/* Reset to Default Button (only if using custom key) */}
+          {!isUsingDefaultKey && (
+            <TouchableOpacity
+              style={styles.resetButton}
+              onPress={handleResetToDefault}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color={theme.colors.text} />
+              ) : (
+                <>
+                  <Ionicons name="refresh" size={18} color={theme.colors.text} />
+                  <Text style={styles.resetButtonText}>Reset to RUNSTR Premium</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Toggle Custom Key Section */}
           <TouchableOpacity
-            style={styles.getReferralButton}
-            onPress={handleGetApiKey}
-            disabled={isSaving}
+            style={styles.toggleCustomSection}
+            onPress={() => setShowCustomKeySection(!showCustomKeySection)}
           >
+            <Text style={styles.toggleCustomText}>
+              {showCustomKeySection ? 'Hide custom key options' : 'Use your own PPQ.AI key (optional)'}
+            </Text>
             <Ionicons
-              name="open-outline"
-              size={20}
-              color="#000"
-              style={styles.buttonIcon}
+              name={showCustomKeySection ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={theme.colors.textMuted}
             />
-            <Text style={styles.getReferralButtonText}>Get API Key</Text>
           </TouchableOpacity>
 
-          {/* API Key Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>API Key</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Paste your PPQ.AI API key here"
-              placeholderTextColor={theme.colors.textMuted}
-              value={apiKey}
-              onChangeText={setApiKey}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-              editable={!isSaving}
-            />
-          </View>
+          {/* Custom Key Section (expandable) */}
+          {showCustomKeySection && (
+            <>
+              {/* Get API Key Button */}
+              <TouchableOpacity
+                style={styles.getReferralButton}
+                onPress={handleGetApiKey}
+                disabled={isSaving}
+              >
+                <Ionicons
+                  name="open-outline"
+                  size={20}
+                  color="#000"
+                  style={styles.buttonIcon}
+                />
+                <Text style={styles.getReferralButtonText}>Get Your Own API Key</Text>
+              </TouchableOpacity>
+
+              {/* API Key Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Your API Key</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Paste your PPQ.AI API key here"
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={apiKey}
+                  onChangeText={setApiKey}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry
+                  editable={!isSaving}
+                />
+              </View>
+
+              {/* Info Box */}
+              <View style={styles.infoBox}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color="#FF9D42"
+                />
+                <Text style={styles.infoText}>
+                  Using your own key? Costs ~$0.001 per insight. Your key is stored
+                  locally and never shared.
+                </Text>
+              </View>
+
+              {/* Save Button */}
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  (!apiKey.trim() || isSaving) && styles.saveButtonDisabled,
+                ]}
+                onPress={handleSave}
+                disabled={!apiKey.trim() || isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Custom Key</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
 
           {/* Error Message */}
           {error && (
             <View style={styles.errorContainer}>
               <Ionicons name="alert-circle" size={16} color="#ff6b6b" />
               <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          {/* Info Box */}
-          <View style={styles.infoBox}>
-            <Ionicons
-              name="information-circle-outline"
-              size={20}
-              color="#FF9D42"
-            />
-            <Text style={styles.infoText}>
-              PPQ.AI costs ~$0.001 per insight. Your API key is stored locally
-              and never shared.
-            </Text>
-          </View>
-
-          {/* Save Button */}
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              (!apiKey.trim() || isSaving) && styles.saveButtonDisabled,
-            ]}
-            onPress={handleSave}
-            disabled={!apiKey.trim() || isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#000" />
-            ) : (
-              <Text style={styles.saveButtonText}>Save API Key</Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Status */}
-          {apiKeyConfigured && (
-            <View style={styles.statusContainer}>
-              <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
-              <Text style={styles.statusText}>API Key Configured</Text>
             </View>
           )}
         </View>
@@ -346,5 +409,77 @@ const styles = StyleSheet.create({
     color: theme.colors.accent,
     marginLeft: 8,
     fontWeight: theme.typography.weights.medium,
+  },
+
+  defaultActiveBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1510',
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#3a2a10',
+  },
+
+  defaultActiveText: {
+    fontSize: 14,
+    color: '#FF9D42',
+    marginLeft: 10,
+    flex: 1,
+    fontWeight: theme.typography.weights.medium,
+  },
+
+  customActiveBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1510',
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#3a2a10',
+  },
+
+  customActiveText: {
+    fontSize: 14,
+    color: '#FF9D42',
+    marginLeft: 10,
+    flex: 1,
+    fontWeight: theme.typography.weights.medium,
+  },
+
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+
+  resetButtonText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    marginLeft: 8,
+    fontWeight: theme.typography.weights.medium,
+  },
+
+  toggleCustomSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+
+  toggleCustomText: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    marginRight: 6,
   },
 });

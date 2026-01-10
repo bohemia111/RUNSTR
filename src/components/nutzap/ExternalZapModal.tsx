@@ -5,7 +5,7 @@
  * Updated: Removed QR code, added amount selection
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -34,6 +34,9 @@ import {
   openInWalletOfSatoshi,
   openInBreez,
 } from '../../utils/walletDeepLinks';
+import { RewardSenderWallet } from '../../services/rewards/RewardSenderWallet';
+import { DonationTrackingService } from '../../services/donation/DonationTrackingService';
+import { getUserNostrIdentifiers } from '../../utils/nostr';
 
 // Storage key for default amount
 const DEFAULT_AMOUNT_KEY = '@runstr:default_zap_amount';
@@ -49,6 +52,10 @@ interface ExternalZapModalProps {
   memo?: string; // Optional - will default to "RUNSTR Community Rewards"
   onClose: () => void;
   onSuccess?: () => void;
+  // Charity donation mode - routes through RUNSTR wallet for verification
+  isCharityDonation?: boolean;
+  charityId?: string;
+  charityLightningAddress?: string;
 }
 
 export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
@@ -59,6 +66,9 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
   memo,
   onClose,
   onSuccess,
+  isCharityDonation = false,
+  charityId,
+  charityLightningAddress,
 }) => {
   const [selectedAmount, setSelectedAmount] = useState<number>(
     initialAmount || AMOUNT_PRESETS[0]
@@ -75,6 +85,17 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [isExpired, setIsExpired] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
+
+  // Charity donation verification state
+  // Note: We store paymentHash for potential debugging, but pass it directly to polling
+  const [_paymentHash, setPaymentHash] = useState<string | null>(null);
+  const [_isVerifying, setIsVerifying] = useState(false);
+  const [paymentVerified, setPaymentVerified] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Suppress unused variable warnings - these are used for debugging
+  void _paymentHash;
+  void _isVerifying;
 
   // Convert npub to hex for API calls (skip for Lightning addresses)
   const recipientHex = React.useMemo(() => {
@@ -128,6 +149,11 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
       setCustomAmount('');
       setIsCustom(false);
 
+      // Reset charity verification state
+      setPaymentHash(null);
+      setIsVerifying(false);
+      setPaymentVerified(false);
+
       // If initial amount provided, use it
       if (initialAmount && initialAmount > 0) {
         setSelectedAmount(initialAmount);
@@ -135,8 +161,18 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
 
       // Resolve lightning address
       resolveLightningAddress();
+    } else {
+      // Cleanup polling when modal closes
+      stopPaymentPolling();
     }
   }, [visible, initialAmount]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      stopPaymentPolling();
+    };
+  }, []);
 
   // Countdown timer effect - updates every second
   useEffect(() => {
@@ -217,6 +253,63 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
     }
   };
 
+  // Stop payment polling
+  const stopPaymentPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  // Start payment polling for charity donations
+  const startPaymentPolling = (hash: string) => {
+    if (!isCharityDonation) return;
+
+    console.log('[ExternalZapModal] Starting payment polling for hash:', hash.slice(0, 16) + '...');
+    setIsVerifying(true);
+
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const result = await RewardSenderWallet.lookupInvoice(hash);
+
+        if (result.settled) {
+          console.log('[ExternalZapModal] ✅ Payment verified!');
+          stopPaymentPolling();
+
+          // Record donation and forward to charity
+          const amount = getEffectiveAmount();
+          let donorPubkey = 'anonymous';
+          try {
+            const identifiers = await getUserNostrIdentifiers();
+            if (identifiers?.hexPubkey) {
+              donorPubkey = identifiers.hexPubkey;
+            }
+          } catch (e) {
+            console.warn('[ExternalZapModal] Could not get donor pubkey');
+          }
+
+          await DonationTrackingService.recordAndForward({
+            donorPubkey,
+            amount,
+            charityId: charityId!,
+            charityLightningAddress: charityLightningAddress!,
+          });
+
+          setPaymentVerified(true);
+          setIsVerifying(false);
+
+          // Brief delay to show success, then close
+          setTimeout(() => {
+            onSuccess?.();
+            onClose();
+          }, 1500);
+        }
+      } catch (err) {
+        console.error('[ExternalZapModal] Payment polling error:', err);
+      }
+    }, 2000); // Poll every 2 seconds
+  };
+
   // Get the effective amount (selected preset or custom)
   const getEffectiveAmount = (): number => {
     if (isCustom && customAmount) {
@@ -271,6 +364,7 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
       recipientName,
       amount,
       memo,
+      isCharityDonation,
     });
 
     setIsLoading(true);
@@ -278,54 +372,77 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
     setIsExpired(false);
     setInvoice('');
     setTimeRemaining(null);
+    setPaymentHash(null);
 
     try {
-      const lnAddress = lightningAddress || recipientNpub;
+      // For charity donations, create invoice from RUNSTR's wallet for verification
+      if (isCharityDonation) {
+        console.log('[ExternalZapModal] 🔄 Creating RUNSTR wallet invoice for charity donation');
 
-      if (!lnAddress || !lnAddress.includes('@')) {
-        throw new Error('No Lightning address available for recipient');
-      }
-
-      console.log(
-        '[ExternalZapModal] 🔄 Requesting invoice for',
-        amount,
-        'sats'
-      );
-      console.log(
-        '[ExternalZapModal] Memo:',
-        memo || 'RUNSTR Community Rewards'
-      );
-
-      const invoiceResult = await getInvoiceFromLightningAddress(
-        lnAddress,
-        amount,
-        memo || 'RUNSTR Community Rewards'
-      );
-
-      console.log('[ExternalZapModal] Invoice result:', {
-        hasInvoice: !!invoiceResult?.invoice,
-        invoiceLength: invoiceResult?.invoice?.length,
-        successMessage: invoiceResult?.successMessage,
-      });
-
-      if (invoiceResult && invoiceResult.invoice) {
-        // Validate invoice amount matches requested amount
-        console.log('[ExternalZapModal] Validating invoice amount...');
-        const amountValid = validateInvoiceAmount(
-          invoiceResult.invoice,
-          amount
+        const invoiceResult = await RewardSenderWallet.createInvoice(
+          amount,
+          memo || `Donation to ${recipientName}`
         );
 
-        if (!amountValid) {
-          const errorMsg = `Invoice amount mismatch! Expected ${amount} sats. Please try again.`;
-          console.error('[ExternalZapModal] ❌', errorMsg);
-          throw new Error(errorMsg);
+        if (!invoiceResult.success || !invoiceResult.invoice || !invoiceResult.paymentHash) {
+          throw new Error(invoiceResult.error || 'Failed to create invoice');
         }
 
         setInvoice(invoiceResult.invoice);
-        console.log('[ExternalZapModal] ✅ Invoice generated successfully!');
+        setPaymentHash(invoiceResult.paymentHash);
+        console.log('[ExternalZapModal] ✅ RUNSTR invoice created, starting polling');
+
+        // Start polling for payment verification
+        startPaymentPolling(invoiceResult.paymentHash);
       } else {
-        throw new Error('Failed to generate invoice - no invoice returned');
+        // Standard flow - get invoice from recipient's Lightning address
+        const lnAddress = lightningAddress || recipientNpub;
+
+        if (!lnAddress || !lnAddress.includes('@')) {
+          throw new Error('No Lightning address available for recipient');
+        }
+
+        console.log(
+          '[ExternalZapModal] 🔄 Requesting invoice for',
+          amount,
+          'sats'
+        );
+        console.log(
+          '[ExternalZapModal] Memo:',
+          memo || 'RUNSTR Community Rewards'
+        );
+
+        const invoiceResult = await getInvoiceFromLightningAddress(
+          lnAddress,
+          amount,
+          memo || 'RUNSTR Community Rewards'
+        );
+
+        console.log('[ExternalZapModal] Invoice result:', {
+          hasInvoice: !!invoiceResult?.invoice,
+          invoiceLength: invoiceResult?.invoice?.length,
+          successMessage: invoiceResult?.successMessage,
+        });
+
+        if (invoiceResult && invoiceResult.invoice) {
+          // Validate invoice amount matches requested amount
+          console.log('[ExternalZapModal] Validating invoice amount...');
+          const amountValid = validateInvoiceAmount(
+            invoiceResult.invoice,
+            amount
+          );
+
+          if (!amountValid) {
+            const errorMsg = `Invoice amount mismatch! Expected ${amount} sats. Please try again.`;
+            console.error('[ExternalZapModal] ❌', errorMsg);
+            throw new Error(errorMsg);
+          }
+
+          setInvoice(invoiceResult.invoice);
+          console.log('[ExternalZapModal] ✅ Invoice generated successfully!');
+        } else {
+          throw new Error('Failed to generate invoice - no invoice returned');
+        }
       }
     } catch (err) {
       console.error('[ExternalZapModal] ❌ Error generating invoice:', err);
@@ -782,20 +899,45 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
             )}
           </ScrollView>
 
-          {/* Footer - Payment Confirmation */}
+          {/* Footer - Payment Confirmation or Verification Status */}
           {showInvoice && invoice && !isLoading && (
             <View style={styles.footer}>
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handlePaymentConfirmed}
-              >
-                <Ionicons
-                  name="checkmark-circle"
-                  size={20}
-                  color={theme.colors.background}
-                />
-                <Text style={styles.confirmButtonText}>I've Paid</Text>
-              </TouchableOpacity>
+              {isCharityDonation ? (
+                // Charity mode: Show verification status instead of "I've Paid" button
+                paymentVerified ? (
+                  <View style={styles.verifiedContainer}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={24}
+                      color="#22c55e"
+                    />
+                    <Text style={styles.verifiedText}>Payment Verified!</Text>
+                  </View>
+                ) : (
+                  <View style={styles.verifyingContainer}>
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.accent}
+                    />
+                    <Text style={styles.verifyingText}>
+                      Waiting for payment...
+                    </Text>
+                  </View>
+                )
+              ) : (
+                // Standard mode: Show "I've Paid" button
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handlePaymentConfirmed}
+                >
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={20}
+                    color={theme.colors.background}
+                  />
+                  <Text style={styles.confirmButtonText}>I've Paid</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -1232,5 +1374,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: theme.typography.weights.semiBold,
     color: theme.colors.error,
+  },
+
+  // Charity donation verification styles
+  verifyingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.medium,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+
+  verifyingText: {
+    fontSize: 16,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.textMuted,
+  },
+
+  verifiedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderRadius: theme.borderRadius.medium,
+    borderWidth: 1,
+    borderColor: '#22c55e',
+  },
+
+  verifiedText: {
+    fontSize: 16,
+    fontWeight: theme.typography.weights.bold,
+    color: '#22c55e',
   },
 });

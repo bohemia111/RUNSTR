@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NostrInitializationService } from '../nostr/NostrInitializationService';
 import nostrPrefetchService from '../nostr/NostrPrefetchService';
 import { getUserNostrIdentifiers } from '../../utils/nostr';
+import { LeaderboardBaselineService } from '../season/LeaderboardBaselineService';
 
 class AppInitializationService {
   private static instance: AppInitializationService | null = null;
@@ -70,6 +71,18 @@ class AppInitializationService {
           // Wait for minimum 2 relays (fast threshold)
           await GlobalNDKService.waitForMinimumConnection(2, 2000);
           console.log('✅ AppInit: Nostr connected');
+
+          // Prefetch leaderboard baseline (1 event, cached for all screens)
+          console.log('📊 AppInit: Prefetching leaderboard baseline...');
+          LeaderboardBaselineService.fetchBaseline().then((baseline) => {
+            if (baseline) {
+              console.log('✅ AppInit: Leaderboard baseline cached');
+            } else {
+              console.log('⚠️ AppInit: No baseline note found');
+            }
+          }).catch((err) => {
+            console.warn('⚠️ AppInit: Baseline prefetch failed:', err);
+          });
         } catch (ndkError) {
           console.error(
             '⚠️ AppInit: NDK connection failed, continuing offline'
@@ -111,23 +124,8 @@ class AppInitializationService {
             }
           );
 
-          // Step 4: Prefetch Satlantis events (for instant Events screen)
-          if (!signal.aborted) {
-            console.log('📅 AppInit: Prefetching Satlantis events...');
-            try {
-              const { SatlantisEventService } = await import(
-                '../satlantis/SatlantisEventService'
-              );
-              await SatlantisEventService.prefetchEventsForOfflineAccess();
-              console.log('✅ AppInit: Satlantis events cached');
-            } catch (satlantisError) {
-              console.warn(
-                '⚠️ AppInit: Satlantis prefetch failed (non-blocking):',
-                satlantisError
-              );
-              // Don't throw - Satlantis prefetch failure shouldn't block app initialization
-            }
-          }
+          // NOTE: Satlantis events are now hardcoded - no Nostr fetch needed
+          // Removed: SatlantisEventService.prefetchEventsForOfflineAccess()
 
           console.log('✅ AppInit: All data loaded!');
         }

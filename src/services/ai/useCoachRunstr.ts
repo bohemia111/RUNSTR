@@ -19,6 +19,9 @@ const CACHE_PREFIX = '@runstr:coach_cache:';
 const API_KEY_STORAGE_KEY = '@runstr:ppq_api_key';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// Default PPQ.AI API key for RUNSTR Premium (all users get AI features by default)
+const DEFAULT_PPQ_API_KEY = 'sk-cHbG30uYuFdQGvKGKSHBP6';
+
 interface CachedInsight extends CoachInsight {
   expiresAt: number;
 }
@@ -78,26 +81,27 @@ export function useCoachRunstr() {
   const [error, setError] = useState<string | null>(null);
   const [modelReady, setModelReady] = useState(false);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+  const [isUsingDefaultKey, setIsUsingDefaultKey] = useState(true);
 
   // Initialize Claude service on mount
   useEffect(() => {
     const initializeService = async () => {
       try {
-        // Try to load API key from AsyncStorage
+        // Try to load custom API key from AsyncStorage
         const storedKey = await AsyncStorage.getItem(API_KEY_STORAGE_KEY);
 
-        if (storedKey) {
-          coachClaude.initialize(storedKey);
-          setApiKeyConfigured(true);
-          setModelReady(true);
-          console.log(
-            '[CoachRunstr] Claude service initialized with stored API key'
-          );
-        } else {
-          console.log('[CoachRunstr] No API key found in storage');
-          setApiKeyConfigured(false);
-          setModelReady(false);
-        }
+        // Use stored key if available, otherwise use default RUNSTR Premium key
+        const keyToUse = storedKey || DEFAULT_PPQ_API_KEY;
+        const usingDefault = !storedKey;
+
+        coachClaude.initialize(keyToUse);
+        setApiKeyConfigured(true);
+        setModelReady(true);
+        setIsUsingDefaultKey(usingDefault);
+
+        console.log(
+          `[CoachRunstr] Claude service initialized with ${usingDefault ? 'default RUNSTR Premium' : 'custom'} API key`
+        );
       } catch (err) {
         console.error('[CoachRunstr] Failed to initialize service:', err);
         setError('Failed to initialize Coach Claude');
@@ -109,24 +113,49 @@ export function useCoachRunstr() {
   }, []);
 
   /**
-   * Set API key and initialize service
+   * Set custom API key and initialize service
    */
   const setApiKey = useCallback(async (apiKey: string) => {
     try {
-      // Store API key in AsyncStorage
+      // Store custom API key in AsyncStorage
       await AsyncStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
 
-      // Initialize Claude service
+      // Initialize Claude service with custom key
       coachClaude.initialize(apiKey);
 
       setApiKeyConfigured(true);
       setModelReady(true);
+      setIsUsingDefaultKey(false);
       setError(null);
 
-      console.log('[CoachRunstr] API key configured successfully');
+      console.log('[CoachRunstr] Custom API key configured successfully');
     } catch (err) {
       console.error('[CoachRunstr] Failed to set API key:', err);
       setError('Failed to configure API key');
+      throw err;
+    }
+  }, []);
+
+  /**
+   * Reset to default RUNSTR Premium API key
+   */
+  const resetToDefaultKey = useCallback(async () => {
+    try {
+      // Remove custom key from storage
+      await AsyncStorage.removeItem(API_KEY_STORAGE_KEY);
+
+      // Re-initialize with default key
+      coachClaude.initialize(DEFAULT_PPQ_API_KEY);
+
+      setApiKeyConfigured(true);
+      setModelReady(true);
+      setIsUsingDefaultKey(true);
+      setError(null);
+
+      console.log('[CoachRunstr] Reset to default RUNSTR Premium API key');
+    } catch (err) {
+      console.error('[CoachRunstr] Failed to reset to default key:', err);
+      setError('Failed to reset API key');
       throw err;
     }
   }, []);
@@ -222,10 +251,12 @@ export function useCoachRunstr() {
     generateInsight,
     clearCache,
     setApiKey,
+    resetToDefaultKey,
     loading,
     error,
     modelReady,
     apiKeyConfigured,
+    isUsingDefaultKey,
   };
 }
 

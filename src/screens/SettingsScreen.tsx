@@ -30,13 +30,23 @@ import { CustomAlert } from '../components/ui/CustomAlert';
 import { SettingsAccordion } from '../components/ui/SettingsAccordion';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import * as SecureStore from 'expo-secure-store';
+// useAuth no longer needed - using RNRestart for sign out
 import * as Clipboard from 'expo-clipboard';
+import RNRestart from 'react-native-restart';
 import { dailyStepCounterService } from '../services/activity/DailyStepCounterService';
 import { PPQAPIKeyModal } from '../components/ai/PPQAPIKeyModal';
 import { useCoachRunstr } from '../services/ai/useCoachRunstr';
 import { ModelManager } from '../services/ai/ModelManager';
 import { GPSPermissionsDiagnostics } from '../components/permissions/GPSPermissionsDiagnostics';
+import { WearableConnectionModal } from '../components/settings/WearableConnectionModal';
+import { WatchSyncSection } from '../components/profile/WatchSyncSection';
+import { AntiCheatRequestModal } from '../components/settings/AntiCheatRequestModal';
+import Nostr1301ImportService from '../services/fitness/Nostr1301ImportService';
+import { CustomAlertManager } from '../components/ui/CustomAlert';
+import { useSeason2Registration } from '../hooks/useSeason2';
+// useAuth removed - using direct AsyncStorage.clear() + CommonActions.reset()
 
 interface SettingsScreenProps {
   onCaptainDashboard?: () => void;
@@ -84,6 +94,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onSignOut,
 }) => {
   const navigation = useNavigation();
+  const { isRegistered: isSeason2Participant } = useSeason2Registration();
   const [userRole, setUserRole] = useState<'captain' | 'member' | null>(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [userNsec, setUserNsec] = useState<string | null>(null);
@@ -104,6 +115,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [selectedAIModel, setSelectedAIModel] =
     useState<string>('claude-haiku-4.5');
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [wearableModalVisible, setWearableModalVisible] = useState(false);
+  const [showAntiCheatModal, setShowAntiCheatModal] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -164,13 +178,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       setUserRole(storedRole as 'captain' | 'member' | null);
       setUserNsec(nsec);
 
-      // Check if background step tracking is available and enabled
-      const available = await dailyStepCounterService.isAvailable();
-      if (available) {
-        const permissionStatus =
-          await dailyStepCounterService.checkPermissionStatus();
-        setBackgroundTrackingEnabled(permissionStatus === 'granted');
-      }
+      // Check if background step tracking is enabled (reads from AsyncStorage)
+      const trackingEnabled = await dailyStepCounterService.isBackgroundTrackingEnabled();
+      setBackgroundTrackingEnabled(trackingEnabled);
 
       // Load selected AI model
       const model = await ModelManager.getSelectedModel();
@@ -219,9 +229,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     if (enabled) {
       // Request permission when user toggles on
       const granted = await dailyStepCounterService.requestPermissions();
-      setBackgroundTrackingEnabled(granted);
 
-      if (!granted) {
+      if (granted) {
+        // Save the enabled setting to AsyncStorage
+        await dailyStepCounterService.setBackgroundTrackingEnabled(true);
+        setBackgroundTrackingEnabled(true);
+      } else {
         // Show alert if permission denied
         setAlertTitle('Permission Required');
         setAlertMessage(
@@ -238,7 +251,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         setAlertVisible(true);
       }
     } else {
-      // Just disable the toggle - permissions stay granted on device level
+      // Save the disabled setting to AsyncStorage and update UI
+      await dailyStepCounterService.setBackgroundTrackingEnabled(false);
       setBackgroundTrackingEnabled(false);
     }
   };
@@ -258,24 +272,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         text: 'Sign Out',
         style: 'destructive',
         onPress: async () => {
-          try {
-            // Clear all stored data
-            await AsyncStorage.multiRemove([
-              '@runstr:user_nsec',
-              '@runstr:npub',
-              '@runstr:hex_pubkey',
-              '@runstr:user_role',
-            ]);
+          setAlertVisible(false);
 
-            // Call the provided sign out handler
-            onSignOut?.();
-          } catch (error) {
-            console.error('Error signing out:', error);
-            setAlertTitle('Error');
-            setAlertMessage('Failed to sign out. Please try again.');
-            setAlertButtons([{ text: 'OK' }]);
-            setAlertVisible(true);
-          }
+          // Clear all auth data
+          await AsyncStorage.multiRemove([
+            '@runstr:user_nsec',
+            '@runstr:npub',
+            '@runstr:hex_pubkey',
+            '@runstr:auth_method',
+            '@runstr:amber_pubkey',
+            '@runstr:app_init_completed',
+          ]);
+          await SecureStore.deleteItemAsync('nwc_string');
+
+          // Restart the app - it will boot fresh and find no auth → show Login
+          RNRestart.restart();
         },
       },
     ]);
@@ -327,7 +338,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             setAlertButtons([
               { text: 'Cancel', style: 'cancel' },
               {
-                text: 'I Understand, Delete My Account',
+                text: 'Delete Account',
                 style: 'destructive',
                 onPress: () => performAccountDeletion(),
               },
@@ -341,38 +352,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   };
 
   const performAccountDeletion = async () => {
-    setIsDeletingAccount(true);
+    setAlertVisible(false);
 
-    try {
-      const deleteService = DeleteAccountService.getInstance();
-      await deleteService.deleteAccount();
+    // Clear ALL local data for account deletion
+    await AsyncStorage.clear();
+    await SecureStore.deleteItemAsync('nwc_string');
 
-      // Navigate to login screen and reset navigation stack
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        })
-      );
-
-      // Show success message after navigation
-      setTimeout(() => {
-        setAlertTitle('Account Deleted');
-        setAlertMessage('Your account has been successfully deleted.');
-        setAlertButtons([{ text: 'OK' }]);
-        setAlertVisible(true);
-      }, 100);
-    } catch (error) {
-      console.error('Account deletion failed:', error);
-      setAlertTitle('Deletion Failed');
-      setAlertMessage(
-        'Failed to delete your account. Please try again or contact support.'
-      );
-      setAlertButtons([{ text: 'OK' }]);
-      setAlertVisible(true);
-    } finally {
-      setIsDeletingAccount(false);
-    }
+    // Restart the app - it will boot fresh and find no auth → show Login
+    RNRestart.restart();
   };
 
   const handleRefresh = async () => {
@@ -388,6 +375,39 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
   };
 
+  const handleImportNostrHistory = async () => {
+    try {
+      setImporting(true);
+
+      // Get user pubkey
+      const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+      if (!pubkey) {
+        console.error('[Settings] No pubkey found - cannot import workouts');
+        CustomAlertManager.alert('Error', 'No user key found. Please sign in again.');
+        setImporting(false);
+        return;
+      }
+
+      console.log('[Settings] Starting Nostr workout import...');
+
+      const result = await Nostr1301ImportService.importUserHistory(pubkey);
+
+      if (result.success) {
+        console.log(`[Settings] ✅ Imported ${result.imported} workouts`);
+        CustomAlertManager.alert(
+          'Import Complete',
+          `Successfully imported ${result.imported} workout${result.imported !== 1 ? 's' : ''} from Nostr.`
+        );
+      } else {
+        throw new Error(result.error || 'Import failed');
+      }
+    } catch (error) {
+      console.error('[Settings] ❌ Nostr import failed:', error);
+      CustomAlertManager.alert('Import Failed', 'Could not import workouts from Nostr. Please try again.');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const handleModelSelect = async (modelId: string) => {
     try {
@@ -591,58 +611,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onPress={() => (navigation as any).navigate('HealthProfile')}
               />
 
+              {/* Import Workouts from Nostr */}
+              <SettingItem
+                title="Import"
+                subtitle="Download your workout history from Nostr"
+                onPress={handleImportNostrHistory}
+                rightElement={
+                  importing ? (
+                    <ActivityIndicator size="small" color={theme.colors.orangeBright} />
+                  ) : (
+                    <Ionicons name="cloud-download-outline" size={20} color={theme.colors.textMuted} />
+                  )
+                }
+              />
+
               {/* GPS Permissions Diagnostics (Android only) */}
               {Platform.OS === 'android' && <GPSPermissionsDiagnostics />}
-            </Card>
-          </SettingsAccordion>
-        </View>
-
-
-        {/* Coach RUNSTR AI Accordion (includes Voice Announcements) */}
-        <View style={styles.section}>
-          <SettingsAccordion title="COACH RUNSTR AI" defaultExpanded={false}>
-            <Card style={styles.accordionCard}>
-              {/* PPQ.AI API Key */}
-              <SettingItem
-                title="PPQ.AI API Key"
-                subtitle={
-                  apiKeyConfigured
-                    ? 'Configured - AI insights enabled'
-                    : 'Not configured - Tap to set up'
-                }
-                onPress={() => setShowPPQModal(true)}
-                rightElement={
-                  <View style={styles.securityIcon}>
-                    <Ionicons
-                      name={
-                        apiKeyConfigured
-                          ? 'checkmark-circle'
-                          : 'add-circle-outline'
-                      }
-                      size={20}
-                      color={
-                        apiKeyConfigured ? '#FF9D42' : theme.colors.textMuted
-                      }
-                    />
-                  </View>
-                }
-              />
-
-              {/* AI Model Selection */}
-              <SettingItem
-                title="AI Model"
-                subtitle={ModelManager.getModelName(selectedAIModel)}
-                onPress={() => setShowModelPicker(true)}
-                rightElement={
-                  <View style={styles.securityIcon}>
-                    <Ionicons
-                      name="swap-horizontal"
-                      size={20}
-                      color={theme.colors.textMuted}
-                    />
-                  </View>
-                }
-              />
 
               {/* Voice Announcements Subsection */}
               <View style={styles.voiceSubsection}>
@@ -807,6 +791,140 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </SettingsAccordion>
         </View>
 
+        {/* Wearables Accordion */}
+        <View style={styles.section}>
+          <SettingsAccordion title="WEARABLES" defaultExpanded={false}>
+            <Card style={styles.accordionCard}>
+              <SettingItem
+                title="Connect Wearable"
+                subtitle="Sync workouts from your watch or fitness tracker"
+                onPress={() => setWearableModalVisible(true)}
+              />
+
+              {/* Apple Watch Identity Sync */}
+              <WatchSyncSection />
+            </Card>
+          </SettingsAccordion>
+        </View>
+
+        {/* Experimental Features Accordion - Season Pass Required */}
+        <View style={styles.section}>
+          <SettingsAccordion title="EXPERIMENTAL" defaultExpanded={false}>
+            <Card style={styles.accordionCard}>
+              {/* PPQ.AI API Key */}
+              <SettingItem
+                title="PPQ.AI API Key"
+                subtitle={
+                  apiKeyConfigured
+                    ? 'Configured - AI insights enabled'
+                    : 'Not configured - Tap to set up'
+                }
+                onPress={() => {
+                  if (!isSeason2Participant) {
+                    setAlertTitle('Season Pass Required');
+                    setAlertMessage('This feature is only available for Season II participants. Join Season II to unlock experimental features!');
+                    setAlertButtons([{ text: 'OK' }]);
+                    setAlertVisible(true);
+                    return;
+                  }
+                  setShowPPQModal(true);
+                }}
+                rightElement={
+                  <View style={styles.securityIcon}>
+                    <Ionicons
+                      name={
+                        apiKeyConfigured
+                          ? 'checkmark-circle'
+                          : 'add-circle-outline'
+                      }
+                      size={20}
+                      color={
+                        apiKeyConfigured ? '#FF9D42' : theme.colors.textMuted
+                      }
+                    />
+                  </View>
+                }
+              />
+
+              {/* AI Model Selection */}
+              <SettingItem
+                title="AI Model"
+                subtitle={ModelManager.getModelName(selectedAIModel)}
+                onPress={() => {
+                  if (!isSeason2Participant) {
+                    setAlertTitle('Season Pass Required');
+                    setAlertMessage('This feature is only available for Season II participants. Join Season II to unlock experimental features!');
+                    setAlertButtons([{ text: 'OK' }]);
+                    setAlertVisible(true);
+                    return;
+                  }
+                  setShowModelPicker(true);
+                }}
+                rightElement={
+                  <View style={styles.securityIcon}>
+                    <Ionicons
+                      name="swap-horizontal"
+                      size={20}
+                      color={theme.colors.textMuted}
+                    />
+                  </View>
+                }
+              />
+
+              {/* Advanced Analytics */}
+              <SettingItem
+                title="Advanced Analytics"
+                subtitle="Body composition, fitness age & AI coaching"
+                onPress={() => {
+                  if (!isSeason2Participant) {
+                    setAlertTitle('Season Pass Required');
+                    setAlertMessage('This feature is only available for Season II participants. Join Season II to unlock experimental features!');
+                    setAlertButtons([{ text: 'OK' }]);
+                    setAlertVisible(true);
+                    return;
+                  }
+                  (navigation as any).navigate('AdvancedAnalytics');
+                }}
+                rightElement={
+                  <View style={styles.securityIcon}>
+                    <Ionicons
+                      name="analytics"
+                      size={20}
+                      color={theme.colors.textMuted}
+                    />
+                  </View>
+                }
+              />
+
+              {/* Extended Activities (Strength, Diet, Wellness) */}
+              <SettingItem
+                title="Extended Activities"
+                subtitle="Strength, diet & wellness tracking"
+                onPress={() => {
+                  if (!isSeason2Participant) {
+                    setAlertTitle('Season Pass Required');
+                    setAlertMessage('This feature is only available for Season II participants. Join Season II to unlock experimental features!');
+                    setAlertButtons([{ text: 'OK' }]);
+                    setAlertVisible(true);
+                    return;
+                  }
+                  (navigation as any).navigate('ActivityTracker', { showExperimentalMenu: true });
+                }}
+                rightElement={
+                  <View style={styles.securityIcon}>
+                    <Ionicons
+                      name="flask"
+                      size={20}
+                      color={theme.colors.textMuted}
+                    />
+                  </View>
+                }
+              />
+
+            </Card>
+          </SettingsAccordion>
+        </View>
+
         {/* Password Accordion (collapsed by default) */}
         <View style={styles.section}>
           <SettingsAccordion title="PASSWORD" defaultExpanded={false}>
@@ -851,6 +969,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 subtitle="How we protect your data"
                 onPress={onPrivacyPolicy}
               />
+              <SettingItem
+                title="Anti-Cheat Verification"
+                subtitle="Request cheater investigation (5,000 sats)"
+                onPress={() => setShowAntiCheatModal(true)}
+              />
             </Card>
           </SettingsAccordion>
         </View>
@@ -894,7 +1017,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
         {/* App Version Info */}
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Version 1.2.3 (Build 123)</Text>
+          <Text style={styles.versionText}>Version 1.4.6 (Build 146)</Text>
         </View>
       </ScrollView>
 
@@ -968,6 +1091,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Wearable Connection Modal */}
+      <WearableConnectionModal
+        visible={wearableModalVisible}
+        onClose={() => setWearableModalVisible(false)}
+        onConnectionSuccess={() => {
+          setWearableModalVisible(false);
+        }}
+      />
+
+      {/* Anti-Cheat Request Modal */}
+      <AntiCheatRequestModal
+        visible={showAntiCheatModal}
+        onClose={() => setShowAntiCheatModal(false)}
+      />
 
     </SafeAreaView>
   );
@@ -1094,34 +1232,32 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
 
-  // Sign Out Button
+  // Sign Out Button - matches LoginScreen button styling
   signOutButton: {
-    backgroundColor: '#FFB366', // Light orange to match Profile screen
-    borderRadius: theme.borderRadius.medium,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    backgroundColor: theme.colors.orangeBright,
+    borderRadius: theme.borderRadius.large,
+    paddingVertical: 16,
     alignItems: 'center',
   },
 
   signOutButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: theme.typography.weights.semiBold,
-    color: '#000000', // Black text for contrast on light orange
+    color: theme.colors.accentText, // Black text on orange
   },
 
-  // Delete Account Button
+  // Delete Account Button - matches LoginScreen button styling
   deleteAccountButton: {
-    backgroundColor: '#FFB366', // Same light orange as Sign Out
-    borderRadius: theme.borderRadius.medium,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    backgroundColor: theme.colors.orangeBright,
+    borderRadius: theme.borderRadius.large,
+    paddingVertical: 16,
     alignItems: 'center',
   },
 
   deleteAccountButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: theme.typography.weights.semiBold,
-    color: '#000000', // Black text for contrast on light orange
+    color: theme.colors.accentText, // Black text on orange
   },
 
   versionContainer: {

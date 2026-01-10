@@ -31,13 +31,12 @@ const ACTIVITY_THRESHOLDS = {
     minDistance: 0.5, // meters - match October's jitter filter
   },
   walking: {
-    // RESTORED v0.7.0 philosophy: stricter accuracy + looser speed = better results
-    // Stricter accuracy = fewer but higher quality points
-    // Looser speed = won't reject valid points due to GPS noise
-    maxAccuracy: Platform.OS === 'android' ? 35 : 30, // STRICTER - only good GPS
-    maxSpeed: 12, // m/s (~43 km/h) - allow GPS variance without false rejections
-    maxTeleport: Platform.OS === 'android' ? 60 : 50, // STRICTER - fewer jumps
-    minDistance: 1.0, // meters - better jitter filter
+    // FIX: Match running thresholds - stricter 35m was rejecting all GPS points on some devices
+    // Urban environments commonly report 40-80m accuracy, causing 0.0 km walks
+    maxAccuracy: Platform.OS === 'android' ? 100 : 50, // Same as running - trust GPS hardware
+    maxSpeed: 12, // m/s (~43 km/h) - keep walking speed limit
+    maxTeleport: Platform.OS === 'android' ? 150 : 100, // Same as running
+    minDistance: 0.5, // meters - same as running
   },
   cycling: {
     maxAccuracy: Platform.OS === 'android' ? 100 : 50, // Trust GPS hardware more
@@ -240,6 +239,12 @@ TaskManager.defineTask(SIMPLE_TRACKER_TASK, async ({ data, error }) => {
         `[GPS-FLOW] 📤 Sending ${validLocations.length} valid points to cache...`
       );
       simpleRunTracker.appendGpsPointsToCache(validLocations);
+
+      // Track points received for debug UI
+      simpleRunTracker.incrementPointsReceived(
+        validLocations.length,
+        lastValidLocation?.accuracy
+      );
 
       // Reset GPS watchdog restart counter - GPS is working!
       // This allows unlimited recovery from intermittent failures (e.g., Samsung battery management)

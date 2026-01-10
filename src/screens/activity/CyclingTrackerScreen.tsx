@@ -12,9 +12,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { AppStateManager } from '../../services/core/AppStateManager';
 import { CustomAlert } from '../../components/ui/CustomAlert';
 import { simpleRunTracker } from '../../services/activity/SimpleRunTracker';
@@ -40,17 +38,16 @@ import type { NostrProfile } from '../../services/nostr/NostrProfileService';
 import type { PublishableWorkout } from '../../services/nostr/workoutPublishingService';
 // Redesigned components
 import { SpeedGauge } from '../../components/activity/SpeedGauge';
-import { HeroMetric } from '../../components/activity/HeroMetric';
 import {
   SecondaryMetricRow,
   type SecondaryMetric,
 } from '../../components/activity/SecondaryMetricRow';
 import { CountdownOverlay } from '../../components/activity/CountdownOverlay';
 import { ControlBar } from '../../components/activity/ControlBar';
+import { HoldToStartButton } from '../../components/activity/HoldToStartButton';
 import { LastActivityCard } from '../../components/activity/LastActivityCard';
 
 export const CyclingTrackerScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
   const [isTracking, setIsTracking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [metrics, setMetrics] = useState({
@@ -212,7 +209,7 @@ export const CyclingTrackerScreen: React.FC = () => {
           '[CyclingTrackerScreen] App returned to foreground, restarting timers and syncing...'
         );
 
-        // Restart timers
+        // Restart timer (metrics update via useEffect when elapsedTime changes)
         if (!timerRef.current) {
           timerRef.current = setInterval(() => {
             if (!isPausedRef.current) {
@@ -223,9 +220,6 @@ export const CyclingTrackerScreen: React.FC = () => {
               setElapsedTime(totalElapsed);
             }
           }, 1000);
-        }
-        if (!metricsUpdateRef.current) {
-          metricsUpdateRef.current = setInterval(updateMetrics, 1000);
         }
 
         // Force immediate sync of metrics
@@ -347,6 +341,7 @@ export const CyclingTrackerScreen: React.FC = () => {
     pauseStartTimeRef.current = 0;
     totalPausedTimeRef.current = 0;
 
+    // Single timer interval - metrics update via useEffect when elapsedTime changes
     timerRef.current = setInterval(() => {
       if (!isPausedRef.current) {
         const now = Date.now();
@@ -356,8 +351,6 @@ export const CyclingTrackerScreen: React.FC = () => {
         setElapsedTime(totalElapsed);
       }
     }, 1000);
-
-    metricsUpdateRef.current = setInterval(updateMetrics, 1000); // Update every second for speed
   };
 
   const updateMetrics = () => {
@@ -578,9 +571,10 @@ export const CyclingTrackerScreen: React.FC = () => {
       };
 
       // Open social share modal
+      // Note: State stays as 'posting' while modal is open to prevent double-tap
+      // State is reset in modal's onClose (cancelled) or onSuccess (posted) callbacks
       setPreparedWorkout(publishableWorkout);
       setShowSocialModal(true);
-      setDistancePostingState('idle');
 
       console.log(
         `[CyclingTrackerScreen] ✅ Opening social share modal for weekly distance`
@@ -665,91 +659,41 @@ export const CyclingTrackerScreen: React.FC = () => {
         {isTracking ? (
           /* ============ ACTIVE TRACKING STATE ============ */
           <View style={styles.activeContainer}>
-          {/* Route Badge (if selected) */}
-          {selectedRoute && (
-            <View style={styles.routeBadge}>
-              <Ionicons name="map" size={14} color={theme.colors.accent} />
-              <Text style={styles.routeBadgeText}>{selectedRoute.name}</Text>
+            {/* Route Badge (if selected) */}
+            {selectedRoute && (
+              <View style={styles.routeBadge}>
+                <Ionicons name="map" size={14} color={theme.colors.accent} />
+                <Text style={styles.routeBadgeText}>{selectedRoute.name}</Text>
+              </View>
+            )}
+
+            {/* Speed Gauge - Compact for cycling */}
+            <View style={styles.gaugeSection}>
+              <SpeedGauge
+                currentSpeed={currentSpeed}
+                maxSpeed={maxSpeed}
+                avgSpeed={avgSpeed}
+                unit="km/h"
+              />
             </View>
-          )}
 
-          {/* Speed Gauge - Hero element for cycling */}
-          <View style={styles.gaugeSection}>
-            <SpeedGauge
-              currentSpeed={currentSpeed}
-              maxSpeed={maxSpeed}
-              avgSpeed={avgSpeed}
-              unit="km/h"
-            />
+            {/* Secondary Metrics Row - Distance, Duration, Elevation */}
+            <SecondaryMetricRow metrics={secondaryMetrics} />
           </View>
-
-          {/* Distance & Duration as hero below gauge */}
-          <View style={styles.heroMetricSection}>
-            <HeroMetric
-              primaryValue={metrics.distance.replace(' km', '')}
-              primaryUnit="km"
-              secondaryValue={metrics.duration}
-            />
-          </View>
-
-          {/* Secondary Metrics Row */}
-          <SecondaryMetricRow metrics={secondaryMetrics} />
-
-          {/* Spacer to push controls to bottom */}
-          <View style={{ flex: 1 }} />
-
-          {/* Control Bar - Fixed at bottom */}
-          <ControlBar
-            state={controlBarState}
-            startLabel="Start Ride"
-            onHoldComplete={handleHoldComplete}
-            onPause={pauseTracking}
-            onResume={resumeTracking}
-            onStop={stopTracking}
-          />
-        </View>
       ) : (
         /* ============ IDLE STATE ============ */
-        <View style={styles.idleContainer}>
-          {/* Weekly Distance Goal Card */}
-          <WeeklyDistanceGoalCard
-            activityType="cycling"
-            distance={weeklyDistance}
-            progress={distanceProgress}
-            loading={distanceLoading}
-            onPost={handlePostWeeklyDistance}
-            onSetGoal={handleSetGoal}
-            postingState={distancePostingState}
+        <View style={styles.idleCenteredContainer}>
+          <HoldToStartButton
+            label="Start Ride"
+            onHoldComplete={handleHoldComplete}
+            size="large"
           />
+        </View>
+      )}
 
-          {/* Last Activity & Weekly Stats */}
-          <LastActivityCard activityType="cycling" />
-
-          {/* Route Selection */}
-          <TouchableOpacity
-            style={styles.routeSelector}
-            onPress={() => setRouteSelectionVisible(true)}
-          >
-            <View style={styles.routeSelectorLeft}>
-              <Ionicons
-                name={selectedRoute ? 'map' : 'map-outline'}
-                size={20}
-                color={selectedRoute ? theme.colors.accent : theme.colors.textMuted}
-              />
-              <Text style={[
-                styles.routeSelectorText,
-                selectedRoute && { color: theme.colors.accent }
-              ]}>
-                {selectedRoute ? selectedRoute.name : 'Routes'}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
-          </TouchableOpacity>
-
-          {/* Spacer to push controls to bottom */}
-          <View style={{ flex: 1 }} />
-
-          {/* Control Bar - Fixed at bottom */}
+      {/* Fixed Control Bar - Only visible when tracking */}
+      {isTracking && (
+        <View style={styles.fixedControlsWrapper}>
           <ControlBar
             state={controlBarState}
             startLabel="Start Ride"
@@ -812,6 +756,8 @@ export const CyclingTrackerScreen: React.FC = () => {
         onClose={() => {
           setShowSocialModal(false);
           setPreparedWorkout(null);
+          // Reset to idle if user cancels - allows retry
+          setDistancePostingState('idle');
         }}
         onSuccess={() => {
           setShowSocialModal(false);
@@ -842,12 +788,25 @@ const styles = StyleSheet.create({
   activeContainer: {
     flex: 1,
     backgroundColor: theme.colors.background,
+    paddingBottom: 140, // Space for fixed controls
   },
-  // Idle state container
-  idleContainer: {
+  // Idle state container - centered HoldToStart button
+  idleCenteredContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: theme.colors.background,
-    paddingHorizontal: 16,
+    paddingBottom: 120, // Shift button up from true center
+  },
+  // Fixed controls wrapper - always visible at bottom
+  fixedControlsWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   // Activity header in idle state
   activityHeader: {
@@ -884,12 +843,43 @@ const styles = StyleSheet.create({
   // Speed gauge section
   gaugeSection: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
-  // Hero metric section below gauge
-  heroMetricSection: {
+  // Compact distance and time row
+  distanceTimeRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 24,
+  },
+  distanceBlock: {
+    alignItems: 'center',
+  },
+  distanceValue: {
+    fontSize: 56,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text,
+    lineHeight: 60,
+  },
+  distanceUnit: {
+    fontSize: 18,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.textMuted,
+    marginTop: -4,
+  },
+  timeDivider: {
+    width: 1,
+    height: 50,
+    backgroundColor: theme.colors.border,
+  },
+  timeBlock: {
+    alignItems: 'center',
+  },
+  timeValue: {
+    fontSize: 40,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text,
   },
   // Route selector in idle state
   routeSelector: {

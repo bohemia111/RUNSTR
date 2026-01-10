@@ -1,10 +1,11 @@
 /**
- * TeamsScreen - Hardcoded teams + charities selection
- * Users can select ONE team and ONE charity at a time
+ * TeamsScreen - Bitcoin circular economy teams (formerly charities)
+ * Users can select ONE team at a time to support with their workouts
  * Selections are stored in AsyncStorage and added to kind 1301/kind 1 posts
+ * Features Lightning zap buttons for donations (tap = QR modal, long-press = quick NWC zap)
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,52 +14,66 @@ import {
   TouchableOpacity,
   Image,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 import { theme } from '../styles/theme';
-import { HARDCODED_TEAMS } from '../constants/hardcodedTeams';
 import { CHARITIES, Charity } from '../constants/charities';
-import { ToggleButtons } from '../components/ui/ToggleButtons';
+import { ExternalZapModal } from '../components/nutzap/ExternalZapModal';
+import { useNWCZap } from '../hooks/useNWCZap';
+import { NWCWalletService } from '../services/wallet/NWCWalletService';
+import { getInvoiceFromLightningAddress } from '../utils/lnurl';
 
-// Storage keys
+// Storage key - charities are now stored as "teams"
 const SELECTED_TEAM_KEY = '@runstr:selected_team_id';
-const SELECTED_CHARITY_KEY = '@runstr:selected_charity_id';
 
 interface TeamCardProps {
-  id: string;
-  name: string;
-  description?: string;
-  image?: string;
+  charity: Charity;
   isSelected: boolean;
   onSelect: () => void;
+  onZapPress: () => void;
+  onZapLongPress: () => void;
+  isZapping: boolean;
 }
 
-const TeamCard: React.FC<TeamCardProps> = ({
-  id,
-  name,
-  description,
-  image,
+// ✅ PERFORMANCE: React.memo prevents re-renders when props haven't changed
+const TeamCardComponent: React.FC<TeamCardProps> = ({
+  charity,
   isSelected,
   onSelect,
+  onZapPress,
+  onZapLongPress,
+  isZapping,
 }) => {
-  // Extract image URL from rawEvent tags if available
-  const getTeamImage = () => {
-    const team = HARDCODED_TEAMS.find((t) => t.id === id);
-    if (!team?.rawEvent?.tags) return null;
+  const scaleAnimation = useRef(new Animated.Value(1)).current;
 
-    const bannerTag = team.rawEvent.tags.find(
-      (tag: string[]) => tag[0] === 'banner'
-    );
-    const imageTag = team.rawEvent.tags.find(
-      (tag: string[]) => tag[0] === 'image'
-    );
-    return bannerTag?.[1] || imageTag?.[1] || null;
+  const animatePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnimation, {
+        toValue: 0.95,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnimation, {
+        toValue: 1.0,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
-  const imageUrl = image || getTeamImage();
+  const handleZapPress = () => {
+    animatePress();
+    onZapPress();
+  };
+
+  const handleZapLongPress = () => {
+    animatePress();
+    onZapLongPress();
+  };
 
   return (
     <TouchableOpacity
@@ -66,8 +81,8 @@ const TeamCard: React.FC<TeamCardProps> = ({
       onPress={onSelect}
       activeOpacity={0.7}
     >
-      {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.cardImage} />
+      {charity.image ? (
+        <Image source={charity.image} style={styles.cardImage} />
       ) : (
         <View style={styles.cardImagePlaceholder}>
           <Ionicons name="people" size={24} color={theme.colors.textMuted} />
@@ -75,89 +90,85 @@ const TeamCard: React.FC<TeamCardProps> = ({
       )}
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle} numberOfLines={1}>
-          {name}
+          {charity.name}
         </Text>
-        {description ? (
-          <Text style={styles.cardDescription} numberOfLines={2}>
-            {description}
-          </Text>
-        ) : null}
+        <Text style={styles.cardDescription} numberOfLines={2}>
+          {charity.description}
+        </Text>
       </View>
+
+      {/* Zap Button */}
+      <Animated.View style={{ transform: [{ scale: scaleAnimation }] }}>
+        <TouchableOpacity
+          onPress={handleZapPress}
+          onLongPress={handleZapLongPress}
+          style={[
+            styles.zapButton,
+            isZapping && styles.zappingButton,
+          ]}
+          activeOpacity={0.7}
+          delayLongPress={500}
+          disabled={isZapping}
+        >
+          <Ionicons
+            name="flash-outline"
+            size={16}
+            color={theme.colors.orangeBright}
+          />
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Selection Checkmark */}
       {isSelected && (
         <Ionicons
           name="checkmark-circle"
           size={24}
           color={theme.colors.success}
+          style={styles.checkmark}
         />
       )}
     </TouchableOpacity>
   );
 };
 
-interface CharityCardProps {
-  charity: Charity;
-  isSelected: boolean;
-  onSelect: () => void;
-}
+const TeamCard = React.memo(TeamCardComponent);
 
-const CharityCard: React.FC<CharityCardProps> = ({
-  charity,
-  isSelected,
-  onSelect,
-}) => (
-  <TouchableOpacity
-    style={styles.card}
-    onPress={onSelect}
-    activeOpacity={0.7}
-  >
-    <View style={styles.cardContent}>
-      <Text style={styles.cardTitle} numberOfLines={1}>
-        {charity.name}
-      </Text>
-      <Text style={styles.cardDescription} numberOfLines={2}>
-        {charity.description}
-      </Text>
-    </View>
-    {isSelected && (
-      <Ionicons
-        name="checkmark-circle"
-        size={24}
-        color={theme.colors.success}
-      />
-    )}
-  </TouchableOpacity>
-);
-
-export const TeamsScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
-  const [activeTab, setActiveTab] = useState<'teams' | 'charities'>('teams');
+// ✅ PERFORMANCE: React.memo prevents re-renders when props haven't changed
+const TeamsScreenComponent: React.FC = () => {
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [selectedCharityId, setSelectedCharityId] = useState<string | null>(
-    null
-  );
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Load saved selections on mount
+  // Zap modal state
+  const [showZapModal, setShowZapModal] = useState(false);
+  const [zapTargetCharity, setZapTargetCharity] = useState<Charity | null>(null);
+  const [zappingCharityId, setZappingCharityId] = useState<string | null>(null);
+  const [defaultZapAmount, setDefaultZapAmount] = useState(21);
+
+  // NWC hook for wallet operations
+  const { hasWallet, refreshBalance } = useNWCZap();
+
+  // Load saved selection and default zap amount on mount
   useEffect(() => {
-    const loadSelections = async () => {
+    const loadState = async () => {
       try {
-        const [teamId, charityId] = await Promise.all([
+        const [teamId, storedZapAmount] = await Promise.all([
           AsyncStorage.getItem(SELECTED_TEAM_KEY),
-          AsyncStorage.getItem(SELECTED_CHARITY_KEY),
+          AsyncStorage.getItem('@runstr:default_zap_amount'),
         ]);
+
         if (teamId) setSelectedTeamId(teamId);
-        if (charityId) setSelectedCharityId(charityId);
+        if (storedZapAmount) setDefaultZapAmount(parseInt(storedZapAmount, 10) || 21);
       } catch (error) {
-        console.error('[TeamsScreen] Error loading selections:', error);
+        console.error('[TeamsScreen] Error loading state:', error);
       }
     };
-    loadSelections();
+    loadState();
   }, []);
 
-  const handleSelectTeam = useCallback(async (teamId: string) => {
+  const handleSelectTeam = useCallback(async (charityId: string) => {
     try {
       // Toggle selection - if already selected, deselect
-      const newValue = selectedTeamId === teamId ? null : teamId;
+      const newValue = selectedTeamId === charityId ? null : charityId;
       if (newValue) {
         await AsyncStorage.setItem(SELECTED_TEAM_KEY, newValue);
       } else {
@@ -170,76 +181,128 @@ export const TeamsScreen: React.FC = () => {
     }
   }, [selectedTeamId]);
 
-  const handleSelectCharity = useCallback(async (charityId: string) => {
-    try {
-      // Toggle selection - if already selected, deselect
-      const newValue = selectedCharityId === charityId ? null : charityId;
-      if (newValue) {
-        await AsyncStorage.setItem(SELECTED_CHARITY_KEY, newValue);
-      } else {
-        await AsyncStorage.removeItem(SELECTED_CHARITY_KEY);
-      }
-      setSelectedCharityId(newValue);
-      console.log('[TeamsScreen] Selected charity:', newValue);
-    } catch (error) {
-      console.error('[TeamsScreen] Error saving charity selection:', error);
-    }
-  }, [selectedCharityId]);
-
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    // Re-load selections from storage
     try {
-      const [teamId, charityId] = await Promise.all([
-        AsyncStorage.getItem(SELECTED_TEAM_KEY),
-        AsyncStorage.getItem(SELECTED_CHARITY_KEY),
-      ]);
+      const teamId = await AsyncStorage.getItem(SELECTED_TEAM_KEY);
       if (teamId) setSelectedTeamId(teamId);
-      if (charityId) setSelectedCharityId(charityId);
     } catch (error) {
       console.error('[TeamsScreen] Error refreshing:', error);
     }
     setIsRefreshing(false);
   }, []);
 
-  // Find selected team and charity objects
+  // Single tap - open ExternalZapModal (handles invoice creation and verification)
+  const handleZapPress = (charity: Charity) => {
+    console.log(`[TeamsScreen] Opening zap modal for ${charity.name}`);
+    setZapTargetCharity(charity);
+    setShowZapModal(true);
+  };
+
+  // Long press - quick NWC zap
+  const handleZapLongPress = async (charity: Charity) => {
+    if (!hasWallet) {
+      Toast.show({
+        type: 'error',
+        text1: 'No Wallet Connected',
+        text2: 'Tap the zap button to use external wallets like Cash App or Strike.',
+        position: 'top',
+        visibilityTime: 4000,
+      });
+      return;
+    }
+
+    // Get FRESH balance directly from service (useNWCZap hook balance can be stale)
+    const freshBalance = await NWCWalletService.getBalance();
+    if (freshBalance.error || freshBalance.balance < defaultZapAmount) {
+      Toast.show({
+        type: 'error',
+        text1: 'Insufficient Balance',
+        text2: `Need ${defaultZapAmount} sats but only have ${freshBalance.balance}. Tap to use external wallet.`,
+        position: 'top',
+        visibilityTime: 4000,
+      });
+      return;
+    }
+
+    setZappingCharityId(charity.id);
+    try {
+      console.log(`[TeamsScreen] Quick NWC zap to ${charity.name} with ${defaultZapAmount} sats`);
+
+      const { invoice } = await getInvoiceFromLightningAddress(
+        charity.lightningAddress,
+        defaultZapAmount,
+        `Donation to ${charity.name}`
+      );
+
+      if (!invoice) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to get invoice from team.',
+          position: 'top',
+          visibilityTime: 4000,
+        });
+        return;
+      }
+
+      const paymentResult = await NWCWalletService.sendPayment(invoice);
+
+      if (paymentResult.success) {
+        await refreshBalance();
+        Toast.show({
+          type: 'reward',
+          text1: 'Zapped!',
+          text2: `Donated ${defaultZapAmount} sats to ${charity.name}`,
+          position: 'top',
+          visibilityTime: 3000,
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: paymentResult.error || 'Failed to process donation.',
+          position: 'top',
+          visibilityTime: 4000,
+        });
+      }
+    } catch (error) {
+      console.error('[TeamsScreen] Quick zap error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to process donation. Tap to use external wallet.',
+        position: 'top',
+        visibilityTime: 4000,
+      });
+    } finally {
+      setZappingCharityId(null);
+    }
+  };
+
+  // Handle verified payment confirmation (called when payment detected)
+  const handleZapSuccess = async () => {
+    if (zapTargetCharity) {
+      Toast.show({
+        type: 'reward',
+        text1: 'Thank You!',
+        text2: `Donation to ${zapTargetCharity.name} verified!`,
+        position: 'top',
+        visibilityTime: 3000,
+      });
+      await refreshBalance();
+    }
+    setShowZapModal(false);
+    setZapTargetCharity(null);
+  };
+
+  // Find selected team object
   const selectedTeam = selectedTeamId
-    ? HARDCODED_TEAMS.find((t) => t.id === selectedTeamId)
-    : null;
-  const selectedCharity = selectedCharityId
-    ? CHARITIES.find((c) => c.id === selectedCharityId)
+    ? CHARITIES.find((c) => c.id === selectedTeamId)
     : null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header - back button only */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons
-            name="arrow-back"
-            size={24}
-            color={theme.colors.text}
-          />
-        </TouchableOpacity>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      {/* Toggle between Teams and Charities */}
-      <View style={styles.toggleContainer}>
-        <ToggleButtons
-          options={[
-            { key: 'teams', label: 'Teams' },
-            { key: 'charities', label: 'Charities' },
-          ]}
-          activeKey={activeTab}
-          onSelect={(key) => setActiveTab(key as 'teams' | 'charities')}
-        />
-      </View>
-
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.scrollContent}
@@ -252,79 +315,61 @@ export const TeamsScreen: React.FC = () => {
           />
         }
       >
-        {/* Teams Tab Content */}
-        {activeTab === 'teams' && (
-          <>
-            {/* Your Selected Team */}
-            {selectedTeam && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>YOUR TEAM</Text>
-                <TeamCard
-                  id={selectedTeam.id}
-                  name={selectedTeam.name}
-                  description={selectedTeam.description}
-                  isSelected={true}
-                  onSelect={() => handleSelectTeam(selectedTeam.id)}
-                />
-              </View>
-            )}
-
-            {/* All Teams */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>ALL TEAMS</Text>
-              <Text style={styles.sectionSubtitle}>
-                Select a team to add to your workout posts
-              </Text>
-              {HARDCODED_TEAMS.map((team) => (
-                <TeamCard
-                  key={team.id}
-                  id={team.id}
-                  name={team.name}
-                  description={team.description}
-                  isSelected={selectedTeamId === team.id}
-                  onSelect={() => handleSelectTeam(team.id)}
-                />
-              ))}
-            </View>
-          </>
+        {/* Your Selected Team */}
+        {selectedTeam && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>YOUR TEAM</Text>
+            <TeamCard
+              charity={selectedTeam}
+              isSelected={true}
+              onSelect={() => handleSelectTeam(selectedTeam.id)}
+              onZapPress={() => handleZapPress(selectedTeam)}
+              onZapLongPress={() => handleZapLongPress(selectedTeam)}
+              isZapping={zappingCharityId === selectedTeam.id}
+            />
+          </View>
         )}
 
-        {/* Charities Tab Content */}
-        {activeTab === 'charities' && (
-          <>
-            {/* Your Selected Charity */}
-            {selectedCharity && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>YOUR CHARITY</Text>
-                <CharityCard
-                  charity={selectedCharity}
-                  isSelected={true}
-                  onSelect={() => handleSelectCharity(selectedCharity.id)}
-                />
-              </View>
-            )}
-
-            {/* All Charities */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>ALL CHARITIES</Text>
-              <Text style={styles.sectionSubtitle}>
-                Select a charity to receive a portion of your rewards
-              </Text>
-              {CHARITIES.map((charity) => (
-                <CharityCard
-                  key={charity.id}
-                  charity={charity}
-                  isSelected={selectedCharityId === charity.id}
-                  onSelect={() => handleSelectCharity(charity.id)}
-                />
-              ))}
-            </View>
-          </>
-        )}
+        {/* All Teams */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ALL TEAMS</Text>
+          <Text style={styles.sectionSubtitle}>
+            Select a team to support with your workouts
+          </Text>
+          {CHARITIES.map((charity) => (
+            <TeamCard
+              key={charity.id}
+              charity={charity}
+              isSelected={selectedTeamId === charity.id}
+              onSelect={() => handleSelectTeam(charity.id)}
+              onZapPress={() => handleZapPress(charity)}
+              onZapLongPress={() => handleZapLongPress(charity)}
+              isZapping={zappingCharityId === charity.id}
+            />
+          ))}
+        </View>
 
         {/* Bottom padding */}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* External Zap Modal with charity donation verification */}
+      {zapTargetCharity && (
+        <ExternalZapModal
+          visible={showZapModal}
+          recipientNpub={zapTargetCharity.lightningAddress}
+          recipientName={zapTargetCharity.name}
+          memo={`Donation to ${zapTargetCharity.name}`}
+          onClose={() => {
+            setShowZapModal(false);
+            setZapTargetCharity(null);
+          }}
+          onSuccess={handleZapSuccess}
+          isCharityDonation={true}
+          charityId={zapTargetCharity.id}
+          charityLightningAddress={zapTargetCharity.lightningAddress}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -333,33 +378,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  toggleContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  headerTitle: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: theme.typography.weights.bold,
-  },
-  headerSpacer: {
-    width: 40,
   },
   content: {
     flex: 1,
@@ -421,6 +439,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  zapButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  zappingButton: {
+    opacity: 0.7,
+  },
+  checkmark: {
+    marginLeft: 8,
+  },
 });
 
+// ✅ PERFORMANCE: React.memo prevents re-renders when props haven't changed
+export const TeamsScreen = React.memo(TeamsScreenComponent);
 export default TeamsScreen;

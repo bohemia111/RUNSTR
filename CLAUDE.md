@@ -1,134 +1,89 @@
-# RUNSTR REWARDS - Claude Context
+# RUNSTR - Claude Context
 
 ## Project Overview
-RUNSTR REWARDS is a React Native mobile application that transforms fitness routines into Bitcoin-powered team competitions through Nostr's decentralized protocol. The app focuses on three core pillars: **Teams** (community-driven fitness groups with charity integration), **Competitions** (Bitcoin-incentivized events with ticket sales), and **Workouts** (local-first data with selective publishing). Teams receive payments via Nostr Wallet Connect (NWC), enabling instant Bitcoin transactions without platform custody. Members can pay event entry fees with any Lightning wallet (Cash App, Strike, Alby, self-custodial), and captains can challenge each other to 1v1 competitions with Bitcoin wagers.
+RUNSTR is an anonymous fitness tracker that rewards cardio workouts with Bitcoin and enables charity donations via the Nostr protocol. Built for Bitcoiners and the Nostr community, the app focuses on running, walking, and cycling.
 
-📖 **For comprehensive feature documentation, see**: [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md)
-🎯 **For Phase 1 MVP strategy and implementation plan, see**: [PHASE_1_MVP.md](./PHASE_1_MVP.md)
-📖 **For detailed overview, see**: [RUNSTR_REWARDS_OVERVIEW.md](./RUNSTR_REWARDS_OVERVIEW.md)
-📖 **For user flow documentation, see**: [APP_USER_FLOW_AND_CAPTAIN_EXPERIENCE.md](./docs/APP_USER_FLOW_AND_CAPTAIN_EXPERIENCE.md)
-🔐 **For environment setup (NWC, secrets), see**: [ENVIRONMENT_SETUP.md](./docs/ENVIRONMENT_SETUP.md)
+**Core Value:** Fitness earns Bitcoin. Bitcoin supports charities.
 
-## Strategic Direction: Three Core Pillars
+📖 **For workout event specification, see**: [docs/KIND_1301_SPEC.md](./docs/KIND_1301_SPEC.md)
+🔐 **For environment setup, see**: [docs/ENVIRONMENT_SETUP.md](./docs/ENVIRONMENT_SETUP.md)
 
-RUNSTR is refocusing on three essential components that make fitness competitions work:
+## Four Core Pillars
 
-### 1. **Teams** - Community-Driven Fitness Groups
-- Teams discovered through Nostr (kind 33404 metadata)
-- Member rosters stored in kind 30000 lists (single source of truth)
-- **Charity Integration**: Each team designates a supported charity (OpenSats, HRF, local organizations)
-- **NWC Payment Reception**: Teams receive payments via Nostr Wallet Connect connection strings
-- **No Platform Custody**: Teams control their own Lightning wallets
+### 1. **Workouts** - GPS Cardio Tracking
+- Core activities: Running, Walking, Cycling
+- GPS tracking with real-time metrics (pace, distance, elevation, splits)
+- HealthKit (iOS), Health Connect (Android), Garmin sync
+- Experimental features in settings (strength, diet, wellness)
+- Published as kind 1301 Nostr events
 
-### 2. **Competitions** - Bitcoin-Incentivized Events
-- Virtual fitness events (5Ks, cycling challenges, strength competitions)
-- **Entry Fee Tickets**: Captains set entry fees in satoshis (e.g., 2,100 sats = ~$1-2)
-- **Lightning Invoice Generation**: Using Alby MCP tools to create invoices
-- **Universal Wallet Support**: Users pay with Cash App, Strike, Alby, or self-custodial wallets
-- **Payment Detection**: Automatic confirmation via NWC polling/webhooks
-- **Instant Participation**: Payment detected → User added to event locally → Join request to captain
-- **1v1 Challenges**: Members challenge each other with Bitcoin wagers (escrow both sides, auto-payout winner)
+### 2. **Rewards** - Bitcoin for Fitness
+- **50 sats** per daily workout
+- **5 sats** per 1,000 steps
+- Delivered via Lightning address (LNURL protocol)
+- Real Bitcoin, not points or tokens
+- Creates positive feedback loop for healthy behavior
 
-### 3. **Workouts** - Local-First Data Control
-- All workouts stored locally in AsyncStorage/SQLite until published
-- **Two Publishing Options**:
-  - Kind 1 (social posts with beautiful cards)
-  - Kind 1301 (competition entries with structured data)
-- HealthKit integration for Apple Watch/iPhone workouts
-- User has complete control over when/what to publish
+### 3. **Donations** - Teams = Charities
+- "Joining" a team means selecting a charity to support
+- Team tag embedded in kind 1301 and kind 1 notes
+- Split a percentage of rewards to your charity
+- Zap charities directly from Lightning wallets (Cash App, Strike, Alby, Zeus)
+- **Impact Level** XP system tracks contributions
 
-### Target Market: Bitcoin/Nostr Community First
+### 4. **Events** - Fitness Competitions
+- Hardcoded events (Season II, January Walking Contest)
+- Participation via Supabase database
+- Leaderboards by activity type (Running, Walking, Cycling)
+- Bitcoin prize pools
+
+### Target Market: Bitcoin/Nostr Community
 - **50,000+ addressable market** of Bitcoiners and Nostr users
-- Solves cold start problem by targeting community that already understands:
-  - Private keys (nsec) and public keys (npub)
-  - Lightning Network payments and invoices
-  - Decentralized protocols and data ownership
-- **Auto-Nsec Generation**: Bitcoiners without Nostr accounts get auto-generated keys with backup instructions
-- **Proven Product-Market Fit**: Won first place in NosFabrica challenge
+- Community already understands nsec/npub, Lightning, decentralized protocols
+- Solves cold start problem by targeting knowledgeable users
 
-## Core User & Captain Experience
-**User Flow**: Nsec login → Auto-wallet creation → Profile screen → Teams discovery → Team joining → Competition participation → Earn/send zaps
-**Captain Flow**: Teams page → Captain dashboard → Competition creation → Member management → Direct Bitcoin rewards via zaps
+## User Experience
 
-**Key Features**:
-- **Nostr-Only Authentication**: Direct nsec login with automatic profile/workout import (auto-generation for Bitcoiners)
-- **NWC Lightning Payments**: Teams receive payments via Nostr Wallet Connect connection strings
-- **Universal Wallet Support**: Users pay with ANY Lightning wallet (Cash App, Strike, Alby, self-custodial)
-- **Event Ticket Sales**: Entry fees generate Lightning invoices, payment detection triggers instant participation
-- **1v1 Bitcoin Wagers**: Challenge friends with sats on the line, automatic escrow and winner payout
-- **Charity Integration**: Team pages display selected charities (OpenSats, HRF, community organizations)
-- **HealthKit Workout Posting**: Transform Apple Health workouts into Nostr events and social media cards
-- Real-time team discovery from multiple Nostr relays
-- Captain dashboard with join request management
-- Competition creation (7 activity types, cascading dropdowns)
-- Automatic leaderboard scoring based on captain-defined parameters
-- **Beautiful Social Cards**: Instagram-worthy workout achievement graphics with RUNSTR branding
-- **Performance Optimizations**: Aggressive caching eliminates loading states, instant navigation after splash
+**User Flow:** Nsec login → Profile screen → Select charity → Track workouts → Earn rewards → Join events
 
-**Authentication**:
-- **Simple Login Screen**: Show login screen unless npub/nsec found in local storage
-- **Direct Nostr Authentication**: Manual nsec input only (no platform-specific auth)
-- **Pure Nostr Flow**: Nsec login → derive npub → store locally in AsyncStorage
+**Key Features:**
+- **Nostr Authentication**: Direct nsec login with automatic profile import
+- **Lightning Address Rewards**: Users enter Lightning address to receive sats
+- **Charity Support**: Select a team (charity) to donate portion of rewards
+- **HealthKit/Health Connect Sync**: Import workouts from Apple/Android health apps
+- **Social Posting**: Share workouts as kind 1 posts with achievement cards
+- **Event Participation**: Join competitions via Supabase, workouts count toward leaderboards
+
+**Authentication:**
+- Show login screen unless npub/nsec found in local storage
+- Manual nsec input only (no platform-specific auth)
+- Nsec login → derive npub → store locally in AsyncStorage
 
 ## Key Technologies
 - **Frontend**: React Native with TypeScript (Expo framework)
-- **Data Layer**: Pure Nostr - NO SUPABASE (all data from Nostr events)
+- **Workout Data**: Nostr kind 1301 events + HealthKit/Health Connect
+- **Event Participation**: Supabase database for joining events and leaderboards
 - **Authentication**: Nostr (nsec) - direct authentication only
-- **Fitness Data**: Kind 1301 events from Nostr relays + Apple HealthKit
-- **Team Data**: Custom Nostr event kinds for teams, leagues, events, challenges (see [nostr-native-fitness-competitions.md](./docs/nostr-native-fitness-competitions.md))
-- **Bitcoin**: Lightning payments via Nostr Wallet Connect (NWC) + Lightning addresses for universal wallet support
+- **Rewards**: Lightning address via LNURL protocol
 - **Nostr Library**: NDK (@nostr-dev-kit/ndk) EXCLUSIVELY - NEVER use nostr-tools
-- **Global NDK Instance**: Single shared NDK instance via `GlobalNDKService` - reduces WebSocket connections by 90%
-- **Nostr Relays**: Damus, Primal, nos.lol, Nostr.band (4 relays via global NDK pool)
-- **In-App Notifications**: Nostr event-driven notifications (kinds 1101, 1102, 1103) - no push notifications
-- **IMPORTANT**: This project uses NO SUPABASE - pure Nostr only
+- **Global NDK Instance**: Single shared NDK instance via `GlobalNDKService`
+- **Nostr Relays**: Damus, Primal, nos.lol, Nostr.band (4 relays)
 
-## Nostr Event Kinds Reference
+## Nostr Event Kinds
 
-📖 **For comprehensive details, see**: [nostr-native-fitness-competitions.md](./docs/nostr-native-fitness-competitions.md)
+### Core Events
+- **kind 0**: Profile metadata (name, picture, about, Lightning address)
+- **kind 1**: Social posts (workout shares with achievement cards)
+- **kind 1301**: Workout events (distance, duration, calories, team tag)
 
-**Quick Reference Table:**
+### Kind 1301 Tags
+Workouts include tags for:
+- `exercise` - Activity type (running, walking, cycling)
+- `distance` - Distance with unit (km or mi)
+- `duration` - Duration in HH:MM:SS format
+- `team` - Charity/team identifier (for donation tracking)
 
-### Fitness & Workout Data
-- **kind 1301**: Workout events (distance, duration, calories) - **foundation of all competitions**
-- **kind 1**: Social workout posts with beautiful cards
-
-### Team Management
-- **kind 33404**: Team metadata and discovery
-- **kind 30000**: Team member lists (**single source of truth** for membership)
-- **kind 30001**: Generic lists (secondary lists)
-- **kind 1104**: Team join requests
-
-### Competitions (Leagues & Events)
-- **kind 30100**: League definitions (ongoing competitions)
-- **kind 30101**: Event definitions (time-bounded competitions)
-- **kind 1105**: Event join requests (separate from team joins)
-
-### Challenges (1v1 Competitions)
-- **kind 1105**: Challenge requests (initiate 1v1 competition)
-- **kind 1106**: Challenge acceptances (creates kind 30000 participant list)
-- **kind 1107**: Challenge declines
-
-### Notifications
-- **kind 1101**: Competition announcements
-- **kind 1102**: Competition results and prize distribution
-- **kind 1103**: Competition starting soon reminders
-
-### Bitcoin/Lightning Payments
-- **NWC Connection Strings**: Stored in team metadata for receiving payments (nostr+walletconnect://...)
-- **Lightning Addresses**: Fallback payment method (team@getalby.com format)
-- **Invoice Generation**: Using Alby MCP tools for Lightning invoice creation
-- **Payment Detection**: Polling/webhooks via NWC for instant payment confirmation
-
-### User Profile
-- **kind 0**: Profile metadata (name, picture, about)
-- **kind 3**: Contact lists (social graph)
-
-**Critical Architecture:**
-- **kind 1301** = workout data (what users do)
-- **kind 30000** = team rosters (who's competing)
-- **Leaderboards** = query kind 30000 for members → query kind 1301 from those members → calculate locally
-- **No backend database** - pure client-side Nostr queries
+📖 **For complete specification, see**: [docs/KIND_1301_SPEC.md](./docs/KIND_1301_SPEC.md)
 
 ## Kind 1301 Workout Event Format
 
@@ -146,14 +101,14 @@ RUNSTR is refocusing on three essential components that make fitness competition
 
 ## Architecture Principles
 - **File Size Limit**: Maximum 500 lines per file for maintainability
-- **Three Core Pillars**: Focus on Teams, Competitions, Workouts - everything else is secondary
-- **Pure Nostr Data Model**: All team, competition, and social data from Nostr events
-- **No Backend Dependencies**: No Supabase, no traditional backend - pure Nostr
-- **NWC Payment Integration**: Non-custodial Lightning payments via Nostr Wallet Connect
-- **Performance First**: Aggressive caching eliminates loading states after initial splash
-- **Local-First Workouts**: Store locally, sync to Nostr only on user action
-- **Real Data Only**: No mock data - all functionality uses actual Nostr events + HealthKit data
-- **Folder Documentation**: Update folder READMEs when adding/removing/changing files
+- **Four Core Pillars**: Workouts, Rewards, Donations, Events
+- **Cardio Focus**: Running, Walking, Cycling are core; other features are experimental
+- **Teams = Charities**: Team selection means choosing a charity to support
+- **Lightning Address Rewards**: Users receive sats via LNURL protocol
+- **Supabase for Events**: Event participation and leaderboards via database
+- **Nostr for Workouts**: Kind 1301 events for fitness data
+- **Performance First**: Aggressive caching eliminates loading states
+- **Local-First**: Store locally, sync to Nostr on user action
 
 ## Global NDK Instance Architecture
 
@@ -204,104 +159,6 @@ console.log(`${status.connectedRelays}/${status.relayCount} relays connected`);
 await GlobalNDKService.reconnect();
 ```
 
-## Lightning Payment Architecture (NWC)
-
-**Overview**: RUNSTR uses Lightning payments for event tickets, 1v1 challenges, and team payments via Nostr Wallet Connect (NWC).
-
-**Key Features:**
-- Event ticket sales with entry fees (e.g., 2,100 sats)
-- 1v1 challenge wagers with Bitcoin escrow
-- Payment detection via Alby SDK (@getalby/sdk v6+)
-- Universal wallet support (Cash App, Strike, Alby, self-custodial)
-- Non-custodial team wallets via NWC connection strings
-
-📖 **For complete implementation details, code examples, and payment flows, see**: [docs/LIGHTNING_IMPLEMENTATION.md](./docs/LIGHTNING_IMPLEMENTATION.md)
-
-## Event Payment Verification System
-
-**Overview**: Complete payment verification system for paid event join requests with dual-path verification (NWC auto-verify + manual override).
-
-### **Architecture Components:**
-
-**1. Payment Data Model** (`EventJoinRequestService.ts`)
-- Join requests (kind 1105) include payment tracking fields:
-  - `paymentProof`: Lightning invoice string or 'MANUAL_VERIFICATION'
-  - `paymentHash`: Extracted payment hash for NWC lookups
-  - `amountPaid`: Entry fee amount in satoshis
-  - `paymentTimestamp`: When payment was submitted
-- Tags automatically extracted when parsing kind 1105 events
-
-**2. Payment Verification Badge** (`PaymentVerificationBadge.tsx`)
-- Visual indicator showing payment status with 6 states:
-  - `free`: No payment required
-  - `claimed`: User claims payment (can't auto-verify)
-  - `verifying`: Checking NWC for payment confirmation
-  - `verified`: Payment confirmed via NWC
-  - `not_found`: Payment not found in NWC transactions
-  - `manual_paid`: Captain manually marked as paid
-- Auto-verifies payments when captain has NWC wallet configured
-- Shows retry button for failed verifications
-
-**3. Transaction History** (`EventTransactionHistory.tsx`)
-- Shows incoming Lightning payments matching event entry fee
-- Filters transactions by:
-  - Amount (entry fee ±1% tolerance for network fees)
-  - Date range (event start date → present)
-  - Type (incoming only)
-- Collapsible UI component (only visible for paid events)
-- Requires captain to have NWC wallet configured
-
-**4. NWC Wallet Integration** (`NWCWalletService.ts`)
-- `listTransactions()`: Query wallet transaction history with filters
-- `lookupInvoice()`: Check if specific invoice has been paid
-- Supports both invoice strings and payment hashes
-- Returns settled status for payment verification
-
-### **Payment Flows:**
-
-**Flow 1: NWC Auto-Verification (Captains with NWC Wallets)**
-1. User pays entry fee → Submits join request with payment proof
-2. Captain opens join requests section
-3. PaymentVerificationBadge auto-checks NWC wallet via `lookupInvoice()`
-4. Badge shows "Verified ✓" if payment found, "Not Found ✗" if missing
-5. Captain can retry verification or manually approve
-
-**Flow 2: Lightning Address Manual Verification (Captains without NWC)**
-1. User pays entry fee → Submits join request with payment proof
-2. Captain sees "Payment Claimed ⚠️" badge (can't auto-verify)
-3. Captain clicks "Mark as Paid" button if payment received off-chain
-4. Badge updates to "Marked as Paid ✓"
-
-**Flow 3: Off-Chain Payments (Cash/Venmo)**
-1. User requests to join with amount specified (no invoice)
-2. Captain receives payment via cash/Venmo in person
-3. Captain clicks "Mark as Paid" button on join request
-4. Join request marked with `MANUAL_VERIFICATION` proof
-
-### **Implementation Files:**
-- `src/services/events/EventJoinRequestService.ts` - Payment data model
-- `src/services/event/EventJoinService.ts` - Submit join requests with payment tags
-- `src/services/wallet/NWCWalletService.ts` - NWC wallet operations + transaction history
-- `src/components/captain/PaymentVerificationBadge.tsx` - Payment status indicator
-- `src/components/captain/EventTransactionHistory.tsx` - Transaction history display
-- `src/components/captain/EventJoinRequestsSection.tsx` - Join request management UI
-- `src/screens/EventCaptainDashboardScreen.tsx` - Captain dashboard with transaction history
-
-### **Key Design Decisions:**
-- **Dual-Path Verification**: Auto-verify for NWC, manual for everything else
-- **No Payment Enforcement**: Captains can always manually approve (trust-based system)
-- **Transaction Matching**: Fuzzy matching (±1% tolerance) for network fee variations
-- **Special Proof Value**: `'MANUAL_VERIFICATION'` distinguishes captain-approved payments
-- **Performance**: Transaction history loads on-demand, not on every screen render
-
-### **Testing Checklist:**
-- [ ] NWC captain receives payment → Auto-verification shows "Verified"
-- [ ] Lightning address captain receives payment → "Payment Claimed" badge appears
-- [ ] Captain clicks "Mark as Paid" → Badge updates to "Marked as Paid"
-- [ ] Transaction history shows matching incoming payments
-- [ ] Non-NWC captains don't see transaction history section
-- [ ] Failed lookups show retry button
-
 ## Performance Optimization Strategy
 
 **Problem**: Heavy Nostr usage causing slow app startup and loading states throughout navigation.
@@ -336,65 +193,47 @@ src/
 ```
 
 ## App Flow Architecture
-**1. Authentication & Profile Import**:
+
+**1. Authentication**:
 - Show login screen unless npub/nsec found in local storage
-- Nsec login automatically imports profile from kind 0 events
-- Derived npub stored locally in AsyncStorage for session persistence
-- Workout data synced from kind 1301 events across Nostr relays
-- Apple HealthKit workouts automatically imported and available for posting
-- Direct navigation to Profile screen after authentication
+- Nsec login imports profile from kind 0 events
+- Derived npub stored locally in AsyncStorage
 
-**2. Two-Tab Navigation**:
-- **Profile Tab**: Personal dashboard with unified workout history (HealthKit + Nostr), posting controls, team membership, account settings
-- **Teams Tab**: Real-time team discovery, captain detection, join/create functionality
+**2. Three-Tab Navigation**:
+- **Profile Tab**: Workout tracking, history, settings, Lightning address entry
+- **Teams Tab**: Browse/select charities to support
+- **Rewards Tab**: Total earnings, Impact Level XP, donation splits
 
-**3. Role-Based Experience**:
-- **Members**: Browse teams → Join → Participate in competitions
-- **Captains**: Captain dashboard access → Wizard-driven competition creation → Member management
+**3. Workout Flow**:
+- Track cardio via GPS (Running, Walking, Cycling)
+- Sync from HealthKit/Health Connect/Garmin
+- Publish as kind 1301 to Nostr
+- Share as kind 1 social post with achievement card
 
-**4. Competition System**:
-- **Wizard Creation**: 7 activity types → Dynamic competition options → Time/settings configuration
-- **Nostr Event Based**: Competitions published as kind 30100 (leagues) and 30101 (events)
-- **Manual Entry**: Participants post kind 1301 workout events to enter competitions
-- **Automatic Scoring**: Real-time leaderboards based on captain's wizard parameters
-- **Bitcoin Rewards**: Direct P2P zaps via Lightning - captains and members can instantly send satoshis
+**4. Rewards Flow**:
+- Complete daily workout → Earn 50 sats
+- Walk 1,000 steps → Earn 5 sats
+- Rewards sent to user's Lightning address via LNURL
 
-**5. Team Management**:
-- **Two-Tier Membership**: Local joining (instant UX) + Official Nostr lists (captain approval)
-- **Join Requests**: Real-time notifications with approval workflow
-- **Member Lists**: Nostr kind 30000/30001 lists for fast competition queries
+**5. Donation Flow**:
+- Select a team (charity) to support
+- Set donation split percentage
+- Team tag embedded in workout events
+- Zap charities directly from any Lightning wallet
 
-**6. In-App Notification System**:
-- **Nostr Event-Driven**: Real-time processing of kinds 1101 (announcements), 1102 (results), 1103 (starting soon)
-- **In-App Only**: Notifications appear while app is active (no push notifications)
-- **User Preference Integration**: Respects Profile notification settings with granular control
-- **Pure Client-Side**: No external push services, all notifications handled locally
-
-**7. HealthKit Workout Posting System**:
-- **Unified Workout Display**: Shows both HealthKit and Nostr workouts in single timeline
-- **Two-Button System**: "Save to Nostr" (kind 1301 for competitions) vs "Post to Nostr" (kind 1 social)
-- **Beautiful Social Cards**: SVG-based workout achievement graphics with RUNSTR branding
-- **Smart Status Tracking**: Prevents duplicate posting, shows completion states
-- **Achievement Recognition**: Automatic badges for PRs, distance milestones, calorie burns
-- **Motivational Content**: Inspirational quotes tailored to workout types
-
-**8. Pure Nostr Competition System**:
-- **Kind 30000 Member Lists**: Team members stored in Nostr kind 30000 lists (single source of truth)
-- **Competition Query Engine**: `Competition1301QueryService` queries kind 1301 workout events from team members
-- **Dynamic Leaderboards**: Real-time calculation based on wizard-defined parameters (no database needed)
-- **Captain Member Management**: Approve/remove members directly modifies kind 30000 Nostr lists
-- **Cached Performance**: 5-minute cache for member lists, 1-minute cache for competition queries
-- **Scoring Algorithms**: Total distance, consistency streaks, average pace, longest workouts, calorie tracking
-- **No Backend Required**: Pure client-side Nostr queries replace all database dependencies
+**6. Event Flow**:
+- Join hardcoded events via Supabase
+- Workouts during event period count toward leaderboard
+- Leaderboards organized by activity type
+- Prize pools distributed to winners
 
 ## UI Requirements
-Simple two-tab interface with dark theme:
+Simple three-tab interface with dark theme:
 - **Colors**: Black background (#000), dark cards (#0a0a0a), borders (#1a1a1a)
-- **Navigation**: Bottom tab bar with Teams and Profile tabs
-- **Teams Tab**: Feed layout with "+" button for team creation
-- **Profile Tab**: Unified workout history with posting controls, notification preferences, team membership
-- **Team Dashboard**: Three sections (League, Events, Challenges) when viewing a team
-- **In-App Notifications**: Real-time Nostr event notifications displayed while app is active
+- **Navigation**: Bottom tab bar with Profile, Teams, Rewards
+- **Profile Tab**: Start workout, workout history, settings, Lightning address
+- **Teams Tab**: Browse charities, select one to support, zap button
+- **Rewards Tab**: Total sats earned, Impact Level XP, donation split settings
 
 ## Development Workflow & Testing Protocol
 
@@ -464,21 +303,16 @@ Simple two-tab interface with dark theme:
 - **App crashes on startup**: Check Metro logs for JavaScript errors, not Xcode logs
 
 ## Local Data Storage
-**Pure Nostr Architecture**: All data comes from Nostr events, with local caching for performance.
 
 **Local Storage (AsyncStorage)**:
-- User's nsec/npub for authentication:
+- User authentication:
   - `@runstr:user_nsec` - User's private key (nsec)
   - `@runstr:npub` - User's public key (npub)
   - `@runstr:hex_pubkey` - User's hex-encoded public key
-- Cached team membership status
+- Lightning address for receiving rewards
+- Selected team/charity
 - Workout posting status (to prevent duplicates)
 - User preferences and settings
-
-**Captain Detection**:
-- Captain status determined from team's Nostr events
-- Team captain field checked against user's npub/hex pubkey
-- No backend verification needed - pure client-side from Nostr data
 
 ## Quality Assurance Requirements
 **MANDATORY: Before completing any development phase:**
@@ -520,59 +354,23 @@ git add . && git status && git commit -m "Fix: description" && git push origin m
 - Keep descriptions concise (1-2 sentences per file)
 - Update READMEs as part of file modification commits
 
-## Current Development Status - Payment Verification System Complete (Jan 2025)
-✅ Project structure and architecture established
-✅ Two-tab navigation (Teams/Profile) with bottom tab navigation
-✅ Nostr authentication with profile/workout auto-import
-✅ Real-time team discovery from multiple Nostr relays
-✅ **FIXED: Captain Detection System** - Single source of truth with caching architecture
-✅ **FIXED: Captain Dashboard Navigation** - Button now correctly navigates captains to dashboard
-✅ **Competition Wizard System** - Complete Event & League creation wizards
-✅ **Captain Dashboard** - Team management with join request approvals and member removal
-✅ **Dynamic Scoring System** - Automatic leaderboards based on wizard parameters
-✅ **Bitcoin Integration** - NWC Lightning payments, direct P2P zaps and prize distribution
-✅ **NEW: Event Payment Verification** - NWC auto-verify + manual override for paid event join requests
-✅ **NEW: Transaction History Dashboard** - Captain view of incoming payments matching entry fees
-✅ **NEW: Multi-Path Payment Support** - NWC wallets, Lightning addresses, cash/Venmo manual approval
-✅ Two-tier membership system (local + official Nostr lists)
-✅ **In-App Notifications** - Nostr event-driven notifications (no push)
-✅ **HealthKit Workout Posting** - Transform Apple Health workouts into Nostr events and social cards
-✅ **Pure Nostr Competition System** - Kind 30000 member lists, 1301 queries, dynamic leaderboards
-✅ All TypeScript compilation successful - Core services production-ready
+## Current Development Status (Jan 2026)
+✅ Three-tab navigation (Profile, Teams, Rewards)
+✅ Nostr authentication with nsec
+✅ GPS cardio tracking (Running, Walking, Cycling)
+✅ HealthKit, Health Connect, Garmin sync
+✅ Kind 1301 workout publishing
+✅ Kind 1 social posts with achievement cards
+✅ Daily rewards (50 sats/workout)
+✅ Step rewards (5 sats/1k steps)
+✅ Lightning address reward delivery via LNURL
+✅ Teams = Charities with donation splitting
+✅ Impact Level XP system
+✅ Hardcoded events with leaderboards (Season II, January Walking)
+✅ Supabase event participation
+✅ All TypeScript compilation successful
 
 
-
-## Competition Architecture (Wizard-Driven Leaderboards)
-
-**How Competitions Actually Work:**
-- Competitions are **local parameter sets** created through wizards, NOT Nostr events
-- Captains use wizards to define competition parameters (activity type, dates, scoring method)
-- Team membership defined by **kind 30000 Nostr lists** (single source of truth)
-- Members publish **kind 1301 workout events** to Nostr as they complete workouts
-- App queries 1301 events from team members and applies wizard parameters locally to calculate leaderboards
-- Competition parameters cached locally using AsyncStorage for performance
-
-**Competition Data Flow:**
-1. Captain creates competition via wizard → Parameters stored locally in AsyncStorage
-2. App identifies team members from kind 30000 Nostr list
-3. Members post workouts as kind 1301 events (completely independent of competitions)
-4. App queries members' 1301 events within competition date range
-5. Local scoring engine applies wizard parameters to calculate rankings
-6. Leaderboards displayed in real-time (pure client-side calculation)
-
-**Key Architecture Principles:**
-- **No Competition Events**: Competitions are NOT published to Nostr (may change in future)
-- **No Team Wallets**: Direct P2P Bitcoin payments via NWC and Lightning addresses (no pooled funds)
-- **No Backend Database**: Pure Nostr events + AsyncStorage caching only
-- **Ephemeral Competitions**: Competitions exist as app-side views over permanent Nostr workout data
-- **Payment System**: Uses NWC (Nostr Wallet Connect) for team payments and Lightning invoices for event tickets
-
-**Why This Architecture:**
-- **Simplicity**: No complex Nostr event types needed for competitions
-- **Flexibility**: Different apps can create different competition views over same workout data
-- **Privacy**: Competition parameters stay local unless captain chooses to share
-- **Performance**: No network calls needed to create/modify competitions
-- **Compatibility**: Works with existing kind 1301 workout events standard
 
 ## CRITICAL WALLET ARCHITECTURE RULES
 **⚠️ NEVER use nostr-tools in wallet code - Use NDK exclusively**
@@ -588,8 +386,10 @@ git add . && git status && git commit -m "Fix: description" && git push origin m
 
 ## Important Notes
 - All files must stay under 500 lines of code for maintainability
-- **Core User Journey**: Login → Auto-wallet → Teams → Competitions → Earn/send Bitcoin
-- **Two-Page Focus**: Keep UI simple with just Teams and Profile tabs
-- **Nostr-Native Data**: All team/workout data comes from Nostr events
-- **Bitcoin Economy**: Every team operates as a circular economy with P2P zaps
-- **Real Data Only**: No mock data - all functionality uses actual Nostr events
+- **Core User Journey**: Login → Select charity → Track workouts → Earn rewards → Donate
+- **Three-Tab Focus**: Profile (workouts), Teams (charities), Rewards (earnings)
+- **Teams = Charities**: Always use this framing, not "social groups"
+- **Cardio Focus**: Running, Walking, Cycling are core activities
+- **Bitcoin, not crypto**: Never use "cryptocurrency" - Bitcoin is Bitcoin
+- **Lightning Address**: Users receive rewards via LNURL, no NWC required
+- **Real Data Only**: No mock data - all functionality uses actual Nostr/Supabase

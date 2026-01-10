@@ -1,13 +1,31 @@
 /**
  * SatlantisRSVPService - Fetch RSVPs (kind 31925) for calendar events
  *
+ * ⚠️ DEPRECATED: This service is being phased out in favor of UnifiedEventParticipantService
+ *
+ * The new architecture uses local AsyncStorage for join tracking instead of Nostr RSVPs:
+ * - UnifiedEventParticipantService.joinEvent() - Local-first join storage
+ * - UnifiedEventParticipantService.getJoinedPubkeys() - Get participants for leaderboards
+ * - Season II participants are public, others are private (visible only to self)
+ *
+ * This service is kept for:
+ * - Backward compatibility with existing event joins
+ * - Local join backup functionality (still used by SatlantisEventJoinService)
+ * - Migration of legacy RSVP data
+ *
  * RSVPs are separate Nostr events that reference calendar events via the `a` tag.
  * This service fetches and parses RSVPs to get participant lists for events.
  *
- * Usage:
+ * Usage (DEPRECATED):
  * ```typescript
  * const rsvps = await SatlantisRSVPService.getEventRSVPs(pubkey, dTag);
  * const participants = await SatlantisRSVPService.getEventParticipants(pubkey, dTag);
+ * ```
+ *
+ * Preferred (NEW):
+ * ```typescript
+ * const pubkeys = await UnifiedEventParticipantService.getJoinedPubkeys(eventId, viewerPubkey);
+ * const hasJoined = await UnifiedEventParticipantService.hasJoined(eventId, pubkey);
  * ```
  */
 

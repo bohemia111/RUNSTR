@@ -24,6 +24,8 @@ import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService
 import CalorieEstimationService from '../../services/fitness/CalorieEstimationService';
 import { EnhancedSocialShareModal } from '../../components/profile/shared/EnhancedSocialShareModal';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
+import { HoldToStartButton } from '../../components/activity/HoldToStartButton';
+import { CountdownOverlay } from '../../components/activity/CountdownOverlay';
 import type { HealthProfile } from '../HealthProfileScreen';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
 import type { LocalWorkout } from '../../services/fitness/LocalWorkoutStorageService';
@@ -36,7 +38,7 @@ type ExerciseType =
   | 'squats'
   | 'curls'
   | 'bench';
-type WorkoutPhase = 'setup' | 'active' | 'rest' | 'summary';
+type WorkoutPhase = 'idle' | 'setup' | 'active' | 'rest' | 'summary';
 
 const EXERCISE_OPTIONS: {
   value: ExerciseType;
@@ -80,7 +82,8 @@ export const StrengthTrackerScreen: React.FC<StrengthTrackerScreenProps> = ({
   const [exerciseWeight, setExerciseWeight] = useState(0); // Weight being lifted (e.g., for bench press)
 
   // Workout state
-  const [phase, setPhase] = useState<WorkoutPhase>('setup');
+  const [phase, setPhase] = useState<WorkoutPhase>('idle');
+  const [countdown, setCountdown] = useState<3 | 2 | 1 | 'GO' | null>(null);
   const [currentSet, setCurrentSet] = useState(1);
   const [repsCompleted, setRepsCompleted] = useState<number[]>([]);
   const [weightsCompleted, setWeightsCompleted] = useState<number[]>([]); // Track weight per set
@@ -201,6 +204,27 @@ export const StrengthTrackerScreen: React.FC<StrengthTrackerScreenProps> = ({
       if (interval) clearInterval(interval);
     };
   }, [phase, restTimeRemaining]);
+
+  const handleHoldComplete = () => {
+    console.log('[StrengthTrackerScreen] Hold complete, starting countdown...');
+
+    // Start countdown: 3 → 2 → 1 → GO!
+    setCountdown(3);
+    setTimeout(() => {
+      setCountdown(2);
+      setTimeout(() => {
+        setCountdown(1);
+        setTimeout(() => {
+          setCountdown('GO');
+          setTimeout(() => {
+            setCountdown(null);
+            // Go to setup phase after countdown
+            setPhase('setup');
+          }, 500); // Show "GO!" for 0.5 seconds
+        }, 1000);
+      }, 1000);
+    }, 1000);
+  };
 
   const startWorkout = () => {
     setPhase('active');
@@ -455,6 +479,33 @@ export const StrengthTrackerScreen: React.FC<StrengthTrackerScreenProps> = ({
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Idle screen - centered HoldToStart button
+  if (phase === 'idle') {
+    return (
+      <View style={styles.container}>
+        {/* Countdown Overlay */}
+        <CountdownOverlay countdown={countdown} />
+
+        <View style={styles.idleCenteredContainer}>
+          <HoldToStartButton
+            label="Start Strength"
+            onHoldComplete={handleHoldComplete}
+            size="large"
+          />
+        </View>
+
+        {/* Custom Alert */}
+        <CustomAlert
+          visible={alertVisible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          buttons={alertConfig.buttons}
+          onClose={() => setAlertVisible(false)}
+        />
+      </View>
+    );
+  }
 
   // Setup screen
   if (phase === 'setup') {
@@ -930,6 +981,14 @@ const styles = StyleSheet.create({
   setupContainer: {
     flexGrow: 1,
     padding: 20,
+  },
+  // Idle state container - centered HoldToStart button
+  idleCenteredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    paddingBottom: 120, // Shift button up from true center
   },
   iconContainer: {
     alignSelf: 'center',

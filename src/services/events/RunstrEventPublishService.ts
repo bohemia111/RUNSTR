@@ -191,6 +191,11 @@ class RunstrEventPublishServiceClass {
     tags.push(['start', config.startTime.toString()]);
     tags.push(['end', config.endTime.toString()]);
 
+    // Location tag (NIP-52 compliant)
+    if (config.location) {
+      tags.push(['location', config.location]);
+    }
+
     // Activity type tags
     tags.push(['t', config.activityType]);
 
@@ -237,7 +242,7 @@ class RunstrEventPublishServiceClass {
         tags.push(['captain_lightning_address', creatorLightningAddress]);
       }
 
-      // For charity destination (future feature)
+      // For charity destination
       if (config.pledgeDestination === 'charity') {
         if (config.pledgeCharityAddress) {
           tags.push(['pledge_charity_address', config.pledgeCharityAddress]);
@@ -278,6 +283,20 @@ class RunstrEventPublishServiceClass {
     // Banner image (if provided)
     if (config.bannerImageUrl) {
       tags.push(['image', config.bannerImageUrl]);
+    }
+
+    // Impact Level gating tags (donation-based)
+    if (config.minimumImpactLevel && config.minimumImpactLevel > 0) {
+      tags.push(['minimum_impact_level', config.minimumImpactLevel.toString()]);
+    }
+    if (config.minimumImpactTier) {
+      tags.push(['minimum_impact_tier', config.minimumImpactTier]);
+    }
+
+    // Team competition tag
+    if (config.isTeamCompetition) {
+      tags.push(['team_competition', 'true']);
+      console.log('[RunstrEventPublish] 👥 Added team_competition tag');
     }
 
     return tags;
@@ -339,6 +358,7 @@ class RunstrEventPublishServiceClass {
         pubkey,
         title: config.title,
         description: config.description || '',
+        location: config.location, // Event location
         startTime: config.startTime,
         endTime: config.endTime,
         sportType: this.mapActivityToSport(config.activityType),
@@ -362,6 +382,11 @@ class RunstrEventPublishServiceClass {
         captainLightningAddress: captainLightningAddress,
         pledgeCharityAddress: config.pledgeCharityAddress,
         pledgeCharityName: config.pledgeCharityName,
+        // Rank gating fields
+        minimumRank: config.minimumRank,
+        minimumRankTier: config.minimumRankTier,
+        // Team competition
+        isTeamCompetition: config.isTeamCompetition,
       };
 
       // Cache single event (7 days)
@@ -422,28 +447,60 @@ class RunstrEventPublishServiceClass {
     formState: {
       title: string;
       description: string;
+      location: string;
       activityType: RunstrActivityType;
       scoringType: RunstrScoringType;
       targetDistance: string;
       duration: RunstrDuration;
       pledgeCost: number;
       pledgeDestination: 'captain' | 'charity';
+      pledgeCharityId: string | null;
       payoutScheme: RunstrPayoutScheme;
       prizePool: string;
       fixedPayout: string;
       bannerImageUrl: string;
+      // Impact Level gating (donation-based)
+      requireImpactLevel?: boolean;
+      minimumImpactTier?: string;
+      minimumImpactLevel?: number;
+      // Team competition
+      isTeamCompetition?: boolean;
+      // Start date for the event
+      startDate?: Date | null;
       // Legacy fields (optional)
       joinMethod?: RunstrJoinMethod;
       suggestedDonation?: string;
     },
     startTime?: number
   ): RunstrEventConfig {
-    const start = startTime || Math.floor(Date.now() / 1000);
+    // Use form.startDate if provided, otherwise startTime param, otherwise now
+    let start: number;
+    if (formState.startDate) {
+      start = Math.floor(formState.startDate.getTime() / 1000);
+    } else if (startTime) {
+      start = startTime;
+    } else {
+      start = Math.floor(Date.now() / 1000);
+    }
     const durationSeconds = getDurationSeconds(formState.duration);
+
+    // Resolve charity details if destination is charity
+    let charityName: string | undefined;
+    let charityAddress: string | undefined;
+    if (formState.pledgeDestination === 'charity' && formState.pledgeCharityId) {
+      // Import charities here to avoid circular dependency
+      const { getCharityById } = require('../../constants/charities');
+      const charity = getCharityById(formState.pledgeCharityId);
+      if (charity) {
+        charityName = charity.name;
+        charityAddress = charity.lightningAddress;
+      }
+    }
 
     return {
       title: formState.title.trim(),
       description: formState.description.trim() || undefined,
+      location: formState.location.trim() || undefined,
       bannerImageUrl: formState.bannerImageUrl || undefined,
       activityType: formState.activityType,
       scoringType: formState.scoringType,
@@ -462,10 +519,17 @@ class RunstrEventPublishServiceClass {
       joinMethod: 'open', // Legacy: default to open
       pledgeCost: formState.pledgeCost,
       pledgeDestination: formState.pledgeDestination,
+      pledgeCharityAddress: charityAddress,
+      pledgeCharityName: charityName,
       duration: formState.duration,
       startTime: start,
       endTime: start + durationSeconds,
       creatorHasNWC: false, // Will be checked at publish time
+      // Impact Level gating (donation-based)
+      minimumImpactLevel: formState.requireImpactLevel ? formState.minimumImpactLevel : undefined,
+      minimumImpactTier: formState.requireImpactLevel ? formState.minimumImpactTier : undefined,
+      // Team competition
+      isTeamCompetition: formState.isTeamCompetition || false,
     };
   }
 }

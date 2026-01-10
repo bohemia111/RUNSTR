@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NDK, NDKEvent, NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
 import { SimpleNostrService } from '../nostr/SimpleNostrService';
 import { GlobalNDKService } from '../nostr/GlobalNDKService';
+import { getAuthenticationData } from '../../utils/nostrAuth';
+import { SecureNsecStorage } from './SecureNsecStorage';
 
 export class DeleteAccountService {
   private static instance: DeleteAccountService;
@@ -29,11 +31,12 @@ export class DeleteAccountService {
     console.log('🗑️ DeleteAccountService: Starting account deletion...');
 
     try {
-      // Step 1: Get user's nsec for signing deletion requests
-      const nsec = await AsyncStorage.getItem('@runstr:user_nsec');
-      if (!nsec) {
+      // Step 1: Get user's nsec for signing deletion requests (from SecureStore)
+      const authData = await getAuthenticationData();
+      if (!authData?.nsec) {
         throw new Error('No user session found');
       }
+      const nsec = authData.nsec;
 
       // Step 2: Initialize NDK with user's signer for deletion requests
       await this.initializeNDK(nsec);
@@ -156,12 +159,16 @@ export class DeleteAccountService {
   }
 
   /**
-   * Clear all local data from AsyncStorage
+   * Clear all local data from AsyncStorage and SecureStore
    */
   private async clearAllLocalData(): Promise<void> {
     console.log('🧹 Clearing all local data...');
 
     try {
+      // Clear nsec from SecureStore (hardware-backed storage)
+      await SecureNsecStorage.clearNsec();
+      console.log('✅ SecureStore nsec cleared');
+
       // Get all keys from AsyncStorage
       const allKeys = await AsyncStorage.getAllKeys();
 
@@ -179,7 +186,7 @@ export class DeleteAccountService {
           key.includes('cache')
       );
 
-      console.log(`Found ${runstrKeys.length} keys to delete`);
+      console.log(`Found ${runstrKeys.length} AsyncStorage keys to delete`);
 
       // Delete all RUNSTR keys
       if (runstrKeys.length > 0) {
@@ -188,7 +195,6 @@ export class DeleteAccountService {
 
       // Also clear specific known keys to be thorough
       const specificKeys = [
-        '@runstr:user_nsec',
         '@runstr:npub',
         '@runstr:hex_pubkey',
         '@runstr:user_role',
@@ -205,7 +211,7 @@ export class DeleteAccountService {
 
       await AsyncStorage.multiRemove(specificKeys);
 
-      console.log('✅ All local data cleared');
+      console.log('✅ All local data cleared (SecureStore + AsyncStorage)');
     } catch (error) {
       console.error('Error clearing local data:', error);
       throw new Error('Failed to clear local data');

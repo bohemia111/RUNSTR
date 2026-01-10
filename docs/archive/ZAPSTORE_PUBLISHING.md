@@ -19,10 +19,7 @@ For reference, installation commands:
 **REQUIRED**: Contact the Zapstore team via Nostr to get whitelisted as a publisher. Without whitelisting, you cannot publish to `relay.zapstore.dev`.
 
 ### 3. Nostr Signing Key
-Your publishing nsec is configured in `.env`:
-```
-SIGN_WITH=nsec1f3s3gxkaxzgg70fp4n9r94gwn5ep0n0e8jcty3wdrjlq76zgnqwqmecgjp
-```
+Provide your nsec at publish time using the `--sign-with` flag or environment variable. Do not store your nsec in the repository.
 
 ## Project Configuration
 
@@ -36,7 +33,7 @@ SIGN_WITH=nsec1f3s3gxkaxzgg70fp4n9r94gwn5ep0n0e8jcty3wdrjlq76zgnqwqmecgjp
 
 2. **CHANGELOG.md** - Version history following Keep a Changelog format
 
-3. **.env** - Contains the Nostr signing key (already in .gitignore)
+3. **Signing** - Provide your nsec at publish time via `--sign-with` flag
 
 4. **assets/** - Directory structure:
    ```
@@ -111,7 +108,7 @@ zapstore publish --overwrite-release
 
 3. **Nostr Event Creation**
    - Creates kind 30063 event with app metadata
-   - Signs with your nsec from .env
+   - Signs with your nsec provided via `--sign-with` flag
    - Includes download links, descriptions, version info
 
 4. **Broadcast to Relays**
@@ -132,9 +129,9 @@ zapstore publish --overwrite-release
 - **Version**: 0.0.1 (from CHANGELOG.md)
 
 ### Security Considerations
-- Keep your nsec private (already in .gitignore)
-- Never commit .env to git
-- Consider using dedicated publishing key
+- Never store your nsec in the repository
+- Provide your nsec at publish time via `--sign-with` flag or environment variable
+- Consider using a dedicated publishing key
 
 ## Updating the App
 

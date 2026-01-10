@@ -42,17 +42,13 @@ export const useNWCZap = (): UseNWCZapReturn => {
   const [error, setError] = useState<string | null>(null);
 
   // Initialize and check wallet status on mount
+  // DON'T auto-fetch balance - it blocks UI with NWCClient WebSocket
   useEffect(() => {
     const initializeWallet = async () => {
       try {
         const walletAvailable = await NWCStorageService.hasNWC();
         setHasWallet(walletAvailable);
-
-        if (walletAvailable) {
-          const walletBalance = await NWCWalletService.getBalance();
-          setBalance(walletBalance.balance);
-        }
-
+        // Balance fetched on-demand via refreshBalance() when user triggers action
         setIsInitialized(true);
       } catch (err) {
         console.error('[useNWCZap] Initialization error:', err);
@@ -89,27 +85,36 @@ export const useNWCZap = (): UseNWCZapReturn => {
       setError(null);
 
       try {
-        // Normalize recipient pubkey to hex format
-        const recipientHex = npubToHex(recipientPubkey) || recipientPubkey;
+        let lightningAddress: string;
 
-        console.log(
-          '[useNWCZap] Getting recipient Lightning address for:',
-          recipientHex.slice(0, 8) + '...'
-        );
+        // Check if input is already a Lightning address (contains @)
+        if (recipientPubkey.includes('@')) {
+          // Already a Lightning address - use directly
+          lightningAddress = recipientPubkey;
+          console.log('[useNWCZap] Using provided Lightning address:', lightningAddress);
+        } else {
+          // It's a pubkey - look up profile to get Lightning address
+          const recipientHex = npubToHex(recipientPubkey) || recipientPubkey;
 
-        // Get recipient's profile to extract Lightning address
-        const recipientProfile = await ProfileService.getUserProfile(
-          recipientHex
-        );
+          console.log(
+            '[useNWCZap] Getting recipient Lightning address for:',
+            recipientHex.slice(0, 8) + '...'
+          );
 
-        if (!recipientProfile || !recipientProfile.lud16) {
-          setError('Recipient has no Lightning address in their profile');
-          setIsLoading(false);
-          return false;
+          // Get recipient's profile to extract Lightning address
+          const recipientProfile = await ProfileService.getUserProfile(
+            recipientHex
+          );
+
+          if (!recipientProfile || !recipientProfile.lud16) {
+            setError('Recipient has no Lightning address in their profile');
+            setIsLoading(false);
+            return false;
+          }
+
+          lightningAddress = recipientProfile.lud16;
+          console.log('[useNWCZap] Found Lightning address:', lightningAddress);
         }
-
-        const lightningAddress = recipientProfile.lud16;
-        console.log('[useNWCZap] Found Lightning address:', lightningAddress);
 
         // Request invoice from Lightning address via LNURL
         console.log('[useNWCZap] Requesting invoice for', amount, 'sats');

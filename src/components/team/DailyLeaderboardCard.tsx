@@ -14,9 +14,12 @@ interface DailyLeaderboardCardProps {
   title: string; // "5K Today"
   distance: string; // "5km"
   participants: number; // 7
-  entries: LeaderboardEntry[]; // All leaderboard entries (not just top runner)
+  entries: LeaderboardEntry[]; // Top 25 + user position if outside top 25
   onPress: () => void;
   onShare?: () => void; // Callback to open share modal
+  currentUserPubkey?: string; // For highlighting user's row
+  maxDisplay?: number; // Max entries to display (default 25)
+  participantLabel?: string; // "runner" or "walker" - defaults to "runner"
 }
 
 export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
@@ -26,11 +29,19 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
   entries,
   onPress,
   onShare,
+  currentUserPubkey: _currentUserPubkey, // Reserved for future use
+  maxDisplay = 25,
+  participantLabel = 'runner',
 }) => {
   const handleShare = (e: any) => {
     e.stopPropagation(); // Prevent triggering onPress
     onShare?.();
   };
+
+  // Split entries into top N and user position (if outside top N)
+  const topEntries = entries.slice(0, maxDisplay);
+  const userEntryOutsideTopN = entries.length > maxDisplay ? entries[entries.length - 1] : null;
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       {/* Header */}
@@ -63,13 +74,13 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
         <View style={styles.statItem}>
           <Ionicons name="people" size={16} color={theme.colors.textMuted} />
           <Text style={styles.statText}>
-            {participants} {participants === 1 ? 'runner' : 'runners'}
+            {participants} {participants === 1 ? participantLabel : `${participantLabel}s`}
           </Text>
         </View>
       </View>
 
-      {/* All Runners List */}
-      {entries.map((entry, index) => (
+      {/* Top Runners List */}
+      {topEntries.map((entry, index) => (
         <View key={entry.npub + index} style={styles.runnerRow}>
           <View style={styles.rankBadge}>
             <Text style={styles.rankText}>{entry.rank}</Text>
@@ -86,6 +97,43 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
           <Text style={styles.runnerTime}>{entry.formattedScore}</Text>
         </View>
       ))}
+
+      {/* User position section (if outside top N) */}
+      {userEntryOutsideTopN && (
+        <>
+          {/* Separator */}
+          <View style={styles.separator}>
+            <View style={styles.separatorLine} />
+            <Text style={styles.separatorText}>Your position</Text>
+            <View style={styles.separatorLine} />
+          </View>
+
+          {/* User's entry with optional lock icon */}
+          <View style={[styles.runnerRow, styles.userPositionRow]}>
+            {/* Lock icon for private participation */}
+            {(userEntryOutsideTopN as any).isPrivate && (
+              <Ionicons
+                name="lock-closed"
+                size={12}
+                color={theme.colors.textMuted}
+                style={styles.lockIcon}
+              />
+            )}
+            <View style={styles.rankBadge}>
+              <Text style={styles.rankText}>{userEntryOutsideTopN.rank}</Text>
+            </View>
+            <View style={styles.userRowContainer}>
+              <ZappableUserRow
+                npub={userEntryOutsideTopN.npub}
+                fallbackName={userEntryOutsideTopN.name}
+                showQuickZap={false}
+                hideActionsForCurrentUser={true}
+              />
+            </View>
+            <Text style={styles.runnerTime}>{userEntryOutsideTopN.formattedScore}</Text>
+          </View>
+        </>
+      )}
     </TouchableOpacity>
   );
 };
@@ -177,5 +225,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FF8C00', // Orange
     fontWeight: '600',
+  },
+  separator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+    paddingHorizontal: 8,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#1a1a1a',
+  },
+  separatorText: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    marginHorizontal: 8,
+    textTransform: 'uppercase',
+  },
+  userPositionRow: {
+    borderWidth: 1,
+    borderColor: '#FF8C00',
+    backgroundColor: 'rgba(255, 140, 0, 0.1)',
+  },
+  lockIcon: {
+    marginRight: 6,
   },
 });

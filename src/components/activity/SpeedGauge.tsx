@@ -21,7 +21,7 @@ export const SpeedGauge: React.FC<SpeedGaugeProps> = ({
   avgSpeed,
   unit = 'km/h',
 }) => {
-  const size = 200;
+  const size = 160; // Compact size to fit all metrics on screen
   const strokeWidth = 12;
   const radius = (size - strokeWidth) / 2;
   const center = size / 2;
@@ -128,9 +128,9 @@ export const SpeedGauge: React.FC<SpeedGaugeProps> = ({
         {/* Center speed display */}
         <SvgText
           x={center}
-          y={center - 10}
+          y={center - 8}
           fill={theme.colors.text}
-          fontSize={42}
+          fontSize={34}
           fontWeight="bold"
           textAnchor="middle"
           alignmentBaseline="middle"
@@ -139,9 +139,9 @@ export const SpeedGauge: React.FC<SpeedGaugeProps> = ({
         </SvgText>
         <SvgText
           x={center}
-          y={center + 25}
+          y={center + 18}
           fill={theme.colors.textMuted}
-          fontSize={14}
+          fontSize={12}
           fontWeight="500"
           textAnchor="middle"
           alignmentBaseline="middle"
@@ -169,13 +169,13 @@ export const SpeedGauge: React.FC<SpeedGaugeProps> = ({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 4,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    gap: 24,
+    marginTop: 4,
+    gap: 20,
   },
   statItem: {
     alignItems: 'center',

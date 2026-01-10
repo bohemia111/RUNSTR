@@ -115,9 +115,9 @@ export const MonthlyWorkoutGroup: React.FC<MonthlyWorkoutGroupProps> = ({
             <Text style={styles.statText}>
               {formatDuration(group.stats.totalDuration)}
             </Text>
-            {group.stats.totalDistance && (
+            {group.stats.totalDistance != null && group.stats.totalDistance > 0 && (
               <Text style={styles.statText}>
-                • {formatDistance(group.stats.totalDistance)}
+                {' \u2022 '}{formatDistance(group.stats.totalDistance)}
               </Text>
             )}
           </View>

@@ -4,6 +4,9 @@
  * Only active in development mode
  */
 
+// Guard to prevent multiple installations
+let isDebuggerInstalled = false;
+
 /**
  * Enable WebSocket debugging by wrapping the global WebSocket
  * This helps diagnose NWC connection issues at the protocol level
@@ -11,6 +14,12 @@
 export function enableWebSocketDebugging(): void {
   if (!__DEV__) {
     console.log('[WS-Debug] Skipping WebSocket debugging in production');
+    return;
+  }
+
+  // Prevent multiple installations (causes 5x log duplication!)
+  if (isDebuggerInstalled) {
+    console.log('[WS-Debug] Already installed, skipping...');
     return;
   }
 
@@ -182,6 +191,7 @@ export function enableWebSocketDebugging(): void {
 
   // Replace global WebSocket
   (global as any).WebSocket = DebugWebSocket;
+  isDebuggerInstalled = true;
   console.log('[WS-Debug] WebSocket debugger installed successfully');
 }
 

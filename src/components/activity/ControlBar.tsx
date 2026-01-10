@@ -6,6 +6,7 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../../styles/theme';
 import { HoldToStartButton } from './HoldToStartButton';
 
@@ -30,9 +31,13 @@ export const ControlBar: React.FC<ControlBarProps> = ({
   onStop,
   disabled = false,
 }) => {
+  const insets = useSafeAreaInsets();
+  // Ensure buttons are visible above system UI (nav bar on Android, home indicator on iOS)
+  const bottomPadding = Math.max(insets.bottom, 24) + 8;
+
   if (state === 'idle') {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingBottom: bottomPadding }]}>
         <HoldToStartButton
           label={startLabel}
           onHoldComplete={onHoldComplete}
@@ -45,7 +50,7 @@ export const ControlBar: React.FC<ControlBarProps> = ({
 
   // Tracking or Paused state
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: bottomPadding }]}>
       <View style={styles.buttonRow}>
         {state === 'tracking' ? (
           <TouchableOpacity style={styles.pauseButton} onPress={onPause}>

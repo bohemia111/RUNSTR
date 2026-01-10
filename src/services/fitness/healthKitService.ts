@@ -66,14 +66,90 @@ const HEALTHKIT_READ_PERMISSIONS = [
 ];
 
 // Workout type mappings (iOS HealthKit -> RUNSTR)
+// CORRECT type codes from @yzlin/expo-healthkit HKWorkoutActivityType enum
 const HK_WORKOUT_TYPE_MAP: Record<string, WorkoutType> = {
-  16: 'running', // HKWorkoutActivityTypeRunning
-  52: 'walking', // HKWorkoutActivityTypeWalking
-  13: 'cycling', // HKWorkoutActivityTypeCycling
-  24: 'hiking', // HKWorkoutActivityTypeHiking
-  46: 'other', // HKWorkoutActivityTypeYoga (not supported - mapped to other)
-  35: 'strength_training', // HKWorkoutActivityTypeStrengthTraining
-  3: 'gym', // HKWorkoutActivityTypeTraditionalStrengthTraining
+  // Core cardio - CORRECT mappings
+  37: 'running', // running
+  52: 'walking', // walking
+  13: 'cycling', // cycling
+  24: 'hiking', // hiking
+
+  // Strength training
+  20: 'strength_training', // functionalStrengthTraining
+  50: 'strength_training', // traditionalStrengthTraining
+  59: 'strength_training', // coreTraining
+
+  // Cardio machines → map to running
+  16: 'running', // elliptical
+  35: 'running', // rowing
+  44: 'running', // stairClimbing
+  63: 'running', // highIntensityIntervalTraining
+  11: 'running', // crossTraining
+  25: 'running', // mixedCardio
+
+  // Other activities → map to running (never 'other')
+  46: 'running', // swimming
+  57: 'running', // yoga
+  66: 'running', // pilates
+  58: 'running', // flexibility
+  45: 'running', // dance
+  60: 'running', // kickboxing
+  62: 'running', // jumpRope
+
+  // Sports → map to running as cardio fallback
+  1: 'running', // americanFootball
+  2: 'running', // archery
+  3: 'running', // australianFootball
+  4: 'running', // badminton
+  5: 'running', // baseball
+  6: 'running', // basketball
+  7: 'running', // bowling
+  8: 'running', // boxing
+  9: 'running', // climbing
+  10: 'running', // cricket
+  14: 'running', // crossCountrySkiing
+  15: 'running', // curling
+  17: 'running', // downhillSkiing
+  18: 'running', // equestrianSports
+  19: 'running', // fencing
+  21: 'running', // fishing
+  22: 'running', // golf
+  23: 'running', // gymnastics
+  26: 'running', // handball
+  27: 'running', // hockey
+  28: 'running', // hunting
+  29: 'running', // lacrosse
+  30: 'running', // martialArts
+  31: 'running', // mindAndBody
+  32: 'running', // paddleSports
+  33: 'running', // play
+  34: 'running', // preparationAndRecovery
+  36: 'running', // racquetball
+  38: 'running', // sailingSports
+  39: 'running', // skatingSports
+  40: 'running', // snowSports
+  41: 'running', // soccer
+  42: 'running', // softball
+  43: 'running', // squash
+  47: 'running', // surfingSports
+  48: 'running', // tableTennis
+  49: 'running', // tennis
+  51: 'running', // trackAndField
+  53: 'running', // volleyball
+  54: 'running', // waterFitness
+  55: 'running', // waterPolo
+  56: 'running', // waterSports
+  61: 'running', // wrestling
+  64: 'running', // wheelchairWalkPace
+  65: 'running', // wheelchairRunPace
+  67: 'running', // barre
+  68: 'running', // cardioDance
+  69: 'running', // socialDance
+  70: 'running', // pickleball
+  71: 'running', // cooldown
+  72: 'running', // swimBikeRun
+  73: 'running', // transition
+  74: 'running', // underwaterDiving
 };
 
 export interface HealthKitWorkout {
@@ -614,11 +690,9 @@ export class HealthKitService {
     // First try the standard mapping
     let activityType = HK_WORKOUT_TYPE_MAP[hkWorkout.workoutActivityType];
 
-    // If unmapped, check if it's from Garmin - default to running
-    // This fixes Garmin workouts synced via Apple HealthKit showing as "other"
+    // If unmapped, always default to running (never 'other')
     if (!activityType) {
-      const isGarmin = sourceName.toLowerCase().includes('garmin');
-      activityType = isGarmin ? 'running' : 'other';
+      activityType = 'running';
     }
 
     return {
@@ -682,13 +756,9 @@ export class HealthKitService {
       // Map HealthKit activity type to RUNSTR workout type
       let workoutType = HK_WORKOUT_TYPE_MAP[hkWorkout.workoutActivityType];
 
-      // If unmapped, check if from Garmin - default to running
-      // This fixes Garmin workouts synced via Apple HealthKit showing as "other"
+      // If unmapped, always default to running (never 'other')
       if (!workoutType) {
-        const isGarmin = (hkWorkout.sourceName || '')
-          .toLowerCase()
-          .includes('garmin');
-        workoutType = isGarmin ? 'running' : 'other';
+        workoutType = 'running';
       }
 
       // Convert and validate duration
@@ -1189,7 +1259,7 @@ export class HealthKitService {
           // Return in format expected by AppleHealthTab (simplified Workout interface)
           return {
             id: workoutData?.id || `healthkit_${workout.uuid}`,
-            type: workoutData?.type || 'other',
+            type: workoutData?.type || 'running',
             duration: workoutData?.duration || 0,
             distance: workoutData?.distance || 0,
             calories: workoutData?.calories || 0,

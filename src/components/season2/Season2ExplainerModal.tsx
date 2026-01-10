@@ -27,8 +27,7 @@ export const Season2ExplainerModal: React.FC<Season2ExplainerModalProps> = ({
   visible,
   onClose,
 }) => {
-  const { dateRange, prizePoolBonus, prizePoolCharity, entryFeeSats } =
-    useSeason2Status();
+  const { dateRange, prizePoolBonus, prizePoolCharity } = useSeason2Status();
 
   const charityPrizePerCategory = Math.floor(prizePoolCharity / 3);
 
@@ -67,12 +66,20 @@ export const Season2ExplainerModal: React.FC<Season2ExplainerModalProps> = ({
               </Text>
             </View>
 
-            {/* Entry Fee */}
+            {/* Registration Status */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Entry Fee</Text>
-              <Text style={styles.highlightText}>{formatSats(entryFeeSats)}</Text>
+              <Text style={styles.sectionTitle}>Registration</Text>
+              <View style={styles.closedBadge}>
+                <Ionicons
+                  name="lock-closed"
+                  size={16}
+                  color={theme.colors.orangeBright}
+                />
+                <Text style={styles.closedText}>Registration is closed</Text>
+              </View>
               <Text style={styles.paragraph}>
-                One-time payment to register for the competition.
+                Registration closed on December 31, 2025. Good luck to all
+                participants!
               </Text>
             </View>
 
@@ -260,6 +267,23 @@ const styles = StyleSheet.create({
   categoryText: {
     color: theme.colors.text,
     fontSize: 13,
+  },
+  closedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.medium,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  closedText: {
+    color: theme.colors.orangeBright,
+    fontSize: 14,
+    fontWeight: theme.typography.weights.medium,
   },
   bottomPadding: {
     height: 40,

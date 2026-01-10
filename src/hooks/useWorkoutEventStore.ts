@@ -1,16 +1,31 @@
 /**
  * useWorkoutEventStore - React hook for accessing the centralized workout store
  *
- * Provides reactive access to the WorkoutEventStore singleton.
- * Components using this hook will automatically re-render when the store updates.
+ * @deprecated This hook is deprecated. Use UnifiedWorkoutCache instead for leaderboards.
  *
- * Usage:
+ * The UnifiedWorkoutCache is now the single source of truth for:
+ * - Season II leaderboards
+ * - Satlantis event leaderboards
+ * - Distance leaderboards (5K, 10K, Half, Marathon)
+ *
+ * UnifiedWorkoutCache queries Season II participants + logged-in user,
+ * providing faster performance and privacy-aware data access.
+ *
+ * Migration:
  * ```typescript
- * const { workouts, isLoading, refresh, getTodaysWorkouts } = useWorkoutEventStore();
+ * // OLD (deprecated)
+ * const { workouts, refresh } = useWorkoutEventStore();
  *
- * // Get today's workouts for a specific team
- * const teamWorkouts = workouts.filter(w => w.teamId === teamId);
- * const todaysTeamWorkouts = teamWorkouts.filter(w => isToday(w.createdAt));
+ * // NEW (use UnifiedWorkoutCache)
+ * import { UnifiedWorkoutCache } from '../services/cache/UnifiedWorkoutCache';
+ *
+ * useEffect(() => {
+ *   UnifiedWorkoutCache.ensureLoaded().then(() => {
+ *     const workouts = UnifiedWorkoutCache.getWorkoutsByActivity('running');
+ *   });
+ *   const unsubscribe = UnifiedWorkoutCache.subscribe(() => { ... });
+ *   return () => unsubscribe();
+ * }, []);
  * ```
  */
 
@@ -59,9 +74,7 @@ export function useWorkoutEventStore(): UseWorkoutEventStoreResult {
 
   // Subscribe to store updates
   useEffect(() => {
-    console.log('[useWorkoutEventStore] Setting up subscription...');
     const unsubscribe = store.subscribe((updatedWorkouts) => {
-      console.log(`[useWorkoutEventStore] 📥 Subscription callback fired - received ${updatedWorkouts.length} workouts`);
       setWorkouts(updatedWorkouts);
       setIsLoading(store.isLoading);
       setError(store.error);
@@ -70,14 +83,12 @@ export function useWorkoutEventStore(): UseWorkoutEventStoreResult {
 
     // Initial load from store
     const initialWorkouts = store.getAllWorkouts();
-    console.log(`[useWorkoutEventStore] Initial load from store: ${initialWorkouts.length} workouts`);
     setWorkouts(initialWorkouts);
     setIsLoading(store.isLoading);
     setError(store.error);
     setLastFetchTime(store.lastFetchTime);
 
     // Initialize store if not already done
-    console.log('[useWorkoutEventStore] Calling store.initialize()...');
     store.initialize().catch((err) => {
       console.error('[useWorkoutEventStore] Initialization error:', err);
     });

@@ -11,6 +11,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { CustomAlertManager } from '../../ui/CustomAlert';
 import { theme } from '../../../styles/theme';
@@ -39,6 +40,10 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
   const [hasPermission, setHasPermission] = useState(false);
   const [permissionRequested, setPermissionRequested] = useState(false);
 
+  // Button loading state - tracks which workout is being processed
+  const [postingWorkoutId, setPostingWorkoutId] = useState<string | null>(null);
+  const [postingType, setPostingType] = useState<'post' | 'compete' | null>(null);
+
   useEffect(() => {
     // Only check status on mount, don't auto-request permissions
     checkPermissionStatus();
@@ -59,12 +64,42 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
       const status = healthKitService.getStatus();
 
       if (status.authorized) {
-        // Already authorized, but DON'T auto-load workouts
-        // This prevents the iOS permission popup from appearing on app startup
-        // Users must manually pull-to-refresh or tap a button to load workouts
+        // Already authorized
         setHasPermission(true);
-        setIsLoading(false);
-        // REMOVED: await loadAppleHealthWorkouts(); - This was causing permission popups!
+
+        // Load cached workouts immediately for instant display
+        // This prevents workouts from disappearing when navigating away and back
+        const cached = await healthKitService.getCachedWorkouts();
+        if (cached && cached.length > 0) {
+          // Transform cached data to UI format matching Workout interface
+          const transformedWorkouts: Workout[] = cached.map((workout) => ({
+            id: workout.UUID || workout.id || `hk_${Date.now()}`,
+            odId: workout.UUID || workout.id,
+            userId: userId,
+            type: (workout.activityType || 'running') as Workout['type'],
+            source: 'healthkit' as const,
+            duration: workout.duration,
+            distance: workout.totalDistance || 0,
+            calories: workout.totalEnergyBurned || 0,
+            startTime: workout.startDate,
+            endTime: workout.endDate,
+            syncedAt: new Date().toISOString(),
+            metadata: {
+              sourceApp: workout.sourceName,
+              originalWorkoutType: workout.workoutActivityType,
+              healthKitId: workout.UUID,
+              syncedVia: 'healthkit_service',
+            },
+          }));
+          setWorkouts(transformedWorkouts);
+          setIsLoading(false);
+
+          // Fetch fresh data in background (don't show loading spinner)
+          loadAppleHealthWorkouts(false);
+        } else {
+          // No cache, fetch with loading state
+          await loadAppleHealthWorkouts(true);
+        }
       } else {
         // Not authorized - just update state, don't auto-request
         console.log('🍎 HealthKit not authorized - showing connect button');
@@ -172,9 +207,11 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
     }
   };
 
-  const loadAppleHealthWorkouts = async () => {
+  const loadAppleHealthWorkouts = async (showLoading: boolean = true) => {
     try {
-      setIsLoading(true);
+      if (showLoading) {
+        setIsLoading(true);
+      }
       console.log('🍎 Loading Apple Health workouts (last 30 days)...');
 
       // Add timeout protection to prevent hanging
@@ -222,10 +259,15 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
         console.log('HealthKit workout loading failed:', errorMessage);
       }
 
-      // Always set empty array to prevent UI crashes
-      setWorkouts([]);
+      // Only clear workouts if we're not doing a background refresh
+      // (keep cached data visible if background refresh fails)
+      if (showLoading) {
+        setWorkouts([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -251,6 +293,11 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
       return;
     }
 
+    // Prevent double-tap
+    if (postingWorkoutId === workout.id) return;
+
+    setPostingWorkoutId(workout.id);
+    setPostingType('compete');
     try {
       await onCompete(workout);
       CustomAlertManager.alert('Success', 'Workout entered into competition!');
@@ -260,6 +307,9 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
         'Error',
         'Failed to enter workout into competition'
       );
+    } finally {
+      setPostingWorkoutId(null);
+      setPostingType(null);
     }
   };
 
@@ -272,46 +322,82 @@ const AppleHealthTabContent: React.FC<AppleHealthTabProps> = ({
       return;
     }
 
+    // Prevent double-tap
+    if (postingWorkoutId === workout.id) return;
+
+    setPostingWorkoutId(workout.id);
+    setPostingType('post');
     try {
       await onSocialShare(workout);
       // Success alert handled by EnhancedSocialShareModal
     } catch (error) {
       console.error('Social share failed:', error);
       CustomAlertManager.alert('Error', 'Failed to share workout');
+    } finally {
+      setPostingWorkoutId(null);
+      setPostingType(null);
     }
   };
 
-  const renderWorkout = ({ item }: { item: Workout }) => (
-    <WorkoutCard workout={item}>
-      <View style={styles.buttonContainer}>
-        {/* Post button - Kind 1 social sharing */}
-        <TouchableOpacity
-          style={[styles.actionButton, styles.postButton]}
-          onPress={() => handleSocialShare(item)}
-        >
-          <Ionicons
-            name="chatbubble-outline"
-            size={16}
-            color={theme.colors.accentText}
-          />
-          <Text style={styles.postButtonText}>Post</Text>
-        </TouchableOpacity>
+  const renderWorkout = ({ item }: { item: Workout }) => {
+    const isPostingThis = postingWorkoutId === item.id;
+    const isPostingPost = isPostingThis && postingType === 'post';
+    const isPostingCompete = isPostingThis && postingType === 'compete';
 
-        {/* Compete button - Kind 1301 competition entry */}
-        <TouchableOpacity
-          style={[styles.actionButton, styles.publicButton]}
-          onPress={() => handleCompete(item)}
-        >
-          <Ionicons
-            name="cloud-upload-outline"
-            size={16}
-            color={theme.colors.accentText}
-          />
-          <Text style={styles.publicButtonText}>Compete</Text>
-        </TouchableOpacity>
-      </View>
-    </WorkoutCard>
-  );
+    return (
+      <WorkoutCard workout={item}>
+        <View style={styles.buttonContainer}>
+          {/* Post button - Kind 1 social sharing */}
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.postButton,
+              isPostingPost && styles.buttonDisabled,
+            ]}
+            onPress={() => handleSocialShare(item)}
+            disabled={isPostingThis}
+          >
+            {isPostingPost ? (
+              <ActivityIndicator size="small" color={theme.colors.accentText} />
+            ) : (
+              <>
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={16}
+                  color={theme.colors.accentText}
+                />
+                <Text style={styles.postButtonText}>Post</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Compete button - Kind 1301 competition entry */}
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              styles.publicButton,
+              isPostingCompete && styles.buttonDisabled,
+            ]}
+            onPress={() => handleCompete(item)}
+            disabled={isPostingThis}
+          >
+            {isPostingCompete ? (
+              <ActivityIndicator size="small" color={theme.colors.accentText} />
+            ) : (
+              <>
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={16}
+                  color={theme.colors.accentText}
+                />
+                <Text style={styles.publicButtonText}>Compete</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </WorkoutCard>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -418,6 +504,9 @@ const styles = StyleSheet.create({
   },
   publicButton: {
     backgroundColor: theme.colors.accent,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   postButtonText: {
     color: theme.colors.accentText,

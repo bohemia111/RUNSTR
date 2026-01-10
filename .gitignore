@@ -43,3 +43,6 @@ app-example
 
 # Build logs
 build-v*.log
+
+# Encrypted secrets (auto-generated, contains sensitive data)
+src/config/encryptedSecrets.ts

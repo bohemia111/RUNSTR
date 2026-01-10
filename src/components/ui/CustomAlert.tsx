@@ -49,9 +49,9 @@ export const CustomAlert: React.FC<CustomAlertProps> = ({
     }
   }, [visible]);
 
-  const handleButtonPress = (button: AlertButton) => {
+  const handleButtonPress = async (button: AlertButton) => {
     if (button.onPress) {
-      button.onPress();
+      await button.onPress();  // Await async handlers before closing
     }
     onClose();
   };
@@ -233,9 +233,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   destructiveButton: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: theme.colors.orangeBright, // Orange theme, not red
     borderWidth: 1,
-    borderColor: theme.colors.error,
+    borderColor: theme.colors.orangeDeep,
   },
   buttonText: {
     fontSize: 15,
@@ -246,6 +246,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text, // Light orange text for visibility on dark background
   },
   destructiveButtonText: {
-    color: theme.colors.text, // Light orange on red
+    color: theme.colors.accentText, // Black text on orange
   },
 });

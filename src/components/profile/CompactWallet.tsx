@@ -18,11 +18,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { NWCStorageService } from '../../services/wallet/NWCStorageService';
 import { NWCWalletService } from '../../services/wallet/NWCWalletService';
 import { WalletConfigModal } from '../wallet/WalletConfigModal';
-import { FEATURES } from '../../config/features';
-
-// Keep legacy imports for Cashu support (feature flagged)
-import { useWalletStore } from '../../store/walletStore';
-import { useNutzap } from '../../hooks/useNutzap';
 
 interface CompactWalletProps {
   onSendPress?: () => void;
@@ -33,137 +28,99 @@ interface CompactWalletProps {
 export const CompactWallet: React.FC<CompactWalletProps> = ({
   onSendPress,
   onReceivePress,
-  onHistoryPress,
 }) => {
-  // NWC wallet state
   const [hasNWC, setHasNWC] = useState(false);
-  const [nwcBalance, setNwcBalance] = useState(0);
+  const [balance, setBalance] = useState(0);
   const [showWalletConfig, setShowWalletConfig] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  // Legacy Cashu wallet state (feature flagged)
-  const {
-    balance: cashuBalance,
-    isInitialized,
-    isInitializing,
-    refreshBalance: refreshStoreBalance,
-  } = useWalletStore();
-  const { claimNutzaps } = useNutzap(false);
-  const [lastClaimTime, setLastClaimTime] = useState<Date | null>(null);
-
-  // Initialize NWC wallet on mount
+  // Initialize wallet on mount - DON'T auto-connect, just check if configured
+  // This prevents app freeze from blocking NWCClient WebSocket
   useEffect(() => {
-    const initNWC = async () => {
+    const init = async () => {
       setIsLoading(true);
+      setConnectionError(null);
       try {
         const nwcAvailable = await NWCStorageService.hasNWC();
         setHasNWC(nwcAvailable);
-
+        // DON'T automatically fetch balance - let user tap refresh
+        // This prevents the blocking NWCClient from freezing the app
         if (nwcAvailable) {
-          // Get balance
-          const balanceResult = await NWCWalletService.getBalance();
-          setNwcBalance(balanceResult.balance);
+          setConnectionError('Tap refresh to connect');
         }
       } catch (error) {
-        console.error('[CompactWallet] NWC init error:', error);
+        console.error('[CompactWallet] Init error:', error);
+        setConnectionError('Error checking wallet');
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (FEATURES.ENABLE_NWC_WALLET) {
-      initNWC();
-    } else {
-      setIsLoading(false);
-    }
+    init();
   }, []);
 
-  // Refresh NWC balance
-  const handleRefreshNWC = useCallback(async () => {
+  // Refresh balance
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
+    setConnectionError(null);
     try {
-      const balanceResult = await NWCWalletService.getBalance();
-      setNwcBalance(balanceResult.balance);
-      console.log(
-        '[CompactWallet] NWC balance refreshed:',
-        balanceResult.balance
-      );
+      const result = await NWCWalletService.getBalance();
+      if (result.error) {
+        setConnectionError(result.error);
+      } else {
+        setBalance(result.balance);
+      }
     } catch (error) {
-      console.error('[CompactWallet] NWC refresh error:', error);
+      console.error('[CompactWallet] Refresh error:', error);
+      setConnectionError('Refresh failed');
     } finally {
       setIsRefreshing(false);
     }
   }, []);
 
-  // Handle wallet config success
+  // Handle wallet config success - DON'T immediately fetch balance
+  // This prevents blocking the UI if the wallet is slow to connect
+  // User can tap refresh to test the connection
   const handleWalletConfigSuccess = useCallback(async () => {
+    setConnectionError(null);
+    setIsLoading(false);
     const nwcAvailable = await NWCStorageService.hasNWC();
     setHasNWC(nwcAvailable);
-
+    // Show "Tap refresh to connect" state - don't block trying to connect
     if (nwcAvailable) {
-      // Get initial balance
-      const balanceResult = await NWCWalletService.getBalance();
-      setNwcBalance(balanceResult.balance);
+      setBalance(0);
+      setConnectionError('Tap refresh to connect');
     }
   }, []);
 
-  // Legacy Cashu handlers (feature flagged)
-  const handleClaim = useCallback(
-    async (silent: boolean = true) => {
-      if (!FEATURES.ENABLE_CASHU_WALLET) return;
-
-      const result = await claimNutzaps();
-      if (result.claimed > 0) {
-        setLastClaimTime(new Date());
-        if (!silent) {
-          Alert.alert('Payment Received!', `Received ${result.claimed} sats`, [
-            { text: 'OK' },
-          ]);
-        }
-      }
-    },
-    [claimNutzaps]
-  );
-
-  const handleRefreshCashu = useCallback(async () => {
-    if (!FEATURES.ENABLE_CASHU_WALLET) return;
-
-    setIsRefreshing(true);
-    try {
-      await handleClaim(true);
-      await refreshStoreBalance();
-    } catch (err) {
-      console.error('[CompactWallet] Cashu refresh failed:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [handleClaim, refreshStoreBalance]);
-
-  // Legacy Cashu initialization (feature flagged)
-  useEffect(() => {
-    if (FEATURES.ENABLE_CASHU_WALLET && isInitialized) {
-      refreshStoreBalance().catch((err) =>
-        console.warn('[CompactWallet] Cashu balance sync failed:', err)
-      );
-    }
-  }, [isInitialized, refreshStoreBalance]);
-
-  useEffect(() => {
-    if (FEATURES.ENABLE_CASHU_WALLET && isInitialized) {
-      handleClaim(true);
-      const interval = setInterval(() => {
-        handleClaim(true);
-      }, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [isInitialized, handleClaim]);
-
-  // Determine which wallet system to use
-  const balance = FEATURES.ENABLE_NWC_WALLET ? nwcBalance : cashuBalance;
-  const handleRefresh = FEATURES.ENABLE_NWC_WALLET
-    ? handleRefreshNWC
-    : handleRefreshCashu;
+  // Handle wallet disconnect
+  const handleDisconnectWallet = useCallback(() => {
+    Alert.alert(
+      'Disconnect Wallet',
+      'Are you sure you want to disconnect your wallet? You can reconnect anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Disconnect',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await NWCStorageService.clearNWC();
+              NWCWalletService.forceReset();
+              setHasNWC(false);
+              setBalance(0);
+              setConnectionError(null);
+            } catch (error) {
+              console.error('[CompactWallet] Disconnect error:', error);
+              Alert.alert('Error', 'Failed to disconnect wallet');
+            }
+          },
+        },
+      ]
+    );
+  }, []);
 
   const formatBalance = (sats: number): string => {
     if (sats >= 1000000) {
@@ -174,11 +131,10 @@ export const CompactWallet: React.FC<CompactWalletProps> = ({
     return sats.toString();
   };
 
-  // Render wallet UI based on NWC availability
   return (
     <>
       <View style={styles.walletBox}>
-        {!hasNWC && FEATURES.ENABLE_NWC_WALLET ? (
+        {!hasNWC ? (
           // No wallet configured - show connect prompt
           <View style={styles.noWalletContainer}>
             <View style={styles.noWalletIcon}>
@@ -204,23 +160,46 @@ export const CompactWallet: React.FC<CompactWalletProps> = ({
               <Text style={styles.connectButtonText}>Connect Wallet</Text>
             </TouchableOpacity>
             <Text style={styles.receiveNote}>
-              💡 Set your Lightning address in profile to receive Bitcoin
+              Set your Lightning address in profile to receive Bitcoin
             </Text>
           </View>
         ) : (
           // Wallet configured - show balance and actions
           <>
-            {/* Centered balance with sync indicator and refresh button */}
+            {/* Disconnect button */}
+            <TouchableOpacity
+              style={styles.disconnectButton}
+              onPress={handleDisconnectWallet}
+              activeOpacity={0.6}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="settings-outline"
+                size={16}
+                color={theme.colors.textMuted}
+              />
+            </TouchableOpacity>
+
+            {/* Balance display */}
             <View style={styles.balanceContainer}>
-              <Text style={styles.balanceAmount}>{formatBalance(balance)}</Text>
-              <Text style={styles.balanceUnit}>sats</Text>
+              {connectionError ? (
+                <TouchableOpacity onPress={handleRefresh} style={styles.errorContainer}>
+                  <Ionicons name="alert-circle" size={18} color="#FF6B6B" />
+                  <Text style={styles.errorText}>Tap to retry</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <Text style={styles.balanceAmount}>{formatBalance(balance)}</Text>
+                  <Text style={styles.balanceUnit}>sats</Text>
+                </>
+              )}
               {isLoading || isRefreshing ? (
                 <ActivityIndicator
                   size="small"
                   color={theme.colors.textMuted}
                   style={styles.syncIndicator}
                 />
-              ) : (
+              ) : !connectionError && (
                 <TouchableOpacity
                   onPress={handleRefresh}
                   style={styles.refreshButton}
@@ -235,7 +214,7 @@ export const CompactWallet: React.FC<CompactWalletProps> = ({
               )}
             </View>
 
-            {/* Compact action buttons */}
+            {/* Action buttons */}
             <View style={styles.actions}>
               <TouchableOpacity
                 style={styles.actionButton}
@@ -263,7 +242,6 @@ export const CompactWallet: React.FC<CompactWalletProps> = ({
         )}
       </View>
 
-      {/* Wallet Configuration Modal */}
       <WalletConfigModal
         visible={showWalletConfig}
         onClose={() => setShowWalletConfig(false)}
@@ -285,7 +263,14 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
-  // No wallet state
+  disconnectButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
+    zIndex: 10,
+  },
+
   noWalletContainer: {
     flex: 1,
     alignItems: 'center',
@@ -338,7 +323,6 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 
-  // Centered balance
   balanceContainer: {
     flex: 1,
     flexDirection: 'row',
@@ -369,7 +353,18 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // Actions
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  errorText: {
+    fontSize: 14,
+    color: '#FF6B6B',
+    fontWeight: theme.typography.weights.medium,
+  },
+
   actions: {
     flexDirection: 'row',
     gap: 8,

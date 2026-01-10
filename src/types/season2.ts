@@ -17,6 +17,7 @@ export interface Season2Participant {
   charityId?: string;
   charityName?: string;
   isLocalJoin: boolean; // True if user joined locally but not yet on official list
+  isPrivateCompetitor?: boolean; // True if user is competing privately (not official participant)
 }
 
 export interface Season2Leaderboard {

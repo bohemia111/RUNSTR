@@ -95,19 +95,13 @@ export const CompetitionsListScreen: React.FC = () => {
   if (isLoading && !globalLeaderboards) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
-            <Text style={styles.title}>Leaderboards</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-        </View>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.accent} />
           <Text style={styles.loadingText}>Loading global events...</Text>
@@ -120,19 +114,13 @@ export const CompetitionsListScreen: React.FC = () => {
   if (!hasAnyLeaderboards) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.backButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
-            <Text style={styles.title}>Leaderboards</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-        </View>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           refreshControl={
@@ -162,19 +150,13 @@ export const CompetitionsListScreen: React.FC = () => {
   // Main content - Show global leaderboards
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Leaderboards</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-      </View>
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={styles.backButton}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+      </TouchableOpacity>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -276,6 +258,8 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'flex-start',
+    marginLeft: 16,
+    marginTop: 8,
   },
 
   title: {

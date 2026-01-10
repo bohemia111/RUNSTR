@@ -20,10 +20,21 @@ import type { LocalWorkout } from '../../services/fitness/LocalWorkoutStorageSer
 // PUBLIC TAB: Hidden from UI (local-first architecture), but code kept for potential future use
 export type WorkoutTabType = 'public' | 'private' | 'apple' | 'healthconnect'; // | 'garmin';
 
+// Export tab options builder for external use (e.g., rendering tabs in parent header)
+export const getWorkoutTabOptions = () => [
+  { key: 'private', label: 'Local' },
+  ...(Platform.OS === 'ios' ? [{ key: 'apple', label: 'Apple Health' }] : []),
+  ...(Platform.OS === 'android' ? [{ key: 'healthconnect', label: 'Health Connect' }] : []),
+];
+
 interface WorkoutTabNavigatorProps {
   userId: string;
   pubkey?: string;
   initialTab?: WorkoutTabType;
+  // External tab control (when tabs are rendered in parent)
+  activeTab?: WorkoutTabType;
+  onActiveTabChange?: (tab: WorkoutTabType) => void;
+  hideInternalTabBar?: boolean;
   onRefresh?: () => void;
   onPostToNostr?: (workout: LocalWorkout) => Promise<void>;
   onPostToSocial?: (workout: LocalWorkout) => Promise<void>;
@@ -40,6 +51,9 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
   userId,
   pubkey,
   initialTab = 'private',
+  activeTab: externalActiveTab,
+  onActiveTabChange,
+  hideInternalTabBar = false,
   onRefresh,
   onPostToNostr,
   onPostToSocial,
@@ -51,37 +65,44 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
   onSocialShareHealthConnect,
   onNavigateToAnalytics,
 }) => {
-  const [activeTab, setActiveTab] = useState<WorkoutTabType>(initialTab);
+  const [internalActiveTab, setInternalActiveTab] = useState<WorkoutTabType>(initialTab);
+
+  // Use external tab state if provided, otherwise use internal state
+  const activeTab = externalActiveTab ?? internalActiveTab;
+  const setActiveTab = (tab: WorkoutTabType) => {
+    if (onActiveTabChange) {
+      onActiveTabChange(tab);
+    } else {
+      setInternalActiveTab(tab);
+    }
+  };
 
   // Build tab options based on platform
-  const tabOptions = [
-    { key: 'private', label: 'Phone' },
-    ...(Platform.OS === 'ios' ? [{ key: 'apple', label: 'Watch' }] : []),
-    ...(Platform.OS === 'android' ? [{ key: 'healthconnect', label: 'Health' }] : []),
-  ];
+  const tabOptions = getWorkoutTabOptions();
 
   return (
     <View style={styles.container}>
-      {/* Tab Switcher */}
-      <View style={styles.tabBar}>
-        <ToggleButtons
-          options={tabOptions}
-          activeKey={activeTab}
-          onSelect={(key) => setActiveTab(key as WorkoutTabType)}
-        />
-      </View>
+      {/* Tab Switcher - can be hidden when parent renders tabs */}
+      {!hideInternalTabBar && (
+        <View style={styles.tabBar}>
+          <ToggleButtons
+            options={tabOptions}
+            activeKey={activeTab}
+            onSelect={(key) => setActiveTab(key as WorkoutTabType)}
+          />
+        </View>
+      )}
 
-      {/* Tab Content */}
+      {/* Tab Content - All tabs stay mounted to preserve state across switches */}
       <View style={styles.tabContent}>
-        {/* Only mount the active tab to prevent unnecessary component initialization */}
-        {activeTab === 'public' && (
+        <View style={{ display: activeTab === 'public' ? 'flex' : 'none', flex: 1 }}>
           <PublicWorkoutsTab
             userId={userId}
             pubkey={pubkey}
             onRefresh={onRefresh}
           />
-        )}
-        {activeTab === 'private' && (
+        </View>
+        <View style={{ display: activeTab === 'private' ? 'flex' : 'none', flex: 1 }}>
           <PrivateWorkoutsTab
             userId={userId}
             pubkey={pubkey}
@@ -90,28 +111,28 @@ export const WorkoutTabNavigator: React.FC<WorkoutTabNavigatorProps> = ({
             onPostToSocial={onPostToSocial}
             onNavigateToAnalytics={onNavigateToAnalytics}
           />
-        )}
-        {activeTab === 'apple' && (
+        </View>
+        <View style={{ display: activeTab === 'apple' ? 'flex' : 'none', flex: 1 }}>
           <AppleHealthTab
             userId={userId}
             onCompete={onCompeteHealthKit}
             onSocialShare={onSocialShareHealthKit}
           />
-        )}
-        {activeTab === 'healthconnect' && (
+        </View>
+        <View style={{ display: activeTab === 'healthconnect' ? 'flex' : 'none', flex: 1 }}>
           <HealthConnectTab
             userId={userId}
             onCompete={onCompeteHealthConnect}
             onSocialShare={onSocialShareHealthConnect}
           />
-        )}
-        {activeTab === 'garmin' && (
+        </View>
+        <View style={{ display: activeTab === 'garmin' ? 'flex' : 'none', flex: 1 }}>
           <GarminHealthTab
             userId={userId}
             onCompete={onCompeteGarmin}
             onSocialShare={onSocialShareGarmin}
           />
-        )}
+        </View>
       </View>
     </View>
   );

@@ -70,38 +70,59 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
       return;
     }
 
+    const trimmedNwcString = nwcString.trim();
+
+    // Validate format first (fast check)
+    if (!NWCStorageService.validateFormat(trimmedNwcString)) {
+      setAlertTitle('Invalid Format');
+      setAlertMessage(
+        'NWC string must start with nostr+walletconnect:// - please check and try again.'
+      );
+      setAlertButtons([{ text: 'OK', style: 'default' }]);
+      setAlertVisible(true);
+      return;
+    }
+
     setIsValidating(true);
 
     try {
-      const result = await NWCStorageService.saveNWCString(nwcString.trim());
+      // SAVE IMMEDIATELY - Don't test connection (it can block the UI)
+      // Connection will be tested lazily on first actual use
+      console.log('[WalletConfig] Saving NWC string (no pre-test to avoid freeze)...');
+      const result = await NWCStorageService.saveNWCString(trimmedNwcString);
 
       if (result.success) {
-        setAlertTitle('Wallet Connected');
-        setAlertMessage('You can now send and receive Bitcoin!');
+        setAlertTitle('Wallet Saved');
+        setAlertMessage('Your wallet connection has been saved. It will connect when you use Bitcoin features.');
         setAlertButtons([
           {
             text: 'OK',
             style: 'default',
             onPress: () => {
               setNwcString('');
-              onSuccess?.();
-              onClose();
+              // Defer callbacks to let CustomAlert close first (prevents modal state conflict freeze)
+              setTimeout(() => {
+                onSuccess?.();
+                onClose();
+              }, 50);
             },
           },
         ]);
         setAlertVisible(true);
       } else {
-        setAlertTitle('Connection Failed');
+        setAlertTitle('Save Failed');
         setAlertMessage(
-          result.error || 'Please check your NWC string and try again.'
+          result.error || 'Failed to save wallet configuration. Please try again.'
         );
         setAlertButtons([{ text: 'OK', style: 'default' }]);
         setAlertVisible(true);
       }
     } catch (error) {
       console.error('[WalletConfig] Save error:', error);
-      setAlertTitle('Error');
-      setAlertMessage('Failed to save wallet configuration');
+      setAlertTitle('Connection Error');
+      setAlertMessage(
+        'Failed to connect to wallet. The connection may have timed out.\n\nPlease try again.'
+      );
       setAlertButtons([{ text: 'OK', style: 'default' }]);
       setAlertVisible(true);
     } finally {
@@ -128,12 +149,10 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
   const handleCancel = () => {
     Keyboard.dismiss();
     if (isValidating) {
-      setAlertTitle('Cancel Validation?');
-      setAlertMessage(
-        'Connection test is in progress. Are you sure you want to cancel?'
-      );
+      setAlertTitle('Cancel Save?');
+      setAlertMessage('Saving is in progress. Are you sure you want to cancel?');
       setAlertButtons([
-        { text: 'Continue Testing', style: 'cancel' },
+        { text: 'Continue', style: 'cancel' },
         {
           text: 'Cancel',
           style: 'destructive',
@@ -252,12 +271,17 @@ export const WalletConfigModal: React.FC<WalletConfigModalProps> = ({
                   ]}
                 >
                   {isValidating ? (
-                    <ActivityIndicator color="#000000" />
+                    <>
+                      <ActivityIndicator color="#000000" size="small" />
+                      <Text style={styles.connectButtonText}>
+                        Saving...
+                      </Text>
+                    </>
                   ) : (
                     <>
                       <Ionicons name="wallet" size={20} color="#000000" />
                       <Text style={styles.connectButtonText}>
-                        Connect Wallet
+                        Save Wallet
                       </Text>
                     </>
                   )}

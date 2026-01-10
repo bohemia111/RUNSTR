@@ -148,6 +148,7 @@ export interface RunstrEventConfig {
   // Basic info
   title: string;
   description?: string;
+  location?: string; // Event location (e.g., "Austin, TX" or "Virtual")
   bannerImageUrl?: string; // URL of uploaded banner image
 
   // Activity
@@ -180,6 +181,17 @@ export interface RunstrEventConfig {
 
   // Payment automation
   creatorHasNWC: boolean; // Creator can auto-payout
+
+  // Impact Level gating (donation-based)
+  minimumImpactLevel?: number; // Minimum Impact Level required (e.g., 5 for 'Supporter')
+  minimumImpactTier?: string; // Human-readable tier ('Supporter' | 'Contributor' | 'Champion' | 'Legend' | 'Philanthropist')
+
+  // @deprecated - Use minimumImpactLevel/minimumImpactTier instead
+  minimumRank?: number; // Legacy WoT score threshold
+  minimumRankTier?: string; // Legacy WoT tier name
+
+  // Team competition
+  isTeamCompetition: boolean; // Enable team vs team competition mode
 }
 
 /**
@@ -206,19 +218,29 @@ export interface RunstrEvent extends SatlantisEvent {
 export interface RunstrEventFormState {
   title: string;
   description: string;
+  location: string; // Event location (e.g., "Austin, TX" or "Virtual")
   activityType: RunstrActivityType;
   scoringType: RunstrScoringType;
   targetDistance: string; // String for input field
   duration: RunstrDuration;
   pledgeCost: number; // Number of daily workouts to pledge (1, 3, 5, 7)
   pledgeDestination: RunstrPledgeDestination; // 'captain' or 'charity'
+  pledgeCharityId: string | null; // ID of selected charity when destination is 'charity'
   payoutScheme: RunstrPayoutScheme;
   prizePool: string; // String for input field
   fixedPayout: string; // String for input field
   bannerImageUrl: string; // URL of uploaded banner image
+  // Impact Level gating (donation-based)
+  requireImpactLevel: boolean;
+  minimumImpactTier: 'Supporter' | 'Contributor' | 'Champion' | 'Legend' | 'Philanthropist';
+  minimumImpactLevel: number; // Level threshold for the tier (5, 10, 20, 50, 100)
   // Legacy fields - kept for backward compatibility
   joinMethod?: RunstrJoinMethod;
   suggestedDonation?: string;
+  // Team competition
+  isTeamCompetition: boolean; // Enable team vs team competition mode
+  // Start date for the event
+  startDate: Date | null; // null = starts immediately on creation
 }
 
 /**
@@ -227,16 +249,26 @@ export interface RunstrEventFormState {
 export const DEFAULT_FORM_STATE: RunstrEventFormState = {
   title: '',
   description: '',
+  location: '', // Empty by default - optional field
   activityType: 'running',
   scoringType: 'fastest_time',
   targetDistance: '5',
   duration: '1d',
   pledgeCost: 1, // Default: 1 daily workout pledge (50 sats)
   pledgeDestination: 'captain', // Default: rewards go to event creator
+  pledgeCharityId: null, // No charity selected by default
   payoutScheme: 'winner_takes_all',
   prizePool: '',
   fixedPayout: '',
   bannerImageUrl: '',
+  // Impact Level gating defaults (donation-based)
+  requireImpactLevel: false,
+  minimumImpactTier: 'Supporter',
+  minimumImpactLevel: 5,
+  // Team competition default
+  isTeamCompetition: false,
+  // Start date default - today at midnight
+  startDate: null,
 };
 
 // ============================================================================
@@ -419,4 +451,32 @@ export function validateEventForm(form: RunstrEventFormState): ValidationError[]
   }
 
   return errors;
+}
+
+// ============================================================================
+// Team Competition Types
+// ============================================================================
+
+/**
+ * Leaderboard entry for team competitions
+ * Aggregates scores from all team members
+ */
+export interface TeamLeaderboardEntry {
+  /** Position in team leaderboard (1-indexed) */
+  rank: number;
+
+  /** Team ID from hardcoded teams */
+  teamId: string;
+
+  /** Team display name */
+  teamName: string;
+
+  /** Total aggregated score (sum of all member scores) */
+  totalScore: number;
+
+  /** Formatted score for display (e.g., "45.23 km" or "2:34:45") */
+  formattedScore: string;
+
+  /** Number of team members who contributed workouts */
+  memberCount: number;
 }

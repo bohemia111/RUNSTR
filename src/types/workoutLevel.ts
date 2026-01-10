@@ -20,10 +20,11 @@ export interface XPCalculation {
 
 export interface LevelStats {
   totalWorkouts: number;
-  qualifyingWorkouts: number; // Workouts that met distance threshold
+  qualifyingWorkouts: number; // Workouts that met minimum threshold
   totalDistance: number; // in meters (all workouts)
-  qualifyingDistance: number; // in meters (only threshold-meeting workouts)
+  qualifyingDistance: number; // in meters (only cardio workouts)
   level: WorkoutLevel;
+  currentStreak?: number; // Current consecutive workout days
 }
 
 export interface LevelMilestone {
@@ -34,19 +35,33 @@ export interface LevelMilestone {
   unlockedAt?: Date;
 }
 
-// Distance thresholds - minimum distance to earn XP (in meters)
-export const DISTANCE_THRESHOLDS: Record<string, number> = {
-  walking: 1000, // 1 km
-  running: 2000, // 2 km
-  cycling: 3000, // 3 km
-};
+// Minimum thresholds for qualifying workouts
+export const MIN_DURATION_SECONDS = 300; // 5 minutes
+export const MIN_DISTANCE_METERS = 500; // 0.5 km (alternative for cardio)
 
-// XP Constants for distance-based system with exponential scaling
+// Cardio activity types (eligible for distance bonus)
+export const CARDIO_ACTIVITIES = ['running', 'walking', 'cycling', 'hiking'];
+
+// XP Constants for universal workout system
 export const XP_CONSTANTS = {
-  XP_PER_KM: 10, // 10 XP per kilometer
+  // Base XP for every qualifying workout
+  BASE_XP_PER_WORKOUT: 100,
+  // Duration bonus: XP per 10 minutes
+  DURATION_XP_PER_10_MIN: 10,
+  // Distance bonus (cardio only): XP per kilometer
+  DISTANCE_XP_PER_KM: 10,
+  // Level scaling
   LEVEL_SCALING_BASE: 100, // Base XP for level 1
-  LEVEL_SCALING_FACTOR: 1.15, // Each level needs 15% more XP
+  LEVEL_SCALING_FACTOR: 1.10, // Each level needs 10% more XP (easier progression)
 } as const;
+
+// Streak bonus thresholds
+export const STREAK_BONUSES: { days: number; bonus: number }[] = [
+  { days: 30, bonus: 100 },
+  { days: 14, bonus: 75 },
+  { days: 7, bonus: 50 },
+  { days: 3, bonus: 25 },
+];
 
 // Predefined milestones (unlimited levels supported)
 export const LEVEL_MILESTONES: LevelMilestone[] = [

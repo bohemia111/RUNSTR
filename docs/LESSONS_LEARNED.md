@@ -1245,3 +1245,110 @@ onNavigate={(data) => handler(data)} // handler will try AsyncStorage again
 ---
 
 *Updated after Captain Detection Authentication Fix. Successfully resolved AsyncStorage corruption authentication inconsistency, enabling proper captain detection across all app navigation paths.*
+
+---
+
+## iOS WebSocket Timer Blocking (January 2026)
+
+### The Problem: 67-Second Stuck Spinner
+
+**Symptom:** Season II leaderboard showed a loading spinner for 43-67 seconds AFTER data was successfully fetched from Nostr relays. The fetch completed in ~4 seconds, but React couldn't render until much later.
+
+**Root Cause:** iOS blocks the native timer queue (setTimeout, requestAnimationFrame) after receiving many WebSocket messages rapidly. The block duration scales with event count.
+
+### Discovery Process
+
+**Key diagnostic finding:**
+```
+[BLOCK-1] setTimeout(0) after fetchEvents: 67,000ms  ← BLOCKED!
+[BLOCK-1] setImmediate after fetchEvents: 2ms        ← Works!
+[BLOCK-1] Promise.resolve after fetchEvents: 1ms     ← Works!
+```
+
+This revealed that **macrotasks** were blocked while **microtasks and setImmediate** worked fine.
+
+### Event Count Threshold Testing
+
+| Authors | Events | Block Time | UX Impact |
+|---------|--------|------------|-----------|
+| 1 | ~5 | 504ms | Instant |
+| 10 | 65 | 74ms | Instant |
+| 15 | 100 | 8,654ms | Noticeable |
+| 20 | 113 | 34,000ms | Unacceptable |
+| 43 | 178 | 67,000ms | Broken |
+
+**Threshold:** ~65-80 events works, 100+ events blocks timers.
+
+### Solutions Attempted
+
+**Option B - Subscribe Pattern (FAILED):**
+- Streaming events via `ndk.subscribe()` instead of `fetchEvents()`
+- Still blocked for 64+ seconds - the issue is at iOS level, not NDK
+
+**Option A - Batched Fetching (SUCCESS!):**
+- Fetch authors in groups of 10 (staying under 80 events per batch)
+- Use setImmediate between batches to yield to React
+- Timer block reduced from 64,000ms to 64ms!
+
+### Final Solution
+
+```typescript
+// Fetch in batches of 10 authors
+const BATCH_SIZE = 10;
+const PRIORITY_AUTHORS = [...]; // 10 most active users
+
+// Batch 1: Priority users (instant leaderboard)
+await fetchBatch(priorityAuthors);
+this.notifySubscribers();
+await yieldToReact(); // setImmediate
+
+// Batches 2+: Remaining authors
+for (const batch of remainingBatches) {
+  await fetchBatch(batch);
+  this.notifySubscribers();
+  await yieldToReact();
+}
+```
+
+### Results
+
+| Metric | Before | After |
+|--------|--------|-------|
+| setTimeout block | 64,000ms | 64ms |
+| Time to first data | 67s (stuck) | 2s |
+| UI responsiveness | Frozen | Progressive updates |
+
+### Key Lessons
+
+**1. iOS WebSocket Behavior**
+- iOS's native WebSocket affects JS timer queue after many rapid messages
+- This is NOT a React Native or NDK bug - it's iOS platform behavior
+- Android does not exhibit this issue
+
+**2. Workarounds That Work**
+- `setImmediate` - Bypasses blocked timer queue (React Native specific)
+- `Promise.resolve().then()` - Microtasks are not blocked
+- Batched fetching - Keep each batch under ~80 events
+
+**3. Workarounds That DON'T Work**
+- Streaming with subscribe() - Still triggers the block
+- Disconnecting relays after fetch - Triggers NDK auto-reconnect (worse!)
+- requestAnimationFrame - Same blocked queue as setTimeout
+
+**4. Debugging Approach**
+- Add timing logs at every step to isolate where delays occur
+- Test with different data volumes to find thresholds
+- Distinguish between macrotask and microtask execution
+
+### Prevention
+
+For any Nostr query that might return 100+ events on iOS:
+1. Use batched fetching with ~10 authors per batch
+2. Use setImmediate for state updates, not setTimeout
+3. Yield to React between batches for progressive UI updates
+
+**Full documentation:** See `docs/IOS_TIMER_BLOCK_FIX.md`
+
+---
+
+*Updated January 7, 2026. iOS timer block issue discovered and fixed via batched fetching pattern.*

@@ -36,6 +36,7 @@ export interface StoredWorkout {
   profileName?: string;
   profilePicture?: string;
   splits?: Map<number, number>; // km -> elapsed time in seconds (e.g., km 5 -> 1800s)
+  eventIds?: string[]; // Event IDs this workout belongs to (from #e tags)
 }
 
 interface WorkoutEventStoreState {
@@ -53,8 +54,8 @@ type WorkoutSubscriber = (workouts: StoredWorkout[]) => void;
 
 const CACHE_KEY = '@runstr:workout_event_store_v1';
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000; // Fetch window for events (reduced from 7 days for faster loading)
-const QUERY_TIMEOUT_MS = 8000;
-const RELAY_CONNECT_TIMEOUT_MS = 4000;
+const QUERY_TIMEOUT_MS = 3000; // Reduced for faster perceived loading
+const RELAY_CONNECT_TIMEOUT_MS = 2000; // Reduced for faster perceived loading
 
 // ============================================================================
 // WorkoutEventStore
@@ -121,22 +122,23 @@ export class WorkoutEventStore {
   }
 
   private async _initialize(): Promise<void> {
-    console.log('[WorkoutEventStore] Initializing...');
+    const t0 = Date.now();
+    console.log(`[WorkoutEventStore] Initializing at ${t0}...`);
 
     try {
       // Step 1: Load from cache immediately (instant)
       await this.loadFromCache();
       console.log(
-        `[WorkoutEventStore] Loaded ${this.state.workouts.size} workouts from cache`
+        `[WorkoutEventStore] Loaded ${this.state.workouts.size} workouts from cache (${Date.now() - t0}ms)`
       );
 
       // Step 2: Fetch fresh data in background
       await this.fetchFromRelays();
       console.log(
-        `[WorkoutEventStore] Initialized with ${this.state.workouts.size} workouts`
+        `[WorkoutEventStore] ✅ Initialize COMPLETE at ${Date.now()} (${Date.now() - t0}ms total, ${this.state.workouts.size} workouts)`
       );
     } catch (error) {
-      console.error('[WorkoutEventStore] Initialization failed:', error);
+      console.error(`[WorkoutEventStore] Initialization failed at ${Date.now()}:`, error);
       this.state.error =
         error instanceof Error ? error.message : 'Initialization failed';
     }
@@ -251,6 +253,34 @@ export class WorkoutEventStore {
     });
   }
 
+  /**
+   * Get workouts tagged with a specific event ID
+   * Used by RUNSTR events - workouts self-identify via #e tag
+   * No RSVP/participant queries needed - just filter by event tag
+   */
+  getWorkoutsByEventId(eventId: string): StoredWorkout[] {
+    return this.getAllWorkouts().filter(
+      (w) => w.eventIds && w.eventIds.includes(eventId)
+    );
+  }
+
+  /**
+   * Get workouts tagged with a specific event ID within a date range
+   * Combines event tag filtering with date range for accurate leaderboards
+   */
+  getWorkoutsByEventIdInRange(
+    eventId: string,
+    startTimestamp: number,
+    endTimestamp: number
+  ): StoredWorkout[] {
+    return this.getAllWorkouts().filter((w) => {
+      const hasEventTag = w.eventIds && w.eventIds.includes(eventId);
+      const isInDateRange =
+        w.createdAt >= startTimestamp && w.createdAt <= endTimestamp;
+      return hasEventTag && isInDateRange;
+    });
+  }
+
   // ============================================================================
   // Subscription
   // ============================================================================
@@ -292,6 +322,13 @@ export class WorkoutEventStore {
         const data = JSON.parse(cached);
         if (data.workouts && Array.isArray(data.workouts)) {
           for (const workout of data.workouts) {
+            // FIX: Reconstruct splits Map from serialized plain object
+            // Maps don't survive JSON.stringify/parse - they become plain objects
+            if (workout.splits && typeof workout.splits === 'object' && !(workout.splits instanceof Map)) {
+              workout.splits = new Map(
+                Object.entries(workout.splits).map(([k, v]) => [Number(k), v as number])
+              );
+            }
             this.state.workouts.set(workout.id, workout);
           }
           this.state.lastFetchTime = data.lastFetchTime || 0;
@@ -304,8 +341,14 @@ export class WorkoutEventStore {
 
   private async saveToCache(): Promise<void> {
     try {
+      // FIX: Convert Map to plain object before JSON serialization
+      // Maps don't survive JSON.stringify - they serialize as empty objects
+      const workoutsToSave = Array.from(this.state.workouts.values()).map(w => ({
+        ...w,
+        splits: w.splits instanceof Map ? Object.fromEntries(w.splits) : w.splits,
+      }));
       const data = {
-        workouts: Array.from(this.state.workouts.values()),
+        workouts: workoutsToSave,
         lastFetchTime: this.state.lastFetchTime,
       };
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data));
@@ -319,10 +362,13 @@ export class WorkoutEventStore {
   // ============================================================================
 
   private async fetchFromRelays(): Promise<void> {
+    const t0 = Date.now();
+    console.log(`[WorkoutEventStore] fetchFromRelays START at ${t0}`);
     this.state.isLoading = true;
 
     try {
       const ndk = await GlobalNDKService.getInstance();
+      console.log(`[WorkoutEventStore] NDK getInstance: ${Date.now() - t0}ms`);
 
       // Wait for relay connection first
       const connected = await GlobalNDKService.waitForMinimumConnection(
@@ -382,23 +428,12 @@ export class WorkoutEventStore {
 
       console.log(`[WorkoutEventStore] Parsed ${parsed} workouts`);
 
-      // DEBUG: Log sample workouts to verify team IDs
-      const sampleWorkouts = Array.from(this.state.workouts.values()).slice(0, 5);
-      console.log('[WorkoutEventStore] DEBUG - Sample parsed workouts:');
-      sampleWorkouts.forEach((w, i) => {
-        console.log(`  ${i + 1}. id=${w.id.slice(0, 8)}, pubkey=${w.pubkey.slice(0, 8)}, teamId=${w.teamId || 'NONE'}, type=${w.activityType}`);
-      });
-
-      // DEBUG: Count workouts with/without team IDs
-      const withTeam = Array.from(this.state.workouts.values()).filter(w => w.teamId).length;
-      const withoutTeam = this.state.workouts.size - withTeam;
-      console.log(`[WorkoutEventStore] DEBUG - Workouts with teamId: ${withTeam}, without: ${withoutTeam}`);
-
       this.state.lastFetchTime = Date.now();
       this.state.error = null;
 
       // Save to cache
       await this.saveToCache();
+      console.log(`[WorkoutEventStore] Fetched ${this.state.workouts.size} workouts in ${Date.now() - t0}ms`);
     } finally {
       this.state.isLoading = false;
     }
@@ -412,38 +447,56 @@ export class WorkoutEventStore {
       const collectedEvents = new Set<NDKEvent>();
       let eoseReceived = false;
 
-      const subscription = ndk.subscribe(filter, { closeOnEose: false });
-
-      subscription.on('event', (event: NDKEvent) => {
-        collectedEvents.add(event);
+      // IMPORTANT: Use explicit relay pool to disable Outbox Model
+      // This prevents NDK from connecting to author's preferred relays
+      const subscription = ndk.subscribe(filter, {
+        closeOnEose: false,
+        pool: ndk.pool,  // Force use of explicit relays only
+        groupable: false, // Don't group with other subscriptions
       });
 
+      // Track if we've already resolved to prevent double-resolution
+      let resolved = false;
+
+      const cleanup = () => {
+        if (resolved) return;
+        resolved = true;
+        // Remove listeners BEFORE stopping to prevent accumulation
+        subscription.removeAllListeners('event');
+        subscription.removeAllListeners('eose');
+        subscription.stop();
+        resolve(collectedEvents);
+      };
+
+      // EVENT-DRIVEN: Resolve immediately on EOSE (no polling!)
       subscription.on('eose', () => {
-        eoseReceived = true;
         console.log(
           `[WorkoutEventStore] EOSE received - ${collectedEvents.size} events collected`
         );
+        cleanup();
       });
 
-      // Check every 100ms if EOSE received
-      const checkInterval = setInterval(() => {
-        if (eoseReceived) {
-          clearInterval(checkInterval);
-          subscription.stop();
-          resolve(collectedEvents);
-        }
-      }, 100);
-
-      // Hard timeout after 5s
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        subscription.stop();
-        if (!eoseReceived) {
+      // Event handler with EARLY TERMINATION: If we have 100+ events, resolve immediately
+      // This prevents waiting for slow relays when we have enough data
+      subscription.on('event', (event: NDKEvent) => {
+        collectedEvents.add(event);
+        // Early termination threshold
+        if (collectedEvents.size >= 100 && !resolved) {
           console.log(
-            `[WorkoutEventStore] Timeout (no EOSE) - ${collectedEvents.size} events`
+            `[WorkoutEventStore] Early termination - 100+ events collected`
+          );
+          cleanup();
+        }
+      });
+
+      // Safety timeout after 5s (increased from 3s for reliability)
+      setTimeout(() => {
+        if (!resolved) {
+          console.log(
+            `[WorkoutEventStore] Timeout - ${collectedEvents.size} events`
           );
         }
-        resolve(collectedEvents);
+        cleanup();
       }, 5000);
     });
   }
@@ -599,6 +652,15 @@ export class WorkoutEventStore {
         }
       }
 
+      // Parse event IDs from #e tags (workout tagged with event)
+      const eventIds: string[] = [];
+      const eTags = event.tags.filter((t: string[]) => t[0] === 'e');
+      for (const eTag of eTags) {
+        if (eTag.length >= 2 && eTag[1]) {
+          eventIds.push(eTag[1]);
+        }
+      }
+
       return {
         id: event.id,
         pubkey: event.pubkey,
@@ -611,6 +673,7 @@ export class WorkoutEventStore {
         elevation,
         createdAt: event.created_at || Math.floor(Date.now() / 1000),
         splits: splits.size > 0 ? splits : undefined,
+        eventIds: eventIds.length > 0 ? eventIds : undefined,
       };
     } catch (error) {
       console.warn('[WorkoutEventStore] Failed to parse event:', error);

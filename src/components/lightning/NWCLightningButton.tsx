@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Animated,
   View,
   Text,
@@ -18,8 +17,10 @@ import {
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 import { theme } from '../../styles/theme';
 import { useNWCZap } from '../../hooks/useNWCZap';
+import { NWCWalletService } from '../../services/wallet/NWCWalletService';
 import { npubToHex } from '../../utils/ndkConversion';
 import { EnhancedZapModal } from '../nutzap/EnhancedZapModal';
 import { ExternalZapModal } from '../nutzap/ExternalZapModal';
@@ -50,7 +51,6 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
 }) => {
   const { balance, sendZap, isInitialized, hasWallet, refreshBalance, error } =
     useNWCZap();
-  const [isZapped, setIsZapped] = useState(false);
   const [isZapping, setIsZapping] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showExternalModal, setShowExternalModal] = useState(false);
@@ -83,9 +83,8 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
     return null;
   }
 
-  // Load zapped state and default amount on mount
+  // Load default amount on mount
   useEffect(() => {
-    loadZapState();
     loadDefaultAmount();
   }, [recipientHex]);
 
@@ -98,31 +97,6 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
     };
   }, []);
 
-  const loadZapState = async () => {
-    try {
-      const zappedUsers = await AsyncStorage.getItem('@runstr:zapped_users');
-      if (zappedUsers) {
-        const parsed = JSON.parse(zappedUsers);
-        const today = new Date().toDateString();
-
-        // Reset if it's a new day
-        if (parsed.date !== today) {
-          await AsyncStorage.setItem(
-            '@runstr:zapped_users',
-            JSON.stringify({
-              date: today,
-              users: [],
-            })
-          );
-        } else if (parsed.users.includes(recipientHex)) {
-          setIsZapped(true);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading zap state:', error);
-    }
-  };
-
   const loadDefaultAmount = async () => {
     try {
       const stored = await AsyncStorage.getItem('@runstr:default_zap_amount');
@@ -131,31 +105,6 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
       }
     } catch (error) {
       console.error('Error loading default amount:', error);
-    }
-  };
-
-  const saveZapState = async () => {
-    try {
-      const zappedUsers = await AsyncStorage.getItem('@runstr:zapped_users');
-      const today = new Date().toDateString();
-
-      let data = { date: today, users: [] as string[] };
-      if (zappedUsers) {
-        const parsed = JSON.parse(zappedUsers);
-        if (parsed.date === today) {
-          data = parsed;
-        }
-      }
-
-      if (!data.users.includes(recipientHex)) {
-        data.users.push(recipientHex);
-        await AsyncStorage.setItem(
-          '@runstr:zapped_users',
-          JSON.stringify(data)
-        );
-      }
-    } catch (error) {
-      console.error('Error saving zap state:', error);
     }
   };
 
@@ -205,21 +154,26 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
 
     // Check if wallet is connected
     if (!isInitialized || !hasWallet) {
-      Alert.alert(
-        'No Wallet Connected',
-        'NWC quick zap requires a configured wallet. Tap the button to pay with an external wallet (Cash App, Strike, etc.), or configure NWC in Settings.',
-        [{ text: 'OK' }]
-      );
+      Toast.show({
+        type: 'error',
+        text1: 'No Wallet Connected',
+        text2: 'Tap to use external wallet, or configure NWC in Settings.',
+        position: 'top',
+        visibilityTime: 4000,
+      });
       return;
     }
 
-    // Check balance
-    if (balance < defaultAmount) {
-      Alert.alert(
-        'Insufficient Balance',
-        `You need ${defaultAmount} sats but only have ${balance} sats. Tap the button to pay with an external wallet.`,
-        [{ text: 'OK' }]
-      );
+    // Get FRESH balance directly from service (useNWCZap hook balance can be stale)
+    const freshBalance = await NWCWalletService.getBalance();
+    if (freshBalance.error || freshBalance.balance < defaultAmount) {
+      Toast.show({
+        type: 'error',
+        text1: 'Insufficient Balance',
+        text2: `Need ${defaultAmount} sats but only have ${freshBalance.balance}. Tap to use external wallet.`,
+        position: 'top',
+        visibilityTime: 4000,
+      });
       return;
     }
 
@@ -260,47 +214,53 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
 
         // Refresh balance
         await refreshBalance();
-
-        // Set zapped state for color change
-        setIsZapped(true);
-        await saveZapState();
         onZapSuccess?.();
 
         // Brief success feedback
-        Alert.alert(
-          '⚡ Zapped!',
-          `Sent ${defaultAmount} sats to ${recipientName}`,
-          [{ text: 'OK' }],
-          { cancelable: true }
-        );
+        Toast.show({
+          type: 'reward',
+          text1: 'Zapped!',
+          text2: `Sent ${defaultAmount} sats to ${recipientName}`,
+          position: 'top',
+          visibilityTime: 3000,
+        });
       } else {
         // Haptic feedback for error
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
         const errorMessage = error || 'Unable to send zap. Please try again.';
-        Alert.alert('Zap Failed', errorMessage);
+        Toast.show({
+          type: 'error',
+          text1: 'Zap Failed',
+          text2: errorMessage,
+          position: 'top',
+          visibilityTime: 4000,
+        });
       }
-    } catch (error) {
-      console.error('Quick zap error:', error);
+    } catch (err) {
+      console.error('Quick zap error:', err);
 
       // Haptic feedback for error
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
       // Show specific error message
       const errorMessage =
-        error instanceof Error
-          ? error.message
+        err instanceof Error
+          ? err.message
           : 'An error occurred while sending the zap';
-      Alert.alert('Zap Error', errorMessage);
+      Toast.show({
+        type: 'error',
+        text1: 'Zap Error',
+        text2: errorMessage,
+        position: 'top',
+        visibilityTime: 4000,
+      });
     } finally {
       setIsZapping(false);
     }
   };
 
   const handleModalSuccess = async () => {
-    // Set zapped state for color change
-    setIsZapped(true);
-    await saveZapState();
     setShowModal(false);
     onZapSuccess?.();
   };
@@ -318,9 +278,6 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
   };
 
   const handleExternalZapSuccess = async () => {
-    // Set zapped state for color change
-    setIsZapped(true);
-    await saveZapState();
     setShowExternalModal(false);
     onZapSuccess?.();
   };
@@ -378,7 +335,6 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
                     height: config.button,
                     borderRadius: config.button / 2,
                   },
-              isZapped && styles.buttonZapped,
               isButtonDisabled && styles.buttonDisabled,
               style,
             ]}
@@ -405,8 +361,6 @@ export const NWCLightningButton: React.FC<NWCLightningButtonProps> = ({
                     color={
                       !isInitialized || !hasWallet
                         ? theme.colors.textMuted
-                        : isZapped
-                        ? theme.colors.background
                         : theme.colors.orangeBright
                     }
                   />
@@ -458,10 +412,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  buttonZapped: {
-    backgroundColor: 'transparent',
   },
 
   buttonDisabled: {

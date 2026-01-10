@@ -31,12 +31,12 @@ import { RewardLightningAddressService } from './RewardLightningAddressService';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import { RewardNotificationManager, DonationSplit } from './RewardNotificationManager';
 import { getCharityById, Charity } from '../../constants/charities';
+import { DonationTrackingService } from '../donation/DonationTrackingService';
 import { PledgeService } from '../pledge/PledgeService';
-// Note: Team donations disabled - teams don't have lightning addresses yet
 
 // Storage keys for donation settings
-// Note: SELECTED_TEAM_KEY is in TeamsScreen but not used here (team payments disabled)
-const SELECTED_CHARITY_KEY = '@runstr:selected_charity_id';
+// Uses same key as TeamsScreen - teams ARE charities (with lightning addresses)
+const SELECTED_CHARITY_KEY = '@runstr:selected_team_id';
 const DONATION_PERCENTAGE_KEY = '@runstr:donation_percentage';
 
 // DEBUG FLAG: Set to false for production (only shows debug alerts for failures)
@@ -44,12 +44,76 @@ const DEBUG_REWARDS = false;
 
 // Workout sources that count as "user-generated" (not imports/syncs)
 // Only these sources trigger daily rewards
-const REWARD_ELIGIBLE_SOURCES = ['gps_tracker', 'manual_entry', 'daily_steps'];
+// Note: 'daily_steps' removed - step rewards come from StepRewardService (5 sats per 1k steps)
+const REWARD_ELIGIBLE_SOURCES = ['gps_tracker', 'manual_entry'];
 
 export interface RewardResult {
   success: boolean;
   amount?: number;
   reason?: string;
+}
+
+// Diagnostic entry for reward attempts
+export interface RewardDiagnosticEntry {
+  timestamp: number;
+  userPubkey: string;
+  action: 'check' | 'send' | 'pledge';
+  success: boolean;
+  reason?: string;
+  amount?: number;
+}
+
+// Maximum diagnostic entries to keep
+const MAX_REWARD_DIAGNOSTICS = 30;
+
+// Diagnostic buffer for reward attempts (viewable in Settings)
+const rewardDiagnosticLog: RewardDiagnosticEntry[] = [];
+
+/**
+ * Add a diagnostic entry to the reward log
+ */
+function addRewardDiagnostic(
+  userPubkey: string,
+  action: RewardDiagnosticEntry['action'],
+  success: boolean,
+  reason?: string,
+  amount?: number
+): void {
+  rewardDiagnosticLog.push({
+    timestamp: Date.now(),
+    userPubkey: userPubkey.slice(0, 8) + '...',
+    action,
+    success,
+    reason,
+    amount,
+  });
+
+  // Keep only recent entries
+  if (rewardDiagnosticLog.length > MAX_REWARD_DIAGNOSTICS) {
+    rewardDiagnosticLog.splice(0, rewardDiagnosticLog.length - MAX_REWARD_DIAGNOSTICS);
+  }
+}
+
+/**
+ * Get combined diagnostics from DailyRewardService and RewardSenderWallet
+ * Useful for debugging reward issues in Settings
+ */
+export function getRewardDiagnostics(): {
+  rewardAttempts: RewardDiagnosticEntry[];
+  walletDiagnostics: import('./RewardSenderWallet').WalletDiagnosticEntry[];
+  walletStatus: {
+    initialized: boolean;
+    lastError: string | null;
+  };
+} {
+  return {
+    rewardAttempts: [...rewardDiagnosticLog],
+    walletDiagnostics: RewardSenderWallet.getDiagnostics(),
+    walletStatus: {
+      initialized: RewardSenderWallet.isInitialized(),
+      lastError: RewardSenderWallet.getLastError(),
+    },
+  };
 }
 
 /**
@@ -107,6 +171,7 @@ class DailyRewardServiceClass {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const streakKey = `@runstr:streak_incremented_today:${today}`;
 
+    // Rate limit: Only one reward per day
     const alreadyIncremented = await AsyncStorage.getItem(streakKey);
     if (alreadyIncremented) {
       console.log('[Reward] Streak already incremented today, skipping reward');
@@ -543,10 +608,11 @@ class DailyRewardServiceClass {
         Alert.alert('Reward Debug', `🚀 Reward triggered!\n\nUser: ${userPubkey.slice(0, 8)}...`);
       }
 
-      // Check if user can claim today
+      // Check if user already claimed today (one reward per day limit)
       const canClaim = await this.canClaimToday(userPubkey);
       if (!canClaim) {
         console.log('[Reward] User already claimed today');
+        addRewardDiagnostic(userPubkey, 'check', false, 'already_claimed_today');
         if (DEBUG_REWARDS) {
           Alert.alert('Reward Debug', 'Already claimed today - only 1 reward per day allowed');
         }
@@ -562,6 +628,7 @@ class DailyRewardServiceClass {
         console.log(
           '[Reward] User has no Lightning address in profile, skipping reward'
         );
+        addRewardDiagnostic(userPubkey, 'check', false, 'no_lightning_address');
         if (DEBUG_REWARDS) {
           Alert.alert('Reward Debug', 'No Lightning address found!\n\nSet one in Settings → Rewards, or add lud16 to your Nostr profile');
         }
@@ -631,6 +698,16 @@ class DailyRewardServiceClass {
             const result = await RewardSenderWallet.sendRewardPayment(charityInvoice);
             charityPaymentSuccess = result.success;
             console.log(`[Reward] Charity (${charity.name}) payment:`, charityPaymentSuccess ? '✅' : '❌');
+
+            // Track successful charity donations for leaderboard
+            if (charityPaymentSuccess) {
+              await DonationTrackingService.recordDonation({
+                donorPubkey: userPubkey,
+                amount: split.charityAmount,
+                charityId: charity.id,
+                charityName: charity.name,
+              });
+            }
           }
         } catch (error) {
           console.error('[Reward] Charity payment error:', error);
@@ -649,14 +726,20 @@ class DailyRewardServiceClass {
           `User: ${split.userAmount}, Charity: ${split.charityAmount}`
         );
 
+        // Log success
+        addRewardDiagnostic(userPubkey, 'send', true, undefined, totalAmount);
+
         // Show branded reward notification with donation split info
+        // Only show charity in split if charity payment actually succeeded
         const donationSplit: DonationSplit = {
           userAmount: split.userAmount,
-          charityAmount: split.charityAmount,
-          charityName: split.charityAmount > 0 ? charity?.name : undefined,
+          charityAmount: charityPaymentSuccess ? split.charityAmount : 0,
+          charityName: charityPaymentSuccess && split.charityAmount > 0 ? charity?.name : undefined,
         };
 
+        console.log('[Reward] 📢 About to show toast notification:', { totalAmount, donationSplit });
         RewardNotificationManager.showRewardEarned(totalAmount, donationSplit);
+        console.log('[Reward] ✅ Toast notification triggered');
 
         return {
           success: true,
@@ -665,6 +748,7 @@ class DailyRewardServiceClass {
       } else {
         // SILENT FAILURE - just log
         console.log('[Reward] ❌ User payment failed (silent)');
+        addRewardDiagnostic(userPubkey, 'send', false, 'payment_failed');
 
         if (DEBUG_REWARDS) {
           Alert.alert('Reward Debug', 'User payment failed!\n\nPossible causes:\n- Reward wallet empty\n- NWC connection failed\n- Invoice expired');
@@ -677,7 +761,9 @@ class DailyRewardServiceClass {
       }
     } catch (error) {
       // SILENT FAILURE - just log error
+      const errorMsg = error instanceof Error ? error.message : 'unknown_error';
       console.error('[Reward] Error sending reward (silent):', error);
+      addRewardDiagnostic(userPubkey, 'send', false, errorMsg);
 
       if (DEBUG_REWARDS) {
         Alert.alert('Reward Debug', `Unexpected error!\n\n${error instanceof Error ? error.message : String(error)}`);

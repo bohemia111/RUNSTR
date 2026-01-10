@@ -25,6 +25,7 @@ import { useAuth } from './AuthContext';
 import unifiedCache from '../services/cache/UnifiedNostrCache';
 import { CacheKeys, CacheTTL } from '../constants/cacheTTL';
 import { PerformanceLogger } from '../utils/PerformanceLogger';
+import { NostrFetchLogger } from '../utils/NostrFetchLogger';
 import { HARDCODED_TEAMS } from '../constants/hardcodedTeams';
 import type {
   TeamScreenData,
@@ -221,6 +222,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
    */
   const getAllUserTeams = async (user: UserWithWallet): Promise<any[]> => {
     PerformanceLogger.start('NavigationDataContext: getAllUserTeams()');
+    NostrFetchLogger.start('NavData.getAllUserTeams');
     setIsLoadingTeam(true);
     try {
       const userIdentifiers = await getUserNostrIdentifiers();
@@ -228,6 +230,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
         console.log('No user identifiers found for team detection');
         setIsLoadingTeam(false);
         PerformanceLogger.end('NavigationDataContext: getAllUserTeams()');
+        NostrFetchLogger.end('NavData.getAllUserTeams', 0, 'no identifiers');
         return [];
       }
 
@@ -248,32 +251,18 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
           const teamService = getNostrTeamService();
           let discoveredTeams = teamService.getDiscoveredTeams();
 
-          // Ensure discovered teams exist
+          // ❌ ANDROID FIX: Skip team discovery on profile load to prevent freezing
+          // Teams are now built from:
+          // 1. Hardcoded teams (HARDCODED_TEAMS constant)
+          // 2. Local memberships (AsyncStorage)
+          // 3. Captain cache
+          // Team discovery (kind 33404) will happen lazily when needed
           if (discoveredTeams.size === 0) {
             console.log(
-              `[${new Date().toISOString()}] 🔍 NavigationData: No discovered teams, starting discoverFitnessTeams...`
+              `[${new Date().toISOString()}] 🔍 NavigationData: No discovered teams - skipping Nostr query (Android fix)`
             );
-            PerformanceLogger.start(
-              '  └─ discoverFitnessTeams() [NOSTR QUERY]',
-              1
-            );
-            // FIX: Removed InteractionManager.runAfterInteractions wrapper
-            // This was causing a deadlock with modal animations that never complete
-            // The same fix was already applied to AppInitializationService.ts
-            console.log(
-              `[${new Date().toISOString()}] 🔍 NavigationData: About to call teamService.discoverFitnessTeams()`
-            );
-            await teamService.discoverFitnessTeams();
-            console.log(
-              `[${new Date().toISOString()}] 🔍 NavigationData: teamService.discoverFitnessTeams() completed`
-            );
-            PerformanceLogger.end('  └─ discoverFitnessTeams() [NOSTR QUERY]');
-            discoveredTeams = teamService.getDiscoveredTeams();
-            console.log(
-              `[${new Date().toISOString()}] 🔍 NavigationData: Got ${
-                discoveredTeams.size
-              } discovered teams`
-            );
+            // Don't block on team discovery - use hardcoded teams and local memberships
+            // Background refresh can happen later if needed
           } else {
             console.log(
               `[${new Date().toISOString()}] 🔍 NavigationData: Already have ${
@@ -449,11 +438,13 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
       );
       setIsLoadingTeam(false);
       PerformanceLogger.end('NavigationDataContext: getAllUserTeams()');
+      NostrFetchLogger.end('NavData.getAllUserTeams', teams?.length || 0, 'success');
       return teams || [];
     } catch (error) {
       console.error('Error getting all user teams:', error);
       setIsLoadingTeam(false);
       PerformanceLogger.end('NavigationDataContext: getAllUserTeams()');
+      NostrFetchLogger.error('NavData.getAllUserTeams', error as Error);
       return [];
     } finally {
       setIsLoadingTeam(false);
@@ -477,6 +468,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
 
   const fetchProfileData = async (user: UserWithWallet): Promise<void> => {
     PerformanceLogger.start('NavigationDataContext: fetchProfileData()');
+    NostrFetchLogger.start('NavData.fetchProfileData');
     console.log(
       `[${new Date().toISOString()}] 🔍 NavigationData: fetchProfileData starting for user ${
         user.name
@@ -590,13 +582,16 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
 
       setProfileData(profileData);
       PerformanceLogger.end('NavigationDataContext: fetchProfileData()');
+      NostrFetchLogger.end('NavData.fetchProfileData', teams.length, 'success');
     } catch (error) {
       console.error('Error creating profile data:', error);
       PerformanceLogger.end('NavigationDataContext: fetchProfileData()');
+      NostrFetchLogger.error('NavData.fetchProfileData', error as Error);
     }
   };
 
   const loadTeams = useCallback(async (): Promise<void> => {
+    NostrFetchLogger.start('NavData.loadTeams');
     // ✅ PERFORMANCE: Quick cache check first (runstr-github pattern)
     const now = Date.now();
     const timeSinceLastLoad = now - teamsLastLoaded;
@@ -607,6 +602,8 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
       console.log(
         '⚡ Teams recently loaded, using cached data (instant return)'
       );
+      NostrFetchLogger.cacheHit('NavData.loadTeams', 'recently loaded');
+      NostrFetchLogger.end('NavData.loadTeams', availableTeams.length, 'cached');
       return;
     }
 
@@ -615,12 +612,14 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
       CacheKeys.DISCOVERED_TEAMS
     );
     if (cachedTeams && cachedTeams.length > 0) {
+      NostrFetchLogger.cacheHit('NavData.loadTeams', 'memory cache');
       console.log(
         `⚡ Using ${cachedTeams.length} cached teams (instant display)`
       );
       setAvailableTeams(cachedTeams);
       setTeamsLoaded(true);
       setTeamsLastLoaded(now);
+      NostrFetchLogger.end('NavData.loadTeams', cachedTeams.length, 'from cache');
 
       // ✅ OPTIMIZATION 3: Background refresh if cache > 2 minutes old
       if (timeSinceLastLoad > 2 * 60 * 1000) {
@@ -657,6 +656,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
     }
 
     // ✅ OPTIMIZATION 4: Full load only if no cache
+    NostrFetchLogger.cacheMiss('NavData.loadTeams');
     try {
       console.log('📡 No cache, fetching teams from Nostr...');
       const teams = await unifiedCache.get<any[]>(
@@ -677,11 +677,13 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
       setAvailableTeams(teams || []);
       setTeamsLoaded(true);
       setTeamsLastLoaded(now);
+      NostrFetchLogger.end('NavData.loadTeams', teams?.length || 0, 'from Nostr');
     } catch (error) {
       console.error('Error loading teams:', error);
       setError('Failed to load teams');
+      NostrFetchLogger.error('NavData.loadTeams', error as Error);
     }
-  }, [teamsLoaded, teamsLastLoaded]);
+  }, [teamsLoaded, teamsLastLoaded, availableTeams.length]);
 
   const fetchTeamsFresh = async (): Promise<any[]> => {
     try {
@@ -821,7 +823,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
     }
   }, [leaguesPrefetched]);
 
-  const refresh = async (): Promise<void> => {
+  const refresh = useCallback(async (): Promise<void> => {
     setIsLoading(true);
     setError(null);
     setTeamsLoaded(false);
@@ -838,7 +840,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // ✅ ANDROID FIX: React to currentUser from AuthContext WITHOUT refetching
   useEffect(() => {
@@ -865,7 +867,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
     setIsLoading(false);
   }, []);
 
-  // ✅ PERFORMANCE FIX: Memoize context value to prevent unnecessary re-renders
+  // ✅ PERFORMANCE FIX: Memoize context value - callbacks excluded from deps (they're stable with useCallback)
   const value = useMemo<NavigationData>(
     () => ({
       user,
@@ -893,11 +895,7 @@ export const NavigationDataProvider: React.FC<NavigationDataProviderProps> = ({
       isLoading,
       isLoadingTeam,
       error,
-      refresh,
-      loadTeams,
-      loadWallet,
-      loadCaptainDashboard,
-      prefetchLeaguesInBackground,
+      // Note: Callbacks excluded - they're stable via useCallback
     ]
   );
 

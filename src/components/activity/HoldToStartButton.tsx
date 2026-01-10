@@ -25,22 +25,45 @@ interface HoldToStartButtonProps {
   onHoldComplete: () => void;
   disabled?: boolean;
   holdDuration?: number; // milliseconds (default 2000)
+  size?: 'default' | 'large'; // Size variant - large for minimalist UI
 }
+
+// Size configurations
+const sizeConfigs = {
+  default: {
+    svgSize: 140,
+    containerSize: 160,
+    strokeWidth: 3,
+    labelFontSize: 16,
+    hintFontSize: 12,
+  },
+  large: {
+    svgSize: 200,
+    containerSize: 220,
+    strokeWidth: 4,
+    labelFontSize: 20,
+    hintFontSize: 14,
+  },
+};
 
 export const HoldToStartButton: React.FC<HoldToStartButtonProps> = ({
   label,
   onHoldComplete,
   disabled = false,
   holdDuration = 2000,
+  size: sizeVariant = 'default',
 }) => {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // SVG Circle parameters - matches original 180px circle with 3px border
-  const size = 180;
-  const strokeWidth = 3;
-  const center = size / 2;
-  const radius = (size - strokeWidth) / 2;
+  // Get size configuration based on variant
+  const config = sizeConfigs[sizeVariant];
+
+  // SVG Circle parameters - dynamic based on size variant
+  const svgSize = config.svgSize;
+  const strokeWidth = config.strokeWidth;
+  const center = svgSize / 2;
+  const radius = (svgSize - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
   // Animated strokeDashoffset: full circumference (empty) -> 0 (full)
@@ -113,14 +136,26 @@ export const HoldToStartButton: React.FC<HoldToStartButtonProps> = ({
     onHoldComplete();
   };
 
+  // Dynamic container style based on size
+  const containerStyle = {
+    width: config.containerSize,
+    height: config.containerSize,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    position: 'relative' as const,
+  };
+
+  // Dynamic SVG container positioning (center the SVG in the container)
+  const svgOffset = (config.containerSize - config.svgSize) / 2;
+
   return (
     <View
-      style={[styles.container, disabled && styles.containerDisabled]}
+      style={[containerStyle, disabled && styles.containerDisabled]}
       {...panResponder.panHandlers}
     >
       {/* SVG Progress Ring */}
-      <View style={styles.svgContainer}>
-        <Svg width={size} height={size}>
+      <View style={{ position: 'absolute', top: svgOffset, left: svgOffset }}>
+        <Svg width={svgSize} height={svgSize}>
           {/* Background circle (gray track with dark fill) */}
           <Circle
             cx={center}
@@ -150,10 +185,18 @@ export const HoldToStartButton: React.FC<HoldToStartButtonProps> = ({
 
       {/* Label text */}
       <View style={styles.labelContainer}>
-        <Text style={[styles.label, disabled && styles.labelDisabled]}>
+        <Text style={[
+          styles.label,
+          { fontSize: config.labelFontSize },
+          disabled && styles.labelDisabled
+        ]}>
           {label}
         </Text>
-        <Text style={[styles.hint, disabled && styles.hintDisabled]}>
+        <Text style={[
+          styles.hint,
+          { fontSize: config.hintFontSize },
+          disabled && styles.hintDisabled
+        ]}>
           Hold to start
         </Text>
       </View>
@@ -162,28 +205,14 @@ export const HoldToStartButton: React.FC<HoldToStartButtonProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: 200,
-    height: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
   containerDisabled: {
     opacity: 0.5,
-  },
-  svgContainer: {
-    position: 'absolute',
-    // Center the 180px SVG in the 200px container
-    top: 10,
-    left: 10,
   },
   labelContainer: {
     alignItems: 'center',
     zIndex: 1,
   },
   label: {
-    fontSize: 18,
     fontWeight: theme.typography.weights.bold,
     color: theme.colors.text,
     letterSpacing: 0.5,
@@ -192,7 +221,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
   },
   hint: {
-    fontSize: 12,
     color: theme.colors.textMuted,
     marginTop: 4,
   },

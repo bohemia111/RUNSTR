@@ -1,0 +1,109 @@
+/**
+ * Supabase Client Configuration
+ *
+ * Provides a configured Supabase client for competition management,
+ * workout submission, and leaderboard fetching.
+ *
+ * Note: We're NOT using Supabase Auth - users authenticate via Nostr (nsec).
+ * Supabase is used purely for data storage/retrieval.
+ */
+
+import 'react-native-url-polyfill/auto';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+// Environment variables (set in .env file)
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+// Validate environment variables
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn(
+    '[Supabase] Missing environment variables. Competition features will be disabled.',
+    '\nEXPO_PUBLIC_SUPABASE_URL:', !!SUPABASE_URL,
+    '\nEXPO_PUBLIC_SUPABASE_ANON_KEY:', !!SUPABASE_ANON_KEY
+  );
+}
+
+// Create Supabase client without auth (we use Nostr for auth)
+export const supabase: SupabaseClient | null =
+  SUPABASE_URL && SUPABASE_ANON_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          // Disable all auth features - we use Nostr nsec for authentication
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      })
+    : null;
+
+/**
+ * Check if Supabase is configured and available
+ */
+export function isSupabaseConfigured(): boolean {
+  return supabase !== null;
+}
+
+/**
+ * Get the Supabase client, throwing if not configured
+ */
+export function getSupabaseClient(): SupabaseClient {
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Please set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.'
+    );
+  }
+  return supabase;
+}
+
+// Database types for type safety
+export interface Competition {
+  id: string;
+  external_id: string;
+  name: string;
+  activity_type: string;
+  scoring_method: 'total_distance' | 'total_duration' | 'workout_count';
+  start_date: string;
+  end_date: string;
+  created_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface CompetitionParticipant {
+  id: string;
+  competition_id: string;
+  npub: string;
+  joined_at: string;
+}
+
+export interface WorkoutSubmission {
+  id: string;
+  npub: string;
+  event_id: string;
+  activity_type: string;
+  distance_meters: number | null;
+  duration_seconds: number | null;
+  calories: number | null;
+  created_at: string;
+  submitted_at: string;
+  raw_event: Record<string, unknown>;
+}
+
+export interface LeaderboardEntry {
+  npub: string;
+  score: number;
+  rank: number;
+  workout_count?: number;
+  // Charity from user's most recent workout
+  charityId?: string;
+  charityName?: string;
+}
+
+export interface CharityRanking {
+  rank: number;
+  charityId: string;
+  charityName: string;
+  lightningAddress?: string;
+  totalDistance: number; // Total meters from all participants supporting this charity
+  participantCount: number; // How many participants support this charity
+}

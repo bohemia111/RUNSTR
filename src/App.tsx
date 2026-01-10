@@ -35,6 +35,8 @@ LogBox.ignoreLogs([
   'Text strings must be rendered within a <Text> component',
   // Expected when new users haven't configured NWC wallet yet
   '[NWC] ❌ User wallet initialization failed: No NWC connection string found',
+  // Expected on iOS Simulator (no pedometer hardware) or when HealthKit permissions not granted
+  '[DailyStepCounterService] Steps unavailable',
 ]);
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -61,7 +63,7 @@ class AppErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <SafeAreaProvider>
+        <SafeAreaProvider style={{ backgroundColor: '#000' }}>
           <StatusBar barStyle="light-content" backgroundColor="#000000" />
           <View style={errorStyles.container}>
             <Text style={errorStyles.title}>🚨 App Error</Text>
@@ -129,15 +131,28 @@ class ScreenErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { ActivityIndicator } from 'react-native';
+
+// Custom dark theme to prevent white flash during navigation
+const RunstrDarkTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: '#000000', // Matches theme.colors.background
+    card: '#000000', // Navigation cards and headers
+    border: '#1a1a1a', // Matches theme.colors.border
+    primary: '#FF7B1C', // Matches theme.colors.primary
+    text: '#FFB366', // Matches theme.colors.text
+  },
+};
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NavigationDataProvider } from './contexts/NavigationDataContext';
 import { AppNavigator } from './navigation/AppNavigator';
 import { BottomTabNavigator } from './navigation/BottomTabNavigator';
 import { createStackNavigator } from '@react-navigation/stack';
-import { TeamCreationWizard } from './components/wizards/TeamCreationWizard';
+// TeamCreationWizard removed - team creation feature removed
 import { EventDetailScreen } from './screens/EventDetailScreen';
 import { LeagueDetailScreen } from './screens/LeagueDetailScreen';
 // Use SimpleTeamScreen instead of EnhancedTeamScreen to avoid freeze issues
@@ -156,11 +171,17 @@ import { AdvancedAnalyticsScreen } from './screens/AdvancedAnalyticsScreen';
 import { HealthProfileScreen } from './screens/HealthProfileScreen';
 import { SatlantisDiscoveryScreen } from './screens/satlantis/SatlantisDiscoveryScreen';
 import { SatlantisEventDetailScreen } from './screens/satlantis/SatlantisEventDetailScreen';
+import { RunningBitcoinDetailScreen } from './screens/events/RunningBitcoinDetailScreen';
+import { EinundzwanzigDetailScreen } from './screens/events/EinundzwanzigDetailScreen';
+import { JanuaryWalkingDetailScreen } from './screens/events/JanuaryWalkingDetailScreen';
 import { Season2Screen } from './screens/season2/Season2Screen';
+import { CompeteScreen } from './screens/CompeteScreen';
+import { LeaderboardsScreen } from './screens/LeaderboardsScreen';
 import { RewardsScreen } from './screens/RewardsScreen';
 import { DonateScreen } from './screens/DonateScreen';
 import { TeamsScreen } from './screens/TeamsScreen';
 import { EventsScreen } from './screens/EventsScreen';
+import { ActivityTrackerScreen } from './screens/activity/ActivityTrackerScreen';
 import { User } from './types';
 import { useWalletStore } from './store/walletStore';
 import { theme } from './styles/theme';
@@ -179,11 +200,14 @@ import { PermissionRequestModal } from './components/permissions/PermissionReque
 import { WelcomePermissionModal } from './components/onboarding/WelcomePermissionModal';
 import garminAuthService from './services/fitness/garminAuthService';
 import AppInitializationService from './services/core/AppInitializationService';
+import { StepPollingService } from './services/rewards/StepPollingService';
 import {
   CustomAlertProvider,
   CustomAlertManager,
 } from './components/ui/CustomAlert';
 import { RewardNotificationProvider } from './components/rewards/RewardNotificationProvider';
+import Toast from 'react-native-toast-message';
+import { toastConfig } from './components/ui/toastConfig';
 import {
   parseEventDeepLink,
   type ParsedEventData,
@@ -231,10 +255,15 @@ type AuthenticatedStackParamList = {
   HealthProfile: undefined;
   SatlantisDiscovery: undefined;
   SatlantisEventDetail: { eventId: string; eventPubkey: string };
+  RunningBitcoinDetail: undefined;
+  EinundzwanzigDetail: undefined;
+  JanuaryWalkingDetail: undefined;
   Season2: undefined;
   Teams: undefined;
   Rewards: undefined;
   Events: undefined;
+  Exercise: undefined;
+  Compete: undefined;
 };
 
 const AuthenticatedStack = createStackNavigator<AuthenticatedStackParamList>();
@@ -305,6 +334,8 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
         AppInitializationService.initializeInBackground()
           .then(() => {
             console.log('✅ App: Background initialization completed');
+            // Initialize step polling service after app is initialized
+            StepPollingService.initialize();
           })
           .catch((error) => {
             console.error('❌ Background initialization error:', error);
@@ -312,7 +343,11 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
           });
       }, INIT_DELAY);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        // Cleanup step polling on unmount
+        StepPollingService.cleanup();
+      };
     }
   }, [isAuthenticated, currentUser, hasInitialized]);
 
@@ -516,23 +551,9 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
             '[App] 💰 Cashu wallet initialization skipped (using NWC for Lightning payments)'
           );
 
-          // ✅ NWC WALLET: Defer wallet initialization to prevent UI blocking
-          setTimeout(async () => {
-            try {
-              console.log('[App] 💳 Initializing NWC wallet connection...');
-              const { NWCWalletService } = await import(
-                './services/wallet/NWCWalletService'
-              );
-              await NWCWalletService.initialize();
-              console.log('[App] ✅ NWC wallet initialization attempted');
-            } catch (nwcError) {
-              console.error(
-                '[App] ⚠️ NWC wallet initialization failed (non-critical):',
-                nwcError
-              );
-              // Don't block app - NWC wallet is optional
-            }
-          }, 2000); // Defer by 2 seconds to prioritize UI rendering
+          // ✅ NWC WALLET: Connects on-demand when user opens wallet UI
+          // No startup initialization - prevents app freeze on bad NWC strings
+          console.log('[App] 💳 NWC wallet will connect on-demand (no startup init)');
 
           /*
           if (!walletStore.isInitialized && !walletStore.isInitializing) {
@@ -572,6 +593,7 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
         screenOptions={{
           headerShown: false,
           presentation: 'modal',
+          cardStyle: { backgroundColor: '#000' }, // Prevent white flash
         }}
       >
         {/* Main bottom tabs */}
@@ -589,27 +611,7 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
           )}
         </AuthenticatedStack.Screen>
 
-        {/* Team Creation Modal */}
-        <AuthenticatedStack.Screen
-          name="TeamCreation"
-          options={{
-            presentation: 'modal',
-            headerShown: false,
-          }}
-        >
-          {({ navigation }) => (
-            <TeamCreationWizard
-              currentUser={user}
-              onComplete={(teamData, teamId) => {
-                console.log('Team creation complete:', teamData, teamId);
-                navigation.goBack(); // Return to tabs
-              }}
-              onCancel={() => {
-                navigation.goBack(); // Return to tabs
-              }}
-            />
-          )}
-        </AuthenticatedStack.Screen>
+        {/* Team Creation Modal removed - team creation feature removed */}
 
         {/* Enhanced Team Screen */}
         <AuthenticatedStack.Screen
@@ -978,6 +980,33 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
           )}
         </AuthenticatedStack.Screen>
 
+        {/* Running Bitcoin Challenge Detail Screen */}
+        <AuthenticatedStack.Screen
+          name="RunningBitcoinDetail"
+          options={{
+            headerShown: false,
+          }}
+          component={RunningBitcoinDetailScreen}
+        />
+
+        {/* Einundzwanzig Fitness Challenge Detail Screen */}
+        <AuthenticatedStack.Screen
+          name="EinundzwanzigDetail"
+          options={{
+            headerShown: false,
+          }}
+          component={EinundzwanzigDetailScreen}
+        />
+
+        {/* January Walking Contest Detail Screen */}
+        <AuthenticatedStack.Screen
+          name="JanuaryWalkingDetail"
+          options={{
+            headerShown: false,
+          }}
+          component={JanuaryWalkingDetailScreen}
+        />
+
         {/* RUNSTR Season 2 Competition Screen */}
         <AuthenticatedStack.Screen
           name="Season2"
@@ -1013,6 +1042,35 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
           }}
           component={EventsScreen}
         />
+
+        {/* Exercise Screen - Activity Tracker (accessed from Profile card) */}
+        <AuthenticatedStack.Screen
+          name="Exercise"
+          options={{
+            headerShown: false,
+          }}
+          component={ActivityTrackerScreen}
+        />
+
+        {/* Compete Screen - Events/Competitions (accessed from Profile card) */}
+        <AuthenticatedStack.Screen
+          name="Compete"
+          options={{
+            headerShown: false,
+          }}
+        >
+          {({ navigation }) => <CompeteScreen navigation={navigation} />}
+        </AuthenticatedStack.Screen>
+
+        {/* Leaderboards Screen - Daily Leaderboards */}
+        <AuthenticatedStack.Screen
+          name="Leaderboards"
+          options={{
+            headerShown: false,
+          }}
+        >
+          {({ navigation }) => <LeaderboardsScreen navigation={navigation} />}
+        </AuthenticatedStack.Screen>
       </AuthenticatedStack.Navigator>
     );
   };
@@ -1020,7 +1078,7 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
   // Show error screen if initialization failed
   if (initError && !isInitializing) {
     return (
-      <SafeAreaProvider>
+      <SafeAreaProvider style={{ backgroundColor: '#000' }}>
         <StatusBar barStyle="light-content" backgroundColor="#000000" />
         <View style={errorStyles.container}>
           <Text style={errorStyles.title}>🚨 Initialization Error</Text>
@@ -1035,10 +1093,10 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
   // No splash screens, no onboarding screens
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider style={{ backgroundColor: '#000' }}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
 
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer ref={navigationRef} theme={RunstrDarkTheme}>
         {(() => {
           console.log(
             '🚀 AppContent: Navigation decision - isAuthenticated:',
@@ -1216,6 +1274,7 @@ export default function App() {
           </AuthProvider>
         </RewardNotificationProvider>
       </CustomAlertProvider>
+      <Toast config={toastConfig} />
     </AppErrorBoundary>
   );
 }

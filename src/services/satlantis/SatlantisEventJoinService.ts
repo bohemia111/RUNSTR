@@ -26,6 +26,7 @@ import { GlobalNDKService } from '../nostr/GlobalNDKService';
 import { SatlantisRSVPService } from './SatlantisRSVPService';
 import UnifiedSigningService from '../auth/UnifiedSigningService';
 import { UnifiedCacheService } from '../cache/UnifiedCacheService';
+import { PledgeService } from '../pledge/PledgeService';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import type { NDKKind } from '@nostr-dev-kit/ndk';
 import type { SatlantisEvent } from '../../types/satlantis';
@@ -39,10 +40,25 @@ const LOCAL_JOINS_KEY = '@runstr:local_event_joins';
 // Storage key for RSVP event IDs (for direct lookup)
 const RSVP_EVENT_IDS_KEY = '@runstr:rsvp_event_ids';
 
+// Storage key for joined events (for workout tagging)
+const JOINED_EVENTS_KEY = '@runstr:joined_events';
+
 // Interface for local join storage - supports multiple users per event
 interface LocalJoinRecord {
   userPubkeys: string[]; // Array of user pubkeys who joined
   timestamps: Record<string, number>; // pubkey → timestamp mapping
+}
+
+// Interface for joined event context (for workout tagging)
+export interface JoinedEventRecord {
+  eventId: string; // Calendar event d-tag
+  eventPubkey: string; // Event creator's pubkey
+  title: string; // Event title for display
+  startTime: number; // Unix timestamp (seconds)
+  endTime: number; // Unix timestamp (seconds)
+  joinedAt: number; // When user joined (Unix ms)
+  activityType?: string; // For filtering workouts
+  pledgeCreated?: boolean; // Whether a pledge was created for this event
 }
 
 // Legacy format (single user) - for migration
@@ -175,6 +191,48 @@ class SatlantisEventJoinServiceClass {
         // Save join locally as backup (in case Nostr query doesn't find it)
         if (userPubkey) {
           await this.saveLocalJoin(event.id, event.pubkey, userPubkey);
+
+          // NEW: Store event context for workout tagging
+          await this.saveJoinedEvent(event);
+          console.log(`[EventJoin] 📝 Saved joined event context for workout tagging`);
+
+          // NEW: Create pledge if event has pledge cost
+          if (event.pledgeCost && event.pledgeCost > 0) {
+            const destination = {
+              type: event.pledgeDestination || 'captain',
+              lightningAddress:
+                event.pledgeDestination === 'charity'
+                  ? event.pledgeCharityAddress
+                  : event.captainLightningAddress,
+              name:
+                event.pledgeDestination === 'charity'
+                  ? event.pledgeCharityName
+                  : event.creatorProfile?.name || 'Event Captain',
+            };
+
+            // Only create pledge if we have a valid destination address
+            if (destination.lightningAddress) {
+              const pledge = await PledgeService.createPledge({
+                eventId: event.id,
+                eventName: event.title,
+                totalWorkouts: event.pledgeCost,
+                destination: {
+                  type: destination.type as 'captain' | 'charity',
+                  lightningAddress: destination.lightningAddress,
+                  name: destination.name,
+                },
+                userPubkey,
+              });
+
+              if (pledge) {
+                console.log(`[EventJoin] 💰 Created pledge: ${pledge.id} (${event.pledgeCost} workouts)`);
+              } else {
+                console.log(`[EventJoin] ⚠️ Could not create pledge (user may already have active pledge)`);
+              }
+            } else {
+              console.log(`[EventJoin] ⚠️ No lightning address for pledge destination`);
+            }
+          }
         }
 
         // Invalidate cache so participant list updates
@@ -653,6 +711,143 @@ class SatlantisEventJoinServiceClass {
     const rsvps = await this.getRsvpEventIds();
     console.log('[EventJoin] 🔍 DEBUG: All RSVP event IDs:', JSON.stringify(rsvps, null, 2));
     return rsvps;
+  }
+
+  // ============================================================================
+  // Joined Events Storage (for Workout Tagging)
+  // ============================================================================
+
+  /**
+   * Save joined event context for workout tagging
+   * Workouts published during active events will include the event's #e tag
+   */
+  async saveJoinedEvent(event: SatlantisEvent): Promise<void> {
+    try {
+      const joinedEvents = await this.getJoinedEvents();
+
+      // Check if already joined (don't duplicate)
+      const existingIndex = joinedEvents.findIndex(
+        (e) => e.eventId === event.id && e.eventPubkey === event.pubkey
+      );
+
+      const record: JoinedEventRecord = {
+        eventId: event.id,
+        eventPubkey: event.pubkey,
+        title: event.title,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        joinedAt: Date.now(),
+        activityType: event.activityType || event.sportType,
+        pledgeCreated: (event.pledgeCost || 0) > 0,
+      };
+
+      if (existingIndex >= 0) {
+        // Update existing record
+        joinedEvents[existingIndex] = record;
+      } else {
+        // Add new record
+        joinedEvents.push(record);
+      }
+
+      await AsyncStorage.setItem(JOINED_EVENTS_KEY, JSON.stringify(joinedEvents));
+      console.log(`[EventJoin] 💾 Saved joined event: ${event.title} (${event.id})`);
+    } catch (error) {
+      console.error('[EventJoin] Error saving joined event:', error);
+    }
+  }
+
+  /**
+   * Get all joined events (for debugging/display)
+   */
+  async getJoinedEvents(): Promise<JoinedEventRecord[]> {
+    try {
+      const stored = await AsyncStorage.getItem(JOINED_EVENTS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('[EventJoin] Error getting joined events:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get currently active joined events (for workout tagging)
+   * Returns events where current time is between start and end
+   */
+  async getActiveJoinedEvents(): Promise<JoinedEventRecord[]> {
+    try {
+      const joinedEvents = await this.getJoinedEvents();
+      const now = Math.floor(Date.now() / 1000); // Unix seconds
+
+      const activeEvents = joinedEvents.filter(
+        (e) => now >= e.startTime && now <= e.endTime
+      );
+
+      if (activeEvents.length > 0) {
+        console.log(
+          `[EventJoin] 📋 Active joined events: ${activeEvents.length}`,
+          activeEvents.map((e) => e.title)
+        );
+      }
+
+      return activeEvents;
+    } catch (error) {
+      console.error('[EventJoin] Error getting active joined events:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get active event IDs for workout tagging
+   * Returns array of event IDs to add as #e tags to published workouts
+   */
+  async getActiveEventIds(): Promise<string[]> {
+    const activeEvents = await this.getActiveJoinedEvents();
+    return activeEvents.map((e) => e.eventId);
+  }
+
+  /**
+   * Remove a joined event (when user leaves/unjoins)
+   */
+  async removeJoinedEvent(eventId: string, eventPubkey: string): Promise<void> {
+    try {
+      const joinedEvents = await this.getJoinedEvents();
+      const filtered = joinedEvents.filter(
+        (e) => !(e.eventId === eventId && e.eventPubkey === eventPubkey)
+      );
+      await AsyncStorage.setItem(JOINED_EVENTS_KEY, JSON.stringify(filtered));
+      console.log(`[EventJoin] 🗑️ Removed joined event: ${eventId}`);
+    } catch (error) {
+      console.error('[EventJoin] Error removing joined event:', error);
+    }
+  }
+
+  /**
+   * Clean up expired joined events (ended more than 7 days ago)
+   */
+  async cleanupExpiredEvents(): Promise<void> {
+    try {
+      const joinedEvents = await this.getJoinedEvents();
+      const now = Math.floor(Date.now() / 1000);
+      const sevenDaysAgo = now - 7 * 24 * 60 * 60;
+
+      const active = joinedEvents.filter((e) => e.endTime > sevenDaysAgo);
+      const removed = joinedEvents.length - active.length;
+
+      if (removed > 0) {
+        await AsyncStorage.setItem(JOINED_EVENTS_KEY, JSON.stringify(active));
+        console.log(`[EventJoin] 🧹 Cleaned up ${removed} expired joined events`);
+      }
+    } catch (error) {
+      console.error('[EventJoin] Error cleaning up expired events:', error);
+    }
+  }
+
+  /**
+   * DEBUG: Clear all joined events
+   */
+  async debugClearJoinedEvents(): Promise<void> {
+    await AsyncStorage.removeItem(JOINED_EVENTS_KEY);
+    console.log('[EventJoin] 💥 DEBUG: Cleared all joined events');
   }
 }
 

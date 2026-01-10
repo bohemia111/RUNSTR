@@ -217,21 +217,25 @@ IMPORTANT: VO2 Max is calculated using Jack Daniels' VDOT formula for timed race
 Format each point starting with •`;
 
     case 'fitness_age':
-      return `${basePrompt}${contextSection}Reflect on the user's fitness age with warmth and perspective.
+      return `${basePrompt}${contextSection}Reflect on the user's RUNSTR Fitness Age with warmth and celebration.
 
 Look at the "Body Composition Data" section in the User Context above for:
 - Chronological age (actual age)
-- Calculated fitness age
-- VO2 Max component (85% weight) - how their cardio fitness compares to age norms
-- Activity Level component (15% weight) - based on workout frequency
-- Formula reference (NTNU methodology)
+- RUNSTR Fitness Age (our activity-focused calculation)
+- Breakdown of bonuses:
+  - Consistency Bonus (up to -5 years): Based on workout frequency
+  - Volume Bonus (up to -5 years): Based on weekly distance/time
+  - Variety Bonus (up to -3 years): Based on activity types (cardio, strength, mindfulness)
+  - Cardio Bonus (up to -5 years): Based on cardio performance (generous 5K brackets)
+  - Inactivity Penalty (only if sedentary): Up to +5 years
+- Summary and encouragement
 
 Provide exactly 3 bullet points:
-1. If fitness age is lower than actual age: Acknowledge it warmly - "Your body is performing like someone younger. That's the result of the choices you've made." If higher: Frame with gentle optimism - "This is where you're starting from, and every bit of movement shifts this number."
-2. Explain the two components as information - VO2 Max (cardiovascular fitness) contributes 85%, and activity level (workout consistency) contributes 15%. Note which one is their strength and which represents opportunity, without pressure.
-3. If they're interested in improving their fitness age, share one gentle approach they might consider - "Some people find that..." Frame as an option, not an assignment.
+1. Celebrate their RUNSTR Fitness Age warmly. If younger than actual age: "Your body is performing like someone X years younger - that's the result of showing up consistently." If same or older: "Every workout you log is shifting this number. You're building something real."
+2. Highlight their strongest bonus category from the breakdown. Examples: "Your consistency is your superpower" or "The variety in your training is paying off." Frame any zero or small bonuses as opportunities, not failures.
+3. If they want to lower their fitness age further, suggest ONE specific action based on their weakest bonus category - "Adding one strength session could unlock another year" or "A weekly long run might boost your cardio bonus."
 
-IMPORTANT: Fitness age is calculated using NTNU methodology (Nes et al., 2013). It does NOT penalize BMI - we removed arbitrary BMI penalties because they don't account for muscle mass. Instead, it rewards consistent activity: very active (+5 workouts/week) subtracts years, while sedentary adds years.
+IMPORTANT: RUNSTR Fitness Age rewards SHOWING UP, not elite performance. A 31:25 5K earns a -2 year cardio bonus. Working out 4x/week earns a -3 year consistency bonus. This is about celebrating activity, not comparing to elite athletes.
 
 Format each point starting with •`;
   }

@@ -1,26 +1,25 @@
 /**
- * MyTeamsBox Component (renamed to Stats)
- * Simple navigation box for Profile screen - shows "STATS"
- * Navigates to WorkoutHistoryScreen (which has Advanced button at top for AdvancedAnalytics)
+ * FitnessTrackerBox Component
+ * Simple navigation box for Profile screen - shows "FITNESS TRACKER"
+ * Navigates to Exercise screen (ActivityTrackerScreen)
  */
 
 import React from 'react';
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 
-export const MyTeamsBox: React.FC = () => {
+export const FitnessTrackerBox: React.FC = () => {
   const navigation = useNavigation<any>();
 
   const handlePress = () => {
-    // Navigate to WorkoutHistory screen (has Stats button at top for analytics)
-    // Use parent navigator since WorkoutHistory is in the stack, not the tab navigator
+    // Navigate to Exercise screen (ActivityTrackerScreen)
+    // Use parent navigator since Exercise is in the stack, not the tab navigator
     const parentNav = navigation.getParent();
     if (parentNav) {
-      parentNav.navigate('WorkoutHistory');
+      parentNav.navigate('Exercise');
     } else {
-      navigation.navigate('WorkoutHistory');
+      navigation.navigate('Exercise');
     }
   };
 
@@ -30,8 +29,7 @@ export const MyTeamsBox: React.FC = () => {
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      <Ionicons name="stats-chart-outline" size={24} color={theme.colors.text} />
-      <Text style={styles.title}>STATS</Text>
+      <Text style={styles.title}>START WORKOUT</Text>
     </TouchableOpacity>
   );
 };
@@ -43,10 +41,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1a1a1a',
     flex: 1,
-    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
   },
   title: {
     fontSize: 16,

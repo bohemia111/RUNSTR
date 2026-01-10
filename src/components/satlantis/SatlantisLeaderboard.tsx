@@ -1,16 +1,23 @@
 /**
  * SatlantisLeaderboard - Event leaderboard with zap capability
  * Any user can zap any participant (not just organizer)
+ *
+ * Privacy model:
+ * - Season II participants (public): visible to all users
+ * - Non-Season II participants (private): visible only to themselves, marked with 🔒 icon
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { ZappableUserRow } from '../ui/ZappableUserRow';
 import type {
   SatlantisLeaderboardEntry,
   SatlantisEventStatus,
 } from '../../types/satlantis';
+
+const MAX_DISPLAY = 25;
 
 interface SatlantisLeaderboardProps {
   entries: SatlantisLeaderboardEntry[];
@@ -25,6 +32,30 @@ export const SatlantisLeaderboard: React.FC<SatlantisLeaderboardProps> = ({
   eventStatus,
   currentUserNpub,
 }) => {
+  // Calculate top 25 + user position if outside top 25
+  const { topEntries, userEntryOutsideTop, userRank } = useMemo(() => {
+    const top = entries.slice(0, MAX_DISPLAY);
+
+    if (!currentUserNpub) {
+      return { topEntries: top, userEntryOutsideTop: null, userRank: -1 };
+    }
+
+    // Find user's rank in full list
+    const userIndex = entries.findIndex(e => e.npub === currentUserNpub);
+    const userRankValue = userIndex >= 0 ? userIndex + 1 : -1;
+
+    // If user is in top 25 or not found, just return top 25
+    if (userIndex < 0 || userIndex < MAX_DISPLAY) {
+      return { topEntries: top, userEntryOutsideTop: null, userRank: userRankValue };
+    }
+
+    // User is outside top 25, include their entry
+    return {
+      topEntries: top,
+      userEntryOutsideTop: entries[userIndex],
+      userRank: userRankValue,
+    };
+  }, [entries, currentUserNpub]);
   // Upcoming events - show placeholder
   if (eventStatus === 'upcoming') {
     return (
@@ -74,10 +105,19 @@ export const SatlantisLeaderboard: React.FC<SatlantisLeaderboardProps> = ({
         Leaderboard {eventStatus === 'live' ? '(Live)' : '(Final)'}
       </Text>
 
-      {entries.map((entry) => (
-        <View key={entry.npub} style={styles.entryRow}>
+      {/* Top 25 entries */}
+      {topEntries.map((entry) => (
+        <View key={entry.npub} style={[styles.entryRow, entry.isPrivate && styles.privateEntry]}>
           {/* Rank */}
           <View style={styles.rankSection}>
+            {entry.isPrivate && (
+              <Ionicons
+                name="lock-closed"
+                size={12}
+                color={theme.colors.textMuted}
+                style={styles.lockIcon}
+              />
+            )}
             <Text style={[styles.rankText, entry.rank <= 3 && styles.topRank]}>
               {entry.rank}
             </Text>
@@ -88,7 +128,6 @@ export const SatlantisLeaderboard: React.FC<SatlantisLeaderboardProps> = ({
             <ZappableUserRow
               npub={entry.npub}
               showQuickZap={entry.npub !== currentUserNpub}
-              showChallengeButton={false}
               hideActionsForCurrentUser={entry.npub === currentUserNpub}
               additionalContent={
                 <View style={styles.scoreSection}>
@@ -100,6 +139,46 @@ export const SatlantisLeaderboard: React.FC<SatlantisLeaderboardProps> = ({
           </View>
         </View>
       ))}
+
+      {/* User position section (if outside top 25) */}
+      {userEntryOutsideTop && userRank > 0 && (
+        <>
+          {/* Separator */}
+          <View style={styles.userPositionSeparator}>
+            <View style={styles.separatorLine} />
+            <Text style={styles.separatorText}>Your position</Text>
+            <View style={styles.separatorLine} />
+          </View>
+
+          {/* User's entry */}
+          <View style={[styles.entryRow, styles.userPositionRow, userEntryOutsideTop.isPrivate && styles.privateEntry]}>
+            <View style={styles.rankSection}>
+              {userEntryOutsideTop.isPrivate && (
+                <Ionicons
+                  name="lock-closed"
+                  size={12}
+                  color={theme.colors.textMuted}
+                  style={styles.lockIcon}
+                />
+              )}
+              <Text style={styles.rankText}>{userRank}</Text>
+            </View>
+            <View style={styles.userSection}>
+              <ZappableUserRow
+                npub={userEntryOutsideTop.npub}
+                showQuickZap={false}
+                hideActionsForCurrentUser={true}
+                additionalContent={
+                  <View style={styles.scoreSection}>
+                    <Text style={styles.scoreText}>{userEntryOutsideTop.formattedScore}</Text>
+                  </View>
+                }
+                style={styles.userRow}
+              />
+            </View>
+          </View>
+        </>
+      )}
 
       {entries.length > 0 && eventStatus === 'live' && (
         <Text style={styles.refreshHint}>
@@ -155,9 +234,19 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
     paddingVertical: 8,
   },
+  privateEntry: {
+    opacity: 0.85,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
   rankSection: {
-    width: 32,
+    width: 40,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  lockIcon: {
+    marginRight: 2,
   },
   rankText: {
     fontSize: 14,
@@ -188,6 +277,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
     fontStyle: 'italic',
+  },
+  userPositionSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+    paddingHorizontal: 4,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border,
+  },
+  separatorText: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    marginHorizontal: 8,
+    textTransform: 'uppercase',
+  },
+  userPositionRow: {
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 140, 0, 0.1)',
+    paddingHorizontal: 8,
   },
 });
 

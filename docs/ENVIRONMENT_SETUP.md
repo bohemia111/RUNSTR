@@ -41,25 +41,6 @@ REWARD_SENDER_NWC=nostr+walletconnect://pubkey?relay=wss://...&secret=...
 - Use a dedicated wallet with limited balance for rewards
 - Consider setting spending limits in your wallet app
 
-### SIGN_WITH (Required for Zapstore Publishing)
-
-Your Nostr private key (nsec) used for signing Zapstore publishing events when releasing APKs.
-
-**Format:**
-```
-SIGN_WITH=nsec1your_private_key_here
-```
-
-**How to get this:**
-1. Use your Nostr key manager or identity tool
-2. Export your private key (nsec format)
-3. Paste into your `.env` file
-
-**Security Note:**
-- This is your Nostr identity - keep it extremely secure
-- Never share it or commit it to git
-- Consider using a dedicated publishing identity separate from your personal Nostr account
-
 ## Optional Variables
 
 ### EXPO_PUBLIC_COINOS_API_BASE
@@ -85,7 +66,7 @@ EXPO_PUBLIC_API_BASE=https://api.example.com
 ```
 
 ### Build-Time Variables (no prefix)
-Variables without the prefix are only available during build time and should be used for sensitive secrets like `REWARD_SENDER_NWC` and `SIGN_WITH`.
+Variables without the prefix are only available during build time and should be used for sensitive secrets like `REWARD_SENDER_NWC`.
 
 ## Security Best Practices
 

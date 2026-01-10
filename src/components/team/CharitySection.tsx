@@ -19,12 +19,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { getCharityById } from '../../constants/charities';
-import { CharityZapService } from '../../services/charity/CharityZapService';
-import { CharityPaymentModal } from '../charity/CharityPaymentModal';
 import { ExternalZapModal } from '../nutzap/ExternalZapModal';
 import { NWCWalletService } from '../../services/wallet/NWCWalletService';
+import { RewardSenderWallet } from '../../services/rewards/RewardSenderWallet';
+import { DonationTrackingService } from '../../services/donation/DonationTrackingService';
 import { useNWCZap } from '../../hooks/useNWCZap';
+import { useAuth } from '../../contexts/AuthContext';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
+import { getUserNostrIdentifiers } from '../../utils/nostr';
 
 const DEFAULT_ZAP_AMOUNT = 21; // Standard quick zap amount
 
@@ -35,10 +37,8 @@ interface CharitySectionProps {
 export const CharitySection: React.FC<CharitySectionProps> = ({
   charityId,
 }) => {
-  // State for modals
-  const [showExternalModal, setShowExternalModal] = useState(false);
-  const [selectedAmount, setSelectedAmount] = useState(DEFAULT_ZAP_AMOUNT);
-  const [selectedMemo, setSelectedMemo] = useState('');
+  // State for payment modal
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Animation for button press
   const scaleAnimation = useRef(new Animated.Value(1)).current;
@@ -49,7 +49,10 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
   const [walletBalance, setWalletBalance] = useState(0);
 
   // NWC hook for wallet operations
-  const { sendZap, hasWallet, balance, refreshBalance } = useNWCZap();
+  const { hasWallet, balance, refreshBalance } = useNWCZap();
+
+  // Get user info for donation tracking
+  const { currentUser } = useAuth();
 
   // If no charity selected, don't render anything
   if (!charityId) {
@@ -134,19 +137,15 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
     ]).start();
   };
 
-  // SINGLE TAP: Open ExternalZapModal with QR code (universal, works for everyone)
+  // SINGLE TAP: Open ExternalZapModal for verified donation
   const handleZapPress = () => {
     animatePress();
-    console.log(
-      '[CharitySection] Tap detected - opening external wallet modal'
-    );
-
-    setSelectedAmount(DEFAULT_ZAP_AMOUNT);
-    setSelectedMemo(`Donation to ${charity.name}`);
-    setShowExternalModal(true);
+    console.log(`[CharitySection] Opening zap modal for ${charity.name}`);
+    setShowPaymentModal(true);
   };
 
   // LONG PRESS: Quick NWC zap (21 sats default, power user feature)
+  // Routes through RUNSTR's wallet for donation tracking
   const handleZapLongPress = async () => {
     animatePress();
 
@@ -170,42 +169,80 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
       return;
     }
 
-    // Quick zap with default amount
+    // Quick zap with default amount - routes through RUNSTR for tracking
     setIsZapping(true);
     try {
       console.log(
         `[CharitySection] Long press NWC zap to ${charity.name} with ${DEFAULT_ZAP_AMOUNT} sats`
       );
 
-      // Get invoice from charity's Lightning address
-      const { invoice } = await getInvoiceFromLightningAddress(
-        charity.lightningAddress,
+      // Step 1: Create invoice from RUNSTR's wallet (so RUNSTR receives the donation)
+      console.log('[CharitySection] Creating invoice from RUNSTR wallet...');
+      const invoiceResult = await RewardSenderWallet.createInvoice(
         DEFAULT_ZAP_AMOUNT,
         `Donation to ${charity.name}`
       );
 
-      if (!invoice) {
-        Alert.alert('Error', 'Failed to get invoice from charity.');
-        setIsZapping(false);
+      if (!invoiceResult.success || !invoiceResult.invoice) {
+        console.error('[CharitySection] Failed to create RUNSTR invoice:', invoiceResult.error);
+        // Fallback: Pay charity directly (legacy behavior)
+        const { invoice } = await getInvoiceFromLightningAddress(
+          charity.lightningAddress,
+          DEFAULT_ZAP_AMOUNT,
+          `Donation to ${charity.name}`
+        );
+        if (invoice) {
+          const paymentResult = await NWCWalletService.sendPayment(invoice);
+          if (paymentResult.success) {
+            await markAsZapped();
+            await refreshBalance();
+            Alert.alert('Success', `Donated ${DEFAULT_ZAP_AMOUNT} sats to ${charity.name}!`);
+          }
+        }
         return;
       }
 
-      // Pay the invoice with NWC wallet
-      const paymentResult = await NWCWalletService.sendPayment(invoice);
+      // Step 2: User pays the RUNSTR invoice with their NWC wallet
+      console.log('[CharitySection] User paying RUNSTR invoice...');
+      const paymentResult = await NWCWalletService.sendPayment(invoiceResult.invoice);
 
-      if (paymentResult.success) {
-        await markAsZapped();
-        await refreshBalance(); // Update the balance after payment
-        Alert.alert(
-          'Success',
-          `Donated ${DEFAULT_ZAP_AMOUNT} sats to ${charity.name}!`
-        );
-      } else {
+      if (!paymentResult.success) {
         Alert.alert(
           'Error',
           paymentResult.error || 'Failed to process donation. Please try again.'
         );
+        return;
       }
+
+      // Step 3: Record donation and forward to charity
+      console.log('[CharitySection] Recording and forwarding donation...');
+      const donorName = currentUser?.name || currentUser?.displayName;
+
+      // Get hex pubkey for tracking
+      let donorPubkey = 'anonymous';
+      try {
+        const identifiers = await getUserNostrIdentifiers();
+        if (identifiers?.hexPubkey) {
+          donorPubkey = identifiers.hexPubkey;
+        }
+      } catch (e) {
+        console.warn('[CharitySection] Could not get hex pubkey');
+      }
+
+      await DonationTrackingService.recordAndForward({
+        donorPubkey,
+        donorName,
+        amount: DEFAULT_ZAP_AMOUNT,
+        charityId: charity.id,
+        charityLightningAddress: charity.lightningAddress,
+      });
+
+      await markAsZapped();
+      await refreshBalance();
+      Alert.alert(
+        'Success',
+        `Donated ${DEFAULT_ZAP_AMOUNT} sats to ${charity.name}!\nYour donation has been recorded.`
+      );
     } catch (error) {
       console.error('[CharitySection] Long press NWC zap error:', error);
       Alert.alert(
@@ -223,13 +260,14 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
     }
   };
 
-  // Handle external wallet payment confirmation
-  const handleExternalPaymentConfirmed = async () => {
+  // Handle verified payment confirmation (called when payment detected)
+  const handlePaymentConfirmed = async () => {
     await markAsZapped();
-    setShowExternalModal(false);
+    await refreshBalance();
+    setShowPaymentModal(false);
     Alert.alert(
       'Thank You!',
-      `Your donation to ${charity.name} has been sent. Thank you for making a difference!`,
+      `Your donation to ${charity.name} has been verified and recorded!`,
       [{ text: 'OK' }]
     );
   };
@@ -298,15 +336,17 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
         </Animated.View>
       </View>
 
-      {/* External Wallet Modal for QR code payment */}
+      {/* External Zap Modal with charity donation verification */}
       <ExternalZapModal
-        visible={showExternalModal}
-        onClose={() => setShowExternalModal(false)}
-        recipientNpub={charity.lightningAddress} // Pass Lightning address directly
+        visible={showPaymentModal}
+        recipientNpub={charity.lightningAddress}
         recipientName={charity.name}
-        amount={selectedAmount}
-        memo={selectedMemo}
-        onSuccess={handleExternalPaymentConfirmed}
+        memo={`Donation to ${charity.name}`}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={handlePaymentConfirmed}
+        isCharityDonation={true}
+        charityId={charity.id}
+        charityLightningAddress={charity.lightningAddress}
       />
     </View>
   );

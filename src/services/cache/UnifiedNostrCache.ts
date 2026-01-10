@@ -30,6 +30,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NostrFetchLogger } from '../../utils/NostrFetchLogger';
 
 // Cache entry interface
 interface CacheEntry<T = any> {
@@ -213,6 +214,7 @@ export class UnifiedNostrCache {
 
     // Check for pending fetch (deduplication)
     if (this.pendingFetches.has(key)) {
+      NostrFetchLogger.dedup(`UnifiedCache.get(${key})`);
       console.log(`[UnifiedCache] Deduplicating fetch for: ${key}`);
       return this.pendingFetches.get(key)!;
     }
@@ -228,6 +230,7 @@ export class UnifiedNostrCache {
       }
 
       if (cached && !this.isExpired(cached)) {
+        NostrFetchLogger.cacheHit(`UnifiedCache.get(${key})`, `age: ${Date.now() - cached.timestamp}ms`);
         console.log(
           `[UnifiedCache] Cache hit: ${key} (age: ${
             Date.now() - cached.timestamp
@@ -241,12 +244,14 @@ export class UnifiedNostrCache {
 
         return cached.data;
       } else if (cached) {
+        NostrFetchLogger.cacheMiss(`UnifiedCache.get(${key})`, 'expired');
         console.log(
           `[UnifiedCache] Cache expired: ${key} (age: ${
             Date.now() - cached.timestamp
           }ms, ttl: ${cached.ttl}ms)`
         );
       } else {
+        NostrFetchLogger.cacheMiss(`UnifiedCache.get(${key})`);
         console.log(`[UnifiedCache] Cache miss: ${key}`);
       }
     } else {
@@ -490,6 +495,7 @@ export class UnifiedNostrCache {
     ttl: number,
     persist: boolean
   ): Promise<T> {
+    NostrFetchLogger.start(`UnifiedCache.fetch(${key})`);
     const fetchPromise = fetcher()
       .then(async (data) => {
         // Cache the data
@@ -498,15 +504,21 @@ export class UnifiedNostrCache {
         // Clean up pending fetch
         this.pendingFetches.delete(key);
 
+        // Log fetch completion with result count if data is array
+        const resultCount = Array.isArray(data) ? data.length : 1;
+        NostrFetchLogger.end(`UnifiedCache.fetch(${key})`, resultCount, 'success');
+
         return data;
       })
       .catch((error) => {
         // ✅ FIX: AbortErrors are expected when canceling fetches - don't log as errors
         if (error?.name === 'AbortError' || error?.message?.includes('abort')) {
+          NostrFetchLogger.end(`UnifiedCache.fetch(${key})`, 0, 'aborted');
           console.log(
             `[UnifiedCache] Fetch cancelled for: ${key} (user navigated away)`
           );
         } else {
+          NostrFetchLogger.error(`UnifiedCache.fetch(${key})`, error);
           // Use warn instead of error for cache failures (non-critical)
           // Cache failures should not break the app - components should handle undefined gracefully
           console.warn(

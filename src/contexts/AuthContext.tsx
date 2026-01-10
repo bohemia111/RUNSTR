@@ -9,6 +9,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from '../services/auth/authService';
@@ -19,6 +20,7 @@ import unifiedCache from '../services/cache/UnifiedNostrCache';
 import { CacheKeys } from '../constants/cacheTTL';
 import type { User } from '../types';
 import { PerformanceLogger } from '../utils/PerformanceLogger';
+import { NostrFetchLogger } from '../utils/NostrFetchLogger';
 import { LocalTeamMembershipService } from '../services/team/LocalTeamMembershipService';
 
 // Authentication state interface
@@ -70,6 +72,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Profile loaded from UnifiedCache (prefetched by SplashInit)
    */
   const checkStoredCredentials = useCallback(async (): Promise<void> => {
+    NostrFetchLogger.start('AuthContext.checkStoredCredentials');
     try {
       const storedNpub = await getNpubFromStorage();
 
@@ -84,6 +87,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.warn('⚠️ AuthContext: No user identifiers');
           setIsAuthenticated(false);
           setCurrentUser(null);
+          NostrFetchLogger.end('AuthContext.checkStoredCredentials', 0, 'no identifiers');
           return;
         }
 
@@ -133,9 +137,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         if (cachedUser) {
+          NostrFetchLogger.cacheHit('AuthContext.checkStoredCredentials', 'user profile');
           setCurrentUser(cachedUser);
           setIsConnected(true);
           setConnectionStatus('Connected');
+          NostrFetchLogger.end('AuthContext.checkStoredCredentials', 1, 'cached user');
 
           // Subscribe to profile updates
           unifiedCache.subscribe(
@@ -146,6 +152,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           );
         } else {
+          NostrFetchLogger.cacheMiss('AuthContext.checkStoredCredentials', 'user profile');
           // ✅ ANDROID FIX: If no cached user, load from Nostr with timeout protection
           console.log(
             '⚠️ AuthContext: No cached user - fetching from Nostr...'
@@ -166,6 +173,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setCurrentUser(fallbackUser);
 
           // Try to upgrade to full profile in background (non-blocking)
+          NostrFetchLogger.end('AuthContext.checkStoredCredentials', 1, 'fallback user');
           loadUserProfile().catch((err) => {
             console.warn(
               '⚠️ AuthContext: Profile upgrade failed, using fallback:',
@@ -176,8 +184,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         setIsAuthenticated(false);
         setCurrentUser(null);
+        NostrFetchLogger.end('AuthContext.checkStoredCredentials', 0, 'no stored npub');
       }
     } catch (error) {
+      NostrFetchLogger.error('AuthContext.checkStoredCredentials', error as Error);
       console.error(
         '❌ AuthContext: Error checking stored credentials:',
         error
@@ -192,6 +202,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Uses global NDK instance for Nostr operations
    */
   const loadUserProfile = async (): Promise<void> => {
+    NostrFetchLogger.start('AuthContext.loadUserProfile');
     try {
       setConnectionStatus('Loading profile...');
 
@@ -206,6 +217,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const cachedUser = await appCache.get<User>('current_user_profile');
 
       if (cachedUser) {
+        NostrFetchLogger.cacheHit('AuthContext.loadUserProfile', 'appCache');
         // Show cached user immediately for fast startup
         setCurrentUser(cachedUser);
         setIsConnected(true);
@@ -249,10 +261,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Continue with cached data
         }
 
+        NostrFetchLogger.end('AuthContext.loadUserProfile', 1, 'from cache + refresh');
         return;
       }
 
       // No cache, load from Nostr
+      NostrFetchLogger.cacheMiss('AuthContext.loadUserProfile', 'appCache');
       let directUser = null;
 
       try {
@@ -287,11 +301,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Cache the profile
         await appCache.set('current_user_profile', user, 5 * 60 * 1000);
+        NostrFetchLogger.end('AuthContext.loadUserProfile', 1, 'from Nostr');
       } else {
         setIsAuthenticated(false);
         setCurrentUser(null);
+        NostrFetchLogger.end('AuthContext.loadUserProfile', 0, 'no profile found');
       }
     } catch (error) {
+      NostrFetchLogger.error('AuthContext.loadUserProfile', error as Error);
       console.error('❌ Error loading profile:', error);
       setInitError(
         error instanceof Error ? error.message : 'Failed to load profile'
@@ -579,10 +596,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Similar to iOS signOut() method
    */
   const signOut = useCallback(async (): Promise<void> => {
-    try {
-      console.log('🔓 AuthContext: Starting sign out process...');
+    console.log('🔓 AuthContext: Starting sign out process...');
 
-      // Clean up all notification handlers before signing out
+    // CRITICAL: Set state FIRST to trigger navigation immediately
+    // This ensures user sees Login screen even if cleanup takes time
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    setIsConnected(false);
+    setConnectionStatus('Disconnected');
+    setInitError(null);
+
+    console.log('✅ AuthContext: State cleared - navigation should happen now');
+
+    // Do cleanup in the background (non-blocking)
+    try {
+      // Clean up notification handlers
       try {
         const { notificationCleanupService } = await import(
           '../services/notifications/NotificationCleanupService'
@@ -590,28 +618,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await notificationCleanupService.cleanupAllHandlers();
         console.log('✅ AuthContext: Notification handlers cleaned up');
       } catch (cleanupError) {
-        console.error(
-          '⚠️ AuthContext: Failed to cleanup notifications:',
-          cleanupError
-        );
-        // Don't fail logout if notification cleanup fails
+        console.warn('⚠️ AuthContext: Notification cleanup failed:', cleanupError);
       }
 
+      // Clear storage and caches
       await AuthService.signOut();
-
-      // Clear all state (like iOS app)
-      setIsAuthenticated(false);
-      setCurrentUser(null);
-      setIsConnected(false);
-      setConnectionStatus('Disconnected');
-      setInitError(null);
-
-      console.log('✅ AuthContext: Sign out complete');
+      console.log('✅ AuthContext: Sign out cleanup complete');
     } catch (error) {
-      console.error('❌ AuthContext: Sign out error:', error);
-      // Still clear state even if service call fails
-      setIsAuthenticated(false);
-      setCurrentUser(null);
+      console.error('❌ AuthContext: Sign out cleanup error:', error);
+      // State already cleared, so user is logged out regardless
     }
   }, []);
 
@@ -668,25 +683,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   //   }
   // }, [isAuthenticated, isInitializing]);
 
-  // Context value - all state and actions
-  const contextValue: AuthContextType = {
-    // State
-    isInitializing,
-    isAuthenticated,
-    currentUser,
-    connectionStatus,
-    isConnected,
-    initError,
+  // Context value - memoized to prevent unnecessary re-renders
+  // This prevents cascading re-renders when context consumers check for changes
+  const contextValue = useMemo<AuthContextType>(
+    () => ({
+      // State
+      isInitializing,
+      isAuthenticated,
+      currentUser,
+      connectionStatus,
+      isConnected,
+      initError,
 
-    // Actions
-    signIn,
-    signUp,
-    signInWithApple,
-    signInWithAmber,
-    signOut,
-    refreshAuthentication,
-    checkStoredCredentials,
-  };
+      // Actions (already stable via useCallback)
+      signIn,
+      signUp,
+      signInWithApple,
+      signInWithAmber,
+      signOut,
+      refreshAuthentication,
+      checkStoredCredentials,
+    }),
+    [
+      isInitializing,
+      isAuthenticated,
+      currentUser,
+      connectionStatus,
+      isConnected,
+      initError,
+      signIn,
+      signUp,
+      signInWithApple,
+      signInWithAmber,
+      signOut,
+      refreshAuthentication,
+      checkStoredCredentials,
+    ]
+  );
 
   return (
     <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>

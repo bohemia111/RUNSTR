@@ -10,8 +10,12 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import { CustomAlertManager } from '../ui/CustomAlert';
+import Nostr1301ImportService from '../../services/fitness/Nostr1301ImportService';
 import { theme } from '../../styles/theme';
 import { PrivacyNoticeModal } from '../ui/PrivacyNoticeModal';
 import localWorkoutStorage from '../../services/fitness/LocalWorkoutStorageService';
@@ -23,6 +27,8 @@ import { LevelCard } from './LevelCard';
 import { CoachRunstrCard } from './CoachRunstrCard';
 import { GoalsHabitsCard } from './GoalsHabitsCard';
 import { CollapsibleAchievementsCard } from './CollapsibleAchievementsCard';
+import { CollapsibleSection } from './CollapsibleSection';
+import { WorkoutLevelRing } from '../profile/WorkoutLevelRing';
 import { PersonalRecordsService } from '../../services/analytics/PersonalRecordsService';
 import type { AllPersonalRecords } from '../../services/analytics/PersonalRecordsService';
 
@@ -42,6 +48,12 @@ export const AdvancedAnalyticsContent: React.FC<AdvancedAnalyticsContentProps> =
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [healthProfile, setHealthProfile] = useState<HealthProfile | null>(null);
   const [personalRecords, setPersonalRecords] = useState<AllPersonalRecords | null>(null);
+  const [pubkey, setPubkey] = useState<string>('');
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
   useEffect(() => {
     initializeAnalytics();
@@ -68,6 +80,11 @@ export const AdvancedAnalyticsContent: React.FC<AdvancedAnalyticsContentProps> =
     try {
       setLoading(true);
       console.log('[AdvancedAnalyticsContent] Loading analytics...');
+
+      // Load user pubkey for WorkoutLevelRing
+      const hexPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+      const npub = await AsyncStorage.getItem('@runstr:npub');
+      setPubkey(hexPubkey || npub || '');
 
       // Load health profile
       const profileData = await AsyncStorage.getItem(HEALTH_PROFILE_KEY);
@@ -121,6 +138,57 @@ export const AdvancedAnalyticsContent: React.FC<AdvancedAnalyticsContentProps> =
     onPrivacyDeclined?.();
   };
 
+  /**
+   * Handle importing public Nostr workout history (kind 1301 events)
+   */
+  const handleImportNostrHistory = async () => {
+    try {
+      setImporting(true);
+      setImportProgress({ current: 0, total: 0 });
+
+      const userKey = pubkey;
+      if (!userKey) {
+        console.error('[AdvancedAnalytics] No pubkey found - cannot import workouts');
+        setImporting(false);
+        setImportProgress(null);
+        return;
+      }
+
+      console.log('[AdvancedAnalytics] Starting Nostr workout import...');
+
+      const result = await Nostr1301ImportService.importUserHistory(
+        userKey,
+        (progress) => {
+          setImportProgress({
+            current: progress.imported,
+            total: progress.total,
+          });
+        }
+      );
+
+      if (result.success) {
+        console.log(`[AdvancedAnalytics] Import successful: ${result.totalImported} workouts`);
+        CustomAlertManager.alert(
+          'Import Complete',
+          `Imported ${result.totalImported} workouts from Nostr`
+        );
+        // Reload analytics to include imported workouts
+        await loadAnalytics();
+      } else {
+        console.error('[AdvancedAnalytics] Import failed:', result.error);
+        CustomAlertManager.alert('Import Failed', result.error || 'Unknown error');
+      }
+
+      setImporting(false);
+      setImportProgress(null);
+    } catch (error) {
+      console.error('[AdvancedAnalytics] Import error:', error);
+      setImporting(false);
+      setImportProgress(null);
+      CustomAlertManager.alert('Import Error', 'Failed to import workouts');
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -137,19 +205,58 @@ export const AdvancedAnalyticsContent: React.FC<AdvancedAnalyticsContentProps> =
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* RUNSTR Rank (Web of Trust) */}
-        <LevelCard />
+        {/* Workout Level Ring - Main Feature at Top */}
+        {pubkey && workouts.length > 0 && (
+          <WorkoutLevelRing workouts={workouts} pubkey={pubkey} />
+        )}
 
-        {/* Achievements (Personal Records) */}
+        {/* RUNSTR Rank (Web of Trust) - Collapsible */}
+        <CollapsibleSection title="RUNSTR Rank" icon="shield-checkmark">
+          <LevelCard />
+        </CollapsibleSection>
+
+        {/* Achievements (Personal Records) - Already Collapsible */}
         {personalRecords && (
           <CollapsibleAchievementsCard personalRecords={personalRecords} />
         )}
 
-        {/* Goals & Habits */}
-        <GoalsHabitsCard />
+        {/* Goals & Habits - Collapsible */}
+        <CollapsibleSection title="Goals & Habits" icon="flag-outline">
+          <GoalsHabitsCard />
+        </CollapsibleSection>
 
-        {/* COACH RUNSTR - AI-Powered Insights */}
-        <CoachRunstrCard workouts={workouts} />
+        {/* COACH RUNSTR - AI-Powered Insights - Collapsible */}
+        <CollapsibleSection title="Coach RUNSTR" icon="sparkles-outline">
+          <CoachRunstrCard workouts={workouts} />
+        </CollapsibleSection>
+
+        {/* Import Data - Collapsible */}
+        <CollapsibleSection title="Import Data" icon="cloud-download-outline">
+          <TouchableOpacity
+            style={[styles.importButton, importing && styles.importButtonDisabled]}
+            onPress={handleImportNostrHistory}
+            activeOpacity={0.7}
+            disabled={importing}
+          >
+            <Ionicons
+              name={importing ? 'sync' : 'cloud-download-outline'}
+              size={20}
+              color={importing ? theme.colors.textMuted : '#FF9D42'}
+            />
+            <View style={styles.importTextContainer}>
+              <Text style={[styles.importButtonText, importing && styles.importButtonTextDisabled]}>
+                {importing
+                  ? importProgress?.total === 0
+                    ? 'Connecting to Nostr relays...'
+                    : `Syncing: ${importProgress?.current || 0} / ${importProgress?.total || 0}`
+                  : 'Import from Nostr'}
+              </Text>
+              <Text style={styles.importSubtext}>
+                Fetch your workout history from Nostr relays
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </CollapsibleSection>
 
         {/* Last Updated */}
         {analytics && (
@@ -194,6 +301,34 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
     marginTop: 16,
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 8,
+    gap: 12,
+  },
+  importButtonDisabled: {
+    opacity: 0.7,
+  },
+  importTextContainer: {
+    flex: 1,
+  },
+  importButtonText: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: theme.typography.weights.medium,
+  },
+  importButtonTextDisabled: {
+    color: theme.colors.textMuted,
+  },
+  importSubtext: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
   },
 });
 

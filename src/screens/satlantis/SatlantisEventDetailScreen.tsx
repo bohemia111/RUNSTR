@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { useSatlantisEventDetail } from '../../hooks/useSatlantisEvents';
 import { SatlantisLeaderboard } from '../../components/satlantis/SatlantisLeaderboard';
+import { SatlantisTeamLeaderboard } from '../../components/satlantis/SatlantisTeamLeaderboard';
 import { EventJoinButton } from '../../components/satlantis/EventJoinButton';
 import { EventCreatorControls } from '../../components/satlantis/EventCreatorControls';
 import { SatlantisEventJoinService } from '../../services/satlantis/SatlantisEventJoinService';
@@ -184,17 +185,28 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
   const { eventId, eventPubkey } = route.params;
   const { currentUser } = useAuth();
 
+  // Get user's hex pubkey for leaderboard visibility filtering
+  const currentUserHexPubkey = React.useMemo(() => {
+    if (!currentUser?.npub) return undefined;
+    try {
+      const decoded = nip19.decode(currentUser.npub);
+      return decoded.data as string;
+    } catch {
+      return undefined;
+    }
+  }, [currentUser?.npub]);
+
   const {
     event,
-    participants,
     leaderboard,
+    teamLeaderboard,
     eventStatus,
     isLoading,
     isLoadingLeaderboard,
     error,
     refresh,
     addLocalParticipant,
-  } = useSatlantisEventDetail(eventPubkey, eventId);
+  } = useSatlantisEventDetail(eventPubkey, eventId, currentUserHexPubkey);
 
   // Separate state for pull-to-refresh spinner (prevents full-screen "Loading event..." blocker)
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -211,17 +223,6 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
       setIsRefreshing(false);
     }
   }, [eventId, refresh]);
-
-  // Get user's hex pubkey for optimistic UI
-  const currentUserHexPubkey = React.useMemo(() => {
-    if (!currentUser?.npub) return null;
-    try {
-      const decoded = nip19.decode(currentUser.npub);
-      return decoded.data as string;
-    } catch {
-      return null;
-    }
-  }, [currentUser?.npub]);
 
   // Alert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -329,7 +330,11 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
       >
         {/* Event Image */}
         {event.image ? (
-          <Image source={{ uri: event.image }} style={styles.eventImage} />
+          <Image
+            key={`event-banner-${event.id}`}
+            source={{ uri: event.image }}
+            style={styles.eventImage}
+          />
         ) : (
           <View style={styles.imagePlaceholder}>
             <Ionicons
@@ -353,6 +358,7 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
           <View style={styles.creatorRow}>
             {event.creatorProfile?.picture ? (
               <Image
+                key={`creator-avatar-${event.pubkey}`}
                 source={{ uri: event.creatorProfile.picture }}
                 style={styles.creatorAvatar}
               />
@@ -417,17 +423,6 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
               </View>
             </View>
           )}
-
-          {/* Participants count */}
-          <View style={styles.metaRow}>
-            <Ionicons name="people" size={18} color={theme.colors.accent} />
-            <View style={styles.metaContent}>
-              <Text style={styles.metaLabel}>Participants</Text>
-              <Text style={styles.metaValue}>
-                {participants.length} registered
-              </Text>
-            </View>
-          </View>
 
           {/* Sport Type */}
           <View style={styles.metaRow}>
@@ -529,14 +524,23 @@ export const SatlantisEventDetailScreen: React.FC<SatlantisEventDetailScreenProp
           </View>
         </View>
 
-        {/* Leaderboard */}
+        {/* Leaderboard - Team or Individual based on event type */}
         <View style={styles.leaderboardSection}>
-          <SatlantisLeaderboard
-            entries={leaderboard}
-            isLoading={isLoadingLeaderboard}
-            eventStatus={eventStatus}
-            currentUserNpub={currentUser?.npub}
-          />
+          {event.isTeamCompetition ? (
+            <SatlantisTeamLeaderboard
+              entries={teamLeaderboard}
+              isLoading={isLoadingLeaderboard}
+              eventStatus={eventStatus}
+              scoringType={event.scoringType}
+            />
+          ) : (
+            <SatlantisLeaderboard
+              entries={leaderboard}
+              isLoading={isLoadingLeaderboard}
+              eventStatus={eventStatus}
+              currentUserNpub={currentUser?.npub}
+            />
+          )}
         </View>
 
         {/* Payout Controls - shown to ANYONE when event ended and has prize pool */}

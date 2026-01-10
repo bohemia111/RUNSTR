@@ -231,11 +231,23 @@ export class SimpleRunTracker {
   private watchdogInterval: NodeJS.Timeout | null = null;
   private gpsRestartAttempts = 0;
   private readonly MAX_GPS_RESTARTS = 100; // Increased from 5 - resets on successful GPS
-  private readonly GPS_TIMEOUT_MS = 15000; // 15 seconds without GPS = dead (was 20s)
+  // Samsung/GrapheneOS have GPS hiccups of 10-20s due to battery management
+  // Use 30s on Android to avoid unnecessary recovery attempts, 15s on iOS
+  private readonly GPS_TIMEOUT_MS = Platform.OS === 'android' ? 30000 : 15000;
   private readonly WATCHDOG_CHECK_MS = 5000; // Check every 5 seconds
 
   // Silent audio recording - keeps app alive in background (Android insurance)
   private silentRecording: Audio.Recording | null = null;
+
+  // Debug state for diagnostic UI (GPS death diagnosis)
+  private debugState = {
+    watchdogLastCheck: 0,
+    recoverySuccesses: 0,
+    recoveryFailures: 0,
+    lastRecoveryError: null as string | null,
+    totalPointsReceived: 0,
+    lastPointAccuracy: 0,
+  };
 
   private constructor() {
     console.log('[SimpleRunTracker] Initialized');
@@ -273,6 +285,9 @@ export class SimpleRunTracker {
     this.runningDistance = 0; // Reset incremental distance
     this.runningElevationGain = 0; // Reset incremental elevation gain
     this.lastAltitude = null; // Reset last altitude
+
+    // Reset debug state for new session
+    this.resetDebugState();
 
     // CRITICAL: Prevent Android from suspending the app (Doze Mode)
     // Reference implementation uses this exact pattern - required for background GPS
@@ -413,6 +428,12 @@ export class SimpleRunTracker {
           notificationTitle: 'RUNSTR Active',
           notificationBody: 'Tracking your workout...',
           notificationColor: '#FF6B35',
+          // CRITICAL: Android 8.0+ requires notification channel for foreground services
+          // Samsung/GrapheneOS kill services without valid channels after ~5 minutes
+          notificationChannelId: 'runstr-gps-tracking',
+          notificationChannelName: 'GPS Tracking',
+          notificationChannelDescription: 'Shows active workout tracking status',
+          notificationId: 123456, // Fixed ID prevents duplicate notifications
           killServiceOnDestroy: false, // CRITICAL: Keep service alive when app killed
         },
         pausesUpdatesAutomatically: false,
@@ -1001,6 +1022,9 @@ export class SimpleRunTracker {
     this.gpsRestartAttempts = 0;
 
     this.watchdogInterval = setInterval(async () => {
+      // Track watchdog activity for debug UI
+      this.debugState.watchdogLastCheck = Date.now();
+
       if (!this.isTracking || this.isPaused) return;
 
       // Read last GPS time from AsyncStorage (shared with background task)
@@ -1077,8 +1101,14 @@ export class SimpleRunTracker {
         this.lastGPSUpdate.toString()
       );
 
+      // Track recovery success for debug UI
+      this.debugState.recoverySuccesses++;
+      this.debugState.lastRecoveryError = null;
       console.log('[WATCHDOG] GPS recovery successful');
     } catch (error) {
+      // Track recovery failure for debug UI
+      this.debugState.recoveryFailures++;
+      this.debugState.lastRecoveryError = String(error);
       console.error('[WATCHDOG] GPS recovery failed:', error);
     }
   }
@@ -1265,6 +1295,108 @@ export class SimpleRunTracker {
       console.error('[SimpleRunTracker] Error restoring session:', error);
       return false;
     }
+  }
+
+  // ============================================================
+  // DEBUG METHODS - For diagnostic UI (GPS death diagnosis)
+  // ============================================================
+
+  /**
+   * Get comprehensive debug state for diagnostic overlay
+   * Async because it checks Location subscription status
+   */
+  async getDebugState(): Promise<{
+    isTracking: boolean;
+    isPaused: boolean;
+    watchdogActive: boolean;
+    watchdogLastCheck: number;
+    msSinceWatchdogCheck: number;
+    subscriptionReportsActive: boolean;
+    taskManagerHeartbeat: number;
+    msSinceTaskHeartbeat: number;
+    gpsRestartAttempts: number;
+    recoverySuccesses: number;
+    recoveryFailures: number;
+    lastRecoveryError: string | null;
+    runningDistance: number;
+    totalPointsReceived: number;
+    lastPointAccuracy: number;
+    cachedPointsCount: number;
+    lastGPSError: string | null;
+  }> {
+    // Check location subscription status
+    let subscriptionActive = false;
+    try {
+      subscriptionActive = await Location.hasStartedLocationUpdatesAsync(
+        SIMPLE_TRACKER_TASK
+      );
+    } catch (e) {
+      // Ignore - subscription check failed
+    }
+
+    // Read TaskManager heartbeat from AsyncStorage
+    let taskHeartbeat = 0;
+    try {
+      const ts = await AsyncStorage.getItem('@runstr:last_gps_time');
+      taskHeartbeat = ts ? parseInt(ts, 10) : 0;
+    } catch (e) {
+      // Ignore - heartbeat read failed
+    }
+
+    return {
+      // Core Status
+      isTracking: this.isTracking,
+      isPaused: this.isPaused,
+
+      // Watchdog Health
+      watchdogActive: this.watchdogInterval !== null,
+      watchdogLastCheck: this.debugState.watchdogLastCheck,
+      msSinceWatchdogCheck: Date.now() - this.debugState.watchdogLastCheck,
+
+      // GPS Subscription
+      subscriptionReportsActive: subscriptionActive,
+      taskManagerHeartbeat: taskHeartbeat,
+      msSinceTaskHeartbeat: taskHeartbeat > 0 ? Date.now() - taskHeartbeat : 0,
+
+      // Recovery Stats
+      gpsRestartAttempts: this.gpsRestartAttempts,
+      recoverySuccesses: this.debugState.recoverySuccesses,
+      recoveryFailures: this.debugState.recoveryFailures,
+      lastRecoveryError: this.debugState.lastRecoveryError,
+
+      // Distance Tracking
+      runningDistance: this.runningDistance,
+      totalPointsReceived: this.debugState.totalPointsReceived,
+      lastPointAccuracy: this.debugState.lastPointAccuracy,
+      cachedPointsCount: this.cachedGpsPoints.length,
+
+      // Error State
+      lastGPSError: this.lastGPSError,
+    };
+  }
+
+  /**
+   * Increment points received counter (called from background task)
+   */
+  incrementPointsReceived(count: number, accuracy?: number): void {
+    this.debugState.totalPointsReceived += count;
+    if (accuracy !== undefined) {
+      this.debugState.lastPointAccuracy = accuracy;
+    }
+  }
+
+  /**
+   * Reset debug state for new session
+   */
+  private resetDebugState(): void {
+    this.debugState = {
+      watchdogLastCheck: 0,
+      recoverySuccesses: 0,
+      recoveryFailures: 0,
+      lastRecoveryError: null,
+      totalPointsReceived: 0,
+      lastPointAccuracy: 0,
+    };
   }
 }
 

@@ -17,6 +17,7 @@
 import NDK, { NDKNip07Signer } from '@nostr-dev-kit/ndk';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppStateManager } from '../core/AppStateManager';
+import { NostrFetchLogger } from '../../utils/NostrFetchLogger';
 
 export class GlobalNDKService {
   private static instance: NDK | null = null;
@@ -45,19 +46,24 @@ export class GlobalNDKService {
     }
   >();
 
+  // ✅ NEW: Relay pause flag to prevent auto-reconnect during pause window
+  // Used by UnifiedWorkoutCache to temporarily stop WebSocket activity
+  // and allow React's macrotask queue to unblock
+  private static isRelayPauseActive: boolean = false;
+
   /**
    * Default relay configuration
    * These are fast, reliable relays used across the app
    *
-   * PERFORMANCE: Reduced from 4 to 3 relays (removed Primal)
-   * - relay.primal.net removed to avoid EOSE hangs (based on runstr-github testing)
-   * - 25% fewer WebSocket connections = faster initial load
+   * PERFORMANCE NOTE: Reduced to 2 relays to minimize native WebSocket bridge traffic
+   * - 3+ relays cause nw_protocol_socket_set_no_wake_from_sleep floods that block React's macrotask queue
+   * - relay.damus.io and nos.lol are the most reliable
    */
   private static readonly DEFAULT_RELAYS = [
     'wss://relay.damus.io',
     'wss://nos.lol',
-    'wss://relay.nostr.band',
-    // 'wss://relay.primal.net', // Removed: causes EOSE hangs
+    // 'wss://relay.primal.net', // Removed: Testing with fewer relays
+    // 'wss://relay.nostr.band', // Removed: SSL failures (-9807) block React for 40+ seconds
   ];
 
   /**
@@ -67,9 +73,12 @@ export class GlobalNDKService {
    * Connection happens in background without blocking app startup
    */
   static async getInstance(): Promise<NDK> {
+    NostrFetchLogger.start('GlobalNDK.getInstance');
+
     // If instance exists, check connection status
     if (this.instance) {
       const status = this.getStatus();
+      NostrFetchLogger.cacheHit('GlobalNDK.getInstance', `${status.connectedRelays}/${status.relayCount} relays`);
       console.log(
         `♻️ GlobalNDK: Reusing cached instance (${status.connectedRelays}/${status.relayCount} relays connected)`
       );
@@ -90,10 +99,12 @@ export class GlobalNDKService {
         }, 0);
       }
 
+      NostrFetchLogger.end('GlobalNDK.getInstance', undefined, 'cached');
       return this.instance;
     }
 
     // Create degraded instance immediately (non-blocking)
+    NostrFetchLogger.cacheMiss('GlobalNDK.getInstance');
     console.log('🚀 GlobalNDK: Creating instant degraded instance...');
 
     const degradedNDK = new NDK({
@@ -130,6 +141,7 @@ export class GlobalNDKService {
     //   console.log('📱 GlobalNDK: AppState listener setup for keepalive lifecycle');
     // }
 
+    NostrFetchLogger.end('GlobalNDK.getInstance', undefined, 'new instance');
     return degradedNDK;
   }
 
@@ -138,17 +150,20 @@ export class GlobalNDKService {
    * Attempts to connect to relays without blocking getInstance()
    */
   private static async connectInBackground(): Promise<void> {
+    NostrFetchLogger.start('GlobalNDK.connectInBackground');
     console.log('🔄 GlobalNDK: Starting background connection to relays...');
 
     // ✅ FIX: Don't connect if app is backgrounded (prevents Android crash)
     if (!AppStateManager.canDoNetworkOps()) {
       console.log('🔴 App is backgrounded, skipping NDK connection');
+      NostrFetchLogger.end('GlobalNDK.connectInBackground', 0, 'skipped - app backgrounded');
       return;
     }
 
     try {
       if (!this.instance) {
         console.warn('⚠️ No NDK instance to connect');
+        NostrFetchLogger.end('GlobalNDK.connectInBackground', 0, 'no instance');
         return;
       }
 
@@ -170,15 +185,18 @@ export class GlobalNDKService {
         console.log(
           '✅ GlobalNDK: Relying on NDK native reconnection (keepalive disabled)'
         );
+        NostrFetchLogger.end('GlobalNDK.connectInBackground', connectedCount, 'connected');
       } else {
         console.warn(
           '⚠️ GlobalNDK: Background connection failed - no relays connected'
         );
+        NostrFetchLogger.end('GlobalNDK.connectInBackground', 0, 'failed - no relays');
         // Schedule retry
         setTimeout(() => this.retryConnection(3), 5000); // Retry after 5s
       }
     } catch (error) {
       console.warn('⚠️ GlobalNDK: Background connection error:', error);
+      NostrFetchLogger.error('GlobalNDK.connectInBackground', error instanceof Error ? error : String(error));
       // Schedule retry
       setTimeout(() => this.retryConnection(3), 5000); // Retry after 5s
     } finally {
@@ -342,6 +360,14 @@ export class GlobalNDKService {
       return;
     }
 
+    // ✅ NEW: Don't reconnect during relay pause (allows React scheduler to unblock)
+    if (this.isRelayPauseActive) {
+      console.log(
+        '⏸️ GlobalNDK: Relay pause active, skipping reconnection attempt'
+      );
+      return;
+    }
+
     // ✅ INFINITE LOOP FIX: Check total reconnection attempts
     if (this.totalReconnectionAttempts >= this.MAX_TOTAL_RECONNECTIONS) {
       console.error(
@@ -435,11 +461,9 @@ export class GlobalNDKService {
    */
   private static async initializeNDK(): Promise<NDK> {
     try {
-      // Load relay URLs from storage (or use defaults)
-      const storedRelays = await AsyncStorage.getItem('nostr_relays');
-      const relayUrls = storedRelays
-        ? JSON.parse(storedRelays)
-        : this.DEFAULT_RELAYS;
+      // Always use default relays for consistent, fast performance
+      // Ignoring stored user relays reduces connections from 9+ to 3
+      const relayUrls = this.DEFAULT_RELAYS;
 
       console.log(`🔗 GlobalNDK: Connecting to ${relayUrls.length} relays...`);
       console.log(`   Relays: ${relayUrls.join(', ')}`);
@@ -447,7 +471,7 @@ export class GlobalNDKService {
       // Create NDK instance with optimized settings
       const ndk = new NDK({
         explicitRelayUrls: relayUrls,
-        autoConnectUserRelays: true, // Connect to user's preferred relays
+        autoConnectUserRelays: false, // Disabled: prevents 5+ extra relay connections from Outbox Model
         autoFetchUserMutelist: false, // Don't auto-fetch mute lists (saves bandwidth)
         // Note: debug option removed - was causing "ndk.debug.extend is not a function" error
       });
@@ -537,6 +561,54 @@ export class GlobalNDKService {
       console.error('❌ GlobalNDK: Reconnection failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * ✅ NEW: Temporarily pause relay connections to unblock iOS timer queue
+   *
+   * Used by UnifiedWorkoutCache after fetching workout data. iOS's native WebSocket
+   * bridge blocks React's macrotask queue (setTimeout, requestAnimationFrame) for 40+ seconds
+   * while connections are active. Pausing allows React to render.
+   */
+  static pauseRelays(): void {
+    if (!this.instance) {
+      console.warn('⚠️ GlobalNDK: No instance to pause');
+      return;
+    }
+
+    this.isRelayPauseActive = true;
+    console.log('⏸️ GlobalNDK: Pausing relays to unblock React scheduler...');
+
+    // Disconnect all relays
+    for (const relay of this.instance.pool.relays.values()) {
+      try {
+        relay.disconnect();
+      } catch (e) {
+        // Ignore disconnect errors
+      }
+    }
+
+    console.log('⏸️ GlobalNDK: Relays paused');
+  }
+
+  /**
+   * ✅ NEW: Resume relay connections after React has rendered
+   */
+  static resumeRelays(): void {
+    this.isRelayPauseActive = false;
+    console.log('▶️ GlobalNDK: Resuming relays...');
+
+    // Reconnect in background (non-blocking)
+    this.connectInBackground().catch(err => {
+      console.warn('⚠️ GlobalNDK: Resume failed:', err);
+    });
+  }
+
+  /**
+   * ✅ NEW: Check if relay pause is active
+   */
+  static isPaused(): boolean {
+    return this.isRelayPauseActive;
   }
 
   /**
@@ -656,6 +728,7 @@ export class GlobalNDKService {
   /**
    * Wait for MINIMUM number of relays to connect before proceeding
    *
+   * EVENT-DRIVEN: Uses relay connect events instead of polling.
    * Progressive connection strategy - faster UX while maintaining good data coverage.
    * Accepts partial connectivity (e.g., 2/4 relays) instead of waiting for all relays.
    *
@@ -667,47 +740,85 @@ export class GlobalNDKService {
     minRelays: number = 2,
     timeoutMs: number = 3000 // ✅ PERFORMANCE: Reduced from 4000ms to 3000ms
   ): Promise<boolean> {
-    const startTime = Date.now();
-    const checkInterval = 500; // Check every 500ms
-
-    while (Date.now() - startTime < timeoutMs) {
-      const status = this.getStatus();
-
-      // Success: Minimum relay count met
-      if (status.connectedRelays >= minRelays) {
-        console.log(
-          `✅ GlobalNDK: ${status.connectedRelays}/${status.relayCount} relays connected ` +
-            `(minimum: ${minRelays}) - ready for queries`
-        );
-        return true;
-      }
-
-      // Still waiting
-      if (Date.now() - startTime < timeoutMs - checkInterval) {
-        console.log(
-          `⏳ GlobalNDK: Waiting for minimum relays... ${status.connectedRelays}/${minRelays} connected`
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, checkInterval));
-    }
-
-    // Timeout: Check if we have ANY connectivity
-    const finalStatus = this.getStatus();
-    const hasMinimum = finalStatus.connectedRelays >= minRelays;
-
-    if (hasMinimum) {
+    // FAST PATH: Check if already connected
+    const status = this.getStatus();
+    if (status.connectedRelays >= minRelays) {
       console.log(
-        `✅ GlobalNDK: Minimum threshold met - ${finalStatus.connectedRelays}/${minRelays} relays`
+        `✅ GlobalNDK: Already connected - ${status.connectedRelays}/${status.relayCount} relays ` +
+          `(minimum: ${minRelays})`
       );
-    } else {
-      console.warn(
-        `⚠️ GlobalNDK: Connection timeout after ${timeoutMs}ms - ` +
-          `only ${finalStatus.connectedRelays}/${minRelays} minimum relays connected`
-      );
-      this.logConnectionDiagnostics();
+      return true;
     }
 
-    return hasMinimum;
+    // If no instance, can't wait for connection
+    if (!this.instance?.pool) {
+      console.warn('⚠️ GlobalNDK: No instance available for connection wait');
+      return false;
+    }
+
+    // EVENT-DRIVEN: Wait for relay connect events instead of polling
+    return new Promise<boolean>((resolve) => {
+      let resolved = false;
+      const relays = Array.from(this.instance!.pool.relays.values());
+      const connectHandlers: Array<() => void> = [];
+
+      const checkAndResolve = () => {
+        if (resolved) return;
+        const currentStatus = this.getStatus();
+        if (currentStatus.connectedRelays >= minRelays) {
+          resolved = true;
+          cleanup();
+          console.log(
+            `✅ GlobalNDK: ${currentStatus.connectedRelays}/${currentStatus.relayCount} relays connected ` +
+              `(minimum: ${minRelays}) - ready for queries`
+          );
+          resolve(true);
+        }
+      };
+
+      const cleanup = () => {
+        // Remove all connect handlers
+        relays.forEach((relay, index) => {
+          if (connectHandlers[index]) {
+            relay.off('connect', connectHandlers[index]);
+          }
+        });
+      };
+
+      // Listen for connect events on all relays
+      relays.forEach((relay, index) => {
+        const handler = () => checkAndResolve();
+        connectHandlers[index] = handler;
+        relay.on('connect', handler);
+      });
+
+      // Timeout handler - check final status
+      setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+
+        const finalStatus = this.getStatus();
+        const hasMinimum = finalStatus.connectedRelays >= minRelays;
+
+        if (hasMinimum) {
+          console.log(
+            `✅ GlobalNDK: Minimum threshold met - ${finalStatus.connectedRelays}/${minRelays} relays`
+          );
+        } else {
+          console.warn(
+            `⚠️ GlobalNDK: Connection timeout after ${timeoutMs}ms - ` +
+              `only ${finalStatus.connectedRelays}/${minRelays} minimum relays connected`
+          );
+          this.logConnectionDiagnostics();
+        }
+
+        resolve(hasMinimum);
+      }, timeoutMs);
+
+      // Check immediately in case status changed
+      checkAndResolve();
+    });
   }
 
   /**

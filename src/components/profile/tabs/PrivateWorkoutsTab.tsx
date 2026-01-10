@@ -299,16 +299,16 @@ export const PrivateWorkoutsTab: React.FC<PrivateWorkoutsTabProps> = ({
             tintColor={theme.colors.text}
           />
         }
-        ListHeaderComponent={
+        ListFooterComponent={
           <>
-            {/* Header with workout count */}
+            {/* Footer with workout count */}
             {workouts.length > 0 && (
-              <View style={styles.header}>
-                <Text style={styles.headerText}>
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>
                   {workouts.length} local workout
                   {workouts.length !== 1 ? 's' : ''}
                 </Text>
-                <Text style={styles.headerSubtext}>Stored on your device</Text>
+                <Text style={styles.footerSubtext}>Stored on your device</Text>
               </View>
             )}
           </>
@@ -367,16 +367,17 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 100,
   },
-  header: {
+  footer: {
+    marginTop: 16,
     marginBottom: 16,
     alignItems: 'center',
   },
-  headerText: {
+  footerText: {
     color: theme.colors.text,
     fontSize: 14,
     fontWeight: theme.typography.weights.medium,
   },
-  headerSubtext: {
+  footerSubtext: {
     color: theme.colors.textMuted,
     fontSize: 12,
     marginTop: 4,

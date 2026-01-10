@@ -3,7 +3,7 @@
  * Displays event preview with image, status badge, and metadata
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
@@ -21,6 +21,8 @@ export const SatlantisEventCard: React.FC<SatlantisEventCardProps> = ({
   onPress,
   participantCount,
 }) => {
+  // Track if the event image has loaded - prevents showing wrong cached image
+  const [imageLoaded, setImageLoaded] = useState(false);
   const status = getEventStatus(event);
 
   const getStatusStyles = (s: SatlantisEventStatus) => {
@@ -47,9 +49,27 @@ export const SatlantisEventCard: React.FC<SatlantisEventCardProps> = ({
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      {/* Event Image */}
+      {/* Event Image - show placeholder until image fully loads to prevent cache collision */}
       {event.image ? (
-        <Image source={{ uri: event.image }} style={styles.image} />
+        <View style={styles.imageContainer}>
+          {/* Placeholder shown until image loads */}
+          {!imageLoaded && (
+            <View style={[styles.imagePlaceholder, styles.imagePlaceholderAbsolute]}>
+              <Ionicons name="trophy-outline" size={32} color={theme.colors.textMuted} />
+            </View>
+          )}
+          <Image
+            key={`event-banner-${event.id}`}
+            source={{ uri: event.image }}
+            style={[styles.image, !imageLoaded && styles.imageHidden]}
+            fadeDuration={0}
+            onLoad={() => {
+              console.log(`[EventCard] Image LOADED: ${event.id}`);
+              setImageLoaded(true);
+            }}
+            onError={(e) => console.log(`[EventCard] Image ERROR: ${event.id}`, e.nativeEvent.error)}
+          />
+        </View>
       ) : (
         <View style={styles.imagePlaceholder}>
           <Ionicons name="trophy-outline" size={32} color={theme.colors.textMuted} />
@@ -101,6 +121,24 @@ export const SatlantisEventCard: React.FC<SatlantisEventCardProps> = ({
               </Text>
             </View>
           )}
+          {/* Prize Pool - shown if > 0 */}
+          {event.prizePoolSats && event.prizePoolSats > 0 && (
+            <View style={styles.tag}>
+              <Ionicons name="flash" size={12} color={theme.colors.accent} />
+              <Text style={styles.tagText}>
+                {event.prizePoolSats.toLocaleString()} sats
+              </Text>
+            </View>
+          )}
+          {/* Charity Badge - shown if supporting charity */}
+          {event.pledgeDestination === 'charity' && event.pledgeCharityName && (
+            <View style={styles.tag}>
+              <Ionicons name="heart" size={12} color={theme.colors.accent} />
+              <Text style={styles.tagText}>
+                {event.pledgeCharityName}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -116,10 +154,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
   },
+  imageContainer: {
+    width: '100%',
+    height: 150,
+    position: 'relative',
+  },
   image: {
     width: '100%',
     height: 150,
     backgroundColor: theme.colors.border,
+  },
+  imageHidden: {
+    opacity: 0,
   },
   imagePlaceholder: {
     width: '100%',
@@ -127,6 +173,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.border,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  imagePlaceholderAbsolute: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    height: 150,
+    zIndex: 1,
   },
   statusBadge: {
     position: 'absolute',

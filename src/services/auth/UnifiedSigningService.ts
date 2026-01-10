@@ -8,8 +8,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NDKPrivateKeySigner, type NDKSigner } from '@nostr-dev-kit/ndk';
 import { AmberNDKSigner } from './amber/AmberNDKSigner';
 import { nsecToPrivateKey } from '../../utils/nostr';
+import { getAuthenticationData } from '../../utils/nostrAuth';
 import type { NostrEvent } from '@nostr-dev-kit/ndk';
 import { GlobalNDKService } from '../nostr/GlobalNDKService';
+import { SecureNsecStorage } from './SecureNsecStorage';
 
 export type AuthMethod = 'nostr' | 'amber' | null;
 
@@ -58,13 +60,14 @@ export class UnifiedSigningService {
       }
 
       // Backward compatibility: check if nsec exists (old users who don't have auth_method set)
-      const nsec = await AsyncStorage.getItem('@runstr:user_nsec');
-      if (nsec) {
+      // Uses SecureNsecStorage which handles migration from AsyncStorage
+      const hasNsec = await SecureNsecStorage.hasNsec();
+      if (hasNsec) {
         // Auto-upgrade: set auth method for old users
         await AsyncStorage.setItem('@runstr:auth_method', 'nostr');
         this.cachedAuthMethod = 'nostr';
         console.log(
-          '✅ UnifiedSigningService: Auto-detected nostr auth method (backward compatibility)'
+          '✅ UnifiedSigningService: Auto-detected nostr auth method (SecureStore)'
         );
         return 'nostr';
       }
@@ -100,14 +103,14 @@ export class UnifiedSigningService {
       const authMethod = await this.getAuthMethod();
 
       if (authMethod === 'nostr') {
-        // Create NDKPrivateKeySigner from stored nsec
-        const nsec = await AsyncStorage.getItem('@runstr:user_nsec');
-        if (!nsec) {
+        // Create NDKPrivateKeySigner from SecureStore nsec
+        const authData = await getAuthenticationData();
+        if (!authData?.nsec) {
           throw new Error('No nsec found for nostr authentication');
         }
 
         // Convert nsec to hex private key
-        const hexPrivateKey = nsecToPrivateKey(nsec);
+        const hexPrivateKey = nsecToPrivateKey(authData.nsec);
 
         // Create NDKPrivateKeySigner from hex key
         const signer = new NDKPrivateKeySigner(hexPrivateKey);
@@ -119,7 +122,7 @@ export class UnifiedSigningService {
         ndk.signer = signer;
 
         console.log(
-          '✅ UnifiedSigningService: Created NDKPrivateKeySigner from nsec and set on GlobalNDK'
+          '✅ UnifiedSigningService: Created NDKPrivateKeySigner from SecureStore nsec'
         );
         return signer;
       }
@@ -306,9 +309,10 @@ export class UnifiedSigningService {
       const authMethod = await this.getAuthMethod();
 
       if (authMethod === 'nostr') {
-        const nsec = await AsyncStorage.getItem('@runstr:user_nsec');
-        if (!nsec) return null;
-        return nsecToPrivateKey(nsec);
+        // Use SecureStore via getAuthenticationData
+        const authData = await getAuthenticationData();
+        if (!authData?.nsec) return null;
+        return nsecToPrivateKey(authData.nsec);
       }
 
       // Amber users don't have access to private key

@@ -113,6 +113,58 @@ export class AuthService {
         );
       }
 
+      // CRITICAL: Clear NWC wallet data from SecureStore
+      try {
+        const { NWCStorageService } = await import(
+          '../wallet/NWCStorageService'
+        );
+        await NWCStorageService.clearNWC();
+        console.log('✅ AuthService: NWC wallet cleared');
+      } catch (err) {
+        console.warn('⚠️ AuthService: NWC wallet clear failed:', err);
+      }
+
+      // Clear local team membership data
+      try {
+        const { LocalTeamMembershipService } = await import(
+          '../team/LocalTeamMembershipService'
+        );
+        await LocalTeamMembershipService.clearAll();
+        console.log('✅ AuthService: Local team memberships cleared');
+      } catch (err) {
+        console.warn('⚠️ AuthService: Team membership clear failed:', err);
+      }
+
+      // Clear unified Nostr cache
+      try {
+        const unifiedCache = (await import('../cache/UnifiedNostrCache')).default;
+        await unifiedCache.clear();
+        console.log('✅ AuthService: Unified Nostr cache cleared');
+      } catch (err) {
+        console.warn('⚠️ AuthService: Unified cache clear failed:', err);
+      }
+
+      // Clear all remaining user-specific AsyncStorage keys
+      try {
+        await AsyncStorage.multiRemove([
+          '@runstr:app_init_completed',
+          '@runstr:first_launch',
+          '@runstr:is_new_signup',
+          '@runstr:session_state',
+          '@runstr:gps_points',
+          '@runstr:nutzap_wallet',
+          '@runstr:daily_step_data',
+          '@runstr:streak_data',
+          'nwc_manual_connection',
+          // Challenge join states (prevent cross-user contamination)
+          '@runstr:running_bitcoin_joined',
+          '@runstr:running_bitcoin_rewards_claimed',
+        ]);
+        console.log('✅ AuthService: Additional user data cleared');
+      } catch (err) {
+        console.warn('⚠️ AuthService: Additional data clear failed:', err);
+      }
+
       console.log(
         '✅ AuthService: Sign out complete - all caches and data cleared'
       );

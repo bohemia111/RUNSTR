@@ -23,7 +23,7 @@ import { ProfileEditScreen } from '../screens/ProfileEditScreen';
 import { WalletScreen } from '../screens/WalletScreen';
 import { TeamDiscoveryScreen } from '../screens/TeamDiscoveryScreen';
 import { CaptainDashboardScreen } from '../screens/CaptainDashboardScreen';
-import { TeamCreationWizard } from '../components/wizards/TeamCreationWizard';
+// TeamCreationWizard removed - team creation feature removed
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { LeagueDetailScreen } from '../screens/LeagueDetailScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -34,12 +34,19 @@ import { HealthProfileScreen } from '../screens/HealthProfileScreen';
 import { FitnessTestResultsScreen } from '../screens/FitnessTestResultsScreen';
 import { SatlantisDiscoveryScreen } from '../screens/satlantis/SatlantisDiscoveryScreen';
 import { SatlantisEventDetailScreen } from '../screens/satlantis/SatlantisEventDetailScreen';
+import { RunningBitcoinDetailScreen } from '../screens/events/RunningBitcoinDetailScreen';
+import { EinundzwanzigDetailScreen } from '../screens/events/EinundzwanzigDetailScreen';
+import { JanuaryWalkingDetailScreen } from '../screens/events/JanuaryWalkingDetailScreen';
 import { RewardsScreen } from '../screens/RewardsScreen';
 import { DonateScreen } from '../screens/DonateScreen';
 import { TeamsScreen } from '../screens/TeamsScreen';
 import { AdvancedAnalyticsScreen } from '../screens/AdvancedAnalyticsScreen';
 import { EventsScreen } from '../screens/EventsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { ActivityTrackerScreen } from '../screens/activity/ActivityTrackerScreen';
+import { Season2Screen } from '../screens/season2/Season2Screen';
+import { CompeteScreen } from '../screens/CompeteScreen';
+import { LeaderboardsScreen } from '../screens/LeaderboardsScreen';
 import type { DiscoveredNostrUser } from '../services/user/UserDiscoveryService';
 
 // Navigation Configuration
@@ -73,7 +80,7 @@ export type RootStackParamList = {
     isOnboarding?: boolean;
     currentTeamId?: string;
   };
-  TeamCreation: undefined;
+  // TeamCreation removed - team creation feature removed
   EventDetail: { eventId: string; eventData?: any };
   LeagueDetail: { leagueId: string; leagueData?: any };
   CompetitionsList: undefined;
@@ -83,12 +90,17 @@ export type RootStackParamList = {
   FitnessTestResults: { testId: string };
   SatlantisDiscovery: undefined;
   SatlantisEventDetail: { eventId: string; eventPubkey: string };
+  RunningBitcoinDetail: undefined;
+  EinundzwanzigDetail: undefined;
+  JanuaryWalkingDetail: undefined;
   Teams: undefined;
   Rewards: undefined;
   Donate: undefined;
   AdvancedAnalytics: undefined;
   Events: undefined;
   Settings: undefined;
+  Exercise: undefined;
+  Compete: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -429,48 +441,7 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
         )}
       </Stack.Screen>
 
-      {/* Team Creation Wizard */}
-      <Stack.Screen
-        name="TeamCreation"
-        options={screenConfigurations.TeamCreation}
-      >
-        {({ navigation }) => {
-          // Only render TeamCreationWizard if user is authenticated
-          if (!user) {
-            return (
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: theme.colors.background,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={{ color: theme.colors.text }}>
-                  Please sign in first
-                </Text>
-              </View>
-            );
-          }
-
-          return (
-            <TeamCreationWizard
-              currentUser={user}
-              onComplete={(teamData, teamId) =>
-                handlers.handleTeamCreationComplete(
-                  teamData,
-                  navigation,
-                  teamId
-                )
-              }
-              onNavigateToTeam={(teamId) =>
-                handlers.handleNavigateToTeam(teamId, navigation)
-              }
-              onCancel={() => navigation.goBack()}
-            />
-          );
-        }}
-      </Stack.Screen>
+      {/* Team Creation Wizard removed - team creation feature removed */}
 
       {/* Event Detail Screen */}
       <Stack.Screen
@@ -559,6 +530,36 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
         }}
       />
 
+      {/* Running Bitcoin Challenge Detail Screen */}
+      <Stack.Screen
+        name="RunningBitcoinDetail"
+        component={RunningBitcoinDetailScreen}
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      />
+
+      {/* Einundzwanzig Fitness Challenge Detail Screen */}
+      <Stack.Screen
+        name="EinundzwanzigDetail"
+        component={EinundzwanzigDetailScreen}
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      />
+
+      {/* January Walking Contest Detail Screen */}
+      <Stack.Screen
+        name="JanuaryWalkingDetail"
+        component={JanuaryWalkingDetailScreen}
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      />
+
       {/* Teams Screen - Hardcoded teams + charities selection */}
       <Stack.Screen
         name="Teams"
@@ -618,6 +619,49 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
           headerShown: false,
         }}
       />
+
+      {/* Exercise Screen - Activity Tracker (accessed from Profile card) */}
+      <Stack.Screen
+        name="Exercise"
+        component={ActivityTrackerScreen}
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      />
+
+      {/* Compete Screen - Events/Competitions (accessed from Profile card) */}
+      <Stack.Screen
+        name="Compete"
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      >
+        {({ navigation }) => <CompeteScreen navigation={navigation} />}
+      </Stack.Screen>
+
+      {/* Season2 Screen - Season II Competition Details */}
+      <Stack.Screen
+        name="Season2"
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      >
+        {({ navigation }) => <Season2Screen navigation={navigation} />}
+      </Stack.Screen>
+
+      {/* Leaderboards Screen - Daily Leaderboards */}
+      <Stack.Screen
+        name="Leaderboards"
+        options={{
+          ...defaultScreenOptions,
+          headerShown: false,
+        }}
+      >
+        {({ navigation }) => <LeaderboardsScreen navigation={navigation} />}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 };

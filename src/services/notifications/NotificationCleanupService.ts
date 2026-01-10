@@ -3,8 +3,6 @@
  * Called on logout to properly stop all listeners and clear state
  */
 
-import { challengeNotificationHandler } from './ChallengeNotificationHandler';
-import { challengeResponseHandler } from './ChallengeResponseHandler';
 import { teamJoinNotificationHandler } from './TeamJoinNotificationHandler';
 import { eventJoinNotificationHandler } from './EventJoinNotificationHandler';
 import { NostrNotificationEventHandler } from './NostrNotificationEventHandler';
@@ -31,30 +29,6 @@ export class NotificationCleanupService {
     );
 
     const cleanupTasks: Promise<void>[] = [];
-
-    // Stop challenge notifications
-    try {
-      cleanupTasks.push(challengeNotificationHandler.stopListening());
-      console.log('[NotificationCleanup] Stopping challenge notifications...');
-    } catch (error) {
-      console.error(
-        '[NotificationCleanup] Failed to stop challenge notifications:',
-        error
-      );
-    }
-
-    // Stop challenge response notifications
-    try {
-      cleanupTasks.push(challengeResponseHandler.stopListening());
-      console.log(
-        '[NotificationCleanup] Stopping challenge response notifications...'
-      );
-    } catch (error) {
-      console.error(
-        '[NotificationCleanup] Failed to stop challenge response notifications:',
-        error
-      );
-    }
 
     // Stop team join notifications
     try {
@@ -97,8 +71,6 @@ export class NotificationCleanupService {
 
     // Clear all notification data
     try {
-      challengeNotificationHandler.clearAll();
-      challengeResponseHandler.clearAll();
       teamJoinNotificationHandler.clearAll();
       eventJoinNotificationHandler.clearAll();
       console.log('[NotificationCleanup] Cleared all notification data');
@@ -116,25 +88,12 @@ export class NotificationCleanupService {
    * Clean up specific handler
    */
   async cleanupHandler(
-    handlerType:
-      | 'challenge'
-      | 'challengeResponse'
-      | 'teamJoin'
-      | 'eventJoin'
-      | 'nostrEvent'
+    handlerType: 'teamJoin' | 'eventJoin' | 'nostrEvent'
   ): Promise<void> {
     console.log(`[NotificationCleanup] Cleaning up ${handlerType} handler...`);
 
     try {
       switch (handlerType) {
-        case 'challenge':
-          await challengeNotificationHandler.stopListening();
-          challengeNotificationHandler.clearAll();
-          break;
-        case 'challengeResponse':
-          await challengeResponseHandler.stopListening();
-          challengeResponseHandler.clearAll();
-          break;
         case 'teamJoin':
           await teamJoinNotificationHandler.stopListening();
           teamJoinNotificationHandler.clearAll();
@@ -222,23 +181,11 @@ export class NotificationCleanupService {
    * Get status of all handlers
    */
   getHandlerStatuses(): {
-    challenge: any;
-    challengeResponse: any;
     teamJoin: any;
     eventJoin: any;
     nostrEvent: any;
   } {
     return {
-      challenge: {
-        notificationCount:
-          challengeNotificationHandler.getNotifications().length,
-        unreadCount: challengeNotificationHandler.getUnreadCount(),
-      },
-      challengeResponse: {
-        notificationCount: challengeResponseHandler.getNotifications().length,
-        unreadCount: challengeResponseHandler.getUnreadCount(),
-        status: challengeResponseHandler.getStatus(),
-      },
       teamJoin: {
         notificationCount:
           teamJoinNotificationHandler.getNotifications().length,

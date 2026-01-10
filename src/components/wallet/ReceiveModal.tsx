@@ -1,6 +1,6 @@
 /**
  * ReceiveModal - Lightning payment receive interface
- * Allows receiving via Lightning invoice generation
+ * Allows receiving via NWC Lightning invoice generation
  */
 
 import React, { useState, useEffect } from 'react';
@@ -19,9 +19,6 @@ import { theme } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
-// import nutzapService from '../../services/nutzap/nutzapService';
-import { useNutzap } from '../../hooks/useNutzap';
-import { FEATURES } from '../../config/features';
 import { NWCStorageService } from '../../services/wallet/NWCStorageService';
 import { NWCWalletService } from '../../services/wallet/NWCWalletService';
 
@@ -32,22 +29,19 @@ interface ReceiveModalProps {
   userNpub?: string;
 }
 
-type ReceiveMethod = 'lightning';
-
 export const ReceiveModal: React.FC<ReceiveModalProps> = ({
   visible,
   onClose,
   currentBalance,
   userNpub,
 }) => {
-  const { refreshBalance, isInitialized, isLoading } = useNutzap(false);
-  const [receiveMethod] = useState<ReceiveMethod>('lightning');
   const [amount, setAmount] = useState('');
   const [invoice, setInvoice] = useState('');
-  const [quoteHash, setQuoteHash] = useState('');
+  const [paymentHash, setPaymentHash] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [hasNWC, setHasNWC] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const checkIntervalRef = React.useRef<NodeJS.Timeout>();
 
   // Check NWC availability when modal opens
@@ -55,11 +49,17 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
     if (visible) {
       checkNWCAvailability();
     }
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
+    };
   }, [visible]);
 
   const checkNWCAvailability = async () => {
     const nwcAvailable = await NWCStorageService.hasNWC();
     setHasNWC(nwcAvailable);
+    setIsReady(nwcAvailable);
   };
 
   const handleGenerateLightningInvoice = async () => {
@@ -69,12 +69,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
       return;
     }
 
-    // Feature flag guard: Require NWC when Cashu is disabled
-    if (
-      FEATURES.ENABLE_NWC_WALLET &&
-      !FEATURES.ENABLE_CASHU_WALLET &&
-      !hasNWC
-    ) {
+    if (!hasNWC) {
       Alert.alert(
         'Wallet Not Connected',
         'Please connect a Lightning wallet in Settings to receive payments.',
@@ -83,59 +78,34 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
       return;
     }
 
-    if (!isInitialized && !hasNWC) {
-      Alert.alert(
-        'Wallet Not Ready',
-        'Please wait for wallet to initialize and try again.'
-      );
-      return;
-    }
-
     setIsGenerating(true);
     try {
-      let invoiceResult;
-
-      // Route to NWCWalletService when NWC is enabled, otherwise use Cashu
-      if (FEATURES.ENABLE_NWC_WALLET && !FEATURES.ENABLE_CASHU_WALLET) {
-        const result = await NWCWalletService.createInvoice(sats);
-        if (!result.success || !result.invoice) {
-          throw new Error(result.error || 'Failed to create invoice');
-        }
-        invoiceResult = { pr: result.invoice, hash: result.paymentHash || '' };
-      } else {
-        // Preserve Cashu logic for when ENABLE_CASHU_WALLET is true
-        invoiceResult = await nutzapService.createLightningInvoice(sats);
+      const result = await NWCWalletService.createInvoice(sats, 'RUNSTR receive');
+      if (!result.success || !result.invoice) {
+        throw new Error(result.error || 'Failed to create invoice');
       }
 
-      const { pr, hash } = invoiceResult;
-      setInvoice(pr);
-      setQuoteHash(hash);
+      setInvoice(result.invoice);
+      setPaymentHash(result.paymentHash || '');
 
-      // Start polling for payment
+      // Start polling for payment using NWC lookupInvoice
       setIsCheckingPayment(true);
       checkIntervalRef.current = setInterval(async () => {
-        let paid = false;
-
-        // Check payment based on wallet type
-        if (FEATURES.ENABLE_NWC_WALLET && !FEATURES.ENABLE_CASHU_WALLET) {
-          // For NWC, we could implement payment checking via NWCWalletService
-          // For now, we'll rely on balance refresh
-          paid = false; // TODO: Implement NWC payment checking
-        } else {
-          paid = await nutzapService.checkInvoicePaid(hash);
+        try {
+          const lookupResult = await NWCWalletService.lookupInvoice(result.invoice!);
+          if (lookupResult.success && lookupResult.paid) {
+            clearInterval(checkIntervalRef.current!);
+            setIsCheckingPayment(false);
+            Alert.alert(
+              'Payment Received!',
+              `${sats} sats have been added to your wallet`,
+              [{ text: 'OK', onPress: handleClose }]
+            );
+          }
+        } catch (err) {
+          console.log('[ReceiveModal] Payment check error:', err);
         }
-
-        if (paid) {
-          clearInterval(checkIntervalRef.current!);
-          setIsCheckingPayment(false);
-          await refreshBalance();
-          Alert.alert(
-            'Payment Received!',
-            `${sats} sats have been added to your wallet`,
-            [{ text: 'OK', onPress: handleClose }]
-          );
-        }
-      }, 2000);
+      }, 3000);
 
       // Stop checking after 10 minutes
       setTimeout(() => {
@@ -150,18 +120,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
 
       if (error instanceof Error) {
         errorMessage = error.message;
-
-        // Provide helpful instructions for common errors
-        if (error.message.includes('initialize')) {
-          errorMessage =
-            'Wallet is initializing. Please wait a moment and try again.';
-        } else if (
-          error.message.includes('network') ||
-          error.message.includes('connection')
-        ) {
-          errorMessage =
-            'Network error. Please check your internet connection and try again.';
-        } else if (error.message.includes('timeout')) {
+        if (error.message.includes('Timeout')) {
           errorMessage = 'Request timed out. Please try again.';
         }
       }
@@ -187,7 +146,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
   const handleClose = () => {
     setAmount('');
     setInvoice('');
-    setQuoteHash('');
+    setPaymentHash('');
     setIsCheckingPayment(false);
     if (checkIntervalRef.current) {
       clearInterval(checkIntervalRef.current);
@@ -240,15 +199,12 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
               <TouchableOpacity
                 style={[
                   styles.primaryButton,
-                  (isGenerating || !amount || !isInitialized || isLoading) &&
-                    styles.buttonDisabled,
+                  (isGenerating || !amount || !isReady) && styles.buttonDisabled,
                 ]}
                 onPress={handleGenerateLightningInvoice}
-                disabled={
-                  isGenerating || !amount || !isInitialized || isLoading
-                }
+                disabled={isGenerating || !amount || !isReady}
               >
-                {isGenerating || (isLoading && !isInitialized) ? (
+                {isGenerating ? (
                   <ActivityIndicator color={theme.colors.accentText} />
                 ) : (
                   <>
@@ -258,7 +214,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
                       color={theme.colors.accentText}
                     />
                     <Text style={styles.primaryButtonText}>
-                      {!isInitialized ? 'Initializing...' : 'Generate Invoice'}
+                      {!isReady ? 'Connect Wallet First' : 'Generate Invoice'}
                     </Text>
                   </>
                 )}
@@ -312,7 +268,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
                 style={styles.secondaryButton}
                 onPress={() => {
                   setInvoice('');
-                  setQuoteHash('');
+                  setPaymentHash('');
                   setAmount('');
                   if (checkIntervalRef.current) {
                     clearInterval(checkIntervalRef.current);

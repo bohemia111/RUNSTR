@@ -92,37 +92,57 @@ export class Nuclear1301Service {
         cacheUsage: NDK.NDKSubscriptionCacheUsage?.ONLY_RELAY,
       });
 
-      subscription.on('event', (event: any) => {
-        console.log(`📥 NDK NUCLEAR 1301 EVENT:`, {
-          id: event.id?.slice(0, 8),
-          kind: event.kind,
-          created_at: new Date(event.created_at * 1000).toISOString(),
-          pubkey: event.pubkey?.slice(0, 8),
-          tags: event.tags?.length,
+      // EVENT-DRIVEN: Resolve on EOSE or timeout - no blocking waits!
+      await new Promise<void>((resolve) => {
+        let resolved = false;
+
+        const cleanup = () => {
+          if (resolved) return;
+          resolved = true;
+          subscription.removeAllListeners('event');
+          subscription.removeAllListeners('eose');
+          subscription.stop();
+          resolve();
+        };
+
+        subscription.on('event', (event: any) => {
+          console.log(`📥 NDK NUCLEAR 1301 EVENT:`, {
+            id: event.id?.slice(0, 8),
+            kind: event.kind,
+            created_at: new Date(event.created_at * 1000).toISOString(),
+            pubkey: event.pubkey?.slice(0, 8),
+            tags: event.tags?.length,
+          });
+
+          // ULTRA NUCLEAR: Accept ANY kind 1301 event - ZERO validation!
+          if (event.kind === 1301) {
+            events.push(event);
+            console.log(
+              `✅ NDK NUCLEAR ACCEPT: Event ${events.length} added - NO filtering!`
+            );
+
+            // Early termination if we have enough events
+            if (events.length >= 500 && !resolved) {
+              console.log('⚡ Early termination - 500+ events collected');
+              cleanup();
+            }
+          }
         });
 
-        // ULTRA NUCLEAR: Accept ANY kind 1301 event - ZERO validation!
-        if (event.kind === 1301) {
-          events.push(event);
-          console.log(
-            `✅ NDK NUCLEAR ACCEPT: Event ${events.length} added - NO filtering!`
-          );
-        }
+        // EVENT-DRIVEN: Resolve immediately on EOSE
+        subscription.on('eose', () => {
+          console.log(`📨 NDK EOSE received - ${events.length} events collected`);
+          cleanup();
+        });
+
+        // Safety timeout after 5 seconds (only if EOSE never fires)
+        setTimeout(() => {
+          if (!resolved) {
+            console.log('⏰ Safety timeout reached');
+            cleanup();
+          }
+        }, 5000);
       });
-
-      subscription.on('eose', () => {
-        console.log(
-          '📨 NDK EOSE received - continuing to wait for complete timeout...'
-        );
-      });
-
-      // Wait for ALL events (nuclear approach - ultra-fast timeout proven by script)
-      console.log(
-        '⏰ NDK NUCLEAR TIMEOUT: Waiting 3 seconds for ALL 1301 events...'
-      );
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      subscription.stop();
 
       console.log(
         `🚀🚀🚀 NUCLEAR RESULT: Found ${events.length} raw 1301 events`
@@ -459,15 +479,44 @@ export class Nuclear1301Service {
         cacheUsage: NDK.NDKSubscriptionCacheUsage?.ONLY_RELAY,
       });
 
-      subscription.on('event', (event: any) => {
-        if (event.kind === 1301) {
-          events.push(event);
-        }
-      });
+      // EVENT-DRIVEN: Resolve on EOSE or timeout - no blocking waits!
+      await new Promise<void>((resolve) => {
+        let resolved = false;
 
-      // Shorter timeout for limited queries (2 seconds)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      subscription.stop();
+        const cleanup = () => {
+          if (resolved) return;
+          resolved = true;
+          subscription.removeAllListeners('event');
+          subscription.removeAllListeners('eose');
+          subscription.stop();
+          resolve();
+        };
+
+        subscription.on('event', (event: any) => {
+          if (event.kind === 1301) {
+            events.push(event);
+            // Early termination if we have enough events
+            if (events.length >= limit && !resolved) {
+              console.log(`⚡ Early termination - ${limit} events collected`);
+              cleanup();
+            }
+          }
+        });
+
+        // EVENT-DRIVEN: Resolve immediately on EOSE
+        subscription.on('eose', () => {
+          console.log(`📨 EOSE received - ${events.length} events collected`);
+          cleanup();
+        });
+
+        // Safety timeout after 3 seconds (only if EOSE never fires)
+        setTimeout(() => {
+          if (!resolved) {
+            console.log('⏰ Safety timeout reached');
+            cleanup();
+          }
+        }, 3000);
+      });
 
       console.log(`✅ Fetched ${events.length} events (limit was ${limit})`);
 

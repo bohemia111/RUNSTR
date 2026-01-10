@@ -26,8 +26,10 @@ import { getUserNostrIdentifiers } from '../../utils/nostr';
 import unifiedCache from '../cache/UnifiedNostrCache';
 import { CacheTTL, CacheKeys } from '../../constants/cacheTTL';
 import { CaptainCache } from '../../utils/captainCache';
-import { WorkoutEventStore } from '../fitness/WorkoutEventStore';
+// NOTE: WorkoutEventStore import removed - deprecated, using UnifiedWorkoutCache instead
+import { UnifiedWorkoutCache } from '../cache/UnifiedWorkoutCache';
 import { FrozenEventStore } from '../cache/FrozenEventStore';
+import { NostrFetchLogger } from '../../utils/NostrFetchLogger';
 
 export class NostrPrefetchService {
   private static instance: NostrPrefetchService;
@@ -50,6 +52,7 @@ export class NostrPrefetchService {
   async prefetchAllUserData(
     onProgress?: (step: number, total: number, message: string) => void
   ): Promise<void> {
+    NostrFetchLogger.start('Prefetch.prefetchAllUserData');
     const totalSteps = 1; // Only profile now
     let currentStep = 0;
 
@@ -95,63 +98,41 @@ export class NostrPrefetchService {
         console.warn('[Prefetch] FrozenEventStore init failed:', err?.message);
       });
 
-      // ✅ Initialize WorkoutEventStore in background (non-blocking)
-      // Loads from cache immediately, fetches fresh data in background
-      this.initializeWorkoutStore().catch((err) => {
-        console.warn('[Prefetch] WorkoutEventStore init failed:', err?.message);
-      });
+      // ❌ DISABLED FOR TESTING: Baseline-only mode
+      // UnifiedWorkoutCache.initialize(hexPubkey || undefined).catch((err) => {
+      //   console.warn('[Prefetch] UnifiedWorkoutCache init failed:', err?.message);
+      // });
+      console.log('📦 Prefetch: Skipping UnifiedWorkoutCache (baseline-only mode)');
 
+      // NOTE: WorkoutEventStore init removed - it's deprecated, UnifiedWorkoutCache is the single source of truth
+
+      // Season 2 avatars are now bundled with the app (no prefetch needed)
+
+      NostrFetchLogger.end('Prefetch.prefetchAllUserData', 1, 'essential only');
       console.log(
         '✅ Prefetch complete (<1s) - non-essential data loads on-demand'
       );
     } catch (error) {
+      NostrFetchLogger.error('Prefetch.prefetchAllUserData', error as Error);
       console.error('❌ Prefetch failed:', error);
       // Don't throw - app should still work with partial data
     }
   }
 
-  /**
-   * Initialize WorkoutEventStore (kind 1301 events)
-   * NON-BLOCKING: Loads from cache first, fetches fresh in background
-   * This ensures leaderboards never show infinite spinners
-   */
-  private async initializeWorkoutStore(): Promise<void> {
-    try {
-      const workoutStore = WorkoutEventStore.getInstance();
-
-      // Initialize with 5-second timeout for relay fetch
-      await Promise.race([
-        workoutStore.initialize(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('WorkoutStore timeout')), 5000)
-        ),
-      ]);
-
-      const stats = workoutStore.getStats();
-      console.log(
-        `[Prefetch] WorkoutEventStore initialized: ${stats.totalWorkouts} workouts, ${stats.todaysWorkouts} today`
-      );
-    } catch (error) {
-      if (error instanceof Error && error.message === 'WorkoutStore timeout') {
-        console.warn(
-          '[Prefetch] WorkoutEventStore init timed out - store will continue loading in background'
-        );
-      } else {
-        console.error('[Prefetch] WorkoutEventStore init failed:', error);
-      }
-      // Non-blocking - store will continue to work with cached data
-    }
-  }
+  // NOTE: initializeWorkoutStore method removed - WorkoutEventStore is deprecated
+  // UnifiedWorkoutCache is now the single source of truth for 1301 events
 
   /**
    * Prefetch user profile (kind 0)
    * ✅ PERFORMANCE FIX: 1-second timeout for fast app startup
    */
   private async prefetchUserProfile(hexPubkey: string): Promise<void> {
+    NostrFetchLogger.start('Prefetch.prefetchUserProfile');
     try {
       const profileFetchPromise = unifiedCache.get(
         CacheKeys.USER_PROFILE(hexPubkey),
         async () => {
+          NostrFetchLogger.cacheMiss('Prefetch.prefetchUserProfile');
           const user = await DirectNostrProfileService.getCurrentUserProfile();
           if (!user) {
             return await DirectNostrProfileService.getFallbackProfile();
@@ -169,16 +150,19 @@ export class NostrPrefetchService {
         ),
       ]);
 
+      NostrFetchLogger.end('Prefetch.prefetchUserProfile', 1, (profile as any)?.name || 'Unknown');
       console.log(
         '[Prefetch] User profile cached:',
         (profile as any)?.name || 'Unknown'
       );
     } catch (error) {
       if (error instanceof Error && error.message === 'Profile fetch timeout') {
+        NostrFetchLogger.timeout('Prefetch.prefetchUserProfile', 1000);
         console.warn(
           '[Prefetch] Profile fetch timed out after 1s - using fallback'
         );
       } else {
+        NostrFetchLogger.error('Prefetch.prefetchUserProfile', error as Error);
         console.error('[Prefetch] User profile failed:', error);
       }
     }
