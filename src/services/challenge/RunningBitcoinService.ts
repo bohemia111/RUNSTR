@@ -27,6 +27,7 @@ import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import { GlobalNDKService } from '../nostr/GlobalNDKService';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { SupabaseCompetitionService } from '../backend/SupabaseCompetitionService';
+import { ProfileCache } from '../../cache/ProfileCache';
 import { nip19 } from 'nostr-tools';
 
 const JOINED_USERS_KEY = '@runstr:running_bitcoin_joined';
@@ -119,6 +120,9 @@ class RunningBitcoinServiceClass {
         ...localJoins,
       ]);
 
+      // Fetch Supabase profiles for non-Season II users (single query)
+      const supabaseProfiles = await this.getParticipantProfilesFromSupabase();
+
       // Aggregate distance per participant
       const stats = new Map<string, { distance: number; workoutCount: number }>();
 
@@ -134,13 +138,33 @@ class RunningBitcoinServiceClass {
       // Build participant entries with profile data
       const participantEntries: RunningBitcoinParticipant[] = [];
       for (const [pubkey, data] of stats) {
-        const profile = SEASON_2_PARTICIPANTS.find(p => p.pubkey === pubkey);
-        const isSeason2 = SEASON_2_PARTICIPANTS.some(p => p.pubkey === pubkey);
+        const season2Profile = SEASON_2_PARTICIPANTS.find(p => p.pubkey === pubkey);
+        const isSeason2 = !!season2Profile;
+
+        // For non-Season II users, check Supabase profiles
+        let name = season2Profile?.name;
+        let picture = season2Profile?.picture;
+        let npub = season2Profile?.npub;
+
+        if (!isSeason2) {
+          // Try to get npub from pubkey
+          try {
+            npub = nip19.npubEncode(pubkey);
+            const supabaseProfile = supabaseProfiles.get(npub);
+            if (supabaseProfile) {
+              name = supabaseProfile.name;
+              picture = supabaseProfile.picture;
+            }
+          } catch {
+            // Ignore encoding errors
+          }
+        }
+
         participantEntries.push({
           pubkey,
-          npub: profile?.npub,
-          name: profile?.name || `User ${pubkey.slice(0, 8)}`,
-          picture: profile?.picture,
+          npub,
+          name: name || `User ${pubkey.slice(0, 8)}`,
+          picture,
           totalDistanceKm: data.distance,
           workoutCount: data.workoutCount,
           isFinisher: data.distance >= RUNNING_BITCOIN_CONFIG.goalDistanceKm,
@@ -427,18 +451,122 @@ class RunningBitcoinServiceClass {
 
   /**
    * Register user in Supabase for Running Bitcoin competition
+   * Fetches user's Nostr profile and stores name/picture for leaderboard display
    * Called when joining locally or when Season II participant submits workout
    */
   async registerInSupabase(npub: string): Promise<boolean> {
     try {
-      const result = await SupabaseCompetitionService.joinCompetition('running-bitcoin', npub);
+      // Decode npub to get pubkey for profile lookup
+      let pubkey: string;
+      try {
+        const decoded = nip19.decode(npub);
+        pubkey = decoded.data as string;
+      } catch {
+        console.warn('[RunningBitcoin] Could not decode npub for profile lookup');
+        // Still register without profile data
+        const result = await SupabaseCompetitionService.joinCompetition('running-bitcoin', npub);
+        return result.success;
+      }
+
+      // Fetch user's Nostr profile (kind 0) for name and picture
+      let profileData: { name?: string; picture?: string } | undefined;
+      try {
+        const profiles = await ProfileCache.fetchProfiles([pubkey]);
+        const profile = profiles.get(pubkey);
+        if (profile) {
+          profileData = {
+            name: profile.name,
+            picture: profile.picture,
+          };
+          console.log(`[RunningBitcoin] Fetched profile for ${npub.slice(0, 12)}: ${profile.name || 'no name'}`);
+        }
+      } catch (profileError) {
+        console.warn('[RunningBitcoin] Profile fetch failed (non-blocking):', profileError);
+        // Continue without profile data
+      }
+
+      // Register in Supabase with profile data
+      const result = await SupabaseCompetitionService.joinCompetition(
+        'running-bitcoin',
+        npub,
+        profileData
+      );
+
       if (result.success) {
-        console.log(`[RunningBitcoin] Registered ${npub.slice(0, 12)} in Supabase`);
+        console.log(`[RunningBitcoin] Registered ${npub.slice(0, 12)} in Supabase${profileData?.name ? ` as ${profileData.name}` : ''}`);
       }
       return result.success;
     } catch (error) {
       console.error('[RunningBitcoin] Failed to register in Supabase:', error);
       return false;
+    }
+  }
+
+  /**
+   * Fetch participant profiles from Supabase
+   * Returns a map of npub -> { name, picture } for leaderboard display
+   */
+  async getParticipantProfilesFromSupabase(): Promise<Map<string, { name?: string; picture?: string }>> {
+    const profiles = new Map<string, { name?: string; picture?: string }>();
+
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      return profiles;
+    }
+
+    try {
+      // Query competition_participants for running-bitcoin, including name and picture
+      const url = `${supabaseUrl}/rest/v1/competitions?external_id=eq.running-bitcoin&select=id`;
+
+      const compResponse = await fetch(url, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+      });
+
+      if (!compResponse.ok) {
+        console.warn('[RunningBitcoin] Failed to fetch competition ID');
+        return profiles;
+      }
+
+      const competitions = await compResponse.json();
+      if (!competitions || competitions.length === 0) {
+        return profiles;
+      }
+
+      const competitionId = competitions[0].id;
+
+      // Now fetch participants with profiles
+      const participantsUrl = `${supabaseUrl}/rest/v1/competition_participants?competition_id=eq.${competitionId}&select=npub,name,picture`;
+
+      const participantsResponse = await fetch(participantsUrl, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+      });
+
+      if (!participantsResponse.ok) {
+        console.warn('[RunningBitcoin] Failed to fetch participant profiles');
+        return profiles;
+      }
+
+      const participants = await participantsResponse.json();
+
+      for (const p of participants) {
+        if (p.npub && (p.name || p.picture)) {
+          profiles.set(p.npub, { name: p.name, picture: p.picture });
+        }
+      }
+
+      console.log(`[RunningBitcoin] Fetched ${profiles.size} participant profiles from Supabase`);
+      return profiles;
+    } catch (error) {
+      console.warn('[RunningBitcoin] Error fetching participant profiles:', error);
+      return profiles;
     }
   }
 
@@ -470,6 +598,9 @@ class RunningBitcoinServiceClass {
       ...localJoins,
     ]);
 
+    // Fetch Supabase profiles for non-Season II users (single query)
+    const supabaseProfiles = await this.getParticipantProfilesFromSupabase();
+
     // Filter workouts for Running Bitcoin date range and eligible activities
     const eligibleWorkouts = workouts.filter(w => {
       const activityLower = w.activityType?.toLowerCase() || '';
@@ -493,13 +624,33 @@ class RunningBitcoinServiceClass {
     // Build participant entries with profile data
     const participantEntries: RunningBitcoinParticipant[] = [];
     for (const [pubkey, data] of stats) {
-      const profile = SEASON_2_PARTICIPANTS.find(p => p.pubkey === pubkey);
-      const isSeason2 = SEASON_2_PARTICIPANTS.some(p => p.pubkey === pubkey);
+      const season2Profile = SEASON_2_PARTICIPANTS.find(p => p.pubkey === pubkey);
+      const isSeason2 = !!season2Profile;
+
+      // For non-Season II users, check Supabase profiles
+      let name = season2Profile?.name;
+      let picture = season2Profile?.picture;
+      let npub = season2Profile?.npub;
+
+      if (!isSeason2) {
+        // Try to get npub from pubkey
+        try {
+          npub = nip19.npubEncode(pubkey);
+          const supabaseProfile = supabaseProfiles.get(npub);
+          if (supabaseProfile) {
+            name = supabaseProfile.name;
+            picture = supabaseProfile.picture;
+          }
+        } catch {
+          // Ignore encoding errors
+        }
+      }
+
       participantEntries.push({
         pubkey,
-        npub: profile?.npub,
-        name: profile?.name || `User ${pubkey.slice(0, 8)}`,
-        picture: profile?.picture,
+        npub,
+        name: name || `User ${pubkey.slice(0, 8)}`,
+        picture,
         totalDistanceKm: data.distance,
         workoutCount: data.workoutCount,
         isFinisher: data.distance >= RUNNING_BITCOIN_CONFIG.goalDistanceKm,

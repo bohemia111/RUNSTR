@@ -52,17 +52,13 @@ const ZappableUserRowComponent: React.FC<ZappableUserRowProps> = ({
   const profile = skipProfileFetch ? null : fetchedProfile;
 
   // Resolve display name with fallback chain (treat empty strings as falsy)
-  // Priority: profile name → profile display_name → fallbackName → Anonymous (if no profile) → truncated npub
+  // Priority: profile name → profile display_name → fallbackName → "Anonymous Athlete"
   // When skipProfileFetch=true, profile is null so fallbackName is used directly
   const displayName =
     profile?.name ||
     profile?.display_name ||
     (fallbackName && fallbackName.trim() !== '' ? fallbackName : null) ||
-    (!profile
-      ? 'Anonymous'
-      : npub?.startsWith('npub1')
-      ? `${npub.slice(0, 12)}...`
-      : 'Anonymous');
+    'Anonymous Athlete';
 
   // Use profile picture with fallback to pre-fetched picture (prevents avatar loading issues)
   // Always include URL as fallback for bundled images that fail (progressive JPEG, large files)

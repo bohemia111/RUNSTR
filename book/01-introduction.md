@@ -7,7 +7,50 @@ RUNSTR is a Bitcoin-powered fitness application that rewards users for working o
 ### Core Value Proposition
 **Fitness earns Bitcoin. Bitcoin supports charities.**
 
-Every workout you complete earns you satoshis (sats). You can choose to split a portion of your rewards with a charity you care about. The more you work out, the more you earn, and the more impact you have.
+Complete your daily workout and earn satoshis (sats). Hit step milestones throughout the day for bonus rewards. Choose to split a portion of your earnings with a charity you care about.
+
+---
+
+## Anonymous, Not Private
+
+RUNSTR is an **anonymous** fitness tracker, not a private one. This distinction matters:
+
+| Concept | Definition | RUNSTR Approach |
+|---------|------------|-----------------|
+| **Private** | Data is hidden/protected from everyone | ❌ Not RUNSTR |
+| **Anonymous** | Data may be public, but not tied to real identity | ✅ This is RUNSTR |
+
+### What This Means
+
+- **No personal information collected** - No email, phone number, or real name required
+- **Workout summaries are public** - When you compete, basic workout data (distance, duration, activity type) is published openly to leaderboards
+- **GPS routes stay local** - Only the last 100 GPS points are held in memory for route display; old points are deleted. GPS coordinates are **never published**
+- **Identity is cryptographic** - Your identity is a key pair (nsec/npub), not tied to your real-world identity
+
+### What Gets Published (Kind 1301 Events)
+
+When you save a workout to compete on leaderboards, these fields become public:
+- Activity type (running, walking, cycling)
+- Distance and duration
+- Elevation gain/loss
+- Calories burned
+- Split times (for running)
+- Team/charity selection
+
+### What Never Gets Published
+
+- GPS coordinates or route data
+- Your email, phone, or real name (we don't have them)
+- Detailed health metrics beyond workout summaries
+
+### Open Source & Verifiable
+
+RUNSTR is **free open source software** licensed under the MIT License. Anyone can:
+- Read the source code to verify these claims
+- Audit what data is collected and published
+- Build and run their own version
+
+The code is the proof. Don't trust—verify.
 
 ---
 

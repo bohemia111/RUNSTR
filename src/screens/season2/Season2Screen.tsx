@@ -85,6 +85,14 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
 
   const { isRegistered } = useSeason2Registration();
 
+  // Eager prefetch all activity types on mount
+  // Ensures cache is warm for tab switching even if AppInit prefetch missed
+  useEffect(() => {
+    refreshRunning();
+    refreshWalking();
+    refreshCycling();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Transform Supabase data to Season2Participant format
   const transformToParticipants = useCallback(
     (leaderboard: typeof runningLeaderboard): Season2Participant[] => {
@@ -118,6 +126,11 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
   // Get current leaderboard based on active tab
   const currentParticipants = participants[activeTab];
   const isLoading = activeTab === 'running' ? runningLoading : activeTab === 'walking' ? walkingLoading : cyclingLoading;
+
+  // Detect if all participants have 0 distance (cache not yet loaded)
+  // This prevents showing misleading 0s before real data loads
+  const currentIsAllZeros = currentParticipants.length > 0 &&
+    currentParticipants.every(p => p.totalDistance === 0);
 
   // Get current charity rankings based on active tab
   const currentCharityRankings = useMemo(() => {
@@ -216,7 +229,7 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
         {/* Leaderboard - Now powered by Supabase */}
         <Season2Leaderboard
           participants={currentParticipants}
-          isLoading={isLoading && currentParticipants.length === 0}
+          isLoading={(isLoading && currentParticipants.length === 0) || currentIsAllZeros}
           emptyMessage={`No ${activeTab} workouts yet`}
           currentUserPubkey={currentUserPubkey}
           activityType={activeTab}

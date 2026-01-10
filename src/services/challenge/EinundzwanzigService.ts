@@ -13,6 +13,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { nip19 } from 'nostr-tools';
 import { UnifiedWorkoutCache } from '../cache/UnifiedWorkoutCache';
 import {
   getEinundzwanzigStatus,
@@ -22,6 +23,8 @@ import {
 } from '../../constants/einundzwanzig';
 import { CHARITIES, getCharityById } from '../../constants/charities';
 import { SEASON_2_PARTICIPANTS } from '../../constants/season2';
+import { ProfileCache } from '../../cache/ProfileCache';
+import { SupabaseCompetitionService } from '../backend/SupabaseCompetitionService';
 
 const JOINED_USERS_KEY = '@runstr:einundzwanzig_joined';
 
@@ -136,6 +139,9 @@ class EinundzwanzigServiceClass {
         userStats.set(w.pubkey, existing);
       }
 
+      // Fetch profiles from Supabase for non-Season II users
+      const supabaseProfiles = await this.getParticipantProfilesFromSupabase();
+
       // Group participants by charity
       const charityParticipants = new Map<string, EinundzwanzigParticipant[]>();
 
@@ -144,15 +150,35 @@ class EinundzwanzigServiceClass {
           distance: 0,
           workoutCount: 0,
         };
-        const profile = SEASON_2_PARTICIPANTS.find(
+
+        // Profile resolution chain: Season II → Supabase → fallback
+        const season2Profile = SEASON_2_PARTICIPANTS.find(
           (p) => p.pubkey === record.pubkey
         );
 
+        let name = season2Profile?.name;
+        let picture = season2Profile?.picture;
+        let npub = season2Profile?.npub;
+
+        // If not Season II, try Supabase profiles
+        if (!season2Profile) {
+          try {
+            npub = nip19.npubEncode(record.pubkey);
+            const supabaseProfile = supabaseProfiles.get(npub);
+            if (supabaseProfile) {
+              name = supabaseProfile.name;
+              picture = supabaseProfile.picture;
+            }
+          } catch {
+            // Ignore encoding errors
+          }
+        }
+
         const participant: EinundzwanzigParticipant = {
           pubkey: record.pubkey,
-          npub: profile?.npub,
-          name: profile?.name || `User ${record.pubkey.slice(0, 8)}`,
-          picture: profile?.picture,
+          npub,
+          name: name || 'Anonymous Athlete',
+          picture,
           charityId: record.charityId,
           totalDistanceKm: stats.distance,
           workoutCount: stats.workoutCount,
@@ -218,6 +244,7 @@ class EinundzwanzigServiceClass {
 
   /**
    * Join the Einundzwanzig Challenge with a selected charity
+   * Uses local-first pattern with fire-and-forget Supabase registration
    */
   async joinChallenge(pubkey: string, charityId: string): Promise<boolean> {
     try {
@@ -243,7 +270,15 @@ class EinundzwanzigServiceClass {
         );
       }
 
+      // Save to local storage (instant UX)
       await AsyncStorage.setItem(JOINED_USERS_KEY, JSON.stringify(joinedUsers));
+
+      // Fire-and-forget: Register in Supabase with profile data
+      const npub = nip19.npubEncode(pubkey);
+      this.registerInSupabase(npub, charityId).catch((err) => {
+        console.warn('[Einundzwanzig] Supabase registration failed (non-blocking):', err);
+      });
+
       return true;
     } catch (error) {
       console.error('[Einundzwanzig] Error joining challenge:', error);
@@ -317,6 +352,97 @@ class EinundzwanzigServiceClass {
       description: c.description,
       image: c.image,
     }));
+  }
+
+  /**
+   * Register user in Supabase competition_participants with profile data
+   * Fire-and-forget - doesn't block join flow
+   */
+  async registerInSupabase(npub: string, charityId: string): Promise<boolean> {
+    try {
+      // Decode npub to get hex pubkey for profile fetch
+      let pubkey: string;
+      try {
+        const decoded = nip19.decode(npub);
+        pubkey = decoded.data as string;
+      } catch {
+        pubkey = npub; // Assume it's already hex
+      }
+
+      // Fetch user's Nostr profile (kind 0)
+      const profiles = await ProfileCache.fetchProfiles([pubkey]);
+      const profile = profiles.get(pubkey);
+      const profileData = profile
+        ? { name: profile.name || profile.display_name, picture: profile.picture }
+        : undefined;
+
+      // Register with profile data
+      const result = await SupabaseCompetitionService.joinCompetition(
+        'einundzwanzig',
+        npub,
+        profileData
+      );
+
+      if (result.success) {
+        console.log(`[Einundzwanzig] ✅ Registered ${npub.slice(0, 12)}... in Supabase`);
+      }
+      return result.success;
+    } catch (error) {
+      console.warn('[Einundzwanzig] Failed to register in Supabase:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get participant profiles from Supabase for leaderboard display
+   * Returns map of npub → { name, picture }
+   */
+  async getParticipantProfilesFromSupabase(): Promise<Map<string, { name?: string; picture?: string }>> {
+    const profiles = new Map<string, { name?: string; picture?: string }>();
+
+    try {
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        console.warn('[Einundzwanzig] Supabase not configured');
+        return profiles;
+      }
+
+      // Get competition ID for einundzwanzig
+      const competitionId = await SupabaseCompetitionService.getCompetitionId('einundzwanzig');
+      if (!competitionId) {
+        console.warn('[Einundzwanzig] Competition not found in Supabase');
+        return profiles;
+      }
+
+      // Query participants with profile data
+      const url = `${supabaseUrl}/rest/v1/competition_participants?competition_id=eq.${competitionId}&select=npub,name,picture`;
+      const response = await fetch(url, {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.warn('[Einundzwanzig] Failed to fetch profiles from Supabase');
+        return profiles;
+      }
+
+      const data = await response.json();
+      for (const row of data) {
+        if (row.npub && (row.name || row.picture)) {
+          profiles.set(row.npub, { name: row.name, picture: row.picture });
+        }
+      }
+
+      console.log(`[Einundzwanzig] Loaded ${profiles.size} profiles from Supabase`);
+    } catch (error) {
+      console.warn('[Einundzwanzig] Error fetching Supabase profiles:', error);
+    }
+
+    return profiles;
   }
 
   /**

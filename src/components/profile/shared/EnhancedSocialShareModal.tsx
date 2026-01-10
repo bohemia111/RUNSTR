@@ -21,6 +21,7 @@ import { WorkoutPublishingService } from '../../../services/nostr/workoutPublish
 import { WorkoutStatusTracker } from '../../../services/fitness/WorkoutStatusTracker';
 import { WorkoutCardGenerator } from '../../../services/nostr/workoutCardGenerator';
 import { WorkoutCardRenderer } from '../../cards/WorkoutCardRenderer';
+import { PostingErrorBoundary } from '../../ui/PostingErrorBoundary';
 import { UnifiedSigningService } from '../../../services/auth/UnifiedSigningService';
 import { getNsecFromStorage } from '../../../utils/nostr';
 import type { NDKSigner } from '@nostr-dev-kit/ndk';
@@ -61,10 +62,20 @@ export const EnhancedSocialShareModal: React.FC<
   // Delay SVG rendering on Android to let modal fully mount (prevents crashes on restricted launchers like Olauncher)
   const [svgReady, setSvgReady] = useState(Platform.OS !== 'android');
   const cardRef = useRef<View>(null);
+  // Track mount status to prevent setState on unmounted component (crash prevention)
+  const isMountedRef = useRef(true);
 
   const publishingService = WorkoutPublishingService.getInstance();
   const statusTracker = WorkoutStatusTracker.getInstance();
   const cardGenerator = WorkoutCardGenerator.getInstance();
+
+  // Track mounted state for crash prevention
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Load signer when modal becomes visible
   useEffect(() => {
@@ -88,6 +99,7 @@ export const EnhancedSocialShareModal: React.FC<
   const loadSigner = async () => {
     try {
       const userSigner = await UnifiedSigningService.getInstance().getSigner();
+      if (!isMountedRef.current) return; // Prevent setState on unmounted component
       setSigner(userSigner);
       console.log(
         '✅ Signer loaded for social share (supports both nsec and Amber)'
@@ -111,7 +123,7 @@ export const EnhancedSocialShareModal: React.FC<
     // Skip card generation for text-based template
     if (selectedTemplate === 'achievement') {
       console.log('📝 Text-based template selected - skipping card generation');
-      setCardSvg(''); // Clear any existing card
+      if (isMountedRef.current) setCardSvg(''); // Clear any existing card
       return;
     }
 
@@ -133,6 +145,8 @@ export const EnhancedSocialShareModal: React.FC<
         }
       );
 
+      if (!isMountedRef.current) return; // Prevent setState on unmounted component
+
       console.log('✅ Card preview generated:', {
         svgLength: cardData.svgContent.length,
         dimensions: cardData.dimensions,
@@ -148,7 +162,7 @@ export const EnhancedSocialShareModal: React.FC<
   const handleShare = async () => {
     if (!workout) return;
 
-    setLoading(true);
+    if (isMountedRef.current) setLoading(true);
 
     try {
       // Try to get signer (Amber on Android) or fall back to nsec (iOS or no Amber)
@@ -162,7 +176,7 @@ export const EnhancedSocialShareModal: React.FC<
             '❌ Authentication required - no signer or nsec available'
           );
           // Error handling delegated to parent component
-          setLoading(false);
+          if (isMountedRef.current) setLoading(false);
           return;
         }
         signerOrNsec = nsec;
@@ -187,7 +201,7 @@ export const EnhancedSocialShareModal: React.FC<
           try {
             cardImageUri = await captureRef(cardRef.current, {
               format: 'png',
-              quality: 0.7, // Reduced from 0.9 for faster capture
+              quality: 0.5, // Reduced from 0.7 to prevent memory crashes on large images
             });
             console.log('✅ Card captured successfully:', {
               uri: cardImageUri,
@@ -198,6 +212,7 @@ export const EnhancedSocialShareModal: React.FC<
               '❌ Card capture failed, posting without image:',
               captureError
             );
+            // Continue without image rather than crashing
           }
         } else {
           console.warn('⚠️ Cannot capture card:', {
@@ -208,6 +223,9 @@ export const EnhancedSocialShareModal: React.FC<
       } else {
         console.log('📝 Text-based template - skipping image capture');
       }
+
+      // Check if component is still mounted before continuing
+      if (!isMountedRef.current) return;
 
       // Post to Nostr as kind 1 social event with image
       // Supports both Amber signer (Android) and nsec (iOS)
@@ -244,7 +262,7 @@ export const EnhancedSocialShareModal: React.FC<
       console.error('Failed to share to Nostr:', error);
       // Error handling delegated to parent component
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
   };
 
@@ -305,6 +323,11 @@ export const EnhancedSocialShareModal: React.FC<
       animationType={Platform.OS === 'android' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
+      <PostingErrorBoundary
+        onClose={onClose}
+        fallbackTitle="Share Error"
+        fallbackMessage="There was an error preparing your post. Please try again."
+      >
       <View style={styles.overlay}>
         <View style={styles.container}>
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -430,6 +453,7 @@ export const EnhancedSocialShareModal: React.FC<
           </ScrollView>
         </View>
       </View>
+      </PostingErrorBoundary>
     </Modal>
   );
 };

@@ -140,18 +140,37 @@ export class WorkoutPublishingService {
       const ndk = await GlobalNDKService.getInstance();
       const isSigner = typeof privateKeyHexOrSigner !== 'string';
 
-      // Get signer and pubkey
+      // Get signer and pubkey with error handling
+      // CRASH FIX: signer.user() can fail if Amber disconnects or nsec is invalid
       let signer: NDKSigner;
       let pubkey: string;
 
       if (isSigner) {
         signer = privateKeyHexOrSigner;
-        const user = await signer.user();
-        pubkey = user.pubkey;
+        try {
+          const user = await signer.user();
+          pubkey = user.pubkey;
+        } catch (signerError) {
+          console.warn('[WorkoutPublishing] Failed to get pubkey from signer, using stored fallback:', signerError);
+          const storedPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+          if (!storedPubkey) {
+            throw new Error('No authentication found. Please log in again.');
+          }
+          pubkey = storedPubkey;
+        }
       } else {
         signer = new NDKPrivateKeySigner(privateKeyHexOrSigner);
-        const user = await signer.user();
-        pubkey = user.pubkey;
+        try {
+          const user = await signer.user();
+          pubkey = user.pubkey;
+        } catch (signerError) {
+          console.warn('[WorkoutPublishing] Failed to get pubkey from NDKPrivateKeySigner:', signerError);
+          const storedPubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
+          if (!storedPubkey) {
+            throw new Error('No authentication found. Please log in again.');
+          }
+          pubkey = storedPubkey;
+        }
       }
 
       // Get user's selected team from TeamsScreen (charities ARE teams now)
@@ -193,9 +212,14 @@ export class WorkoutPublishingService {
 
       // Sign and publish WITH TIMEOUT PROTECTION
       // These operations can hang indefinitely without timeouts
+      // Use longer timeout for Amber (external signer needs user approval)
+      const isAmberSigner = signer.constructor.name === 'AmberNDKSigner' ||
+                            (signer as any).AMBER_TIMEOUT_MS !== undefined;
+      const signTimeout = isAmberSigner ? NOSTR_TIMEOUTS.SIGN_AMBER : NOSTR_TIMEOUTS.SIGN;
+
       await withTimeout(
         ndkEvent.sign(signer),
-        NOSTR_TIMEOUTS.SIGN,
+        signTimeout,
         'Event signing'
       );
       await withTimeout(
@@ -239,6 +263,7 @@ export class WorkoutPublishingService {
         (async () => {
           try {
             // Submit workout to Supabase Edge Function (anti-cheat validation)
+            // Pass tags for daily leaderboard split/step parsing
             const supabaseResult = await SupabaseCompetitionService.submitWorkoutSimple({
               eventId: ndkEvent.id || '',
               npub,
@@ -247,6 +272,8 @@ export class WorkoutPublishingService {
               duration: workout.duration,
               calories: workout.calories,
               startTime: workout.startTime,
+              // Daily leaderboard: Pass Nostr tags for split/step extraction
+              tags: ndkEvent.tags as string[][],
             });
 
             if (supabaseResult.success && !supabaseResult.flagged) {
@@ -255,9 +282,14 @@ export class WorkoutPublishingService {
               // Check Running Bitcoin auto-pay for eligible activity types
               if (isRunningBitcoinActive() && isEligibleActivityType(exerciseType)) {
                 console.log('[WorkoutPublishing] Checking Running Bitcoin auto-pay...');
-                const autoPayResult = await RunningBitcoinService.checkAndAutoPayReward(npub);
-                if (autoPayResult.paid) {
-                  console.log('🏃⚡ Running Bitcoin: Auto-paid 1000 sats for 21km completion!');
+                try {
+                  const autoPayResult = await RunningBitcoinService.checkAndAutoPayReward(npub);
+                  if (autoPayResult.paid) {
+                    console.log('🏃⚡ Running Bitcoin: Auto-paid 1000 sats for 21km completion!');
+                  }
+                } catch (rbError) {
+                  // Non-fatal - don't let Running Bitcoin failures crash workout posting
+                  console.error('[WorkoutPublishing] Running Bitcoin auto-pay failed:', rbError);
                 }
               }
             } else if (supabaseResult.flagged) {
@@ -415,9 +447,14 @@ export class WorkoutPublishingService {
       ndkEvent.created_at = Math.floor(Date.now() / 1000);
 
       // Sign and publish WITH TIMEOUT PROTECTION
+      // Use longer timeout for Amber (external signer needs user approval)
+      const isAmberSigner = signer.constructor.name === 'AmberNDKSigner' ||
+                            (signer as any).AMBER_TIMEOUT_MS !== undefined;
+      const signTimeout = isAmberSigner ? NOSTR_TIMEOUTS.SIGN_AMBER : NOSTR_TIMEOUTS.SIGN;
+
       await withTimeout(
         ndkEvent.sign(signer),
-        NOSTR_TIMEOUTS.SIGN,
+        signTimeout,
         'Social post signing'
       );
       await withTimeout(
@@ -429,11 +466,14 @@ export class WorkoutPublishingService {
       console.log(`✅ Workout posted to social: ${ndkEvent.id}`);
 
       // Cache invalidation (fire-and-forget) - social post appears on next refresh
+      // CRASH FIX: Add .catch() to prevent unhandled promise rejection
       signer.user().then((user) => {
         fireAndForget(
           CacheInvalidationService.invalidateWorkout(user.pubkey),
           'socialCacheInvalidation'
         );
+      }).catch((err) => {
+        console.warn('[WorkoutPublishing] Failed to get user for cache invalidation:', err);
       });
 
       return {

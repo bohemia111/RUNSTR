@@ -13,8 +13,10 @@ export const NOSTR_TIMEOUTS = {
   QUERY: 5000,
   /** Publish operations (sending events to relays) */
   PUBLISH: 10000,
-  /** Cryptographic signing operations */
+  /** Cryptographic signing operations (nsec) */
   SIGN: 5000,
+  /** External signer signing operations (Amber) - needs user approval */
+  SIGN_AMBER: 15000,
   /** Relay connection wait */
   RELAY_CONNECT: 3000,
   /** Quick operations (cache checks, local lookups) */

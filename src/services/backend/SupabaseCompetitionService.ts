@@ -40,6 +40,10 @@ interface WorkoutSubmissionData {
   duration: number; // in seconds
   calories?: number;
   startTime: string; // ISO timestamp
+  // Daily leaderboard fields (optional)
+  tags?: string[][]; // Nostr event tags for split/step parsing
+  profileName?: string; // User's display name for leaderboard caching
+  profilePicture?: string; // User's avatar URL for leaderboard caching
 }
 
 export class SupabaseCompetitionService {
@@ -48,11 +52,13 @@ export class SupabaseCompetitionService {
    *
    * @param competitionId - The competition UUID or external_id
    * @param npub - User's Nostr public key (npub format)
+   * @param profile - Optional profile data (name, picture) to store for leaderboard display
    * @returns Success status
    */
   static async joinCompetition(
     competitionId: string,
-    npub: string
+    npub: string,
+    profile?: { name?: string; picture?: string }
   ): Promise<{ success: boolean; error?: string }> {
     if (!isSupabaseConfigured()) {
       console.warn('[SupabaseCompetitionService] Supabase not configured');
@@ -66,12 +72,28 @@ export class SupabaseCompetitionService {
         return { success: false, error: 'Competition not found' };
       }
 
+      // Build participant data with optional profile fields
+      const participantData: {
+        competition_id: string;
+        npub: string;
+        name?: string;
+        picture?: string;
+      } = {
+        competition_id: resolvedId,
+        npub,
+      };
+
+      // Only include profile fields if they have values
+      if (profile?.name) {
+        participantData.name = profile.name;
+      }
+      if (profile?.picture) {
+        participantData.picture = profile.picture;
+      }
+
       const { error } = await supabase!
         .from('competition_participants')
-        .upsert(
-          { competition_id: resolvedId, npub },
-          { onConflict: 'competition_id,npub' }
-        );
+        .upsert(participantData, { onConflict: 'competition_id,npub' });
 
       if (error) {
         console.error('[SupabaseCompetitionService] Join error:', error);
@@ -79,7 +101,7 @@ export class SupabaseCompetitionService {
       }
 
       console.log(
-        `[SupabaseCompetitionService] Joined competition: ${competitionId}`
+        `[SupabaseCompetitionService] Joined competition: ${competitionId}${profile?.name ? ` (${profile.name})` : ''}`
       );
       return { success: true };
     } catch (err) {
@@ -197,6 +219,10 @@ export class SupabaseCompetitionService {
       return { success: false, error: 'Backend not configured' };
     }
 
+    // CRASH FIX: Add timeout to prevent indefinite hang on network issues
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     try {
       // Call Edge Function for server-side validation
       const response = await fetch(
@@ -215,6 +241,9 @@ export class SupabaseCompetitionService {
             duration_seconds: data.duration,
             calories: data.calories || null,
             created_at: data.startTime,
+            // Daily leaderboard: Pass profile data for caching
+            profile_name: data.profileName || null,
+            profile_picture: data.profilePicture || null,
             raw_event: {
               event_id: data.eventId,
               type: data.type,
@@ -223,12 +252,30 @@ export class SupabaseCompetitionService {
               calories: data.calories,
               submitted_via: 'runstr_app',
               submitted_at: new Date().toISOString(),
+              // Daily leaderboard: Pass tags for split/step parsing
+              tags: data.tags || [],
             },
           }),
+          signal: controller.signal,
         }
       );
 
-      const result = await response.json();
+      clearTimeout(timeoutId);
+
+      // CRASH FIX: Check response status before parsing JSON
+      if (!response.ok) {
+        console.error(`[SupabaseCompetitionService] HTTP error: ${response.status}`);
+        return { success: false, error: `HTTP ${response.status}` };
+      }
+
+      // CRASH FIX: Wrap JSON parsing in try-catch for malformed responses
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        console.error('[SupabaseCompetitionService] Failed to parse response JSON:', jsonError);
+        return { success: false, error: 'Invalid response from server' };
+      }
 
       if (result.success) {
         if (result.duplicate) {
@@ -257,6 +304,14 @@ export class SupabaseCompetitionService {
         return { success: false, error: result.error || result.reason || result.message };
       }
     } catch (err) {
+      clearTimeout(timeoutId);
+
+      // CRASH FIX: Handle timeout/abort errors gracefully
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.warn('[SupabaseCompetitionService] Request timed out');
+        return { success: false, error: 'Request timed out' };
+      }
+
       console.error('[SupabaseCompetitionService] Submit workout exception:', err);
       return {
         success: false,

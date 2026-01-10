@@ -12,26 +12,25 @@ The profile section uses a **Public/All tab architecture** with enhanced workout
 - **Post/Compete Actions** - Buttons to share workouts socially or enter competitions
 - **Monthly Organization** - Workouts grouped by month for better navigation
 
-This architecture provides a clear distinction between public (shared) and private (local) workouts with seamless posting capabilities.
-
 ## Files
 
-- **AccountTab.tsx** - Account settings and profile management tab content
-- **ChallengeNotificationsBox.tsx** - Displays incoming kind 30102 challenge notifications with "View Challenge" button
-- **CompactTeamCard.tsx** - 72px compact team card for multi-team display with avatar, badges, and rank (~250 lines)
+- **CompactTeamCard.tsx** - 72px compact team card for multi-team display with avatar, badges, and rank
 - **CompactWallet.tsx** - Compact wallet display with balance and action buttons
-- **NotificationBadge.tsx** - Red notification badge with unread count, positioned in bottom-right of profile header
-- **NotificationItem.tsx** - Individual notification card component with icon, title, body, actions, and unread indicator
-- **NotificationModal.tsx** - Full-screen notification feed modal with date grouping, pull-to-refresh, and action handling
-- **NotificationsTab.tsx** - Notification preferences and settings tab
-- **PerformanceDashboard.tsx** - Workout analytics and performance metrics display
+- **MonthlyStatsPanel.tsx** - Monthly statistics panel
+- **MyTeamsBox.tsx** - Displays user's team memberships
+- **NotificationBadge.tsx** - Red notification badge with unread count
+- **NotificationItem.tsx** - Individual notification card component
+- **NotificationModal.tsx** - Full-screen notification feed modal
+- **PersonalWalletSection.tsx** - Personal wallet management section
 - **ProfileHeader.tsx** - Profile screen header with user information and avatar
-- **TabNavigation.tsx** - Tab navigation for profile screen sections
-- **TeamManagementSection.tsx** - Team membership display with 0/1/multi-team conditional rendering (~390 lines)
+- **TeamManagementSection.tsx** - Team membership display with conditional rendering
 - **WalletSection.tsx** - Bitcoin wallet section for profile screen
-- **WorkoutsTab.tsx** - Public/All tab navigation with sync dropdown (151 lines)
-- **YourCompetitionsBox.tsx** - Shows user's active competitions with counts and navigation (175 lines)
-- **YourWorkoutsBox.tsx** - Displays user's recent workouts with quick access to workout history
+- **WatchSyncSection.tsx** - Apple Watch sync section
+- **WorkoutLevelRing.tsx** - Workout level progress ring
+- **WorkoutsTab.tsx** - Public/All tab navigation with sync dropdown
+- **WorkoutTabNavigator.tsx** - Workout tab navigation component
+- **YourCompetitionsBox.tsx** - Shows user's active competitions
+- **YourWorkoutsBox.tsx** - Displays user's recent workouts
 
 ## Subdirectories
 

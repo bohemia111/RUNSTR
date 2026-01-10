@@ -49,8 +49,8 @@ Your daily workout becomes a lottery ticket for satoshis. Join competitions wher
 ### Season II: The Distance Challenge
 **Live now**: A 2-month distance competition with a **1,000,000 satoshi prize pool**. Log your runs, walks, hikes, and cycling sessions to climb the leaderboard. Top performers split the pot. Anonymous athletes from around the world competing for Bitcoin using nothing but movement and commitment.
 
-### Create Your Own Events
-Any RUNSTR user can become an event captain and create competitions. Set the activity type, define the time period, establish entry fees in satoshis, invite participants. RUNSTR handles leaderboard calculations and payment distribution through Lightning Network.
+### Support Charities Through Fitness
+Select a team (charity) to support—Bitcoin Bay, Bitcoin Ekasi, ALS Network, and more. Split a percentage of your workout rewards with your chosen charity, or zap them directly from any Lightning wallet.
 
 ### Local-First, Publish-Second
 Every workout lives on your device first. RUNSTR never forces you to upload anything. View your complete training history offline. Then, when you're ready, selectively publish to Nostr for backup, post to competitions for Bitcoin rewards, or share to social media.
@@ -66,13 +66,6 @@ Every workout lives on your device first. RUNSTR never forces you to upload anyt
 4. **Compete** → Join competitions to earn Bitcoin rewards
 5. **Publish** → Share achievements to Nostr when you want
 
-### For Captains
-1. **Create Team** → Set up your fitness community
-2. **Configure Wallet** → Add NWC connection for Lightning payments
-3. **Host Competitions** → Create events with entry fees and prize pools
-4. **Manage Members** → Approve join requests and build your community
-5. **Distribute Rewards** → Lightning payouts to top performers
-
 ---
 
 ## Technical Architecture
@@ -84,13 +77,14 @@ All data lives on the Nostr protocol—no central database, no company that can 
 Nostr Relays
 ├── Profile Data (Kind 0)
 ├── Workout Records (Kind 1301)
-├── Team Membership (Kind 30000)
-├── Competition Events (Kind 30101)
 └── Social Posts (Kind 1)
 ```
 
-### Bitcoin Payment Layer
-Non-custodial Lightning payments via Nostr Wallet Connect. Teams control their own wallets, users pay with any Lightning-compatible app (Cash App, Strike, Alby, self-custodial).
+### Bitcoin Rewards
+Earn satoshis for staying active:
+- **50 sats** per daily workout
+- **5 sats** per 1,000 steps
+- Rewards delivered to your Lightning address via LNURL
 
 ### Mobile Stack
 - **Framework**: React Native + Expo
@@ -158,7 +152,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 - **Your keys, your data**: Nostr private key stored securely on device, never transmitted
 - **Decentralized storage**: Workouts exist as Nostr events across relays you choose
-- **Non-custodial payments**: Teams control their own Lightning wallets
+- **Lightning rewards**: Receive Bitcoin directly to your Lightning address
 - **Full portability**: Export your complete fitness history anytime
 
 ---

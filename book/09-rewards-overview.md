@@ -2,10 +2,12 @@
 
 ## Fitness = Bitcoin
 
-RUNSTR's core philosophy: **every workout earns real Bitcoin**.
+RUNSTR's core philosophy: **your daily workout earns real Bitcoin**.
 
-When you complete a workout or hit step milestones, the app sends satoshis directly to your Lightning address. This creates a direct incentive loop:
-- Work out → Earn sats → Stay motivated → Work out more
+Complete your daily workout and earn 50 sats. Hit step milestones throughout the day for bonus rewards. The app sends satoshis directly to your Lightning address—real Bitcoin, not points or tokens.
+
+This creates a direct incentive loop:
+- Work out daily → Earn sats → Stay motivated → Keep moving
 
 ---
 

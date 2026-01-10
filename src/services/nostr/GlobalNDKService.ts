@@ -54,15 +54,11 @@ export class GlobalNDKService {
   /**
    * Default relay configuration
    * These are fast, reliable relays used across the app
-   *
-   * PERFORMANCE NOTE: Reduced to 2 relays to minimize native WebSocket bridge traffic
-   * - 3+ relays cause nw_protocol_socket_set_no_wake_from_sleep floods that block React's macrotask queue
-   * - relay.damus.io and nos.lol are the most reliable
    */
   private static readonly DEFAULT_RELAYS = [
     'wss://relay.damus.io',
     'wss://nos.lol',
-    // 'wss://relay.primal.net', // Removed: Testing with fewer relays
+    'wss://relay.primal.net',
     // 'wss://relay.nostr.band', // Removed: SSL failures (-9807) block React for 40+ seconds
   ];
 

@@ -294,6 +294,13 @@ export class AmberNDKSigner implements NDKSigner {
       });
 
       if (result.resultCode === IntentLauncher.ResultCode.Success) {
+        // Per NIP-55: Check if user has permanently rejected this app
+        if (result.extra?.rejected) {
+          throw new Error(
+            'Signing permanently rejected in Amber. Please check Amber app settings to re-enable RUNSTR.'
+          );
+        }
+
         // Extract signature from Activity Result
         // result.extra contains the object with response data
         const signature =
@@ -389,7 +396,8 @@ export class AmberNDKSigner implements NDKSigner {
     console.log('[Amber] Encrypting message via Activity Result');
 
     try {
-      const result = await IntentLauncher.startActivityAsync(
+      // Use timeout wrapper to prevent indefinite hangs
+      const result = await this.startActivityWithTimeout(
         'android.intent.action.VIEW',
         {
           data: 'nostrsigner:',
@@ -397,8 +405,10 @@ export class AmberNDKSigner implements NDKSigner {
             type: 'nip04_encrypt',
             pubkey: recipientPubkey,
             plaintext: value,
+            current_user: this._pubkey, // Tell Amber which account to use
           },
-        }
+        },
+        15000 // 15s timeout for user approval
       );
 
       console.log('[Amber DEBUG] Encrypt result received:', {
@@ -409,6 +419,13 @@ export class AmberNDKSigner implements NDKSigner {
       });
 
       if (result.resultCode === IntentLauncher.ResultCode.Success) {
+        // Per NIP-55: Check if user has permanently rejected this app
+        if (result.extra?.rejected) {
+          throw new Error(
+            'Encryption permanently rejected in Amber. Please check Amber app settings to re-enable RUNSTR.'
+          );
+        }
+
         const encrypted =
           result.extra?.result || // Result in extras object
           result.data; // Fallback: data as plain string
@@ -450,7 +467,8 @@ export class AmberNDKSigner implements NDKSigner {
     console.log('[Amber] Decrypting message via Activity Result');
 
     try {
-      const result = await IntentLauncher.startActivityAsync(
+      // Use timeout wrapper to prevent indefinite hangs
+      const result = await this.startActivityWithTimeout(
         'android.intent.action.VIEW',
         {
           data: 'nostrsigner:',
@@ -458,8 +476,10 @@ export class AmberNDKSigner implements NDKSigner {
             type: 'nip04_decrypt',
             pubkey: senderPubkey,
             ciphertext: value,
+            current_user: this._pubkey, // Tell Amber which account to use
           },
-        }
+        },
+        15000 // 15s timeout for user approval
       );
 
       console.log('[Amber DEBUG] Decrypt result received:', {
@@ -470,6 +490,13 @@ export class AmberNDKSigner implements NDKSigner {
       });
 
       if (result.resultCode === IntentLauncher.ResultCode.Success) {
+        // Per NIP-55: Check if user has permanently rejected this app
+        if (result.extra?.rejected) {
+          throw new Error(
+            'Decryption permanently rejected in Amber. Please check Amber app settings to re-enable RUNSTR.'
+          );
+        }
+
         const decrypted =
           result.extra?.result || // Result in extras object
           result.data; // Fallback: data as plain string

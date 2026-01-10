@@ -97,6 +97,63 @@ export class WorkoutCardGenerator {
   }
 
   /**
+   * Check if avatar URL is a supported static image format
+   * GIF and other animated formats can crash react-native-svg
+   */
+  private isValidAvatarFormat(url: string | undefined): boolean {
+    if (!url) return false;
+    const lowerUrl = url.toLowerCase();
+    // Only allow static image formats that react-native-svg handles reliably
+    return (
+      lowerUrl.endsWith('.png') ||
+      lowerUrl.endsWith('.jpg') ||
+      lowerUrl.endsWith('.jpeg') ||
+      lowerUrl.endsWith('.webp') ||
+      // Also allow URLs without extension (CDN URLs) - these usually work
+      (!lowerUrl.endsWith('.gif') &&
+        !lowerUrl.endsWith('.svg') &&
+        !lowerUrl.includes('.gif?') &&
+        !lowerUrl.includes('.svg?'))
+    );
+  }
+
+  /**
+   * Create fallback avatar with user initials
+   * Used when avatar URL is unsupported format (GIF, SVG) or fails to load
+   */
+  private createFallbackInitials(
+    userName: string | undefined,
+    size: number = 60,
+    accentColor: string = '#FF6B35'
+  ): string {
+    const initials = userName
+      ? userName
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2)
+      : '?';
+
+    const radius = size / 2;
+    const fontSize = size * 0.4;
+    const textY = radius + fontSize * 0.35; // Vertically center text
+
+    return `
+      <circle cx="${radius}" cy="${radius}" r="${radius}" fill="${accentColor}"/>
+      <text
+        x="${radius}"
+        y="${textY}"
+        text-anchor="middle"
+        font-family="system-ui, -apple-system, sans-serif"
+        font-size="${fontSize}"
+        font-weight="700"
+        fill="#FFFFFF"
+      >${this.escapeXml(initials)}</text>
+    `;
+  }
+
+  /**
    * Detect if this is a step counter post (daily steps) vs GPS-tracked walk
    * Step counter posts have distance = 0 and steps in metadata
    */
@@ -276,7 +333,8 @@ export class WorkoutCardGenerator {
       workout,
       options.userAvatar,
       panelWidth,
-      height
+      height,
+      options.userName
     );
 
     // Right panel: Black background with workout details
@@ -323,9 +381,11 @@ export class WorkoutCardGenerator {
     workout: PublishableWorkout,
     userAvatar: string | undefined,
     width: number,
-    height: number
+    height: number,
+    userName?: string
   ): string {
-    if (userAvatar) {
+    // Check if avatar format is supported (skip GIF, SVG - they can crash)
+    if (userAvatar && this.isValidAvatarFormat(userAvatar)) {
       // User avatar with grayscale filter
       return `
         <image
@@ -339,8 +399,34 @@ export class WorkoutCardGenerator {
           opacity="0.8"
         />
       `;
+    } else if (userAvatar && !this.isValidAvatarFormat(userAvatar)) {
+      // Unsupported format (GIF, etc.) - show large initials with grayscale background
+      console.warn(
+        `⚠️ Unsupported avatar format in card: ${userAvatar.substring(0, 50)}...`
+      );
+      const initials = userName
+        ? userName
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2)
+        : '?';
+      return `
+        <rect width="${width}" height="${height}" fill="#1a1a1a"/>
+        <circle cx="${width / 2}" cy="${height / 2}" r="100" fill="#333333"/>
+        <text
+          x="${width / 2}"
+          y="${height / 2 + 30}"
+          font-size="80"
+          font-weight="700"
+          text-anchor="middle"
+          fill="#666666"
+          font-family="system-ui, -apple-system, sans-serif"
+        >${this.escapeXml(initials)}</text>
+      `;
     } else {
-      // Fallback: Large centered workout icon with grayscale effect
+      // No avatar - fallback to large centered workout icon
       const icon = this.getWorkoutIcon(workout.type);
       return `
         <rect width="${width}" height="${height}" fill="#1a1a1a"/>
@@ -970,6 +1056,15 @@ export class WorkoutCardGenerator {
     y: number,
     accentColor: string
   ): string {
+    // Check if avatar format is supported (skip GIF, SVG - they can crash)
+    const useImage = this.isValidAvatarFormat(avatarUrl);
+
+    if (!useImage) {
+      console.warn(
+        `⚠️ Unsupported avatar format, using initials: ${avatarUrl.substring(0, 50)}...`
+      );
+    }
+
     return `
       <g transform="translate(${x}, ${y})">
         <defs>
@@ -979,8 +1074,13 @@ export class WorkoutCardGenerator {
         </defs>
         <!-- Avatar circle background -->
         <circle cx="30" cy="30" r="30" fill="${accentColor}20" stroke="${accentColor}" stroke-width="2"/>
-        <!-- Avatar image -->
-        <image href="${avatarUrl}" x="0" y="0" width="60" height="60" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice"/>
+        ${
+          useImage
+            ? `<!-- Avatar image -->
+        <image href="${avatarUrl}" x="0" y="0" width="60" height="60" clip-path="url(#avatarClip)" preserveAspectRatio="xMidYMid slice"/>`
+            : `<!-- Initials fallback for unsupported format -->
+        ${this.createFallbackInitials(userName, 60, accentColor)}`
+        }
         ${
           userName
             ? `<text x="70" y="35" font-family="Arial, sans-serif" font-size="14" font-weight="600" fill="${accentColor}">${this.escapeXml(

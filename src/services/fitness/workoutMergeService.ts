@@ -343,12 +343,9 @@ export class WorkoutMergeService {
       console.log('🚀 NDK Filter:', nuclearFilter);
 
       // Create subscription with timeout and convert to clean workout objects
+      // RACE CONDITION FIX: Use resolved flag to prevent double-cleanup crashes
       const rawEventsPromise = new Promise<any[]>((resolve) => {
-        const timeout = setTimeout(() => {
-          subscription.stop();
-          this.subscriptions.delete(subscription);
-          resolve(Array.from(events));
-        }, 5000); // 5 second timeout
+        let resolved = false; // Guard flag to prevent double-stop
 
         const subscription = this.ndk.subscribe(nuclearFilter, {
           closeOnEose: false,
@@ -358,6 +355,25 @@ export class WorkoutMergeService {
         // Track subscription for cleanup
         this.subscriptions.add(subscription);
 
+        const cleanup = () => {
+          if (resolved) return; // Already cleaned up
+          resolved = true;
+          clearTimeout(timeout);
+          try {
+            subscription.stop();
+          } catch (e) {
+            console.warn('[WorkoutMerge] Subscription stop failed:', e);
+          }
+          this.subscriptions.delete(subscription);
+        };
+
+        const timeout = setTimeout(() => {
+          if (resolved) return;
+          console.log('⏱️ Timeout reached - found', events.size, 'events');
+          cleanup();
+          resolve(Array.from(events));
+        }, 5000); // 5 second timeout
+
         subscription.on('event', (event: any) => {
           if (event.kind === 1301) {
             events.add(event);
@@ -366,18 +382,16 @@ export class WorkoutMergeService {
         });
 
         subscription.on('eose', () => {
+          if (resolved) return;
           console.log('📨 EOSE received - found', events.size, 'events');
-          clearTimeout(timeout);
-          subscription.stop();
-          this.subscriptions.delete(subscription);
+          cleanup();
           resolve(Array.from(events));
         });
 
         subscription.on('error', (error: any) => {
+          if (resolved) return;
           console.error('Nostr subscription error:', error);
-          clearTimeout(timeout);
-          subscription.stop();
-          this.subscriptions.delete(subscription);
+          cleanup();
           resolve(Array.from(events)); // Return partial results
         });
       });

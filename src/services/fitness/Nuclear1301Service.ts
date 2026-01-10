@@ -7,6 +7,7 @@
 import type { NostrWorkout } from '../../types/nostrWorkout';
 import type { Split } from '../activity/SplitTrackingService';
 import { GlobalNDKService } from '../nostr/GlobalNDKService';
+import { inferActivityTypeSimple, normalizeActivityType } from '../../utils/activityInference';
 
 export class Nuclear1301Service {
   private static instance: Nuclear1301Service;
@@ -341,11 +342,27 @@ export class Nuclear1301Service {
           // Sort splits by number
           splits.sort((a, b) => a.number - b.number);
 
+          // Normalize and infer activity type if needed
+          // First try to normalize the parsed type (handles 'run' -> 'running', etc.)
+          let finalType = workoutType !== 'unknown'
+            ? normalizeActivityType(workoutType)
+            : 'unknown';
+
+          // If still unknown or 'other', try to infer from metrics
+          if (finalType === 'unknown' || finalType === 'other') {
+            finalType = inferActivityTypeSimple({
+              distance,
+              duration,
+              pace: pace > 0 ? pace : undefined,
+              elevationGain: elevationGain > 0 ? elevationGain : undefined,
+            });
+          }
+
           // ULTRA NUCLEAR: Create workout even if ALL fields are missing/zero
           const workout: NostrWorkout = {
             id: event.id,
             userId: 'nostr_user', // Generic for tab display
-            type: workoutType as any,
+            type: finalType as any,
             startTime: new Date(event.created_at * 1000).toISOString(),
             endTime: new Date(
               (event.created_at + Math.max(duration, 60)) * 1000
@@ -383,10 +400,11 @@ export class Nuclear1301Service {
         } catch (error) {
           console.warn(`⚠️ Error in ultra nuclear parsing ${event.id}:`, error);
           // ULTRA NUCLEAR: Even if parsing fails, create a basic workout
+          // Use 'other' for truly unparseable events (no metrics to infer from)
           const fallbackWorkout: NostrWorkout = {
             id: event.id,
             userId: 'nostr_user',
-            type: 'raw_1301' as any,
+            type: 'other' as any,
             startTime: new Date(event.created_at * 1000).toISOString(),
             endTime: new Date((event.created_at + 60) * 1000).toISOString(),
             duration: 0,

@@ -807,9 +807,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </SettingsAccordion>
         </View>
 
-        {/* Experimental Features Accordion - Season Pass Required */}
+        {/* Advanced Features Accordion */}
         <View style={styles.section}>
-          <SettingsAccordion title="EXPERIMENTAL" defaultExpanded={false}>
+          <SettingsAccordion title="ADVANCED FEATURES" defaultExpanded={false}>
             <Card style={styles.accordionCard}>
               {/* PPQ.AI API Key */}
               <SettingItem
@@ -819,16 +819,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     ? 'Configured - AI insights enabled'
                     : 'Not configured - Tap to set up'
                 }
-                onPress={() => {
-                  if (!isSeason2Participant) {
-                    setAlertTitle('Season Pass Required');
-                    setAlertMessage('This feature is only available for Season II participants. Join Season II to unlock experimental features!');
-                    setAlertButtons([{ text: 'OK' }]);
-                    setAlertVisible(true);
-                    return;
-                  }
-                  setShowPPQModal(true);
-                }}
+                onPress={() => setShowPPQModal(true)}
                 rightElement={
                   <View style={styles.securityIcon}>
                     <Ionicons
@@ -850,16 +841,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <SettingItem
                 title="AI Model"
                 subtitle={ModelManager.getModelName(selectedAIModel)}
-                onPress={() => {
-                  if (!isSeason2Participant) {
-                    setAlertTitle('Season Pass Required');
-                    setAlertMessage('This feature is only available for Season II participants. Join Season II to unlock experimental features!');
-                    setAlertButtons([{ text: 'OK' }]);
-                    setAlertVisible(true);
-                    return;
-                  }
-                  setShowModelPicker(true);
-                }}
+                onPress={() => setShowModelPicker(true)}
                 rightElement={
                   <View style={styles.securityIcon}>
                     <Ionicons
@@ -875,16 +857,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <SettingItem
                 title="Advanced Analytics"
                 subtitle="Body composition, fitness age & AI coaching"
-                onPress={() => {
-                  if (!isSeason2Participant) {
-                    setAlertTitle('Season Pass Required');
-                    setAlertMessage('This feature is only available for Season II participants. Join Season II to unlock experimental features!');
-                    setAlertButtons([{ text: 'OK' }]);
-                    setAlertVisible(true);
-                    return;
-                  }
-                  (navigation as any).navigate('AdvancedAnalytics');
-                }}
+                onPress={() => (navigation as any).navigate('AdvancedAnalytics')}
                 rightElement={
                   <View style={styles.securityIcon}>
                     <Ionicons
@@ -900,16 +873,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <SettingItem
                 title="Extended Activities"
                 subtitle="Strength, diet & wellness tracking"
-                onPress={() => {
-                  if (!isSeason2Participant) {
-                    setAlertTitle('Season Pass Required');
-                    setAlertMessage('This feature is only available for Season II participants. Join Season II to unlock experimental features!');
-                    setAlertButtons([{ text: 'OK' }]);
-                    setAlertVisible(true);
-                    return;
-                  }
-                  (navigation as any).navigate('ActivityTracker', { showExperimentalMenu: true });
-                }}
+                onPress={() => (navigation as any).navigate('ActivityTracker', { showExperimentalMenu: true })}
                 rightElement={
                   <View style={styles.securityIcon}>
                     <Ionicons

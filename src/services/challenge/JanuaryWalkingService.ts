@@ -5,13 +5,15 @@
  * Top 3 participants with the longest walking distance win 1k sats each.
  *
  * Features:
- * - Season II members auto-appear if they have walking data in January
- * - Non-Season II users can join privately (only visible to themselves)
- * - Only Season II participants are eligible for prizes
+ * - Open to everyone (all joined users eligible for prizes)
+ * - Season II members auto-appear if they have walking data
+ * - Uses Running Bitcoin pattern: local join + Supabase registration
+ * - Profile resolution: Season II → Supabase → "Anonymous Athlete"
  * - Walking activity type only
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { nip19 } from 'nostr-tools';
 import { UnifiedWorkoutCache } from '../cache/UnifiedWorkoutCache';
 import {
   JANUARY_WALKING_JOINED_KEY,
@@ -22,6 +24,11 @@ import {
 import { SEASON_2_PARTICIPANTS } from '../../constants/season2';
 import { getBaselineTotals } from '../../constants/season2Baseline';
 import type { CachedWorkout } from '../cache/UnifiedWorkoutCache';
+import { ProfileCache } from '../../cache/ProfileCache';
+import { SupabaseCompetitionService } from '../backend/SupabaseCompetitionService';
+
+// Key for storing ALL joined users (not just current user)
+const JOINED_USERS_KEY = '@runstr:january_walking_joined_users';
 
 export interface JanuaryWalkingParticipant {
   pubkey: string;
@@ -44,10 +51,6 @@ export interface JanuaryWalkingLeaderboard {
   lastUpdated: number;
 }
 
-interface LocalJoinRecord {
-  pubkey: string;
-  joinedAt: number;
-}
 
 class JanuaryWalkingServiceClass {
   private static instance: JanuaryWalkingServiceClass;
@@ -89,14 +92,19 @@ class JanuaryWalkingServiceClass {
 
       console.log(`[JanuaryWalking] Walking workouts in January: ${walkingWorkouts.length}`);
 
-      // Get Season II pubkeys
+      // Get eligible participants: Season II + locally joined users
       const season2Pubkeys = new Set(SEASON_2_PARTICIPANTS.map(p => p.pubkey));
+      const locallyJoined = await this.getJoinedUsers();
+      const eligiblePubkeys = new Set([...season2Pubkeys, ...locallyJoined]);
 
-      // Aggregate distance per participant (Season II members only for public leaderboard)
+      // Fetch Supabase profiles for non-Season II users
+      const supabaseProfiles = await this.getParticipantProfilesFromSupabase();
+
+      // Aggregate distance per participant (ALL eligible users)
       const stats = new Map<string, { distance: number; workoutCount: number }>();
 
       for (const w of walkingWorkouts) {
-        if (!season2Pubkeys.has(w.pubkey)) continue;
+        if (!eligiblePubkeys.has(w.pubkey)) continue;
 
         const existing = stats.get(w.pubkey) || { distance: 0, workoutCount: 0 };
         existing.distance += w.distance;
@@ -104,22 +112,43 @@ class JanuaryWalkingServiceClass {
         stats.set(w.pubkey, existing);
       }
 
-      // Build participant entries with profile data (only those with walking data)
+      // Build participant entries with profile resolution chain
       const participantEntries: JanuaryWalkingParticipant[] = [];
       for (const [pubkey, data] of stats) {
-        if (data.workoutCount === 0) continue; // Skip if no walking data
+        if (data.workoutCount === 0) continue;
 
-        const profile = SEASON_2_PARTICIPANTS.find(p => p.pubkey === pubkey);
+        // Profile resolution: Season II → Supabase → fallback
+        const season2Profile = SEASON_2_PARTICIPANTS.find(p => p.pubkey === pubkey);
+        const isSeason2 = !!season2Profile;
+
+        let name = season2Profile?.name;
+        let picture = season2Profile?.picture;
+        let npub = season2Profile?.npub;
+
+        // For non-Season II, check Supabase profiles
+        if (!season2Profile) {
+          try {
+            npub = nip19.npubEncode(pubkey);
+            const supabaseProfile = supabaseProfiles.get(npub);
+            if (supabaseProfile) {
+              name = supabaseProfile.name;
+              picture = supabaseProfile.picture;
+            }
+          } catch {
+            // Ignore encoding errors
+          }
+        }
+
         participantEntries.push({
           pubkey,
-          npub: profile?.npub,
-          name: profile?.name || `User ${pubkey.slice(0, 8)}`,
-          picture: profile?.picture,
+          npub,
+          name: name || 'Anonymous Athlete',
+          picture,
           totalDistanceKm: data.distance,
           workoutCount: data.workoutCount,
-          isSeasonParticipant: true, // All in this list are S2 members
-          isLocalJoin: false,
-          rank: 0, // Will be set after sorting
+          isSeasonParticipant: isSeason2,
+          isLocalJoin: !isSeason2,
+          rank: 0,
         });
       }
 
@@ -203,6 +232,100 @@ class JanuaryWalkingServiceClass {
   }
 
   /**
+   * Get all locally joined users
+   */
+  async getJoinedUsers(): Promise<string[]> {
+    try {
+      const stored = await AsyncStorage.getItem(JOINED_USERS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('[JanuaryWalking] Error getting joined users:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Register user in Supabase with profile data
+   * Fire-and-forget - doesn't block join flow
+   */
+  async registerInSupabase(npub: string): Promise<boolean> {
+    try {
+      let pubkey: string;
+      try {
+        const decoded = nip19.decode(npub);
+        pubkey = decoded.data as string;
+      } catch {
+        pubkey = npub;
+      }
+
+      // Fetch user's Nostr profile
+      const profiles = await ProfileCache.fetchProfiles([pubkey]);
+      const profile = profiles.get(pubkey);
+      const profileData = profile
+        ? { name: profile.name || profile.display_name, picture: profile.picture }
+        : undefined;
+
+      const result = await SupabaseCompetitionService.joinCompetition(
+        'january-walking',
+        npub,
+        profileData
+      );
+
+      if (result.success) {
+        console.log(`[JanuaryWalking] ✅ Registered ${npub.slice(0, 12)}... in Supabase`);
+      }
+      return result.success;
+    } catch (error) {
+      console.warn('[JanuaryWalking] Failed to register in Supabase:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get participant profiles from Supabase
+   */
+  async getParticipantProfilesFromSupabase(): Promise<Map<string, { name?: string; picture?: string }>> {
+    const profiles = new Map<string, { name?: string; picture?: string }>();
+
+    try {
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        return profiles;
+      }
+
+      const competitionId = await SupabaseCompetitionService.getCompetitionId('january-walking');
+      if (!competitionId) {
+        return profiles;
+      }
+
+      const url = `${supabaseUrl}/rest/v1/competition_participants?competition_id=eq.${competitionId}&select=npub,name,picture`;
+      const response = await fetch(url, {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+        },
+      });
+
+      if (!response.ok) return profiles;
+
+      const data = await response.json();
+      for (const row of data) {
+        if (row.npub && (row.name || row.picture)) {
+          profiles.set(row.npub, { name: row.name, picture: row.picture });
+        }
+      }
+
+      console.log(`[JanuaryWalking] Loaded ${profiles.size} profiles from Supabase`);
+    } catch (error) {
+      console.warn('[JanuaryWalking] Error fetching Supabase profiles:', error);
+    }
+
+    return profiles;
+  }
+
+  /**
    * Create empty leaderboard structure
    */
   private emptyLeaderboard(): JanuaryWalkingLeaderboard {
@@ -215,17 +338,27 @@ class JanuaryWalkingServiceClass {
   }
 
   /**
-   * Join the January Walking Contest locally
-   * Stores join record in AsyncStorage
+   * Join the January Walking Contest
+   * Uses local-first pattern with fire-and-forget Supabase registration
    */
   async join(pubkey: string): Promise<boolean> {
     try {
-      const record: LocalJoinRecord = {
-        pubkey,
-        joinedAt: Date.now(),
-      };
-      await AsyncStorage.setItem(JANUARY_WALKING_JOINED_KEY, JSON.stringify(record));
-      console.log(`[JanuaryWalking] User ${pubkey.slice(0, 8)} joined the contest`);
+      // Get existing joined users
+      const joinedUsers = await this.getJoinedUsers();
+
+      // Add user if not already joined
+      if (!joinedUsers.includes(pubkey)) {
+        joinedUsers.push(pubkey);
+        await AsyncStorage.setItem(JOINED_USERS_KEY, JSON.stringify(joinedUsers));
+        console.log(`[JanuaryWalking] User ${pubkey.slice(0, 8)} joined the contest`);
+      }
+
+      // Fire-and-forget: Register in Supabase with profile data
+      const npub = nip19.npubEncode(pubkey);
+      this.registerInSupabase(npub).catch((err) => {
+        console.warn('[JanuaryWalking] Supabase registration failed (non-blocking):', err);
+      });
+
       return true;
     } catch (error) {
       console.error('[JanuaryWalking] Error joining contest:', error);
@@ -238,11 +371,8 @@ class JanuaryWalkingServiceClass {
    */
   async hasJoined(pubkey: string): Promise<boolean> {
     try {
-      const stored = await AsyncStorage.getItem(JANUARY_WALKING_JOINED_KEY);
-      if (!stored) return false;
-
-      const record: LocalJoinRecord = JSON.parse(stored);
-      return record.pubkey === pubkey;
+      const joinedUsers = await this.getJoinedUsers();
+      return joinedUsers.includes(pubkey);
     } catch (error) {
       console.error('[JanuaryWalking] Error checking join status:', error);
       return false;
@@ -261,14 +391,10 @@ class JanuaryWalkingServiceClass {
    */
   async leave(pubkey: string): Promise<boolean> {
     try {
-      const stored = await AsyncStorage.getItem(JANUARY_WALKING_JOINED_KEY);
-      if (!stored) return true;
-
-      const record: LocalJoinRecord = JSON.parse(stored);
-      if (record.pubkey === pubkey) {
-        await AsyncStorage.removeItem(JANUARY_WALKING_JOINED_KEY);
-        console.log(`[JanuaryWalking] User ${pubkey.slice(0, 8)} left the contest`);
-      }
+      const joinedUsers = await this.getJoinedUsers();
+      const filtered = joinedUsers.filter((p) => p !== pubkey);
+      await AsyncStorage.setItem(JOINED_USERS_KEY, JSON.stringify(filtered));
+      console.log(`[JanuaryWalking] User ${pubkey.slice(0, 8)} left the contest`);
       return true;
     } catch (error) {
       console.error('[JanuaryWalking] Error leaving contest:', error);

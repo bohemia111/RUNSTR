@@ -108,10 +108,19 @@ export class ImageUploadService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.UPLOAD_TIMEOUT);
 
+      // Encode auth event with error handling
+      let authHeader: string;
+      try {
+        authHeader = `Nostr ${btoa(JSON.stringify(authEvent))}`;
+      } catch (encodingError) {
+        console.error(`❌ [${host}] Failed to encode auth event:`, encodingError);
+        throw new Error('Authentication encoding failed');
+      }
+
       const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
-          Authorization: `Nostr ${btoa(JSON.stringify(authEvent))}`,
+          Authorization: authHeader,
           Accept: 'application/json',
         },
         body: formData,
@@ -177,10 +186,19 @@ export class ImageUploadService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.UPLOAD_TIMEOUT);
 
+      // Encode auth event with error handling
+      let authHeader: string;
+      try {
+        authHeader = `Nostr ${btoa(JSON.stringify(authEvent))}`;
+      } catch (encodingError) {
+        console.error(`❌ [${host}] Failed to encode Blossom auth event:`, encodingError);
+        throw new Error('Authentication encoding failed');
+      }
+
       const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
-          Authorization: `Nostr ${btoa(JSON.stringify(authEvent))}`,
+          Authorization: authHeader,
           Accept: 'application/json',
         },
         body: formData,

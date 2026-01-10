@@ -36,6 +36,7 @@ import {
 
 // Import type from the service file (not from the default export)
 import type { LocalWorkout } from '../services/fitness/LocalWorkoutStorageService';
+import { inferActivityTypeSimple } from '../utils/activityInference';
 
 interface WorkoutHistoryScreenProps {
   route?: {
@@ -149,11 +150,17 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       }
 
       // Convert HealthKit workout to PublishableWorkout format
+      // Use workout type or infer from metrics (never 'other' for cardio)
+      const workoutType = workout.type || inferActivityTypeSimple({
+        distance: workout.distance,
+        duration: workout.duration,
+        steps: workout.steps,
+      });
       const publishableWorkout = {
         id: workout.id,
         userId: userId,
         source: 'healthkit' as const,
-        type: workout.type || 'other',
+        type: workoutType,
         duration: workout.duration, // Already in seconds from HealthKit
         distance: workout.distance || 0,
         calories: workout.calories || 0,
@@ -231,11 +238,17 @@ export const WorkoutHistoryScreen: React.FC<WorkoutHistoryScreenProps> = ({
       }
 
       // Convert Health Connect workout to PublishableWorkout format
+      // Use workout type or infer from metrics (never 'other' for cardio)
+      const workoutType = workout.type || inferActivityTypeSimple({
+        distance: workout.distance,
+        duration: workout.duration,
+        steps: workout.steps,
+      });
       const publishableWorkout = {
         id: workout.id,
         userId: userId,
         source: 'health_connect' as const,
-        type: workout.type || 'other',
+        type: workoutType,
         duration: workout.duration, // Already in seconds from Health Connect
         distance: workout.distance || 0,
         calories: workout.calories || 0,

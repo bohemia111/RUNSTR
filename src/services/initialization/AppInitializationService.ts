@@ -7,6 +7,7 @@
 import { WorkoutCacheService } from '../cache/WorkoutCacheService';
 import { season1Service } from '../season/Season1Service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SupabaseCompetitionService } from '../backend/SupabaseCompetitionService';
 
 export class AppInitializationService {
   private static instance: AppInitializationService;
@@ -57,6 +58,7 @@ export class AppInitializationService {
         // Workout cache should be warmed lazily when user actually needs workout data
         // this.warmUpWorkoutCache(pubkey),
         this.prefetchSeasonData(),
+        this.prefetchSeason2Data(),
         this.warmUpTeamData(),
       ]);
 
@@ -118,6 +120,50 @@ export class AppInitializationService {
     } catch (error) {
       console.error('[AppInit] ⚠️ Season data prefetch failed:', error);
       // Non-critical - season data will load on demand
+    }
+  }
+
+  /**
+   * Prefetch Season 2 competition data for all activity types
+   * Populates cache so Season2Screen has instant data (no 0s flash)
+   */
+  private async prefetchSeason2Data(): Promise<void> {
+    try {
+      console.log('[AppInit] 🏆 Prefetching Season 2 leaderboards...');
+
+      // Fetch all 3 activity types in parallel
+      const [running, walking, cycling] = await Promise.all([
+        SupabaseCompetitionService.getLeaderboard('season2-running'),
+        SupabaseCompetitionService.getLeaderboard('season2-walking'),
+        SupabaseCompetitionService.getLeaderboard('season2-cycling'),
+      ]);
+
+      // Cache results using same keys as useSupabaseLeaderboard hook
+      const timestamp = Date.now();
+
+      await Promise.all([
+        AsyncStorage.setItem(
+          '@runstr:leaderboard:season2-running',
+          JSON.stringify({ data: running.leaderboard, timestamp })
+        ),
+        AsyncStorage.setItem(
+          '@runstr:leaderboard:season2-walking',
+          JSON.stringify({ data: walking.leaderboard, timestamp })
+        ),
+        AsyncStorage.setItem(
+          '@runstr:leaderboard:season2-cycling',
+          JSON.stringify({ data: cycling.leaderboard, timestamp })
+        ),
+      ]);
+
+      console.log('[AppInit] ✅ Season 2 prefetch complete:', {
+        running: running.leaderboard.length,
+        walking: walking.leaderboard.length,
+        cycling: cycling.leaderboard.length,
+      });
+    } catch (error) {
+      console.error('[AppInit] ⚠️ Season 2 prefetch failed:', error);
+      // Non-critical - data will load on demand
     }
   }
 

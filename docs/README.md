@@ -14,19 +14,14 @@ Centralized documentation for the RUNSTR REWARDS project, including implementati
 ## Documentation Categories
 
 ### Project Overview
-- **RUNSTR_REWARDS_OVERVIEW.md** - Complete RUNSTR REWARDS project overview
-- **RUNSTR_PROJECT_ARTICLE.md** - 5-paragraph project direction article
-- **APP_USER_FLOW_AND_CAPTAIN_EXPERIENCE.md** - User flow and captain experience
 - **ROADMAP.md** - Project roadmap and future plans
 
 ### Integration Guides
 - **AMBER_INTEGRATION.md** - Amber signer integration guide
 - **HEALTHKIT_IMPLEMENTATION_GUIDE.md** - HealthKit integration
 - **HEALTHKIT_XCODE_SETUP.md** - Xcode HealthKit setup instructions
-- **PUSH_NOTIFICATION_IMPLEMENTATION_SUMMARY.md** - Push notification system
-- **nostr-native-fitness-competitions.md** - Nostr event kinds reference
-- **notifications-integration-example.md** - Notification integration examples
-- **NIP60-61-IMPLEMENTATION-ANALYSIS.md** - NIP-60/61 wallet implementation
+- **KIND_1301_SPEC.md** - Nostr kind 1301 workout event specification
+- **ENVIRONMENT_SETUP.md** - Environment variables and secrets setup
 
 ### Testing Documentation
 - **PHASE_1_2_TESTING_GUIDE.md** - Complete testing guide for Phase 1 & 2

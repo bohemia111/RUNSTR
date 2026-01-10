@@ -27,12 +27,12 @@ import { activityMetricsService } from '../../services/activity/ActivityMetricsS
 import { UnifiedSigningService } from '../../services/auth/UnifiedSigningService';
 import WorkoutStatusTracker from '../../services/fitness/WorkoutStatusTracker';
 import { CustomAlert } from '../ui/CustomAlert';
+import { PostingErrorBoundary } from '../ui/PostingErrorBoundary';
 import routeStorageService from '../../services/routes/RouteStorageService';
 import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { NostrProfile } from '../../services/nostr/NostrProfileService';
 import { LocalTeamMembershipService } from '../../services/team/LocalTeamMembershipService';
 import { RewardNotificationManager } from '../../services/rewards/RewardNotificationManager';
-import { SupabaseCompetitionService } from '../../services/backend/SupabaseCompetitionService';
 
 interface WorkoutSummaryProps {
   visible: boolean;
@@ -363,30 +363,8 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
           }
         }
 
-        // 🏆 Submit to Supabase for competition leaderboards (workout verification)
-        // This is what makes the workout count in our database-backed competitions
-        if (result.eventId && npub) {
-          try {
-            const supabaseResult = await SupabaseCompetitionService.submitWorkoutSimple({
-              eventId: result.eventId,
-              npub: npub,
-              type: publishableWorkout.type,
-              distance: publishableWorkout.distance,
-              duration: publishableWorkout.duration,
-              calories: publishableWorkout.calories,
-              startTime: publishableWorkout.startTime,
-            });
-            if (supabaseResult.success) {
-              console.log('✅ Workout submitted to competition backend');
-            } else {
-              console.warn('⚠️ Supabase submission failed:', supabaseResult.error);
-              // Non-critical - workout is still on Nostr, just won't appear in Supabase leaderboards
-            }
-          } catch (supabaseError) {
-            console.warn('⚠️ Failed to submit to Supabase:', supabaseError);
-            // Non-critical - workout is still on Nostr
-          }
-        }
+        // Note: Supabase submission is now handled inside workoutPublishingService.saveWorkoutToNostr()
+        // This ensures tags (splits, steps) are passed for daily leaderboard calculations
 
         // 🎁 Show success message
         // Note: If user earned a daily reward, the global RewardNotificationProvider
@@ -437,6 +415,11 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
       transparent={true}
       onRequestClose={handleClose}
     >
+      <PostingErrorBoundary
+        onClose={handleClose}
+        fallbackTitle="Workout Error"
+        fallbackMessage="There was an error displaying your workout. Your workout is still saved locally."
+      >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <ScrollView
@@ -772,6 +755,7 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
           </ScrollView>
         </View>
       </View>
+      </PostingErrorBoundary>
 
       <EnhancedSocialShareModal
         visible={showSocialModal}

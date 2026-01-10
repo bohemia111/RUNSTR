@@ -21,6 +21,7 @@ import { LoadingOverlay } from '../../ui/LoadingStates';
 import { WorkoutCard } from '../shared/WorkoutCard';
 import healthConnectService from '../../../services/fitness/healthConnectService';
 import type { Workout } from '../../../types/workout';
+import { inferActivityTypeSimple } from '../../../utils/activityInference';
 import { Ionicons } from '@expo/vector-icons';
 
 interface HealthConnectTabProps {
@@ -78,26 +79,35 @@ const HealthConnectTabContent: React.FC<HealthConnectTabProps> = ({
         const cached = await healthConnectService.getCachedWorkouts();
         if (cached && cached.length > 0) {
           // Transform cached data to UI format matching Workout interface
-          const transformedWorkouts: Workout[] = cached.map((workout) => ({
-            id: workout.id,
-            userId: userId,
-            type: (workout.activityType || 'other') as Workout['type'],
-            source: 'health_connect' as const,
-            duration: workout.duration,
-            distance: workout.totalDistance || 0,
-            calories: workout.totalEnergyBurned || 0,
-            startTime: workout.startTime,
-            endTime: workout.endTime,
-            syncedAt: new Date().toISOString(),
-            steps: workout.steps,
-            heartRate: workout.heartRate,
-            metadata: {
-              sourceApp: workout.sourceName,
-              originalExerciseType: workout.exerciseType,
-              healthConnectId: workout.id,
-              syncedVia: 'health_connect_service',
-            },
-          }));
+          const transformedWorkouts: Workout[] = cached.map((workout) => {
+            // Use activityType from service, or infer from metrics if missing
+            const activityType = workout.activityType || inferActivityTypeSimple({
+              distance: workout.totalDistance,
+              duration: workout.duration,
+              steps: workout.steps,
+              heartRate: workout.heartRate,
+            });
+            return {
+              id: workout.id,
+              userId: userId,
+              type: activityType as Workout['type'],
+              source: 'health_connect' as const,
+              duration: workout.duration,
+              distance: workout.totalDistance || 0,
+              calories: workout.totalEnergyBurned || 0,
+              startTime: workout.startTime,
+              endTime: workout.endTime,
+              syncedAt: new Date().toISOString(),
+              steps: workout.steps,
+              heartRate: workout.heartRate,
+              metadata: {
+                sourceApp: workout.sourceName,
+                originalExerciseType: workout.exerciseType,
+                healthConnectId: workout.id,
+                syncedVia: 'health_connect_service',
+              },
+            };
+          });
           setWorkouts(transformedWorkouts);
           setIsLoading(false);
 

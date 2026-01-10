@@ -1,13 +1,13 @@
 /**
  * LeaderboardsContent - Embeddable leaderboards for Compete screen toggle
- * Shows daily leaderboards for ALL users with 5K+ running workouts today
+ * Shows daily leaderboards for ALL users with workouts today (running + steps)
  *
- * ARCHITECTURE: Uses SimpleLeaderboardService.getGlobalDailyLeaderboards()
- * - Queries ALL kind 1301 events from today (no author filter)
- * - Running workouts only (no walking)
- * - Distance >= threshold (5K/10K/Half/Marathon)
- * - EOSE-aware query with early exit (<3 seconds typical)
+ * ARCHITECTURE: Uses DailyLeaderboardService (Supabase-backed)
+ * - Queries Supabase for today's workouts (~500ms vs 3-5s with Nostr)
+ * - Running workouts for time leaderboards (5K/10K/Half/Marathon)
+ * - Walking workouts for steps leaderboard
  * - Top 25 display with user position shown below if outside top 25
+ * - Server-side anti-cheat validation
  */
 
 import React, { useState, useEffect } from 'react';
@@ -15,7 +15,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { DailyLeaderboardCard } from '../team/DailyLeaderboardCard';
-import { SimpleLeaderboardService, LeaderboardEntry } from '../../services/competition/SimpleLeaderboardService';
+import { DailyLeaderboardService, LeaderboardEntry } from '../../services/competition/DailyLeaderboardService';
 
 // ============================================================================
 // Types
@@ -50,18 +50,17 @@ export const LeaderboardsContent: React.FC<LeaderboardsContentProps> = ({
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load leaderboards from SimpleLeaderboardService
-  // Uses getGlobalDailyLeaderboards() which queries ALL kind 1301 from today
+  // Load leaderboards from DailyLeaderboardService (Supabase-backed)
+  // Queries Supabase for today's workouts - ~500ms vs 3-5s with Nostr
   useEffect(() => {
     const loadLeaderboards = async () => {
       const t0 = Date.now();
-      console.log('[LeaderboardsContent] Loading global daily leaderboards...');
+      console.log('[LeaderboardsContent] Loading global daily leaderboards (Supabase)...');
 
       try {
         // Use forceRefresh when refreshTrigger changes (pull-to-refresh)
         const forceRefresh = refreshTrigger > 0;
-        const data = await SimpleLeaderboardService.getInstance()
-          .getGlobalDailyLeaderboards(forceRefresh);
+        const data = await DailyLeaderboardService.getGlobalDailyLeaderboards(forceRefresh);
 
         console.log(`[LeaderboardsContent] Loaded in ${Date.now() - t0}ms:`, {
           '5k': data.leaderboard5k.length,
@@ -115,9 +114,9 @@ export const LeaderboardsContent: React.FC<LeaderboardsContentProps> = ({
           size={64}
           color={theme.colors.accent}
         />
-        <Text style={styles.emptyTitle}>No Running Workouts Today</Text>
+        <Text style={styles.emptyTitle}>No Workouts Today</Text>
         <Text style={styles.emptyText}>
-          Be the first to complete a running workout (5K+) and appear on the leaderboard!
+          Be the first to complete a workout and appear on the leaderboard!
         </Text>
         <Text style={styles.emptyHint}>Pull down to refresh</Text>
       </View>

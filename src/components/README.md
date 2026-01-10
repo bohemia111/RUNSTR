@@ -4,15 +4,18 @@ Reusable UI components organized by feature area for the RUNSTR React Native app
 
 ## Subdirectories
 
+- **activity/** - Activity tracking and workout UI components
+- **analytics/** - Fitness analytics and Coach Runstr components
 - **auth/** - Authentication-related components and login forms
-- **challenge/** - Challenge display and management components
 - **competition/** - Competition-related UI components and displays
 - **event/** - Event management and display components
+- **events/** - Event cards (Season II, January Walking, etc.)
 - **fitness/** - Workout and fitness data display components
 - **notifications/** - Notification display and management components
-- **profile/** - User profile and settings components
-- **team/** - Team discovery, management, and display components
+- **profile/** - User profile, settings, and workout history components
+- **rewards/** - Reward display and Impact Level components
+- **season2/** - Season II event-specific components
+- **team/** - Team (charity) selection and display components
 - **testing/** - Development and testing utility components
 - **ui/** - Basic reusable UI components (buttons, cards, inputs, etc)
-- **wallet/** - Bitcoin wallet and payment components
-- **wizards/** - Multi-step wizard components for competition creation
+- **wallet/** - Lightning address and payment components

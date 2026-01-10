@@ -67,6 +67,46 @@ The standard Nostr event type for fitness data. Publishing a workout as kind 130
 
 ---
 
+## GPS Data Handling
+
+RUNSTR takes a privacy-conscious approach to GPS data:
+
+### Local Storage Only
+
+- **Last 100 GPS points** are held in memory during tracking for real-time route display
+- **Old points are deleted** to make room for new ones as you move
+- GPS coordinates are used locally for distance calculation and route visualization
+- **GPS coordinates are NEVER published** to Nostr or any external server
+
+### What Gets Published vs. What Stays Local
+
+| Data Type | Published | Stays Local |
+|-----------|-----------|-------------|
+| Distance (total) | ✅ Yes | - |
+| Duration | ✅ Yes | - |
+| Activity type | ✅ Yes | - |
+| Elevation gain/loss | ✅ Yes | - |
+| Split times | ✅ Yes | - |
+| GPS coordinates | ❌ Never | ✅ Local only |
+| Route map | ❌ Never | ✅ Local only |
+| Real-time location | ❌ Never | ✅ Local only |
+
+### Technical Implementation
+
+```typescript
+// SimpleRunTracker.ts - GPS point management
+private cachedGpsPoints: GPSPoint[] = []; // Only last 100 points
+
+// Trim to last 100 points when exceeded
+if (this.cachedGpsPoints.length > 100) {
+  this.cachedGpsPoints = this.cachedGpsPoints.slice(-100);
+}
+```
+
+The `data_points` tag in kind 1301 events only records **how many** GPS points were collected, not the actual coordinates.
+
+---
+
 ## Health Integrations
 
 RUNSTR syncs with external fitness platforms:

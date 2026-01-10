@@ -56,6 +56,161 @@ interface WorkoutSubmission {
   created_at: string
   raw_event: Record<string, unknown>
   source?: 'app' | 'nostr_scan' | 'baseline_migration'
+  // New fields for daily leaderboard
+  profile_name?: string
+  profile_picture?: string
+}
+
+// =============================================
+// DAILY LEADERBOARD: Split Parsing & Time Calculation
+// =============================================
+
+/**
+ * Parse split data from kind 1301 event tags
+ * Tags format: ["split", "5", "00:32:10"] where 5 = km marker, time in HH:MM:SS
+ * Returns map of km -> elapsed seconds
+ */
+function parseSplitsFromTags(rawEvent: Record<string, unknown>): Record<number, number> {
+  const splits: Record<number, number> = {}
+  const tags = rawEvent.tags as string[][] | undefined
+
+  if (!tags || !Array.isArray(tags)) {
+    return splits
+  }
+
+  for (const tag of tags) {
+    if (tag[0] === 'split' && tag.length >= 3) {
+      const km = parseInt(tag[1])
+      const timeStr = tag[2]
+
+      if (!isNaN(km) && timeStr && km > 0) {
+        const seconds = parseTimeToSeconds(timeStr)
+        if (seconds > 0) {
+          splits[km] = seconds
+        }
+      }
+    }
+  }
+
+  return splits
+}
+
+/**
+ * Parse time string (HH:MM:SS or MM:SS) to seconds
+ */
+function parseTimeToSeconds(timeStr: string): number {
+  const parts = timeStr.split(':').map(Number)
+
+  if (parts.length === 3) {
+    // HH:MM:SS
+    return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  } else if (parts.length === 2) {
+    // MM:SS
+    return parts[0] * 60 + parts[1]
+  }
+
+  return 0
+}
+
+/**
+ * Parse step count from kind 1301 event tags
+ * Tag format: ["steps", "12345"]
+ */
+function parseStepCount(rawEvent: Record<string, unknown>): number | null {
+  const tags = rawEvent.tags as string[][] | undefined
+
+  if (!tags || !Array.isArray(tags)) {
+    return null
+  }
+
+  for (const tag of tags) {
+    if (tag[0] === 'steps' && tag[1]) {
+      const steps = parseInt(tag[1])
+      return !isNaN(steps) && steps > 0 ? steps : null
+    }
+  }
+
+  return null
+}
+
+/**
+ * Calculate time at target distance using splits or interpolation
+ * Same logic as client-side SimpleLeaderboardService.extractTargetDistanceTime()
+ *
+ * @param splits - Map of km -> elapsed seconds
+ * @param totalDistanceKm - Total workout distance
+ * @param totalDurationSeconds - Total workout duration
+ * @param targetKm - Target distance (5, 10, 21.1, 42.2)
+ * @returns Time in seconds to reach target distance, or null if not reachable
+ */
+function calculateTargetTime(
+  splits: Record<number, number>,
+  totalDistanceKm: number,
+  totalDurationSeconds: number,
+  targetKm: number
+): number | null {
+  // Must have run at least the target distance
+  if (totalDistanceKm < targetKm) {
+    return null
+  }
+
+  // 1. Check for exact split at target distance
+  const exactSplit = splits[targetKm]
+  if (exactSplit !== undefined && exactSplit > 0) {
+    return exactSplit
+  }
+
+  // 2. Try interpolation from closest split
+  const sortedKms = Object.keys(splits).map(Number).sort((a, b) => a - b)
+
+  // Find closest split <= target distance
+  let closestKm = 0
+  let closestTime = 0
+
+  for (const km of sortedKms) {
+    if (km <= targetKm && km > closestKm) {
+      closestKm = km
+      closestTime = splits[km]
+    }
+  }
+
+  // Interpolate from closest split
+  if (closestKm > 0 && closestTime > 0) {
+    const remainingDistance = targetKm - closestKm
+    const avgPacePerKm = closestTime / closestKm
+    const estimatedTime = closestTime + remainingDistance * avgPacePerKm
+    // Cap at total duration
+    return Math.round(Math.min(estimatedTime, totalDurationSeconds))
+  }
+
+  // 3. Fallback: Calculate from average pace
+  if (totalDistanceKm > 0 && totalDurationSeconds > 0) {
+    const avgPacePerKm = totalDurationSeconds / totalDistanceKm
+    return Math.round(avgPacePerKm * targetKm)
+  }
+
+  return null
+}
+
+/**
+ * Calculate all target times for a workout
+ */
+function calculateAllTargetTimes(
+  splits: Record<number, number>,
+  totalDistanceKm: number,
+  totalDurationSeconds: number
+): {
+  time_5k_seconds: number | null
+  time_10k_seconds: number | null
+  time_half_seconds: number | null
+  time_marathon_seconds: number | null
+} {
+  return {
+    time_5k_seconds: calculateTargetTime(splits, totalDistanceKm, totalDurationSeconds, 5),
+    time_10k_seconds: calculateTargetTime(splits, totalDistanceKm, totalDurationSeconds, 10),
+    time_half_seconds: calculateTargetTime(splits, totalDistanceKm, totalDurationSeconds, 21.1),
+    time_marathon_seconds: calculateTargetTime(splits, totalDistanceKm, totalDurationSeconds, 42.2),
+  }
 }
 
 /**
@@ -291,6 +446,19 @@ serve(async (req) => {
     if (validation.valid) {
       // Insert valid workout with classified activity type
       // Source defaults to 'app' but can be overridden (e.g., 'nostr_scan' for transition scripts)
+
+      // Parse daily leaderboard data from raw_event
+      const distanceKm = (workout.distance_meters || 0) / 1000
+      const durationSeconds = workout.duration_seconds || 0
+      const splits = parseSplitsFromTags(workout.raw_event)
+      const targetTimes = calculateAllTargetTimes(splits, distanceKm, durationSeconds)
+      const stepCount = parseStepCount(workout.raw_event)
+
+      // Calculate leaderboard_date from created_at
+      const leaderboardDate = workout.created_at
+        ? new Date(workout.created_at).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0]
+
       const { error } = await supabase.from('workout_submissions').insert({
         event_id: workout.event_id,
         npub: workout.npub,
@@ -302,6 +470,16 @@ serve(async (req) => {
         raw_event: workout.raw_event,
         verified: true,
         source: workout.source || 'app',
+        // Daily leaderboard fields
+        splits_json: Object.keys(splits).length > 0 ? splits : null,
+        time_5k_seconds: targetTimes.time_5k_seconds,
+        time_10k_seconds: targetTimes.time_10k_seconds,
+        time_half_seconds: targetTimes.time_half_seconds,
+        time_marathon_seconds: targetTimes.time_marathon_seconds,
+        step_count: stepCount,
+        leaderboard_date: leaderboardDate,
+        profile_name: workout.profile_name || null,
+        profile_picture: workout.profile_picture || null,
       })
 
       if (error) {

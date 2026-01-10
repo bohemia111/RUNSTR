@@ -7,6 +7,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { WorkoutData, WorkoutType } from '../../types/workout';
+import { inferActivityTypeSimple } from '../../utils/activityInference';
 
 // Environment-based logging utility
 const isDevelopment = __DEV__;
@@ -428,7 +429,8 @@ export class HealthConnectService {
       }
 
       const exerciseType = session.exerciseType || 0;
-      const activityType = HC_EXERCISE_TYPE_MAP[exerciseType] || 'other';
+      // Get mapped type first - will use inference if not mapped
+      const mappedType = HC_EXERCISE_TYPE_MAP[exerciseType];
 
       // Try to get associated metrics
       let totalDistance = 0;
@@ -511,6 +513,21 @@ export class HealthConnectService {
         }
       } catch (e) {
         debugLog('Health Connect: Could not fetch heart rate:', e);
+      }
+
+      // Determine activity type: use mapped type if available, otherwise infer from metrics
+      let activityType: WorkoutType;
+      if (mappedType) {
+        activityType = mappedType;
+      } else {
+        // Use smart inference based on workout metrics
+        activityType = inferActivityTypeSimple({
+          distance: totalDistance,
+          duration,
+          steps,
+          heartRate: avgHeartRate > 0 ? { avg: avgHeartRate, max: maxHeartRate } : undefined,
+        });
+        debugLog(`Health Connect: Inferred activity type '${activityType}' for unmapped exercise type ${exerciseType}`);
       }
 
       return {

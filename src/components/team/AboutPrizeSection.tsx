@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Button } from '../ui/Button';
-import { CaptainDashboardButton } from './CaptainDashboardButton';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 
 interface AboutPrizeSectionProps {
@@ -48,25 +47,24 @@ export const AboutPrizeSection: React.FC<AboutPrizeSectionProps> = ({
           {/* REMOVED: Join Team / Joined button - teams are bookmarks now, join happens on team discovery page */}
 
           {/* Captain Dashboard Button - Always show, validate on click */}
-          <CaptainDashboardButton
+          <TouchableOpacity
+            style={[styles.captainButton, captainLoading && styles.captainButtonDisabled]}
             onPress={() => {
-              console.log('🎖️ Captain Dashboard button clicked!');
-              console.log(
-                '🎖️ Calling onCaptainDashboard, type:',
-                typeof onCaptainDashboard
-              );
-              if (onCaptainDashboard) {
-                console.log('🎖️ onCaptainDashboard exists, calling it now...');
+              if (!captainLoading && onCaptainDashboard) {
                 onCaptainDashboard();
-              } else {
-                console.log('❌ onCaptainDashboard is not defined!');
               }
             }}
-            isLoading={captainLoading}
-            variant="outline"
-            size="medium"
-            style={styles.actionButton}
-          />
+            disabled={captainLoading}
+          >
+            {captainLoading ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : (
+              <>
+                <Ionicons name="shield-outline" size={16} color={theme.colors.primary} />
+                <Text style={styles.captainButtonText}>Captain</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -120,10 +118,24 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     marginTop: 8,
   },
-  actionButton: {
-    minWidth: 120,
+  captainButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    minWidth: 100,
   },
-  joinedButton: {
-    opacity: 0.7,
+  captainButtonDisabled: {
+    opacity: 0.5,
+  },
+  captainButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.primary,
   },
 });

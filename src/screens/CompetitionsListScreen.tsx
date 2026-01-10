@@ -1,7 +1,11 @@
 /**
- * CompetitionsListScreen - Global Events - Shows daily leaderboards from ALL 1301 notes
+ * CompetitionsListScreen - Global Events - Shows daily leaderboards
  * Accessible from Profile → "MY EVENTS" button
- * Displays global 5K, 10K, Half Marathon, and Marathon leaderboards
+ * Displays global 5K, 10K, Half Marathon, Marathon, and Steps leaderboards
+ *
+ * ARCHITECTURE: Uses DailyLeaderboardService (Supabase-backed)
+ * - ~500ms query vs 3-5s with Nostr
+ * - Server-side anti-cheat validation
  */
 
 import React, { useState, useEffect } from 'react';
@@ -23,7 +27,7 @@ import { theme } from '../styles/theme';
 import { DailyLeaderboardCard } from '../components/team/DailyLeaderboardCard';
 
 // Services
-import SimpleLeaderboardService from '../services/competition/SimpleLeaderboardService';
+import { DailyLeaderboardService } from '../services/competition/DailyLeaderboardService';
 
 interface GlobalLeaderboards {
   date: string;
@@ -40,17 +44,17 @@ export const CompetitionsListScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Load global leaderboards from all 1301 notes
+  // Load global leaderboards from Supabase (server-validated workouts)
   const loadGlobalLeaderboards = async (forceRefresh: boolean = false) => {
     try {
       setIsLoading(true);
       console.log(
-        `[CompetitionsListScreen] 🌍 Loading global leaderboards from all 1301 notes (forceRefresh: ${forceRefresh})`
+        `[CompetitionsListScreen] 🌍 Loading global leaderboards from Supabase (forceRefresh: ${forceRefresh})`
       );
 
-      // Fetch global daily leaderboards (queries ALL kind 1301 events from today)
+      // Fetch global daily leaderboards from Supabase (~500ms)
       const leaderboards =
-        await SimpleLeaderboardService.getGlobalDailyLeaderboards(forceRefresh);
+        await DailyLeaderboardService.getGlobalDailyLeaderboards(forceRefresh);
 
       console.log('[CompetitionsListScreen] ✅ Global leaderboards loaded:', {
         date: leaderboards.date,

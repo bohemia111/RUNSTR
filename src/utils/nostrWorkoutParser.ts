@@ -13,19 +13,31 @@ import type {
   NostrRoutePoint,
 } from '../types/nostrWorkout';
 import type { WorkoutType } from '../types/workout';
+import { inferActivityTypeSimple } from './activityInference';
 
 // Activity type mapping from Nostr to standardized types
+// Extended to include common abbreviations
 const ACTIVITY_TYPE_MAP: Record<string, WorkoutType> = {
   running: 'running',
+  run: 'running',
   jogging: 'running',
+  jog: 'running',
   cycling: 'cycling',
+  cycle: 'cycling',
   biking: 'cycling',
+  bike: 'cycling',
   walking: 'walking',
+  walk: 'walking',
   hiking: 'hiking',
+  hike: 'hiking',
   gym: 'gym',
   strength: 'strength_training',
+  strength_training: 'strength_training',
   weightlifting: 'strength_training',
-  other: 'other',
+  meditation: 'meditation',
+  diet: 'diet',
+  fasting: 'fasting',
+  // Note: 'other' is intentionally NOT mapped here - we want to infer instead
 };
 
 // Unit conversion utilities
@@ -503,10 +515,23 @@ export class NostrWorkoutParser {
       pacePerMile = pacePerMile * (METERS_PER_MILE / METERS_PER_KM);
     }
 
+    // Determine activity type with smart inference fallback
+    let workoutType = event.activityType || this.mapActivityType(content.type);
+
+    // If type is 'other' or unrecognized, try to infer from metrics
+    if (workoutType === 'other' || !workoutType) {
+      workoutType = inferActivityTypeSimple({
+        distance: distanceInMeters,
+        duration: content.duration,
+        pace: content.pace,
+        elevationGain: content.elevationGain,
+      });
+    }
+
     const workout: NostrWorkout = {
       id: `nostr_${event.id}`,
       userId,
-      type: event.activityType || this.mapActivityType(content.type),
+      type: workoutType,
       source: 'nostr',
       distance: distanceInMeters,
       duration: content.duration,
