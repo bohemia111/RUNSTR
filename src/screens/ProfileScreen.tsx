@@ -61,7 +61,6 @@ interface ProfileScreenProps {
   onNavigateToTeamDiscovery?: () => void;
   onViewCurrentTeam?: () => void;
   onCaptainDashboard?: () => void;
-  onTeamCreation?: () => void;
   onEditProfile?: () => void;
   onSend?: () => void;
   onReceive?: () => void;
@@ -84,7 +83,6 @@ const ProfileScreenComponent: React.FC<ProfileScreenProps> = ({
   onNavigateToTeamDiscovery,
   onViewCurrentTeam,
   onCaptainDashboard,
-  onTeamCreation,
   onEditProfile,
   onSend,
   onReceive,

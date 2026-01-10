@@ -3,7 +3,7 @@
  * Centralized navigation logic for RUNSTR app
  */
 
-import { DiscoveryTeam, TeamCreationData } from '../types';
+import { DiscoveryTeam } from '../types';
 import { useUserStore } from '../store/userStore';
 import { AuthService } from '../services/auth/authService';
 import { getNostrTeamService } from '../services/nostr/NostrTeamService';
@@ -39,12 +39,6 @@ export interface NavigationHandlers {
     navigation: any,
     teamId?: string,
     teamName?: string
-  ) => void;
-  handleTeamCreation: (navigation: any) => void;
-  handleTeamCreationComplete: (
-    teamData: TeamCreationData,
-    navigation: any,
-    teamId?: string
   ) => void;
   handleNavigateToTeam: (teamId: string, navigation: any) => void;
   handleOnboardingComplete: (
@@ -454,61 +448,6 @@ export const createNavigationHandlers = (): NavigationHandlers => {
           'Error',
           'Unable to verify captain permissions. Please try again.'
         );
-      }
-    },
-
-    handleTeamCreation: (navigation: any) => {
-      console.log('Team creation pressed');
-      navigation.navigate('TeamCreation');
-    },
-
-    handleTeamCreationComplete: async (
-      teamData: TeamCreationData,
-      navigation: any,
-      teamId?: string
-    ) => {
-      console.log('Team creation completed:', teamData, 'teamId:', teamId);
-
-      try {
-        // Create the team on Nostr
-        const nostrTeamService = getNostrTeamService();
-        const user = useUserStore.getState().user;
-
-        const createResult = await nostrTeamService.createTeam({
-          name: teamData.teamName,
-          description: teamData.teamAbout,
-          activityTypes: ['fitness'], // Default for Phase 2
-          isPublic: true, // Default to public teams
-          captainId: user?.npub || user?.id,
-        });
-
-        if (createResult.success && createResult.teamId) {
-          console.log(
-            '✅ Nostr team created successfully:',
-            createResult.teamId
-          );
-
-          // For Phase 2, we'll just navigate and let the team discovery handle the new team
-          // In Phase 3, we can properly update the user store
-          console.log('Team created with ID:', createResult.teamId);
-
-          // Navigate to Team screen which will now show the user's team
-          navigation.navigate('Team');
-        } else {
-          throw new Error(createResult.error || 'Failed to create team');
-        }
-      } catch (error) {
-        console.error('❌ Failed to create Nostr team:', error);
-        CustomAlertManager.alert(
-          'Team Creation Failed',
-          `Failed to create team: ${
-            error instanceof Error ? error.message : 'Unknown error'
-          }`,
-          [{ text: 'OK' }]
-        );
-
-        // Stay on current screen or go back
-        navigation.goBack();
       }
     },
 

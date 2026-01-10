@@ -23,7 +23,6 @@ import { ProfileEditScreen } from '../screens/ProfileEditScreen';
 import { WalletScreen } from '../screens/WalletScreen';
 import { TeamDiscoveryScreen } from '../screens/TeamDiscoveryScreen';
 import { CaptainDashboardScreen } from '../screens/CaptainDashboardScreen';
-// TeamCreationWizard removed - team creation feature removed
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { LeagueDetailScreen } from '../screens/LeagueDetailScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -80,7 +79,6 @@ export type RootStackParamList = {
     isOnboarding?: boolean;
     currentTeamId?: string;
   };
-  // TeamCreation removed - team creation feature removed
   EventDetail: { eventId: string; eventData?: any };
   LeagueDetail: { leagueId: string; leagueData?: any };
   CompetitionsList: undefined;
@@ -233,9 +231,6 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
             }
             onTeamSelect={(team) => handlers.handleTeamView(team, navigation)}
             onRefresh={refresh}
-            onCreateTeam={() => {
-              navigation.navigate('TeamCreation');
-            }}
             showHeader={true}
             showCloseButton={false}
             currentUserPubkey={currentUserNpub}
@@ -261,7 +256,6 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
               onCaptainDashboard={() =>
                 handlers.handleCaptainDashboard(navigation)
               }
-              onTeamCreation={() => handlers.handleTeamCreation(navigation)}
               onEditProfile={() => navigation.navigate('ProfileEdit')}
               onSyncSourcePress={handlers.handleSyncSourcePress}
               onManageSubscription={handlers.handleManageSubscription}
@@ -428,20 +422,10 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
             }
             onTeamSelect={(team) => handlers.handleTeamView(team, navigation)}
             onRefresh={refresh}
-            onCreateTeam={
-              user?.role === 'captain'
-                ? () => {
-                    navigation.goBack(); // Close team discovery
-                    navigation.navigate('TeamCreation'); // Navigate to team creation
-                  }
-                : undefined
-            }
             navigation={navigation}
           />
         )}
       </Stack.Screen>
-
-      {/* Team Creation Wizard removed - team creation feature removed */}
 
       {/* Event Detail Screen */}
       <Stack.Screen

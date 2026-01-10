@@ -152,7 +152,6 @@ import { NavigationDataProvider } from './contexts/NavigationDataContext';
 import { AppNavigator } from './navigation/AppNavigator';
 import { BottomTabNavigator } from './navigation/BottomTabNavigator';
 import { createStackNavigator } from '@react-navigation/stack';
-// TeamCreationWizard removed - team creation feature removed
 import { EventDetailScreen } from './screens/EventDetailScreen';
 import { LeagueDetailScreen } from './screens/LeagueDetailScreen';
 // Use SimpleTeamScreen instead of EnhancedTeamScreen to avoid freeze issues
@@ -221,7 +220,6 @@ type AuthenticatedStackParamList = {
   Auth: undefined;
   Main: undefined;
   MainTabs: undefined;
-  TeamCreation: undefined;
   EnhancedTeamScreen: {
     team: any;
     userIsMember?: boolean;
@@ -601,11 +599,8 @@ const AppContent: React.FC<AppContentProps> = ({ onPermissionComplete }) => {
           name="MainTabs"
           options={{ headerShown: false }}
         >
-          {({ navigation }) => (
+          {() => (
             <BottomTabNavigator
-              onNavigateToTeamCreation={() => {
-                navigation.navigate('TeamCreation');
-              }}
               onSignOut={signOut}
             />
           )}

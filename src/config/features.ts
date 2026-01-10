@@ -23,7 +23,6 @@ export const FEATURES = {
 
   // Optional Features
   ENABLE_EVENT_TICKETS: true, // Paid event entry with Lightning invoices
-  ENABLE_1V1_CHALLENGES: true, // Bitcoin-wagered 1v1 challenges with Lightning addresses
 } as const;
 
 // Type for feature keys

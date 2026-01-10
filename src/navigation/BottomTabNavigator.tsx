@@ -65,12 +65,10 @@ export type BottomTabParamList = {
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
 interface BottomTabNavigatorProps {
-  onNavigateToTeamCreation?: () => void;
   onSignOut?: () => Promise<void>;
 }
 
 export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
-  onNavigateToTeamCreation,
   onSignOut,
 }) => {
   // Fetch real data for navigation screens
@@ -189,11 +187,6 @@ export const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({
               onCaptainDashboard={() =>
                 handlers.handleCaptainDashboard(navigation)
               }
-              onTeamCreation={() => {
-                if (onNavigateToTeamCreation) {
-                  onNavigateToTeamCreation();
-                }
-              }}
               onEditProfile={handlers.handleEditProfile}
               onSend={handlers.handleWalletSend}
               onReceive={handlers.handleWalletReceive}
