@@ -2,6 +2,54 @@
 
 All notable changes to RUNSTR will be documented in this file.
 
+## [1.4.8] - 2026-01-11 - Activity Tracker Stability
+
+### Activity Tracker Fixes
+- Added GPS health monitoring for signal quality tracking
+- Added workout crash recovery with 30-second checkpoints
+- Added navigation prevention during active workouts
+- Prevents accidental navigation away from tracker screen during workouts
+- Users now get confirmation dialog if trying to leave during active tracking
+
+### Files Restored
+- GPSHealthMonitor.ts - Monitors GPS signal quality (excellent/good/poor/lost)
+- WorkoutRecovery.ts - Saves checkpoint every 30 seconds for crash recovery
+
+---
+
+## [1.4.7] - 2026-01-10 - Performance & Bug Fixes
+
+### Season 2 Performance
+- Fixed 60-second freeze when switching tabs in Season II leaderboard
+- Added prefetch for all Season 2 activity types on app startup
+- Skip unnecessary Nostr profile queries for Season 2 (use hardcoded data)
+- Added 5-second timeout to profile fetching to prevent UI freezes
+
+### Bug Fixes
+- Fixed Amber Signer integration issues
+- Fixed Kind 1 post publishing bug
+- Fixed JanuaryWalking `getCompetitionId` error
+- Fixed HTTP image URL causing iOS App Transport Security error
+
+### Leaderboard Improvements
+- Improved avatar and username display in leaderboards
+- Enhanced profile data loading with better fallbacks
+
+### Health Integration
+- Improved Apple Health and Health Connect activity syncing
+- Better handling of "Other" activity types
+
+### Settings
+- Renamed "Experimental Features" to "Advanced Features"
+- Advanced features now available to all users
+
+### Codebase
+- Continued refactoring and cleanup
+- Removed additional dead code
+- Updated documentation
+
+---
+
 ## [1.4.6] - 2026-01-10 - Simplification & Refactoring
 
 ### Leaderboard Improvements

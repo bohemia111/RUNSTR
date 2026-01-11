@@ -160,17 +160,27 @@ export const RunningTrackerScreen: React.FC = () => {
 
   const metricsUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const isTrackingRef = useRef<boolean>(false); // Track isTracking without re-subscribing
+  const isPausedRef = useRef<boolean>(false); // CRITICAL FIX: Track isPaused for beforeRemove listener
   // Liveness detection: track when updateMetrics() last actually executed
   // This detects "zombie" intervals that exist but stopped firing (Android throttling)
   const lastMetricsUpdateRef = useRef<number>(Date.now());
   // NOTE: Timer refs removed - SimpleRunTracker handles all timing internally via hybrid timer
 
+  // CRITICAL FIX: Keep refs in sync with state for beforeRemove listener
+  // This prevents stale closure issues after 30+ minutes of state changes
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+    isPausedRef.current = isPaused;
+  }, [isTracking, isPaused]);
+
   // CRITICAL: Prevent navigation away from tracker screen during active tracking
   // This fixes the bug where users were unexpectedly navigated to profile screen mid-workout
+  // FIXED: Use refs instead of state to prevent race condition from listener recreation
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      // CRITICAL FIX: Use refs instead of state to avoid stale closure
       // Only prevent navigation if actively tracking (not paused, not stopped)
-      if (!isTracking || isPaused) {
+      if (!isTrackingRef.current || isPausedRef.current) {
         return; // Allow navigation if not tracking or paused
       }
 
@@ -194,6 +204,7 @@ export const RunningTrackerScreen: React.FC = () => {
               await simpleRunTracker.stopTracking();
               setIsTracking(false);
               isTrackingRef.current = false;
+              isPausedRef.current = false;
               // Now allow navigation
               navigation.dispatch(e.data.action);
             },
@@ -203,7 +214,7 @@ export const RunningTrackerScreen: React.FC = () => {
     });
 
     return unsubscribe;
-  }, [navigation, isTracking, isPaused]);
+  }, [navigation]); // FIXED: Only depend on navigation, not state - refs handle state changes
 
   // Extract metrics update logic to reusable function (defined early for useEffect)
   const updateMetrics = () => {

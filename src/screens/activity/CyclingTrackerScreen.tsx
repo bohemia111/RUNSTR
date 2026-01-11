@@ -116,12 +116,21 @@ export const CyclingTrackerScreen: React.FC = () => {
   const isPausedRef = useRef<boolean>(false); // Ref to avoid stale closure in timer
   const isTrackingRef = useRef<boolean>(false); // Track isTracking without re-subscribing
 
+  // CRITICAL FIX: Keep refs in sync with state for beforeRemove listener
+  // This prevents stale closure issues after 30+ minutes of state changes
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+    isPausedRef.current = isPaused;
+  }, [isTracking, isPaused]);
+
   // CRITICAL: Prevent navigation away from tracker screen during active tracking
   // This fixes the bug where users were unexpectedly navigated to profile screen mid-workout
+  // FIXED: Use refs instead of state to prevent race condition from listener recreation
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      // CRITICAL FIX: Use refs instead of state to avoid stale closure
       // Only prevent navigation if actively tracking (not paused, not stopped)
-      if (!isTracking || isPaused) {
+      if (!isTrackingRef.current || isPausedRef.current) {
         return; // Allow navigation if not tracking or paused
       }
 
@@ -145,6 +154,7 @@ export const CyclingTrackerScreen: React.FC = () => {
               await simpleRunTracker.stopTracking();
               setIsTracking(false);
               isTrackingRef.current = false;
+              isPausedRef.current = false;
               // Now allow navigation
               navigation.dispatch(e.data.action);
             },
@@ -154,7 +164,7 @@ export const CyclingTrackerScreen: React.FC = () => {
     });
 
     return unsubscribe;
-  }, [navigation, isTracking, isPaused]);
+  }, [navigation]); // FIXED: Only depend on navigation, not state - refs handle state changes
 
   useEffect(() => {
     return () => {

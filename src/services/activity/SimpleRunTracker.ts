@@ -273,6 +273,14 @@ export class SimpleRunTracker {
     activityType: 'running' | 'walking' | 'cycling',
     presetDistance?: number
   ): Promise<boolean> {
+    // CRITICAL FIX: Guard against double-calls that would reset distance
+    if (this.isTracking) {
+      console.warn(
+        '[SimpleRunTracker] ⚠️ Already tracking, ignoring startTracking call to prevent distance reset'
+      );
+      return true; // Return true since we're already tracking
+    }
+
     // INSTANT: Set state immediately (no await blocking)
     this.sessionId = `run_${Date.now()}`;
     this.activityType = activityType;
@@ -1234,6 +1242,15 @@ export class SimpleRunTracker {
    * MEMORY-ONLY ARCHITECTURE: Restores metrics only, GPS tracking restarts fresh
    */
   async restoreSession(): Promise<boolean> {
+    // CRITICAL FIX: Don't overwrite an active session with stale stored data
+    // This prevents the bug where navigating away and back resets distance
+    if (this.isTracking && this.runningDistance > 0) {
+      console.log(
+        `[SimpleRunTracker] ✅ Active session with ${(this.runningDistance / 1000).toFixed(2)} km - skipping restore to prevent data loss`
+      );
+      return true; // Already have a valid active session
+    }
+
     try {
       const sessionStateStr = await AsyncStorage.getItem(SESSION_STATE_KEY);
       if (!sessionStateStr) {
