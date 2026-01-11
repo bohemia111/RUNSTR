@@ -23,12 +23,6 @@ import { ProfileService } from '../user/profileService';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import Toast from 'react-native-toast-message';
 import { REWARD_CONFIG } from '../../config/rewards';
-import { getCharityById, Charity } from '../../constants/charities';
-import { DonationTrackingService } from '../donation/DonationTrackingService';
-
-// Storage keys for donation settings (same as DailyRewardService)
-const SELECTED_CHARITY_KEY = '@runstr:selected_team_id';
-const DONATION_PERCENTAGE_KEY = '@runstr:donation_percentage';
 
 // Step reward configuration
 const STEP_CONFIG = {
@@ -148,35 +142,6 @@ class StepRewardServiceClass {
   }
 
   /**
-   * Load donation settings from AsyncStorage
-   * Returns donation percentage and selected charity
-   */
-  private async getDonationSettings(): Promise<{
-    donationPercentage: number;
-    charity: Charity | undefined;
-  }> {
-    try {
-      const [donationPctStr, charityId] = await Promise.all([
-        AsyncStorage.getItem(DONATION_PERCENTAGE_KEY),
-        AsyncStorage.getItem(SELECTED_CHARITY_KEY),
-      ]);
-
-      const donationPercentage = donationPctStr ? parseInt(donationPctStr) : 0;
-      const charity = getCharityById(charityId || undefined);
-
-      console.log('[StepReward] Donation settings:', {
-        donationPercentage,
-        charityId: charity?.id,
-      });
-
-      return { donationPercentage, charity };
-    } catch (error) {
-      console.error('[StepReward] Error loading donation settings:', error);
-      return { donationPercentage: 0, charity: undefined };
-    }
-  }
-
-  /**
    * Get user's Lightning address for rewards
    */
   private async getUserLightningAddress(userPubkey: string): Promise<string | null> {
@@ -202,13 +167,13 @@ class StepRewardServiceClass {
 
   /**
    * Request invoice and pay a milestone reward
-   * Supports donation split - pays user their portion and charity their portion
+   * Pays 100% to user (no donation split for step rewards)
    */
   private async payMilestoneReward(
     userPubkey: string,
     milestone: number
   ): Promise<MilestoneReward> {
-    const totalAmount = STEP_CONFIG.SATS_PER_MILESTONE;
+    const amount = STEP_CONFIG.SATS_PER_MILESTONE;
 
     try {
       // Get user's Lightning address
@@ -217,92 +182,50 @@ class StepRewardServiceClass {
         console.log('[StepReward] No Lightning address configured');
         return {
           milestone,
-          amount: totalAmount,
+          amount,
           success: false,
           error: 'No Lightning address',
         };
       }
 
-      // Load donation settings
-      const { donationPercentage, charity } = await this.getDonationSettings();
+      // Request invoice for full amount
+      console.log(`[StepReward] Requesting invoice for ${amount} sats (milestone ${milestone})`);
+      const { invoice } = await getInvoiceFromLightningAddress(
+        lightningAddress,
+        amount,
+        `RUNSTR step reward! ${milestone.toLocaleString()} steps`
+      );
 
-      // Calculate split
-      const charityAmount = Math.floor(totalAmount * (donationPercentage / 100));
-      const userAmount = totalAmount - charityAmount;
-
-      console.log(`[StepReward] Split: ${userAmount} to user, ${charityAmount} to charity (milestone ${milestone})`);
-
-      let userPaymentSuccess = false;
-      let charityPaymentSuccess = false;
-
-      // Pay user their portion (if any)
-      if (userAmount > 0) {
-        console.log(`[StepReward] Requesting invoice for ${userAmount} sats (user portion)`);
-        const { invoice } = await getInvoiceFromLightningAddress(
-          lightningAddress,
-          userAmount,
-          `RUNSTR step reward! ${milestone.toLocaleString()} steps`
-        );
-
-        if (invoice) {
-          const result = await RewardSenderWallet.sendRewardPayment(invoice);
-          userPaymentSuccess = result.success;
-          console.log('[StepReward] User payment:', userPaymentSuccess ? '✅' : '❌');
-        }
-      } else {
-        // If 100% donation, skip user payment
-        userPaymentSuccess = true;
+      if (!invoice) {
+        console.log('[StepReward] Failed to get invoice');
+        return {
+          milestone,
+          amount,
+          success: false,
+          error: 'Invoice request failed',
+        };
       }
 
-      // Pay charity their portion (if any)
-      if (charityAmount > 0 && charity?.lightningAddress) {
-        try {
-          console.log(`[StepReward] Requesting invoice for ${charityAmount} sats (charity: ${charity.name})`);
-          const { invoice } = await getInvoiceFromLightningAddress(
-            charity.lightningAddress,
-            charityAmount,
-            `RUNSTR step donation from ${milestone.toLocaleString()} steps`
-          );
+      // Pay the invoice
+      const result = await RewardSenderWallet.sendRewardPayment(invoice);
 
-          if (invoice) {
-            const result = await RewardSenderWallet.sendRewardPayment(invoice);
-            charityPaymentSuccess = result.success;
-            console.log(`[StepReward] Charity (${charity.name}) payment:`, charityPaymentSuccess ? '✅' : '❌');
-
-            // Track successful charity donation for Impact XP
-            if (charityPaymentSuccess) {
-              await DonationTrackingService.recordDonation({
-                donorPubkey: userPubkey,
-                amount: charityAmount,
-                charityId: charity.id,
-                charityName: charity.name,
-              });
-              console.log(`[StepReward] Recorded ${charityAmount} sats donation for Impact XP`);
-            }
-          }
-        } catch (charityError) {
-          console.error('[StepReward] Charity payment error:', charityError);
-        }
-      }
-
-      // Consider success if user payment worked (or was 0)
-      if (userPaymentSuccess || userAmount === 0) {
-        console.log(`[StepReward] ✅ Milestone ${milestone} paid: ${userAmount} to user, ${charityPaymentSuccess ? charityAmount : 0} to charity`);
-        return { milestone, amount: totalAmount, success: true };
+      if (result.success) {
+        console.log(`[StepReward] ✅ Milestone ${milestone} paid: ${amount} sats to user`);
+        return { milestone, amount, success: true };
       }
 
       return {
         milestone,
-        amount: totalAmount,
+        amount,
         success: false,
-        error: 'User payment failed',
+        error: result.error || 'Payment failed',
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       console.error(`[StepReward] Error paying milestone ${milestone}:`, error);
       return {
         milestone,
-        amount: totalAmount,
+        amount,
         success: false,
         error: errorMsg,
       };
