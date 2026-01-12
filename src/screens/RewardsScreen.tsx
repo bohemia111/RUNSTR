@@ -87,8 +87,9 @@ const RewardsScreenComponent: React.FC = () => {
   const [isSavingLightningAddress, setIsSavingLightningAddress] = useState(false);
 
   // Donation settings state (teams are charities now)
-  const [donationPercentage, setDonationPercentage] = useState<number>(0);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  // Default: 100% donation to ALS Network for new users
+  const [donationPercentage, setDonationPercentage] = useState<number>(100);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>('als-foundation');
 
   // Streak rewards state
   const [workouts, setWorkouts] = useState<LocalWorkout[]>([]);
@@ -157,13 +158,15 @@ const RewardsScreenComponent: React.FC = () => {
       }
 
       // Load donation settings (teams are charities now)
+      // Default: 100% donation to ALS Network for new users
       const [teamId, donationPct, storedZapAmount] = await Promise.all([
         AsyncStorage.getItem(SELECTED_TEAM_KEY),
         AsyncStorage.getItem(DONATION_PERCENTAGE_KEY),
         AsyncStorage.getItem('@runstr:default_zap_amount'),
       ]);
-      if (teamId) setSelectedTeamId(teamId);
-      if (donationPct) setDonationPercentage(parseInt(donationPct, 10) || 0);
+      // Use stored values if they exist, otherwise keep defaults (100% to ALS)
+      if (teamId !== null) setSelectedTeamId(teamId || 'als-foundation');
+      if (donationPct !== null) setDonationPercentage(parseInt(donationPct, 10));
       if (storedZapAmount) setDefaultZapAmount(parseInt(storedZapAmount, 10) || 21);
 
       // Load workouts for streak calculation

@@ -127,10 +127,9 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
   const currentParticipants = participants[activeTab];
   const isLoading = activeTab === 'running' ? runningLoading : activeTab === 'walking' ? walkingLoading : cyclingLoading;
 
-  // Detect if all participants have 0 distance (cache not yet loaded)
-  // This prevents showing misleading 0s before real data loads
-  const currentIsAllZeros = currentParticipants.length > 0 &&
-    currentParticipants.every(p => p.totalDistance === 0);
+  // REMOVED: "All zeros" detection was causing blink on tab switch
+  // The cached data (even with zeros) is better UX than showing loading spinner
+  // Users can pull-to-refresh if they want fresh data
 
   // Get current charity rankings based on active tab
   const currentCharityRankings = useMemo(() => {
@@ -229,7 +228,7 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
         {/* Leaderboard - Now powered by Supabase */}
         <Season2Leaderboard
           participants={currentParticipants}
-          isLoading={(isLoading && currentParticipants.length === 0) || currentIsAllZeros}
+          isLoading={isLoading && currentParticipants.length === 0}
           emptyMessage={`No ${activeTab} workouts yet`}
           currentUserPubkey={currentUserPubkey}
           activityType={activeTab}

@@ -234,6 +234,8 @@ class DailyRewardServiceClass {
    * Load donation settings from AsyncStorage
    * Returns donation percentage and selected charity
    * Note: Team donations disabled until teams have lightning addresses
+   *
+   * DEFAULT: 100% donation to ALS Network for new users
    */
   private async getDonationSettings(): Promise<{
     donationPercentage: number;
@@ -245,8 +247,10 @@ class DailyRewardServiceClass {
         AsyncStorage.getItem(SELECTED_CHARITY_KEY),
       ]);
 
-      const donationPercentage = donationPctStr ? parseInt(donationPctStr) : 0;
-      const charity = getCharityById(charityId || undefined);
+      // Default to 100% if never set, otherwise use stored value (even if 0)
+      const donationPercentage = donationPctStr !== null ? parseInt(donationPctStr) : 100;
+      // Default to ALS Network if no charity selected
+      const charity = getCharityById(charityId || 'als-foundation');
 
       console.log('[Reward] Donation settings:', {
         donationPercentage,
@@ -256,7 +260,8 @@ class DailyRewardServiceClass {
       return { donationPercentage, charity };
     } catch (error) {
       console.error('[Reward] Error loading donation settings:', error);
-      return { donationPercentage: 0, charity: undefined };
+      // Default to 100% to ALS Network on error
+      return { donationPercentage: 100, charity: getCharityById('als-foundation') };
     }
   }
 

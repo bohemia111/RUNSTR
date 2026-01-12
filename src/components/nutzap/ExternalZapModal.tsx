@@ -27,13 +27,7 @@ import {
   validateInvoiceAmount,
   getInvoiceTimeRemaining,
 } from '../../utils/bolt11Parser';
-import {
-  openInCashApp,
-  openInZeus,
-  openInPhoenix,
-  openInWalletOfSatoshi,
-  openInBreez,
-} from '../../utils/walletDeepLinks';
+import { openInCashApp } from '../../utils/walletDeepLinks';
 import { RewardSenderWallet } from '../../services/rewards/RewardSenderWallet';
 import { DonationTrackingService } from '../../services/donation/DonationTrackingService';
 import { ImpactLevelService } from '../../services/impact/ImpactLevelService';
@@ -501,22 +495,6 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
     await openInCashApp(invoice);
   };
 
-  const handleOpenInZeus = async () => {
-    await openInZeus(invoice);
-  };
-
-  const handleOpenInPhoenix = async () => {
-    await openInPhoenix(invoice);
-  };
-
-  const handleOpenInWalletOfSatoshi = async () => {
-    await openInWalletOfSatoshi(invoice);
-  };
-
-  const handleOpenInBreez = async () => {
-    await openInBreez(invoice);
-  };
-
   const handlePaymentConfirmed = () => {
     const paidAmount = getEffectiveAmount();
     Alert.alert(
@@ -772,7 +750,7 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
                       </View>
                     )}
 
-                    {/* Wallet Selection Buttons */}
+                    {/* Wallet Selection - Cash App Only */}
                     <View style={styles.walletButtonsSection}>
                       <Text style={styles.walletSectionTitle}>
                         Open in Wallet
@@ -790,64 +768,6 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
                           />
                         </View>
                         <Text style={styles.walletButtonText}>Cash App</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.walletButtonFullWidth}
-                        onPress={handleOpenInZeus}
-                      >
-                        <View style={styles.walletIconCircleInline}>
-                          <Ionicons
-                            name="flash-outline"
-                            size={24}
-                            color={theme.colors.accent}
-                          />
-                        </View>
-                        <Text style={styles.walletButtonText}>Zeus</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.walletButtonFullWidth}
-                        onPress={handleOpenInPhoenix}
-                      >
-                        <View style={styles.walletIconCircleInline}>
-                          <Ionicons
-                            name="rocket-outline"
-                            size={24}
-                            color={theme.colors.accent}
-                          />
-                        </View>
-                        <Text style={styles.walletButtonText}>Phoenix</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.walletButtonFullWidth}
-                        onPress={handleOpenInWalletOfSatoshi}
-                      >
-                        <View style={styles.walletIconCircleInline}>
-                          <Ionicons
-                            name="wallet-outline"
-                            size={24}
-                            color={theme.colors.accent}
-                          />
-                        </View>
-                        <Text style={styles.walletButtonText}>
-                          Wallet of Satoshi
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.walletButtonFullWidth}
-                        onPress={handleOpenInBreez}
-                      >
-                        <View style={styles.walletIconCircleInline}>
-                          <Ionicons
-                            name="leaf-outline"
-                            size={24}
-                            color={theme.colors.accent}
-                          />
-                        </View>
-                        <Text style={styles.walletButtonText}>Breez</Text>
                       </TouchableOpacity>
                     </View>
 

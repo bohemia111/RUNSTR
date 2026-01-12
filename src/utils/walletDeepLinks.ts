@@ -447,15 +447,8 @@ export async function openInBestAvailableWallet(
 
 /**
  * List of supported wallet names for UI display
+ * Note: Simplified to Cash App only for streamlined UX
  */
-export const SUPPORTED_WALLETS = [
-  'Cash App',
-  'Strike',
-  'Alby',
-  'Phoenix',
-  'Breez',
-  'BlueWallet',
-  'Zeus',
-] as const;
+export const SUPPORTED_WALLETS = ['Cash App'] as const;
 
 export type SupportedWallet = (typeof SUPPORTED_WALLETS)[number];
