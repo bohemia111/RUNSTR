@@ -209,11 +209,13 @@ class RewardSenderWalletClass {
    *
    * @param invoice - BOLT11 Lightning invoice to pay
    * @param amountSats - Optional amount if invoice is zero-amount
+   * @param metadata - Optional metadata for forward tracking (type, recipient address)
    * @returns Payment result with preimage on success
    */
   async sendRewardPayment(
     invoice: string,
-    amountSats?: number
+    amountSats?: number,
+    metadata?: { type: string; recipientLightningAddress?: string }
   ): Promise<RewardPaymentResult> {
     try {
       // Ensure initialized
@@ -231,12 +233,18 @@ class RewardSenderWalletClass {
       console.log('[RewardWallet] Sending reward payment...', {
         invoice: invoice.slice(0, 20) + '...',
         amount: amountSats,
+        metadata: metadata ? { type: metadata.type, hasRecipient: !!metadata.recipientLightningAddress } : undefined,
       });
 
-      // Send payment via NWC
+      // Send payment via NWC with optional metadata for forward tracking
       const response = await this.nwcClient.payInvoice({
         invoice,
         amount: amountSats,
+        metadata: metadata ? {
+          ...metadata,
+          timestamp: Date.now(),
+          source: 'RUNSTR',
+        } : undefined,
       });
 
       if (response.preimage) {

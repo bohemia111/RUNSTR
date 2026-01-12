@@ -206,8 +206,12 @@ class StepRewardServiceClass {
         };
       }
 
-      // Pay the invoice
-      const result = await RewardSenderWallet.sendRewardPayment(invoice);
+      // Pay the invoice with forward tracking metadata
+      const result = await RewardSenderWallet.sendRewardPayment(
+        invoice,
+        undefined,
+        { type: 'step_reward', recipientLightningAddress: lightningAddress }
+      );
 
       if (result.success) {
         console.log(`[StepReward] ✅ Milestone ${milestone} paid: ${amount} sats to user`);

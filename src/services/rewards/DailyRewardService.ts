@@ -513,8 +513,12 @@ class DailyRewardServiceClass {
         };
       }
 
-      // Pay the invoice
-      const paymentResult = await RewardSenderWallet.sendRewardPayment(invoice);
+      // Pay the invoice with forward tracking metadata
+      const paymentResult = await RewardSenderWallet.sendRewardPayment(
+        invoice,
+        undefined,
+        { type: 'pledge_reward', recipientLightningAddress: pledge.destinationAddress }
+      );
 
       if (!paymentResult.success) {
         console.log('[Reward] Failed to pay pledge invoice');
@@ -683,7 +687,11 @@ class DailyRewardServiceClass {
           split.userAmount
         );
         if (userInvoice) {
-          const result = await RewardSenderWallet.sendRewardPayment(userInvoice);
+          const result = await RewardSenderWallet.sendRewardPayment(
+            userInvoice,
+            undefined,
+            { type: 'daily_reward', recipientLightningAddress: lightningAddress }
+          );
           userPaymentSuccess = result.success;
           console.log('[Reward] User payment:', userPaymentSuccess ? '✅' : '❌');
         }
@@ -700,7 +708,11 @@ class DailyRewardServiceClass {
             split.charityAmount
           );
           if (charityInvoice) {
-            const result = await RewardSenderWallet.sendRewardPayment(charityInvoice);
+            const result = await RewardSenderWallet.sendRewardPayment(
+              charityInvoice,
+              undefined,
+              { type: 'charity_donation', recipientLightningAddress: charity.lightningAddress }
+            );
             charityPaymentSuccess = result.success;
             console.log(`[Reward] Charity (${charity.name}) payment:`, charityPaymentSuccess ? '✅' : '❌');
 

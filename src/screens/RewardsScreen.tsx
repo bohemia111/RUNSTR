@@ -547,6 +547,17 @@ const RewardsScreenComponent: React.FC = () => {
           isPosting={isPostingSteps}
         />
 
+        {/* Monthly Prize Pool - Shows NWC wallet balance */}
+        {hasNWC && walletBalance > 0 && (
+          <View style={styles.prizePoolCard}>
+            <View style={styles.prizePoolHeader}>
+              <Ionicons name="trophy-outline" size={20} color={theme.colors.orangeBright} />
+              <Text style={styles.prizePoolLabel}>Monthly Prize Pool</Text>
+            </View>
+            <Text style={styles.prizePoolAmount}>{formatBalance(walletBalance)}</Text>
+          </View>
+        )}
+
         {/* Impact Level Card */}
         {userHexPubkey && (
           <ImpactLevelCard pubkey={userHexPubkey} />
@@ -1162,6 +1173,35 @@ const styles = StyleSheet.create({
   },
   splitArrow: {
     marginHorizontal: 4,
+  },
+
+  // Prize Pool card styles
+  prizePoolCard: {
+    backgroundColor: '#0a0a0a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1a1a1a',
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  prizePoolHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  prizePoolLabel: {
+    fontSize: 12,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.textMuted,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  prizePoolAmount: {
+    fontSize: 28,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.orangeBright,
   },
 
   // Accordion styles
