@@ -2,6 +2,33 @@
 
 All notable changes to RUNSTR will be documented in this file.
 
+## [1.5.1] - 2026-01-13 - Security & Anti-Cheat
+
+### Security & Anti-Cheat
+- Workout verification system (HMAC-based `["v", "code"]` tags)
+- Rate limiting on reward claims
+
+### Rewards
+- Cardio-only rewards (running/walking/cycling only earn sats)
+
+### Notifications
+- Privacy-first broadcast push notifications for leaderboard updates
+
+### Performance
+- Native Stack Navigator (faster screen transitions)
+- ~3,000 lines dead code removed (14 files)
+
+### UX Changes
+- Workout cards save locally (screenshot to share externally)
+- Auto-compete toggle in Settings
+- Login/welcome modals compacted to fit without scrolling
+
+### Fixes
+- NIP-01 Schnorr signatures (was incorrectly using ECDSA)
+- Various stability improvements
+
+---
+
 ## [1.4.9] - 2026-01-11 - Stability & Bug Fixes
 
 ### Activity Tracker

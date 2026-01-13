@@ -909,7 +909,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <SettingItem
                 title="Extended Activities"
                 subtitle="Strength, diet & wellness tracking"
-                onPress={() => (navigation as any).navigate('ActivityTracker', { showExperimentalMenu: true })}
+                onPress={() => (navigation as any).navigate('Exercise', { showExperimentalMenu: true })}
                 rightElement={
                   <View style={styles.securityIcon}>
                     <Ionicons
@@ -1017,7 +1017,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
         {/* App Version Info */}
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Version 1.5.0-debug (Build 150)</Text>
+          <Text style={styles.versionText}>Version 1.5.1 (Build 151)</Text>
         </View>
       </ScrollView>
 
