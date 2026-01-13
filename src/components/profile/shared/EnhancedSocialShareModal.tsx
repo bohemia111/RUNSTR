@@ -1,6 +1,7 @@
 /**
- * EnhancedSocialShareModal - Modal for sharing workouts with rich image cards
- * Features: Template picker, card preview, image generation, nostr.build upload
+ * EnhancedSocialShareModal - Modal for saving workout cards locally
+ * Features: Template picker, card preview, camera capture, fullscreen preview
+ * NOTE: Kind 1 Nostr posting has been removed. Cards are saved locally for screenshotting.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -14,19 +15,19 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  Image,
+  Alert,
 } from 'react-native';
-import { captureRef } from 'react-native-view-shot';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../../styles/theme';
-import { WorkoutPublishingService } from '../../../services/nostr/workoutPublishingService';
-import { WorkoutStatusTracker } from '../../../services/fitness/WorkoutStatusTracker';
 import { WorkoutCardGenerator } from '../../../services/nostr/workoutCardGenerator';
 import { WorkoutCardRenderer } from '../../cards/WorkoutCardRenderer';
 import { PostingErrorBoundary } from '../../ui/PostingErrorBoundary';
-import { UnifiedSigningService } from '../../../services/auth/UnifiedSigningService';
-import { getNsecFromStorage } from '../../../utils/nostr';
-import type { NDKSigner } from '@nostr-dev-kit/ndk';
+import LocalWorkoutStorageService from '../../../services/fitness/LocalWorkoutStorageService';
 import type { Workout } from '../../../types/workout';
 import type { PublishableWorkout } from '../../../services/nostr/workoutPublishingService';
+import { FullScreenCardModal } from './FullScreenCardModal';
 
 interface EnhancedSocialShareModalProps {
   visible: boolean;
@@ -34,20 +35,23 @@ interface EnhancedSocialShareModalProps {
   userId: string;
   userAvatar?: string;
   userName?: string;
+  localWorkoutId?: string; // For saving card to local storage
   onClose: () => void;
   onSuccess?: () => void;
 }
 
-type Template = 'achievement' | 'progress' | 'minimal' | 'stats' | 'elegant';
+type Template = 'achievement' | 'progress' | 'minimal' | 'stats' | 'elegant' | 'custom_photo';
 
 export const EnhancedSocialShareModal: React.FC<
   EnhancedSocialShareModalProps
 > = ({
   visible,
   workout,
-  userId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  userId: _userId, // Kept for interface compatibility, not used since Nostr posting removed
   userAvatar,
   userName,
+  localWorkoutId,
   onClose,
   onSuccess,
 }) => {
@@ -58,15 +62,14 @@ export const EnhancedSocialShareModal: React.FC<
     width: 800,
     height: 600,
   });
-  const [signer, setSigner] = useState<NDKSigner | null>(null);
+  const [customPhotoUri, setCustomPhotoUri] = useState<string | null>(null);
+  const [showFullscreenPreview, setShowFullscreenPreview] = useState(false);
   // Delay SVG rendering on Android to let modal fully mount (prevents crashes on restricted launchers like Olauncher)
   const [svgReady, setSvgReady] = useState(Platform.OS !== 'android');
   const cardRef = useRef<View>(null);
   // Track mount status to prevent setState on unmounted component (crash prevention)
   const isMountedRef = useRef(true);
 
-  const publishingService = WorkoutPublishingService.getInstance();
-  const statusTracker = WorkoutStatusTracker.getInstance();
   const cardGenerator = WorkoutCardGenerator.getInstance();
 
   // Track mounted state for crash prevention
@@ -76,13 +79,6 @@ export const EnhancedSocialShareModal: React.FC<
       isMountedRef.current = false;
     };
   }, []);
-
-  // Load signer when modal becomes visible
-  useEffect(() => {
-    if (visible) {
-      loadSigner();
-    }
-  }, [visible]);
 
   // Delay SVG rendering on Android to let modal fully mount (prevents crashes on Olauncher)
   useEffect(() => {
@@ -96,19 +92,13 @@ export const EnhancedSocialShareModal: React.FC<
     }
   }, [visible]);
 
-  const loadSigner = async () => {
-    try {
-      const userSigner = await UnifiedSigningService.getInstance().getSigner();
-      if (!isMountedRef.current) return; // Prevent setState on unmounted component
-      setSigner(userSigner);
-      console.log(
-        '✅ Signer loaded for social share (supports both nsec and Amber)'
-      );
-    } catch (error) {
-      console.error('Failed to load signer:', error);
-      // Signer will be null - we'll fall back to nsec in handleShare
+  // Reset custom photo when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setCustomPhotoUri(null);
+      setShowFullscreenPreview(false);
     }
-  };
+  }, [visible]);
 
   // Generate card preview when workout or template changes
   useEffect(() => {
@@ -120,9 +110,9 @@ export const EnhancedSocialShareModal: React.FC<
   const generateCardPreview = async () => {
     if (!workout) return;
 
-    // Skip card generation for text-based template
-    if (selectedTemplate === 'achievement') {
-      console.log('📝 Text-based template selected - skipping card generation');
+    // Skip card generation for text-based template or custom photo
+    if (selectedTemplate === 'achievement' || selectedTemplate === 'custom_photo') {
+      console.log('📝 Text-based or custom photo template selected - skipping card generation');
       if (isMountedRef.current) setCardSvg(''); // Clear any existing card
       return;
     }
@@ -159,111 +149,70 @@ export const EnhancedSocialShareModal: React.FC<
     }
   };
 
-  const handleShare = async () => {
+  /**
+   * Take a photo using the camera
+   */
+  const takePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Camera access is required to take photos');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setCustomPhotoUri(result.assets[0].uri);
+        setSelectedTemplate('custom_photo');
+        console.log('📸 Photo captured:', result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Failed to take photo:', error);
+      Alert.alert('Error', 'Failed to capture photo');
+    }
+  };
+
+  /**
+   * Save the card selection to local storage and show fullscreen preview
+   */
+  const handleSave = async () => {
     if (!workout) return;
 
     if (isMountedRef.current) setLoading(true);
 
     try {
-      // Try to get signer (Amber on Android) or fall back to nsec (iOS or no Amber)
-      let signerOrNsec: NDKSigner | string | null = signer;
-
-      if (!signerOrNsec) {
-        // Fall back to nsec (required for iOS since Amber not supported)
-        const nsec = await getNsecFromStorage(userId);
-        if (!nsec) {
-          console.error(
-            '❌ Authentication required - no signer or nsec available'
-          );
-          // Error handling delegated to parent component
-          if (isMountedRef.current) setLoading(false);
-          return;
-        }
-        signerOrNsec = nsec;
-        console.log(
-          '📝 Using nsec for social post (iOS or Amber not available)'
-        );
-      } else {
-        console.log('📝 Using Amber signer for social post (Android)');
-      }
-
-      // Capture card as image (skip for text-based template)
-      let cardImageUri: string | undefined;
-
-      if (selectedTemplate !== 'achievement') {
-        console.log('📸 Capturing workout card as image...', {
-          hasCardRef: !!cardRef.current,
-          hasSvg: !!cardSvg,
-          svgLength: cardSvg?.length,
+      // Save card selection to local storage if we have a workout ID
+      if (localWorkoutId) {
+        await LocalWorkoutStorageService.saveWorkoutCard(localWorkoutId, {
+          templateId: selectedTemplate,
+          customPhotoUri: selectedTemplate === 'custom_photo' ? customPhotoUri || undefined : undefined,
         });
-
-        if (cardRef.current && cardSvg) {
-          try {
-            cardImageUri = await captureRef(cardRef.current, {
-              format: 'png',
-              quality: 0.5, // Reduced from 0.7 to prevent memory crashes on large images
-            });
-            console.log('✅ Card captured successfully:', {
-              uri: cardImageUri,
-              uriLength: cardImageUri?.length,
-            });
-          } catch (captureError) {
-            console.error(
-              '❌ Card capture failed, posting without image:',
-              captureError
-            );
-            // Continue without image rather than crashing
-          }
-        } else {
-          console.warn('⚠️ Cannot capture card:', {
-            hasCardRef: !!cardRef.current,
-            hasSvg: !!cardSvg,
-          });
-        }
-      } else {
-        console.log('📝 Text-based template - skipping image capture');
+        console.log('✅ Card saved for workout:', localWorkoutId);
       }
 
-      // Check if component is still mounted before continuing
-      if (!isMountedRef.current) return;
-
-      // Post to Nostr as kind 1 social event with image
-      // Supports both Amber signer (Android) and nsec (iOS)
-      const result = await publishingService.postWorkoutToSocial(
-        workout as PublishableWorkout,
-        signerOrNsec,
-        userId,
-        {
-          includeCard: true,
-          cardTemplate: selectedTemplate as
-            | 'achievement'
-            | 'progress'
-            | 'minimal'
-            | 'stats',
-          includeStats: true,
-          includeMotivation: true,
-          userAvatar,
-          userName,
-          cardImageUri,
-        }
-      );
-
-      if (result.success) {
-        // Mark as posted
-        await statusTracker.markAsPosted(workout.id, result.eventId);
-
-        // Close modal and let parent handle success messaging
-        onSuccess?.();
-        onClose();
-      } else {
-        throw new Error(result.error || 'Failed to share workout');
-      }
+      // Show fullscreen preview
+      setShowFullscreenPreview(true);
     } catch (error) {
-      console.error('Failed to share to Nostr:', error);
-      // Error handling delegated to parent component
+      console.error('Failed to save card:', error);
+      Alert.alert('Error', 'Failed to save card');
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
+  };
+
+  /**
+   * Handle fullscreen preview close - notify parent of success
+   */
+  const handleFullscreenClose = () => {
+    setShowFullscreenPreview(false);
+    onSuccess?.();
+    onClose();
   };
 
   const templates = cardGenerator.getAvailableTemplates();
@@ -356,6 +305,24 @@ export const EnhancedSocialShareModal: React.FC<
               showsHorizontalScrollIndicator={false}
               style={styles.templatePicker}
             >
+              {/* Camera Button */}
+              <TouchableOpacity
+                style={[
+                  styles.templateButton,
+                  styles.cameraButton,
+                  selectedTemplate === 'custom_photo' && styles.templateButtonSelected,
+                ]}
+                onPress={takePhoto}
+                disabled={loading}
+              >
+                <Ionicons name="camera" size={24} color={theme.colors.accent} />
+                <Text style={styles.templateName}>Camera</Text>
+                <Text style={styles.templateDescription}>
+                  Take a photo
+                </Text>
+              </TouchableOpacity>
+
+              {/* Template Buttons */}
               {templates.map((template) => (
                 <TouchableOpacity
                   key={template.id}
@@ -364,7 +331,7 @@ export const EnhancedSocialShareModal: React.FC<
                     selectedTemplate === template.id &&
                       styles.templateButtonSelected,
                   ]}
-                  onPress={() => setSelectedTemplate(template.id)}
+                  onPress={() => setSelectedTemplate(template.id as Template)}
                   disabled={loading}
                 >
                   <Text style={styles.templateName}>{template.name}</Text>
@@ -378,13 +345,31 @@ export const EnhancedSocialShareModal: React.FC<
             {/* Card Preview */}
             <Text style={styles.sectionTitle}>Preview</Text>
             <View style={styles.cardPreviewContainer}>
-              {selectedTemplate === 'achievement' ? (
+              {selectedTemplate === 'custom_photo' && customPhotoUri ? (
+                <View style={styles.customPhotoContainer}>
+                  <Image
+                    source={{ uri: customPhotoUri }}
+                    style={styles.customPhotoPreview}
+                    resizeMode="cover"
+                  />
+                  <Text style={styles.textPreviewNote}>
+                    Your photo will be displayed in fullscreen
+                  </Text>
+                </View>
+              ) : selectedTemplate === 'custom_photo' ? (
+                <View style={styles.textPreviewContainer}>
+                  <Ionicons name="camera-outline" size={48} color={theme.colors.textSecondary} />
+                  <Text style={styles.textPreviewNote}>
+                    Tap Camera above to take a photo
+                  </Text>
+                </View>
+              ) : selectedTemplate === 'achievement' ? (
                 <View style={styles.textPreviewContainer}>
                   <Text style={styles.textPreviewContent}>
                     {formatTextPreview(workout)}
                   </Text>
                   <Text style={styles.textPreviewNote}>
-                    Plain text post (no image)
+                    Plain text (no image)
                   </Text>
                 </View>
               ) : cardSvg && svgReady ? (
@@ -425,13 +410,13 @@ export const EnhancedSocialShareModal: React.FC<
               )}
             </View>
 
-            {/* Share Button */}
+            {/* Done Button */}
             <TouchableOpacity
               style={[
                 styles.shareButton,
                 loading && styles.shareButtonDisabled,
               ]}
-              onPress={handleShare}
+              onPress={handleSave}
               disabled={loading}
             >
               {loading ? (
@@ -440,20 +425,33 @@ export const EnhancedSocialShareModal: React.FC<
                   color={theme.colors.accentText}
                 />
               ) : (
-                <Text style={styles.shareButtonText}>Share to Nostr</Text>
+                <Text style={styles.shareButtonText}>Done</Text>
               )}
             </TouchableOpacity>
 
             {/* Info */}
             <Text style={styles.infoText}>
-              {selectedTemplate === 'achievement'
-                ? 'Your workout will be shared as a text post'
-                : 'Your card will be uploaded to nostr.build and shared as a beautiful image post'}
+              {selectedTemplate === 'custom_photo'
+                ? 'Screenshot your photo in fullscreen to share!'
+                : selectedTemplate === 'achievement'
+                ? 'Screenshot the text to share with friends'
+                : 'Screenshot your card in fullscreen to share!'}
             </Text>
           </ScrollView>
         </View>
       </View>
       </PostingErrorBoundary>
+
+      {/* Fullscreen Preview Modal */}
+      <FullScreenCardModal
+        visible={showFullscreenPreview}
+        onClose={handleFullscreenClose}
+        workout={workout as PublishableWorkout}
+        templateId={selectedTemplate}
+        customPhotoUri={customPhotoUri}
+        userAvatar={userAvatar}
+        userName={userName}
+      />
     </Modal>
   );
 };
@@ -526,6 +524,10 @@ const styles = StyleSheet.create({
     minWidth: 140,
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  cameraButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   templateButtonSelected: {
     borderColor: theme.colors.accent,
@@ -606,5 +608,14 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 8,
+  },
+  customPhotoContainer: {
+    alignItems: 'center',
+  },
+  customPhotoPreview: {
+    width: '100%',
+    height: 250,
+    borderRadius: 12,
+    backgroundColor: theme.colors.background,
   },
 });

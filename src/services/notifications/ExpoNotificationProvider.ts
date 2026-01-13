@@ -9,6 +9,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { RichNotificationData } from '../../types';
 import { analytics } from '../../utils/analytics';
+import { BroadcastTokenService } from './BroadcastTokenService';
 
 export class ExpoNotificationProvider {
   private static instance: ExpoNotificationProvider;
@@ -92,6 +93,12 @@ export class ExpoNotificationProvider {
 
       console.log('📱 Device token obtained for local notifications');
       analytics.track('notification_scheduled', { tokenRegistered: true });
+
+      // Register for broadcast community notifications (anonymous - no npub)
+      // This enables server-side push for Daily Running Leaderboard updates
+      BroadcastTokenService.registerToken(this.deviceToken).catch((err) => {
+        console.warn('[ExpoNotificationProvider] Broadcast registration failed:', err);
+      });
     } catch (error) {
       console.error('Failed to get push token:', error);
       analytics.track('notification_scheduled', { tokenFailed: true });

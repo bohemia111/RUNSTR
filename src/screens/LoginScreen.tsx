@@ -204,9 +204,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     setError(null);
   };
 
-  // Calculate responsive dimensions
-  const logoSize = IS_SMALL_DEVICE ? 750 : 900;
-  const logoHeight = IS_SMALL_DEVICE ? 249 : 300;
+  // Calculate responsive dimensions - smaller for Android to fit Amber button
+  const logoSize = IS_SMALL_DEVICE ? 550 : (Platform.OS === 'android' ? 650 : 750);
+  const logoHeight = IS_SMALL_DEVICE ? 180 : (Platform.OS === 'android' ? 215 : 250);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -406,12 +406,12 @@ const styles = StyleSheet.create({
   // Header
   header: {
     alignItems: 'center',
-    paddingTop: 80,
-    paddingBottom: 40,
+    paddingTop: 40,
+    paddingBottom: 20,
     overflow: 'hidden',
   },
   headerSmall: {
-    paddingTop: 60,
+    paddingTop: 30,
     paddingBottom: 0,
   },
   logo: {
@@ -423,8 +423,8 @@ const styles = StyleSheet.create({
   loginSection: {
     flex: 1,
     justifyContent: 'flex-start',
-    paddingVertical: 10,
-    marginTop: 20,
+    paddingVertical: 5,
+    marginTop: 10,
   },
   buttonContainer: {
     alignItems: 'center',
@@ -451,12 +451,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   inputHeader: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   backButton: {
     alignSelf: 'flex-start',
-    padding: 8,
-    marginBottom: 16,
+    padding: 6,
+    marginBottom: 10,
   },
   backButtonText: {
     fontSize: 16,
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
 
   // Input Field
   inputField: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   inputLabel: {
     fontSize: 14,
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
   // Submit Button
   submitButton: {
     backgroundColor: theme.colors.orangeBright,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
@@ -535,13 +535,13 @@ const styles = StyleSheet.create({
 
   // Amber styles
   amberSection: {
-    marginTop: 16,
+    marginTop: 12,
     alignItems: 'center',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
     width: '100%',
   },
   dividerLine: {
@@ -556,8 +556,8 @@ const styles = StyleSheet.create({
   },
   amberButton: {
     backgroundColor: '#FFA500', // Amber color
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: 'center',
     width: '100%',

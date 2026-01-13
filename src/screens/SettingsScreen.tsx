@@ -23,6 +23,7 @@ import {
   TTSPreferencesService,
   type TTSSettings,
 } from '../services/activity/TTSPreferencesService';
+import { AutoCompetePreferencesService } from '../services/activity/AutoCompetePreferencesService';
 import TTSAnnouncementService from '../services/activity/TTSAnnouncementService';
 import { DeleteAccountService } from '../services/auth/DeleteAccountService';
 import { Card } from '../components/ui/Card';
@@ -107,7 +108,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   });
   const [backgroundTrackingEnabled, setBackgroundTrackingEnabled] =
     useState(false);
-
+  const [autoCompeteEnabled, setAutoCompeteEnabled] = useState(false);
 
   // Coach RUNSTR AI state
   const [showPPQModal, setShowPPQModal] = useState(false);
@@ -181,6 +182,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       // Check if background step tracking is enabled (reads from AsyncStorage)
       const trackingEnabled = await dailyStepCounterService.isBackgroundTrackingEnabled();
       setBackgroundTrackingEnabled(trackingEnabled);
+
+      // Load auto-compete setting
+      const autoCompete = await AutoCompetePreferencesService.isAutoCompeteEnabled();
+      setAutoCompeteEnabled(autoCompete);
 
       // Load selected AI model
       const model = await ModelManager.getSelectedModel();
@@ -257,6 +262,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
   };
 
+  const handleAutoCompeteToggle = async (enabled: boolean) => {
+    try {
+      await AutoCompetePreferencesService.setAutoCompeteEnabled(enabled);
+      setAutoCompeteEnabled(enabled);
+    } catch (error) {
+      console.error('Error saving auto-compete setting:', error);
+      // Revert on error
+      const current = await AutoCompetePreferencesService.isAutoCompeteEnabled();
+      setAutoCompeteEnabled(current);
+    }
+  };
+
   const handleBack = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
@@ -316,7 +333,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       }\n`;
     }
     warningDetails +=
-      '• Request deletion from Nostr relays (cannot be guaranteed)\n';
+      '• Request deletion from servers (cannot be guaranteed)\n';
     warningDetails += '\nThis action CANNOT be undone!';
 
     // First warning dialog
@@ -396,14 +413,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         console.log(`[Settings] ✅ Imported ${result.imported} workouts`);
         CustomAlertManager.alert(
           'Import Complete',
-          `Successfully imported ${result.imported} workout${result.imported !== 1 ? 's' : ''} from Nostr.`
+          `Successfully imported ${result.imported} workout${result.imported !== 1 ? 's' : ''}.`
         );
       } else {
         throw new Error(result.error || 'Import failed');
       }
     } catch (error) {
       console.error('[Settings] ❌ Nostr import failed:', error);
-      CustomAlertManager.alert('Import Failed', 'Could not import workouts from Nostr. Please try again.');
+      CustomAlertManager.alert('Import Failed', 'Could not import workouts. Please try again.');
     } finally {
       setImporting(false);
     }
@@ -604,6 +621,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 />
               </View>
 
+              {/* Auto-Compete */}
+              <View style={styles.settingItem}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Auto-Compete</Text>
+                  <Text style={styles.settingSubtitle}>
+                    Automatically enter workouts into competitions
+                  </Text>
+                </View>
+                <Switch
+                  value={autoCompeteEnabled}
+                  onValueChange={handleAutoCompeteToggle}
+                  trackColor={{
+                    false: theme.colors.warning,
+                    true: theme.colors.accent,
+                  }}
+                  thumbColor={theme.colors.orangeBright}
+                />
+              </View>
+
               {/* Health Profile */}
               <SettingItem
                 title="Health Profile"
@@ -611,10 +647,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onPress={() => (navigation as any).navigate('HealthProfile')}
               />
 
-              {/* Import Workouts from Nostr */}
+              {/* Import Workouts */}
               <SettingItem
                 title="Import"
-                subtitle="Download your workout history from Nostr"
+                subtitle="Download your workout history"
                 onPress={handleImportNostrHistory}
                 rightElement={
                   importing ? (
@@ -981,7 +1017,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
         {/* App Version Info */}
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Version 1.4.9 (Build 149)</Text>
+          <Text style={styles.versionText}>Version 1.5.0-debug (Build 150)</Text>
         </View>
       </ScrollView>
 

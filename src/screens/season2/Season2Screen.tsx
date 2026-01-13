@@ -36,8 +36,13 @@ import { ToggleButtons } from '../../components/ui/ToggleButtons';
 import { useSeason2Registration } from '../../hooks/useSeason2';
 import { useSupabaseLeaderboard } from '../../hooks/useSupabaseLeaderboard';
 import { Season2PayoutService } from '../../services/season/Season2PayoutService';
-import { getSeason2Status } from '../../constants/season2';
+import { getSeason2Status, SEASON_2_PARTICIPANTS } from '../../constants/season2';
 import type { Season2ActivityType, Season2Participant } from '../../types/season2';
+
+// Create lookup map from npub to hex pubkey for avatar resolution
+const NPUB_TO_HEX_MAP = new Map(
+  SEASON_2_PARTICIPANTS.map((p) => [p.npub, p.pubkey])
+);
 
 const TABS = [
   { key: 'running', label: 'Running' },
@@ -97,7 +102,8 @@ export const Season2Screen: React.FC<Season2ScreenProps> = ({ navigation: propNa
   const transformToParticipants = useCallback(
     (leaderboard: typeof runningLeaderboard): Season2Participant[] => {
       return leaderboard.map((entry) => ({
-        pubkey: entry.npub, // Use npub as pubkey (component handles both)
+        // IMPORTANT: Use hex pubkey for bundled avatar lookup (getSeason2Avatar expects hex)
+        pubkey: NPUB_TO_HEX_MAP.get(entry.npub) || entry.npub,
         npub: entry.npub,
         name: entry.name,
         picture: entry.picture,

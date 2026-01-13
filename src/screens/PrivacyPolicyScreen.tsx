@@ -65,25 +65,25 @@ export const PrivacyPolicyScreen: React.FC<{ navigation: any }> = ({
       title: '3. Data Ownership & Control',
       content: `You own your data on RUNSTR:
 
-• Nostr Sovereignty: Your Nostr identity (nsec/npub) is yours alone. You can use it across any Nostr app.
+• Your Identity: Your identity keys are yours alone. You can use them across compatible apps.
 
-• Data Portability: All your workouts, team memberships, and achievements can be accessed from any Nostr client.
+• Data Portability: All your workouts, team memberships, and achievements can be accessed from compatible clients.
 
 • Local Deletion: You can clear local app data anytime through device settings.
 
-• Nostr Immutability: Published Nostr events cannot be deleted but can be superseded by newer events.
+• Data Persistence: Published data cannot be deleted but can be superseded by newer entries.
 
-• Relay Choice: You control which Nostr relays store your data through your Nostr client settings.`,
+• Relay Choice: You control which servers store your data through your client settings.`,
     },
     {
-      title: '4. Bitcoin & Financial Privacy',
-      content: `RUNSTR integrates Bitcoin responsibly:
+      title: '4. Financial Privacy',
+      content: `RUNSTR handles rewards responsibly:
 
-• Non-Custodial: We never hold your Bitcoin. All funds remain in your control via NutZap eCash.
+• Non-Custodial: We never hold your funds. All sats remain in your control via NutZap eCash.
 
-• Lightning Privacy: Lightning Network transactions provide enhanced privacy over on-chain Bitcoin.
+• Lightning Privacy: Lightning Network transactions provide enhanced privacy.
 
-• Public Prizes: Competition winnings are announced publicly as Nostr events for transparency.
+• Public Prizes: Competition winnings are announced publicly for transparency.
 
 • No Financial Data: We don't store credit cards, bank accounts, or payment methods.
 

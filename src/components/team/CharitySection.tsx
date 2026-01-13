@@ -21,7 +21,7 @@ import { theme } from '../../styles/theme';
 import { getCharityById } from '../../constants/charities';
 import { ExternalZapModal } from '../nutzap/ExternalZapModal';
 import { NWCWalletService } from '../../services/wallet/NWCWalletService';
-import { RewardSenderWallet } from '../../services/rewards/RewardSenderWallet';
+import { NWCGatewayService } from '../../services/rewards/NWCGatewayService';
 import { DonationTrackingService } from '../../services/donation/DonationTrackingService';
 import { ImpactLevelService } from '../../services/impact/ImpactLevelService';
 import { useNWCZap } from '../../hooks/useNWCZap';
@@ -178,7 +178,7 @@ export const CharitySection: React.FC<CharitySectionProps> = ({
 
       // Step 1: Create invoice from RUNSTR's wallet (so RUNSTR receives the donation)
       console.log('[CharitySection] Creating invoice from RUNSTR wallet...');
-      const invoiceResult = await RewardSenderWallet.createInvoice(
+      const invoiceResult = await NWCGatewayService.createInvoice(
         DEFAULT_ZAP_AMOUNT,
         `Donation to ${charity.name}`
       );

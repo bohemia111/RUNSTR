@@ -10,14 +10,14 @@
  * 2. Get all participants and select random winner
  * 3. Get winner's lightning address from their Nostr profile
  * 4. Get top charity from each activity category
- * 5. Request invoices via LNURL and pay with RewardSenderWallet
+ * 5. Request invoices via LNURL and pay with NWCGatewayService
  * 6. Record results for admin visibility
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Season2Service } from './Season2Service';
 import { ProfileService } from '../user/profileService';
-import { RewardSenderWallet } from '../rewards/RewardSenderWallet';
+import { NWCGatewayService } from '../rewards/NWCGatewayService';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import { getCharityById } from '../../constants/charities';
 import {
@@ -319,8 +319,8 @@ class Season2PayoutServiceClass {
 
       console.log(`[Season2Payout] Invoice received, sending payment...`);
 
-      // Step 2: Pay invoice using RewardSenderWallet
-      const paymentResult = await RewardSenderWallet.sendRewardPayment(invoice);
+      // Step 2: Pay invoice using NWCGatewayService
+      const paymentResult = await NWCGatewayService.payInvoice(invoice);
 
       if (paymentResult.success) {
         console.log(`[Season2Payout] Payment successful!`);

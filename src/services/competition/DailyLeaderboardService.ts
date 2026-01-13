@@ -64,7 +64,9 @@ class DailyLeaderboardServiceClass {
   async getGlobalDailyLeaderboards(
     forceRefresh: boolean = false
   ): Promise<DailyLeaderboards> {
-    const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    // Use local date (not UTC) so leaderboard matches user's day
+    const now = new Date();
+    const todayDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const queryStartTime = Date.now();
 
     console.log(`📊 [DailyLeaderboard/Supabase] ========== QUERY START ==========`);

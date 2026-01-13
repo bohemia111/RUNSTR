@@ -12,7 +12,8 @@ import {
   StyleSheet,
 } from 'react-native';
 // Navigation container provided by Expo Router - removed NavigationContainer import
-import { createStackNavigator } from '@react-navigation/stack';
+// ✅ PERFORMANCE: Using native stack for faster transitions (runs on UI thread)
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { theme } from '../styles/theme';
 
@@ -101,7 +102,7 @@ export type RootStackParamList = {
   Compete: undefined;
 };
 
-const Stack = createStackNavigator<RootStackParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 interface AppNavigatorProps {
   initialRoute?: keyof RootStackParamList;
@@ -615,37 +616,28 @@ export const AppNavigator: React.FC<AppNavigatorProps> = ({
       />
 
       {/* Compete Screen - Events/Competitions (accessed from Profile card) */}
+      {/* ✅ PERFORMANCE: Using component reference instead of inline function */}
       <Stack.Screen
         name="Compete"
-        options={{
-          ...defaultScreenOptions,
-          headerShown: false,
-        }}
-      >
-        {({ navigation }) => <CompeteScreen navigation={navigation} />}
-      </Stack.Screen>
+        component={CompeteScreen}
+        options={defaultScreenOptions}
+      />
 
       {/* Season2 Screen - Season II Competition Details */}
+      {/* ✅ PERFORMANCE: Using component reference instead of inline function */}
       <Stack.Screen
         name="Season2"
-        options={{
-          ...defaultScreenOptions,
-          headerShown: false,
-        }}
-      >
-        {({ navigation }) => <Season2Screen navigation={navigation} />}
-      </Stack.Screen>
+        component={Season2Screen}
+        options={defaultScreenOptions}
+      />
 
       {/* Leaderboards Screen - Daily Leaderboards */}
+      {/* ✅ PERFORMANCE: Using component reference instead of inline function */}
       <Stack.Screen
         name="Leaderboards"
-        options={{
-          ...defaultScreenOptions,
-          headerShown: false,
-        }}
-      >
-        {({ navigation }) => <LeaderboardsScreen navigation={navigation} />}
-      </Stack.Screen>
+        component={LeaderboardsScreen}
+        options={defaultScreenOptions}
+      />
     </Stack.Navigator>
   );
 };

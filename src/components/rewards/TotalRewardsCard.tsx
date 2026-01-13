@@ -4,7 +4,7 @@
  * Combines workout rewards and step rewards into a single minimalist card:
  * - Total sats earned (prominent)
  * - Workout count and streak
- * - Steps today with Compete/Post buttons
+ * - Steps today with Compete button
  * - Info modal explaining the rewards system
  */
 
@@ -27,9 +27,7 @@ interface TotalRewardsCardProps {
   stepRewardsEarned?: number;
   currentSteps: number;
   onCompete?: () => void;
-  onPost?: () => void;
   isPublishing?: boolean;
-  isPosting?: boolean;
 }
 
 export const TotalRewardsCard: React.FC<TotalRewardsCardProps> = ({
@@ -38,9 +36,7 @@ export const TotalRewardsCard: React.FC<TotalRewardsCardProps> = ({
   stepRewardsEarned = 0,
   currentSteps,
   onCompete,
-  onPost,
   isPublishing = false,
-  isPosting = false,
 }) => {
   const [totalStreak, setTotalStreak] = useState(0);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -111,7 +107,7 @@ export const TotalRewardsCard: React.FC<TotalRewardsCardProps> = ({
       {/* Header + Sats in one row */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>TOTAL REWARDS</Text>
+          <Text style={styles.headerTitle}>YOUR REWARDS</Text>
           <TouchableOpacity
             onPress={() => setShowInfoModal(true)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -134,48 +130,29 @@ export const TotalRewardsCard: React.FC<TotalRewardsCardProps> = ({
           <Text style={styles.statText}>{totalStreak} day streak</Text>
         </View>
 
-        {/* Steps row with buttons */}
+        {/* Steps row with Compete button */}
         <View style={styles.stepsRow}>
           <Text style={styles.stepsText}>
             {currentSteps.toLocaleString()} steps today
           </Text>
 
-          {(onCompete || onPost) && (
+          {onCompete && (
             <View style={styles.actionButtons}>
-              {onCompete && (
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    isPublishing && styles.actionButtonDisabled,
-                  ]}
-                  onPress={onCompete}
-                  disabled={isPublishing}
-                  activeOpacity={0.7}
-                >
-                  {isPublishing ? (
-                    <ActivityIndicator size="small" color="#FFB366" />
-                  ) : (
-                    <Text style={styles.actionButtonText}>Compete</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-              {onPost && (
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    isPosting && styles.actionButtonDisabled,
-                  ]}
-                  onPress={onPost}
-                  disabled={isPosting}
-                  activeOpacity={0.7}
-                >
-                  {isPosting ? (
-                    <ActivityIndicator size="small" color="#FFB366" />
-                  ) : (
-                    <Text style={styles.actionButtonText}>Post</Text>
-                  )}
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  isPublishing && styles.actionButtonDisabled,
+                ]}
+                onPress={onCompete}
+                disabled={isPublishing}
+                activeOpacity={0.7}
+              >
+                {isPublishing ? (
+                  <ActivityIndicator size="small" color="#FFB366" />
+                ) : (
+                  <Text style={styles.actionButtonText}>Compete</Text>
+                )}
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -223,10 +200,9 @@ export const TotalRewardsCard: React.FC<TotalRewardsCardProps> = ({
             <View style={styles.infoDivider} />
 
             <View style={styles.infoSection}>
-              <Text style={styles.infoSubtitle}>Compete vs Post</Text>
+              <Text style={styles.infoSubtitle}>Compete</Text>
               <Text style={styles.infoText}>
-                <Text style={styles.infoHighlight}>Compete</Text> pushes your workout into all eligible competitions.{'\n\n'}
-                <Text style={styles.infoHighlight}>Post</Text> shares your steps as a social post.
+                <Text style={styles.infoHighlight}>Compete</Text> pushes your steps into all eligible competitions for the day.
               </Text>
             </View>
 

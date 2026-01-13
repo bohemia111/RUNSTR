@@ -43,6 +43,7 @@ import localWorkoutStorage from '../services/fitness/LocalWorkoutStorageService'
 import type { LocalWorkout } from '../services/fitness/LocalWorkoutStorageService';
 import { DailyRewardService } from '../services/rewards/DailyRewardService';
 import { StepRewardService } from '../services/rewards/StepRewardService';
+import { NWCGatewayService } from '../services/rewards/NWCGatewayService';
 import { dailyStepCounterService } from '../services/activity/DailyStepCounterService';
 import { PledgeService } from '../services/pledge/PledgeService';
 import { ActivePledgeCard } from '../components/pledge/ActivePledgeCard';
@@ -65,6 +66,10 @@ const RewardsScreenComponent: React.FC = () => {
   const [hasNWC, setHasNWC] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // App's rewards pool balance (from Supabase NWC)
+  const [prizePoolBalance, setPrizePoolBalance] = useState(0);
+
   const [showWalletConfig, setShowWalletConfig] = useState(false);
 
   // Wallet modals state
@@ -103,9 +108,8 @@ const RewardsScreenComponent: React.FC = () => {
   const [stepTodaySats, setStepTodaySats] = useState(0);
   const [isPublishingSteps, setIsPublishingSteps] = useState(false);
 
-  // Step social post modal state
+  // Step social post modal state (kept for potential future use)
   const [showStepSocialModal, setShowStepSocialModal] = useState(false);
-  const [isPostingSteps, setIsPostingSteps] = useState(false);
   const [stepWorkoutForPost, setStepWorkoutForPost] = useState<PublishableWorkout | null>(null);
 
   // Default zap amount state
@@ -134,6 +138,7 @@ const RewardsScreenComponent: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       loadSettings();
+      loadPrizePoolBalance();
     }, [])
   );
 
@@ -203,6 +208,26 @@ const RewardsScreenComponent: React.FC = () => {
   };
 
   /**
+   * Load the app's rewards pool balance from Supabase NWC
+   * This shows users how much is available in the rewards pool
+   */
+  const loadPrizePoolBalance = async () => {
+    try {
+      const result = await NWCGatewayService.getBalance();
+      if (result.success && result.balance !== undefined) {
+        // NWC returns millisats, convert to sats
+        const balanceSats = Math.floor(result.balance / 1000);
+        setPrizePoolBalance(balanceSats);
+        console.log('[RewardsScreen] Prize pool balance:', balanceSats, 'sats');
+      } else {
+        console.error('[RewardsScreen] Failed to load prize pool balance:', result.error);
+      }
+    } catch (error) {
+      console.error('[RewardsScreen] Error loading prize pool balance:', error);
+    }
+  };
+
+  /**
    * Load step data and check for new milestones to reward
    */
   const loadStepData = async (checkMilestones: boolean = false) => {
@@ -257,6 +282,7 @@ const RewardsScreenComponent: React.FC = () => {
       await Promise.all([
         loadSettings(),
         loadStepData(true),
+        loadPrizePoolBalance(),
       ]);
     } finally {
       setIsRefreshing(false);
@@ -347,25 +373,6 @@ const RewardsScreenComponent: React.FC = () => {
     } finally {
       setIsPublishingSteps(false);
     }
-  };
-
-  /**
-   * Open social share modal to post steps as a kind 1 social post
-   */
-  const handleStepPost = async () => {
-    const stepWorkout = await createStepWorkout();
-    if (!stepWorkout) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Could not create step workout',
-        position: 'top',
-      });
-      return;
-    }
-
-    setStepWorkoutForPost(stepWorkout);
-    setShowStepSocialModal(true);
   };
 
   const formatBalance = (sats: number): string => {
@@ -535,6 +542,17 @@ const RewardsScreenComponent: React.FC = () => {
           />
         }
       >
+        {/* Rewards Pool - Shows app's reward pool balance */}
+        {prizePoolBalance > 0 && (
+          <View style={styles.prizePoolCard}>
+            <View style={styles.prizePoolHeader}>
+              <Ionicons name="wallet-outline" size={20} color={theme.colors.accent} />
+              <Text style={styles.prizePoolLabel}>Rewards Pool</Text>
+            </View>
+            <Text style={styles.prizePoolAmount}>{formatBalance(prizePoolBalance)}</Text>
+          </View>
+        )}
+
         {/* Total Rewards Card - Unified Hero Section */}
         <TotalRewardsCard
           workouts={workouts}
@@ -542,21 +560,8 @@ const RewardsScreenComponent: React.FC = () => {
           stepRewardsEarned={stepTodaySats}
           currentSteps={currentSteps}
           onCompete={handleStepCompete}
-          onPost={handleStepPost}
           isPublishing={isPublishingSteps}
-          isPosting={isPostingSteps}
         />
-
-        {/* Monthly Prize Pool - Shows NWC wallet balance */}
-        {hasNWC && walletBalance > 0 && (
-          <View style={styles.prizePoolCard}>
-            <View style={styles.prizePoolHeader}>
-              <Ionicons name="trophy-outline" size={20} color={theme.colors.orangeBright} />
-              <Text style={styles.prizePoolLabel}>Monthly Prize Pool</Text>
-            </View>
-            <Text style={styles.prizePoolAmount}>{formatBalance(walletBalance)}</Text>
-          </View>
-        )}
 
         {/* Impact Level Card */}
         {userHexPubkey && (
@@ -830,7 +835,7 @@ const RewardsScreenComponent: React.FC = () => {
             Toast.show({
               type: 'success',
               text1: 'Steps Posted!',
-              text2: 'Your steps are now on Nostr',
+              text2: 'Your steps have been shared',
               position: 'top',
               visibilityTime: 3000,
             });

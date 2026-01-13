@@ -1,68 +1,61 @@
 /**
  * Screen Configurations
- * Animation configs and screen options for React Navigation
+ * Animation configs and screen options for React Navigation Native Stack
  *
- * ✅ PERFORMANCE FIX: Using native driver animations instead of JS interpolators
+ * ✅ PERFORMANCE: Using native stack navigator for faster transitions
  * Native animations run on the UI thread, not blocking the JS thread
  */
 
-import { StackNavigationOptions } from '@react-navigation/stack';
-import { TransitionPresets } from '@react-navigation/stack';
+import { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
-// ✅ PERFORMANCE: Use native transition presets instead of custom JS interpolators
-// These use the native driver and don't block the JavaScript thread
-const slideFromRightAnimation = {
-  ...TransitionPresets.SlideFromRightIOS,
-  cardStyle: { backgroundColor: '#000' }, // Prevents white flash
-};
-
-const modalSlideFromBottomAnimation = {
-  ...TransitionPresets.ModalSlideFromBottomIOS,
-  cardStyle: { backgroundColor: '#000' }, // Prevents white flash
-};
-
-// Screen-specific configurations
+// Screen-specific configurations for native stack
 export const screenConfigurations = {
   // Main Team Screen - no animation for instant load
   Team: {
-    animationEnabled: false,
+    animation: 'none',
     headerShown: false,
-  } as StackNavigationOptions,
+  } as NativeStackNavigationOptions,
 
-  // Profile Screen - slide from right
+  // Profile Screen - slide from right (default iOS behavior)
   Profile: {
-    animationEnabled: true,
-    ...slideFromRightAnimation,
-  } as StackNavigationOptions,
+    animation: 'slide_from_right',
+    headerShown: false,
+    contentStyle: { backgroundColor: '#000' },
+  } as NativeStackNavigationOptions,
 
   // Wallet Screen - slide from right
   Wallet: {
-    animationEnabled: true,
-    ...slideFromRightAnimation,
-  } as StackNavigationOptions,
+    animation: 'slide_from_right',
+    headerShown: false,
+    contentStyle: { backgroundColor: '#000' },
+  } as NativeStackNavigationOptions,
 
   // Captain Dashboard - slide from right
   CaptainDashboard: {
-    animationEnabled: true,
-    ...slideFromRightAnimation,
-  } as StackNavigationOptions,
+    animation: 'slide_from_right',
+    headerShown: false,
+    contentStyle: { backgroundColor: '#000' },
+  } as NativeStackNavigationOptions,
 
   // Team Discovery Modal - slide from bottom
   TeamDiscovery: {
-    presentation: 'modal' as const,
-    animationEnabled: true,
-    ...modalSlideFromBottomAnimation,
-  } as StackNavigationOptions,
+    presentation: 'modal',
+    animation: 'slide_from_bottom',
+    headerShown: false,
+    contentStyle: { backgroundColor: '#000' },
+  } as NativeStackNavigationOptions,
 
   // Event Detail Screen - slide from right
   EventDetail: {
-    animationEnabled: true,
-    ...slideFromRightAnimation,
-  } as StackNavigationOptions,
+    animation: 'slide_from_right',
+    headerShown: false,
+    contentStyle: { backgroundColor: '#000' },
+  } as NativeStackNavigationOptions,
 };
 
-// Default navigator options
-export const defaultScreenOptions: StackNavigationOptions = {
+// Default navigator options for native stack
+export const defaultScreenOptions: NativeStackNavigationOptions = {
   headerShown: false,
-  cardStyle: { backgroundColor: '#000' },
+  contentStyle: { backgroundColor: '#000' },
+  animation: 'slide_from_right',
 };

@@ -11,7 +11,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RewardSenderWallet } from '../rewards/RewardSenderWallet';
+import { NWCGatewayService } from '../rewards/NWCGatewayService';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import { getCharityById } from '../../constants/charities';
 
@@ -207,8 +207,8 @@ class DonationTrackingServiceClass {
       }
 
       // Pay the invoice using RUNSTR's wallet (which received the donation)
-      console.log(`[DonationTracking] Paying invoice via RewardSenderWallet...`);
-      const paymentResult = await RewardSenderWallet.sendRewardPayment(invoice);
+      console.log(`[DonationTracking] Paying invoice via NWCGatewayService...`);
+      const paymentResult = await NWCGatewayService.payInvoice(invoice);
 
       if (paymentResult.success) {
         console.log(`[DonationTracking] ✅ Payment forwarded to charity: ${paymentResult.preimage?.slice(0, 16)}...`);

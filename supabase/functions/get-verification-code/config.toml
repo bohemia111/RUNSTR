@@ -1,0 +1,4 @@
+# Allow public access to get-verification-code
+# The function validates inputs internally (npub format, version)
+# No sensitive data is returned - just a verification code tied to the npub
+verify_jwt = false

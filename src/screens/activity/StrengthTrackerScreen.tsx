@@ -438,7 +438,7 @@ export const StrengthTrackerScreen: React.FC<StrengthTrackerScreenProps> = ({
 
         setAlertConfig({
           title: 'Success',
-          message: 'Workout saved to Nostr!',
+          message: 'Workout saved!',
           buttons: [{ text: 'OK', style: 'default' }],
         });
         setAlertVisible(true);
@@ -940,7 +940,7 @@ export const StrengthTrackerScreen: React.FC<StrengthTrackerScreenProps> = ({
               setAlertConfig({
                 title: 'Success',
                 message:
-                  'Your workout has been shared to Nostr with a beautiful card!',
+                  'Your workout has been shared with a beautiful card!',
                 buttons: [
                   {
                     text: 'OK',

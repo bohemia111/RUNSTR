@@ -27,6 +27,8 @@ import { withTimeout, fireAndForget, NOSTR_TIMEOUTS } from '../../utils/nostrTim
 import { RunningBitcoinService } from '../challenge/RunningBitcoinService';
 import { isRunningBitcoinActive, isEligibleActivityType } from '../../constants/runningBitcoin';
 import { nip19 } from 'nostr-tools';
+import Constants from 'expo-constants';
+import PerWorkoutVerificationService from '../verification/PerWorkoutVerificationService';
 
 // Import split type for race replay data
 import type { Split } from '../activity/SplitTrackingService';
@@ -295,11 +297,11 @@ export class WorkoutPublishingService {
   }
 
   /**
-   * Post workout as Kind 1 social event with workout card image
-   * Supports both direct privateKeyHex (nsec users) and NDKSigner (Amber users)
+   * @deprecated Kind 1 social posting has been removed in v2.0.
+   * Users now save workout cards locally and screenshot to share.
+   * This function is kept for backwards compatibility but will return failure.
    *
-   * New feature: Generates SVG card, converts to PNG, uploads to nostr.build,
-   * and includes as rich media in Nostr post using NIP-94 imeta tags
+   * Previously: Posted workout as Kind 1 social event with workout card image
    */
   async postWorkoutToSocial(
     workout: PublishableWorkout,
@@ -307,6 +309,15 @@ export class WorkoutPublishingService {
     userId: string,
     options: SocialPostOptions = {}
   ): Promise<WorkoutPublishResult> {
+    console.warn('⚠️ postWorkoutToSocial is deprecated. Kind 1 social posting has been removed.');
+    console.warn('Users now save workout cards locally and screenshot to share.');
+    return {
+      success: false,
+      error: 'Kind 1 social posting has been removed. Save cards locally instead.',
+    };
+
+    // Original implementation below (kept for reference, unreachable code)
+    /* eslint-disable no-unreachable */
     try {
       console.log(`🔄 Creating social post for workout ${workout.id}...`);
 
@@ -463,6 +474,7 @@ export class WorkoutPublishingService {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+    /* eslint-enable no-unreachable */
   }
 
   /**
@@ -526,7 +538,7 @@ export class WorkoutPublishingService {
       ['exercise', exerciseVerb], // Simple activity type: running, yoga, strength, etc.
       ['duration', durationFormatted], // HH:MM:SS format (always included)
       ['source', sourceTag], // Data source: 'gps' for tracked, 'manual' for manual entry
-      ['client', 'RUNSTR', '0.1.7'], // Client info with version
+      ['client', 'RUNSTR', Constants.expoConfig?.version || '1.4.9'], // Client info with version
       ['t', this.getActivityHashtag(workout.type)], // Primary hashtag
     ];
 
@@ -714,6 +726,35 @@ export class WorkoutPublishingService {
     } catch (error) {
       console.warn('   ⚠️ Failed to get active events for tagging:', error);
       // Non-blocking - workout publishing continues without event tags
+    }
+
+    // Add per-workout verification code tag for leaderboard anti-cheat
+    // Code is generated server-side (Supabase) and tied to this specific workout's data
+    // This prevents code reuse - each workout gets a unique verification code
+    try {
+      const npub = nip19.npubEncode(pubkey);
+      const startTimestamp = workout.startTime
+        ? Math.floor(new Date(workout.startTime).getTime() / 1000)
+        : Math.floor(Date.now() / 1000);
+
+      const verificationResult = await PerWorkoutVerificationService.getWorkoutVerificationCode({
+        npub,
+        workoutId: workout.id,
+        exercise: exerciseVerb,
+        distanceMeters: Math.round(workout.distance || 0),
+        durationSeconds: Math.round(workout.duration),
+        startTimestamp,
+      });
+
+      if (verificationResult.code) {
+        tags.push(['v', verificationResult.code]);
+        console.log(`   ✅ Added per-workout verification code (expires in ${verificationResult.expiresIn}s)`);
+      } else {
+        console.log(`   ⚠️ No verification code available: ${verificationResult.error || 'unknown'}`);
+      }
+    } catch (error) {
+      console.warn('   ⚠️ Failed to get per-workout verification code:', error);
+      // Non-blocking - workout publishing continues without verification
     }
 
     return tags;

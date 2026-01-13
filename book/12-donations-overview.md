@@ -1,5 +1,19 @@
 # Chapter 12: Donations Overview
 
+## Summary
+
+In RUNSTR, selecting a team means choosing a charity to support with your fitness activities. The Teams tab presents 12+ Bitcoin-focused charities—from Bitcoin Bay building circular economies in the Bay Area to the ALS Network honoring Hal Finney's legacy. Each organization has a Lightning address ready to receive donations, and your workout efforts can directly fund their missions.
+
+The donation system works through configurable splits. In your Rewards settings, you choose what percentage of your earnings to donate: 0%, 10%, 25%, 50%, or even 100%. When you earn your daily 50-sat reward, the app automatically calculates the split. If you've set 25%, you receive 37 sats and your chosen charity receives 13 sats—both payments sent automatically from the app's NWC wallet.
+
+This architecture using the app's NWC wallet enables payment verification that wouldn't be possible if users sent donations directly. The app can confirm both transactions succeeded, track donation totals accurately, and provide reliable reporting on charitable impact. Your donations are real, verified Bitcoin transfers to organizations doing meaningful work in the Bitcoin ecosystem.
+
+Beyond automatic splits, you can zap charities directly using the lightning bolt button on any team card. Tap to open a donation modal with preset amounts (21, 100, 500, or 1,000 sats), or long-press for a quick 21-sat zap if you have NWC configured. This gives you flexibility to make spontaneous donations beyond your regular workout splits.
+
+The Impact Level system gamifies your charitable giving. As you donate, you accumulate XP that increases your Impact Level—from Impact Starter to higher tiers. Your level and XP progress display prominently on the Rewards screen, providing visible recognition of your cumulative contributions. It transforms fitness from a purely personal pursuit into a force for community good, where every workout can fund causes you believe in.
+
+---
+
 ## Teams = Charities
 
 In RUNSTR, **"Teams" and "Charities" are the same thing**. The Teams tab shows organizations you can support through your fitness activities.
@@ -29,9 +43,12 @@ Users configure what percentage of rewards to donate:
 
 When you earn a daily reward:
 1. App calculates split based on your percentage
-2. Your portion sent to your Lightning address
-3. Charity portion sent to charity's Lightning address
-4. Both transactions happen automatically
+2. App's NWC wallet sends your portion to your Lightning address
+3. App's NWC wallet sends charity portion to charity's Lightning address
+4. Both transactions are verified by the app
+5. Donation totals tracked accurately for Impact Level XP
+
+**Why NWC Wallet?** Using the app's NWC wallet for all payments enables payment verification—the app can confirm donations succeeded and track accurate totals.
 
 ---
 

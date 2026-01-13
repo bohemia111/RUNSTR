@@ -54,6 +54,14 @@
 
 ---
 
+## Part 5: In-Person Events
+
+| Chapter | Title | Description |
+|---------|-------|-------------|
+| 17 | [In-Person Events](./17-in-person-events.md) | Meatspace races, sponsorship strategy, scaling to 100+ events |
+
+---
+
 ## Conclusion & Reference
 
 | Chapter | Title | Description |

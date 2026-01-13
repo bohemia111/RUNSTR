@@ -262,7 +262,7 @@ export const ManualEntryScreen: React.FC<ManualEntryScreenProps> = ({
     if (!savedWorkout || !signer || !userId) {
       setAlertConfig({
         title: 'Authentication Required',
-        message: 'Please log in with your Nostr key to post workouts.',
+        message: 'Please log in to post workouts.',
         buttons: [{ text: 'OK', style: 'default' }],
       });
       setAlertVisible(true);
@@ -289,13 +289,13 @@ export const ManualEntryScreen: React.FC<ManualEntryScreenProps> = ({
         setTimeout(() => {
           setAlertConfig({
             title: 'Success!',
-            message: 'Your workout has been saved to Nostr!',
+            message: 'Your workout has been saved!',
             buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
           });
           setAlertVisible(true);
         }, 300);
       } else {
-        throw new Error(result.error || 'Failed to save to Nostr');
+        throw new Error(result.error || 'Failed to save workout');
       }
     } catch (error) {
       console.error('[ManualEntry] Compete error:', error);
@@ -599,7 +599,7 @@ export const ManualEntryScreen: React.FC<ManualEntryScreenProps> = ({
               onSuccess={() => {
                 setAlertConfig({
                   title: 'Success!',
-                  message: 'Your workout has been shared to Nostr!',
+                  message: 'Your workout has been shared!',
                   buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
                 });
                 setAlertVisible(true);

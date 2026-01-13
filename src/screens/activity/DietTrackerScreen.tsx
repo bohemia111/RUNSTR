@@ -412,7 +412,7 @@ export const DietTrackerScreen: React.FC<DietTrackerScreenProps> = ({
         );
         setAlertConfig({
           title: 'Authentication Required',
-          message: 'Please log in with your Nostr key to post workouts.',
+          message: 'Please log in to post workouts.',
           buttons: [{ text: 'OK', style: 'default' }],
         });
         setAlertVisible(true);
@@ -458,14 +458,14 @@ export const DietTrackerScreen: React.FC<DietTrackerScreenProps> = ({
             title: 'Success!',
             message: `Your ${
               summaryType === 'meal' ? 'meal' : 'fast'
-            } has been saved to Nostr!`,
+            } has been saved!`,
             buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
           });
           setAlertVisible(true);
         }, 300);
       } else {
         console.error('❌ [DietTracker] Publishing failed:', result.error);
-        throw new Error(result.error || 'Failed to save to Nostr');
+        throw new Error(result.error || 'Failed to save workout');
       }
     } catch (error) {
       console.error('❌ [DietTracker] handleCompete error:', error);
@@ -956,7 +956,7 @@ export const DietTrackerScreen: React.FC<DietTrackerScreenProps> = ({
                 title: 'Success!',
                 message: `Your ${
                   summaryType === 'meal' ? 'meal' : 'fast'
-                } has been shared to Nostr with a beautiful card!`,
+                } has been shared with a beautiful card!`,
                 buttons: [
                   { text: 'OK', style: 'default', onPress: handleDone },
                 ],

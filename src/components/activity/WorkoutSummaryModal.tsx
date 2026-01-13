@@ -33,6 +33,8 @@ import { nostrProfileService } from '../../services/nostr/NostrProfileService';
 import type { NostrProfile } from '../../services/nostr/NostrProfileService';
 import { LocalTeamMembershipService } from '../../services/team/LocalTeamMembershipService';
 import { RewardNotificationManager } from '../../services/rewards/RewardNotificationManager';
+import { AutoCompetePreferencesService } from '../../services/activity/AutoCompetePreferencesService';
+import Toast from 'react-native-toast-message';
 
 interface WorkoutSummaryProps {
   visible: boolean;
@@ -60,16 +62,16 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
   onClose,
   workout,
 }) => {
-  const [isPosting, setIsPosting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [posted, setPosted] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [cardSaved, setCardSaved] = useState(false);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userProfile, setUserProfile] = useState<NostrProfile | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [preparedWorkout, setPreparedWorkout] =
     useState<PublishableWorkout | null>(null);
+  const [autoCompeteTriggered, setAutoCompeteTriggered] = useState(false);
 
   // Route achievement state
   const [routeAchievements, setRouteAchievements] = useState<{
@@ -198,11 +200,102 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
       if (visible && workout.localWorkoutId) {
         const status = await WorkoutStatusTracker.getStatus(workout.localWorkoutId);
         setSaved(status.competedInNostr);
-        setPosted(status.postedToNostr);
+        // Check if card was saved for this workout
+        const localWorkout = await LocalWorkoutStorageService.getWorkoutById(workout.localWorkoutId);
+        setCardSaved(!!localWorkout?.savedCard);
       }
     };
     checkExistingStatus();
   }, [visible, workout.localWorkoutId]);
+
+  // Reset auto-compete trigger when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setAutoCompeteTriggered(false);
+    }
+  }, [visible]);
+
+  // Auto-compete: trigger publish on modal open if enabled
+  useEffect(() => {
+    const attemptAutoCompete = async () => {
+      // Guards: only run once, only when visible, only if not already competed
+      if (!visible || !workout.localWorkoutId || autoCompeteTriggered || saved || isSaving) {
+        return;
+      }
+
+      const isEnabled = await AutoCompetePreferencesService.isAutoCompeteEnabled();
+      if (!isEnabled) return;
+
+      // Check if already competed (redundant safety check)
+      const status = await WorkoutStatusTracker.getStatus(workout.localWorkoutId);
+      if (status.competedInNostr) {
+        setSaved(true);
+        return;
+      }
+
+      // Mark as triggered to prevent duplicate attempts
+      setAutoCompeteTriggered(true);
+
+      // Trigger the publish
+      setIsSaving(true);
+      try {
+        const signer = await UnifiedSigningService.getInstance().getSigner();
+        const npub = await AsyncStorage.getItem('@runstr:npub');
+
+        if (!signer) {
+          Toast.show({
+            type: 'error',
+            text1: 'Auto-compete failed',
+            text2: 'No authentication found. Tap Compete to retry.',
+            position: 'top',
+            visibilityTime: 4000,
+          });
+          return;
+        }
+
+        const publishableWorkout = await createPublishableWorkout();
+        if (!publishableWorkout) return;
+
+        const result = await workoutPublishingService.saveWorkoutToNostr(
+          publishableWorkout,
+          signer,
+          npub || 'unknown'
+        );
+
+        if (result.success) {
+          setSaved(true);
+          const workoutId = workout.localWorkoutId || publishableWorkout.id;
+          await WorkoutStatusTracker.markAsCompeted(workoutId, result.eventId);
+          if (workout.localWorkoutId && result.eventId) {
+            await LocalWorkoutStorageService.markAsSynced(workout.localWorkoutId, result.eventId);
+          }
+          console.log('[AutoCompete] Workout automatically published to Nostr');
+          // No alert for auto-compete success - button just shows "Competing"
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Auto-compete failed',
+            text2: 'Tap Compete to retry manually.',
+            position: 'top',
+            visibilityTime: 4000,
+          });
+        }
+      } catch (error) {
+        console.error('[AutoCompete] Error:', error);
+        Toast.show({
+          type: 'error',
+          text1: 'Auto-compete failed',
+          text2: 'Tap Compete to retry manually.',
+          position: 'top',
+          visibilityTime: 4000,
+        });
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    attemptAutoCompete();
+  }, [visible, workout.localWorkoutId, autoCompeteTriggered, saved, isSaving]);
 
   const formatDistance = (meters: number): string => {
     const km = meters / 1000;
@@ -371,10 +464,10 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
         // will show the reward modal with donation split info (triggered by DailyRewardService)
         setAlertState({
           visible: true,
-          title: 'Saved to Nostr!',
+          title: 'Workout Saved!',
           message: result.rewardEarned
             ? 'Your workout has been saved! Check your reward notification.'
-            : 'Your workout has been saved to Nostr!',
+            : 'Your workout has been saved!',
         });
       } else {
         setAlertState({
@@ -684,29 +777,20 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
             <TouchableOpacity
               style={[
                 styles.actionButton,
-                styles.postButton,
-                posted && styles.disabledButton,
+                styles.saveCardButton,
+                cardSaved && styles.disabledButton,
               ]}
               onPress={handleShowSocialModal}
-              disabled={isPosting || posted}
+              disabled={cardSaved}
             >
-              {isPosting ? (
-                <ActivityIndicator
-                  size="small"
-                  color={theme.colors.background}
-                />
-              ) : (
-                <>
-                  <Ionicons
-                    name={posted ? 'checkmark-circle' : 'chatbubble-outline'}
-                    size={20}
-                    color={theme.colors.accentText}
-                  />
-                  <Text style={styles.postButtonText}>
-                    {posted ? 'Shared' : 'Post'}
-                  </Text>
-                </>
-              )}
+              <Ionicons
+                name={cardSaved ? 'checkmark-circle' : 'image-outline'}
+                size={20}
+                color={theme.colors.accentText}
+              />
+              <Text style={styles.saveCardButtonText}>
+                {cardSaved ? 'Saved' : 'Save'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -739,8 +823,8 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
           {/* Info Text */}
           <View style={styles.infoContainer}>
             <Text style={styles.infoText}>
-              <Text style={styles.infoBold}>Post:</Text> Share with your
-              followers on social media
+              <Text style={styles.infoBold}>Save:</Text> Create a shareable
+              workout card (screenshot to share)
             </Text>
             <Text style={styles.infoText}>
               <Text style={styles.infoBold}>Compete:</Text> Enter this workout
@@ -763,25 +847,14 @@ export const WorkoutSummaryModal: React.FC<WorkoutSummaryProps> = ({
         userId={userId}
         userAvatar={userProfile?.picture}
         userName={userProfile?.name || userProfile?.display_name}
+        localWorkoutId={workout.localWorkoutId}
         onClose={() => {
           setShowSocialModal(false);
           setPreparedWorkout(null);
         }}
-        onSuccess={async () => {
-          setPosted(true);
+        onSuccess={() => {
+          setCardSaved(true);
           setShowSocialModal(false);
-
-          // Mark as posted in persistent status tracker (prevents duplicate posts)
-          if (preparedWorkout?.id || workout.localWorkoutId) {
-            try {
-              const workoutId = workout.localWorkoutId || preparedWorkout?.id || '';
-              await WorkoutStatusTracker.markAsPosted(workoutId);
-              console.log(`✅ Marked workout ${workoutId} as posted in status tracker`);
-            } catch (statusError) {
-              console.warn('⚠️ Failed to update workout status tracker:', statusError);
-            }
-          }
-
           setPreparedWorkout(null);
         }}
       />
@@ -885,7 +958,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.medium,
     gap: 8,
   },
-  postButton: {
+  saveCardButton: {
     backgroundColor: theme.colors.accent, // #FF7B1C
   },
   saveButton: {
@@ -894,7 +967,7 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.5,
   },
-  postButtonText: {
+  saveCardButtonText: {
     color: theme.colors.accentText,
     fontSize: 16,
     fontWeight: theme.typography.weights.bold,

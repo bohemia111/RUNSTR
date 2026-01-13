@@ -21,12 +21,14 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- 2. Store secrets in Vault (one-time setup)
--- NOTE: These need to be run manually with actual values!
--- The migration file uses placeholders.
+-- NOTE: These MUST be run manually with actual values!
+-- Without these, the cron job will silently fail.
 --
 -- Run these in SQL Editor with your actual values:
--- SELECT vault.create_secret('https://YOUR_PROJECT.supabase.co', 'project_url');
+-- SELECT vault.create_secret('https://cvoepeskjueskdfrpsnv.supabase.co', 'project_url');
 -- SELECT vault.create_secret('YOUR_SERVICE_ROLE_KEY', 'service_role_key');
+--
+-- IMPORTANT: The project_url MUST include https:// prefix!
 
 -- 3. Create the sync function that pg_cron will call
 -- This function uses pg_net to make an HTTP request to the edge function
@@ -48,7 +50,8 @@ BEGIN
   FROM vault.decrypted_secrets
   WHERE name = 'service_role_key';
 
-  -- Make HTTP request to edge function
+  -- Make HTTP request to edge function with 15 second timeout
+  -- (default 5s is too short, sync function takes ~8-10s)
   IF project_url IS NOT NULL AND service_key IS NOT NULL THEN
     PERFORM net.http_post(
       url := project_url || '/functions/v1/sync-nostr-workouts',
@@ -59,7 +62,8 @@ BEGIN
       body := jsonb_build_object(
         'triggered_at', now(),
         'source', 'pg_cron'
-      )
+      ),
+      timeout_milliseconds := 15000
     );
 
     RAISE LOG 'Triggered sync-nostr-workouts at %', now();
@@ -90,6 +94,12 @@ GRANT EXECUTE ON FUNCTION public.trigger_nostr_sync() TO postgres;
 --
 -- Check recent job runs:
 -- SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;
+--
+-- Check pg_net HTTP responses (should show status_code=200):
+-- SELECT id, status_code, created, error_msg FROM net._http_response ORDER BY created DESC LIMIT 10;
+--
+-- Check vault secrets are configured:
+-- SELECT name, created_at FROM vault.secrets WHERE name IN ('project_url', 'service_role_key');
 --
 -- Manually trigger sync:
 -- SELECT public.trigger_nostr_sync();

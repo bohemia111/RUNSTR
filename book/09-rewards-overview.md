@@ -1,5 +1,19 @@
 # Chapter 9: Rewards Overview
 
+## Summary
+
+RUNSTR pays you real Bitcoin for staying active—not points, not tokens, but actual satoshis delivered to your Lightning wallet. Complete a workout and earn 50 sats. Hit step milestones throughout your day and earn 5 sats for every 1,000 steps. These micropayments accumulate over time, creating a tangible financial incentive that compounds alongside your fitness gains.
+
+The daily workout reward system is straightforward: save one qualifying workout per day and receive 50 sats. Workouts tracked via GPS in the app, manually entered, or synced from Apple Health and Health Connect all qualify. The app uses atomic markers to prevent duplicate rewards—only your first qualifying workout of the day triggers payment, even if you save multiple workouts in rapid succession.
+
+Step rewards work on a milestone system that resets at midnight. Every time your step count crosses a 1,000-step threshold (1k, 2k, 3k, and so on), you earn 5 sats. The app polls your device's step count every 60 seconds while active, automatically detecting and rewarding new milestones. There's no cap on step rewards—the more you move, the more you earn.
+
+To receive rewards, you simply enter your Lightning address in the app settings. RUNSTR supports any Lightning address from wallets like Strike, Alby, Zeus, or Wallet of Satoshi. When you earn a reward, the app's NWC wallet requests an invoice from your Lightning address and sends payment, enabling verification that the sats actually arrived.
+
+The rewards system follows a silent failure philosophy: if a payment fails for any reason, your workout still saves and your experience remains uninterrupted. Rewards are designed as a bonus that enhances your fitness journey, never as a blocker that frustrates it. You'll see toast notifications when rewards arrive, but you'll never see error modals demanding attention when something goes wrong on the payment side.
+
+---
+
 ## Fitness = Bitcoin
 
 RUNSTR's core philosophy: **your daily workout earns real Bitcoin**.
@@ -18,8 +32,8 @@ This creates a direct incentive loop:
 
 - One reward per 24-hour period
 - Requires saving workout to the app
-- GPS-tracked or manual entry qualifies
-- HealthKit/Garmin imports do NOT qualify (prevents gaming)
+- GPS-tracked, manual entry, or health imports qualify
+- Apple Health and Health Connect imports qualify for rewards
 
 ### 2. Step Milestone Rewards
 **5 sats per 1,000 steps** throughout the day.

@@ -99,7 +99,6 @@ export const ImpactLevelCard: React.FC<ImpactLevelCardProps> = ({ pubkey }) => {
       {/* Header row with title and tap hint */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
-          <Ionicons name="trophy" size={16} color="#FF9D42" />
           <Text style={styles.headerTitle}>IMPACT LEVEL</Text>
         </View>
         <TouchableOpacity

@@ -28,7 +28,7 @@ import {
   getInvoiceTimeRemaining,
 } from '../../utils/bolt11Parser';
 import { openInCashApp } from '../../utils/walletDeepLinks';
-import { RewardSenderWallet } from '../../services/rewards/RewardSenderWallet';
+import { NWCGatewayService } from '../../services/rewards/NWCGatewayService';
 import { DonationTrackingService } from '../../services/donation/DonationTrackingService';
 import { ImpactLevelService } from '../../services/impact/ImpactLevelService';
 
@@ -264,9 +264,9 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
 
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const result = await RewardSenderWallet.lookupInvoice(hash);
+        const result = await NWCGatewayService.lookupInvoice(hash);
 
-        if (result.settled) {
+        if (result.success && result.settled) {
           console.log('[ExternalZapModal] ✅ Payment verified!');
           stopPaymentPolling();
 
@@ -378,21 +378,21 @@ export const ExternalZapModal: React.FC<ExternalZapModalProps> = ({
       if (isCharityDonation) {
         console.log('[ExternalZapModal] 🔄 Creating RUNSTR wallet invoice for charity donation');
 
-        const invoiceResult = await RewardSenderWallet.createInvoice(
+        const invoiceResult = await NWCGatewayService.createInvoice(
           amount,
           memo || `Donation to ${recipientName}`
         );
 
-        if (!invoiceResult.success || !invoiceResult.invoice || !invoiceResult.paymentHash) {
+        if (!invoiceResult.success || !invoiceResult.invoice || !invoiceResult.payment_hash) {
           throw new Error(invoiceResult.error || 'Failed to create invoice');
         }
 
         setInvoice(invoiceResult.invoice);
-        setPaymentHash(invoiceResult.paymentHash);
+        setPaymentHash(invoiceResult.payment_hash);
         console.log('[ExternalZapModal] ✅ RUNSTR invoice created, starting polling');
 
         // Start polling for payment verification
-        startPaymentPolling(invoiceResult.paymentHash);
+        startPaymentPolling(invoiceResult.payment_hash);
       } else {
         // Standard flow - get invoice from recipient's Lightning address
         const lnAddress = lightningAddress || recipientNpub;

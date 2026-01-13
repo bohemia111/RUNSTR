@@ -1,22 +1,19 @@
 /**
  * DailyRewardService - Automated workout rewards
  *
- * REWARD FLOW:
+ * REWARD FLOW (v2 - Server-Side):
  * 1. User saves qualifying workout locally (≥1km distance)
- * 2. Check eligibility (once per day limit)
+ * 2. Check eligibility (once per day limit, local check only for UI)
  * 3. Get user's Lightning address (settings first, then profile fallback)
- * 4. Request Lightning invoice from their address via LNURL protocol
- * 5. Reward sender wallet (app's wallet) pays the invoice
- * 6. User receives 21 sats to their Lightning address
+ * 4. Call Supabase claim-reward function (handles eligibility + payment)
+ * 5. Server requests invoice via LNURL and pays via NWC
+ * 6. User receives 50 sats to their Lightning address
  *
- * LIGHTNING ADDRESS PRIORITY:
- * 1. Settings-stored address (same as embedded in kind 1301 notes)
- * 2. Nostr profile lud16 field (fallback)
- *
- * PAYMENT ARCHITECTURE:
- * - User provides: Lightning address in settings or Nostr profile
- * - App requests: Invoice from Lightning address via LNURL
- * - Reward sender wallet: Pays invoice using REWARD_SENDER_NWC
+ * ARCHITECTURE (v2):
+ * - NWC credentials stored SERVER-SIDE in Supabase env vars
+ * - Rate limiting done SERVER-SIDE by Lightning address hash
+ * - Client never sees NWC credentials (more secure)
+ * - Can rotate NWC credentials without app update
  *
  * SILENT FAILURE: If any step fails, user never sees error
  * Workout publishing always succeeds regardless of reward status
@@ -25,14 +22,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { REWARD_CONFIG, REWARD_STORAGE_KEYS } from '../../config/rewards';
-import { RewardSenderWallet } from './RewardSenderWallet';
 import { ProfileService } from '../user/profileService';
 import { RewardLightningAddressService } from './RewardLightningAddressService';
-import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import { RewardNotificationManager, DonationSplit } from './RewardNotificationManager';
 import { getCharityById, Charity } from '../../constants/charities';
 import { DonationTrackingService } from '../donation/DonationTrackingService';
 import { PledgeService } from '../pledge/PledgeService';
+import { supabase } from '../../utils/supabase';
 
 // Storage keys for donation settings
 // Uses same key as TeamsScreen - teams ARE charities (with lightning addresses)
@@ -46,6 +42,11 @@ const DEBUG_REWARDS = false;
 // Only these sources trigger daily rewards
 // Note: 'daily_steps' removed - step rewards come from StepRewardService (5 sats per 1k steps)
 const REWARD_ELIGIBLE_SOURCES = ['gps_tracker', 'manual_entry'];
+
+// Cardio activity types that qualify for daily rewards
+// Only these workout types earn the 50 sats daily reward
+// Non-cardio activities (strength, diet, meditation) do NOT earn rewards
+const CARDIO_ACTIVITY_TYPES = ['running', 'walking', 'cycling'];
 
 export interface RewardResult {
   success: boolean;
@@ -95,24 +96,16 @@ function addRewardDiagnostic(
 }
 
 /**
- * Get combined diagnostics from DailyRewardService and RewardSenderWallet
+ * Get diagnostics from DailyRewardService
  * Useful for debugging reward issues in Settings
  */
 export function getRewardDiagnostics(): {
   rewardAttempts: RewardDiagnosticEntry[];
-  walletDiagnostics: import('./RewardSenderWallet').WalletDiagnosticEntry[];
-  walletStatus: {
-    initialized: boolean;
-    lastError: string | null;
-  };
+  serverSidePayments: boolean;
 } {
   return {
     rewardAttempts: [...rewardDiagnosticLog],
-    walletDiagnostics: RewardSenderWallet.getDiagnostics(),
-    walletStatus: {
-      initialized: RewardSenderWallet.isInitialized(),
-      lastError: RewardSenderWallet.getLastError(),
-    },
+    serverSidePayments: true, // v2: Payments are handled server-side via Supabase
   };
 }
 
@@ -149,22 +142,30 @@ class DailyRewardServiceClass {
 
   /**
    * Check if workout should trigger streak reward
-   * Only user-generated workouts on a new day trigger rewards
+   * Only user-generated cardio workouts on a new day trigger rewards
    *
    * This method combines source filtering with atomic "streak incremented today" tracking
    * to prevent race conditions when multiple workouts are saved concurrently.
    *
    * @param userPubkey - User's public key
    * @param workoutSource - The workout.source field (e.g., 'gps_tracker', 'imported_nostr')
+   * @param workoutType - The workout.type field (e.g., 'running', 'strength')
    */
   async checkStreakAndReward(
     userPubkey: string,
-    workoutSource: string
+    workoutSource: string,
+    workoutType?: string
   ): Promise<RewardResult> {
     // Step 1: Filter by source - only user-generated workouts
     if (!REWARD_ELIGIBLE_SOURCES.includes(workoutSource)) {
       console.log(`[Reward] Skipping reward for ${workoutSource} (not user-generated)`);
       return { success: false, reason: 'source_not_eligible' };
+    }
+
+    // Step 1.5: Filter by activity type - only cardio workouts earn rewards
+    if (workoutType && !CARDIO_ACTIVITY_TYPES.includes(workoutType)) {
+      console.log(`[Reward] Skipping reward for ${workoutType} (not cardio activity)`);
+      return { success: false, reason: 'activity_type_not_eligible' };
     }
 
     // Step 2: Atomic streak check - only first workout of the day PER USER
@@ -293,54 +294,6 @@ class DailyRewardServiceClass {
   }
 
   /**
-   * Request Lightning invoice from user's Lightning address
-   *
-   * Uses LNURL protocol to request an invoice from any Lightning address.
-   * This allows us to pay users without them having NWC setup.
-   *
-   * PAYMENT FLOW:
-   * 1. Get Lightning address from user profile (e.g., alice@getalby.com)
-   * 2. Use LNURL to request invoice for 50 sats
-   * 3. Receive BOLT11 invoice that can be paid by any Lightning wallet
-   *
-   * @param lightningAddress - User's Lightning address
-   * @param amount - Amount in satoshis
-   * @returns Invoice string if successful, null otherwise
-   */
-  private async requestInvoiceFromUserAddress(
-    lightningAddress: string,
-    amount: number
-  ): Promise<string | null> {
-    try {
-      console.log(
-        '[Reward] Requesting invoice from Lightning address:',
-        lightningAddress
-      );
-
-      // Request invoice via LNURL protocol
-      const { invoice } = await getInvoiceFromLightningAddress(
-        lightningAddress,
-        amount,
-        `Daily workout reward from RUNSTR! ⚡`
-      );
-
-      if (invoice) {
-        console.log('[Reward] Successfully got invoice from Lightning address');
-        return invoice;
-      }
-
-      console.log('[Reward] Failed to get invoice from Lightning address');
-      return null;
-    } catch (error) {
-      console.error(
-        '[Reward] Error getting invoice from Lightning address:',
-        error
-      );
-      return null;
-    }
-  }
-
-  /**
    * Record that user claimed reward
    * Saves timestamp for eligibility checking and updates weekly total
    */
@@ -464,15 +417,62 @@ class DailyRewardServiceClass {
   }
 
   /**
+   * Call Supabase claim-reward edge function
+   * Server handles: eligibility check, LNURL invoice request, NWC payment
+   *
+   * @param lightningAddress - Recipient's Lightning address
+   * @param rewardType - 'workout' or 'steps'
+   * @param amountSats - For steps, amount being claimed (default: 5)
+   * @returns Result with success status and amount paid
+   */
+  private async claimRewardViaSupabase(
+    lightningAddress: string,
+    rewardType: 'workout' | 'steps',
+    amountSats?: number
+  ): Promise<{
+    success: boolean;
+    amount_paid?: number;
+    reason?: string;
+    remaining_step_allowance?: number;
+  }> {
+    try {
+      if (!supabase) {
+        console.error('[Reward] Supabase not configured');
+        return { success: false, reason: 'supabase_not_configured' };
+      }
+
+      console.log(`[Reward] Calling claim-reward: ${rewardType} to ${lightningAddress}`);
+
+      const { data, error } = await supabase.functions.invoke('claim-reward', {
+        body: {
+          lightning_address: lightningAddress,
+          reward_type: rewardType,
+          amount_sats: amountSats,
+        },
+      });
+
+      if (error) {
+        console.error('[Reward] Supabase function error:', error);
+        return { success: false, reason: 'supabase_error' };
+      }
+
+      console.log('[Reward] claim-reward response:', data);
+      return data;
+    } catch (error) {
+      console.error('[Reward] Error calling claim-reward:', error);
+      return { success: false, reason: 'network_error' };
+    }
+  }
+
+  /**
    * Send reward to pledge destination (captain or charity)
    * Called when user has an active pledge - bypasses normal charity split
    *
-   * PLEDGE FLOW:
-   * 1. Request invoice from pledge destination's Lightning address
-   * 2. Pay full reward amount (no split - user's charity % is paused)
-   * 3. Increment pledge progress
+   * PLEDGE FLOW (v2 - Server-Side):
+   * 1. Call Supabase claim-reward with pledge destination's Lightning address
+   * 2. Server handles invoice request and NWC payment
+   * 3. Increment pledge progress locally
    * 4. Show pledge-specific notification
-   * 5. If pledge complete, show completion notification
    *
    * @param userPubkey - User's public key
    * @param pledge - Active pledge from PledgeService
@@ -499,29 +499,14 @@ class DailyRewardServiceClass {
         );
       }
 
-      // Request invoice from pledge destination
-      const invoice = await this.requestInvoiceFromUserAddress(
+      // Call Supabase edge function to handle payment
+      const result = await this.claimRewardViaSupabase(
         pledge.destinationAddress,
-        totalAmount
+        'workout'
       );
 
-      if (!invoice) {
-        console.log('[Reward] Failed to get invoice from pledge destination');
-        return {
-          success: false,
-          reason: 'pledge_invoice_failed',
-        };
-      }
-
-      // Pay the invoice with forward tracking metadata
-      const paymentResult = await RewardSenderWallet.sendRewardPayment(
-        invoice,
-        undefined,
-        { type: 'pledge_reward', recipientLightningAddress: pledge.destinationAddress }
-      );
-
-      if (!paymentResult.success) {
-        console.log('[Reward] Failed to pay pledge invoice');
+      if (!result.success) {
+        console.log('[Reward] Failed to pay pledge via Supabase:', result.reason);
         return {
           success: false,
           reason: 'pledge_payment_failed',
@@ -544,22 +529,15 @@ class DailyRewardServiceClass {
 
       if (isComplete) {
         console.log('[Reward] Pledge completed!');
-        RewardNotificationManager.showPledgeRewardSent(
-          totalAmount,
-          pledge.eventName,
-          pledge.destinationName,
-          newCompletedCount,
-          pledge.totalWorkouts
-        );
-      } else {
-        RewardNotificationManager.showPledgeRewardSent(
-          totalAmount,
-          pledge.eventName,
-          pledge.destinationName,
-          newCompletedCount,
-          pledge.totalWorkouts
-        );
       }
+
+      RewardNotificationManager.showPledgeRewardSent(
+        totalAmount,
+        pledge.eventName,
+        pledge.destinationName,
+        newCompletedCount,
+        pledge.totalWorkouts
+      );
 
       console.log(
         `[Reward] ✅ Pledge reward sent:`,
@@ -680,62 +658,55 @@ class DailyRewardServiceClass {
       let userPaymentSuccess = false;
       let charityPaymentSuccess = false;
 
-      // 1. Pay user their portion (required)
+      // 1. Pay user their portion via Supabase (server handles rate limiting)
       if (split.userAmount > 0) {
-        const userInvoice = await this.requestInvoiceFromUserAddress(
+        const result = await this.claimRewardViaSupabase(
           lightningAddress,
-          split.userAmount
+          'workout'
         );
-        if (userInvoice) {
-          const result = await RewardSenderWallet.sendRewardPayment(
-            userInvoice,
-            undefined,
-            { type: 'daily_reward', recipientLightningAddress: lightningAddress }
-          );
-          userPaymentSuccess = result.success;
-          console.log('[Reward] User payment:', userPaymentSuccess ? '✅' : '❌');
+
+        if (result.success) {
+          userPaymentSuccess = true;
+          console.log('[Reward] User payment: ✅');
+        } else if (result.reason === 'already_claimed') {
+          // Already claimed today via another device or reinstall
+          console.log('[Reward] Already claimed today (server-side check)');
+          return { success: false, reason: 'already_claimed_today' };
+        } else {
+          console.log('[Reward] User payment: ❌', result.reason);
         }
       } else {
         // If user amount is 0 (100% donation), skip user payment
         userPaymentSuccess = true;
       }
 
-      // 2. Pay charity (if amount > 0)
-      if (split.charityAmount > 0 && charity?.lightningAddress) {
+      // 2. Pay charity (if amount > 0 and user payment succeeded)
+      if (userPaymentSuccess && split.charityAmount > 0 && charity?.lightningAddress) {
         try {
-          const charityInvoice = await this.requestInvoiceFromUserAddress(
+          const result = await this.claimRewardViaSupabase(
             charity.lightningAddress,
-            split.charityAmount
+            'workout'
           );
-          if (charityInvoice) {
-            const result = await RewardSenderWallet.sendRewardPayment(
-              charityInvoice,
-              undefined,
-              { type: 'charity_donation', recipientLightningAddress: charity.lightningAddress }
-            );
-            charityPaymentSuccess = result.success;
-            console.log(`[Reward] Charity (${charity.name}) payment:`, charityPaymentSuccess ? '✅' : '❌');
+          charityPaymentSuccess = result.success;
+          console.log(`[Reward] Charity (${charity.name}) payment:`, charityPaymentSuccess ? '✅' : '❌');
 
-            // Track successful charity donations for leaderboard
-            if (charityPaymentSuccess) {
-              await DonationTrackingService.recordDonation({
-                donorPubkey: userPubkey,
-                amount: split.charityAmount,
-                charityId: charity.id,
-                charityName: charity.name,
-              });
-            }
+          // Track successful charity donations for leaderboard
+          if (charityPaymentSuccess) {
+            await DonationTrackingService.recordDonation({
+              donorPubkey: userPubkey,
+              amount: split.charityAmount,
+              charityId: charity.id,
+              charityName: charity.name,
+            });
           }
         } catch (error) {
           console.error('[Reward] Charity payment error:', error);
         }
       }
 
-      // Note: Team payments disabled until teams have lightning addresses configured
-
       // Consider reward successful if user payment worked
       if (userPaymentSuccess || split.userAmount === 0) {
-        // Record the full reward amount (for stats)
+        // Record the full reward amount locally (for stats/UI)
         await this.recordReward(userPubkey, totalAmount);
 
         console.log(
@@ -747,7 +718,6 @@ class DailyRewardServiceClass {
         addRewardDiagnostic(userPubkey, 'send', true, undefined, totalAmount);
 
         // Show branded reward notification with donation split info
-        // Only show charity in split if charity payment actually succeeded
         const donationSplit: DonationSplit = {
           userAmount: split.userAmount,
           charityAmount: charityPaymentSuccess ? split.charityAmount : 0,
@@ -768,7 +738,7 @@ class DailyRewardServiceClass {
         addRewardDiagnostic(userPubkey, 'send', false, 'payment_failed');
 
         if (DEBUG_REWARDS) {
-          Alert.alert('Reward Debug', 'User payment failed!\n\nPossible causes:\n- Reward wallet empty\n- NWC connection failed\n- Invoice expired');
+          Alert.alert('Reward Debug', 'User payment failed!\n\nPossible causes:\n- Reward service unavailable\n- Lightning address issue');
         }
 
         return {

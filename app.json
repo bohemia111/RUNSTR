@@ -2,7 +2,7 @@
   "expo": {
     "name": "RUNSTR",
     "slug": "runstr.project",
-    "version": "1.4.9",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/images/adaptive-icon.png",
     "scheme": "runstr",
@@ -52,7 +52,7 @@
       "appleTeamId": "SF8967F5M9"
     },
     "android": {
-      "versionCode": 149,
+      "versionCode": 150,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
@@ -163,7 +163,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 600,
+          "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000000",
           "dark": {

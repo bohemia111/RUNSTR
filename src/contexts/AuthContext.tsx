@@ -22,6 +22,7 @@ import type { User } from '../types';
 import { PerformanceLogger } from '../utils/PerformanceLogger';
 import { NostrFetchLogger } from '../utils/NostrFetchLogger';
 import { LocalTeamMembershipService } from '../services/team/LocalTeamMembershipService';
+import VerificationService from '../services/verification/VerificationService';
 
 // Authentication state interface
 interface AuthState {
@@ -391,6 +392,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setInitError(null);
         }, 100);
 
+        // Fetch verification code in background (non-blocking)
+        if (result.user?.npub) {
+          VerificationService.fetchAndStoreCode(result.user.npub).catch((err) => {
+            console.warn('[Auth] Verification code fetch failed:', err);
+          });
+        }
+
         return { success: true };
       } catch (error) {
         console.error('❌ AuthContext: Sign in error:', error);
@@ -458,6 +466,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsConnected(true);
       setConnectionStatus('Connected');
       setInitError(null);
+
+      // Fetch verification code in background (non-blocking)
+      if (result.user?.npub) {
+        VerificationService.fetchAndStoreCode(result.user.npub).catch((err) => {
+          console.warn('[Auth] Verification code fetch failed:', err);
+        });
+      }
 
       return { success: true };
     } catch (error) {
@@ -531,6 +546,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { appCache } = await import('../utils/cache');
       await appCache.set('current_user_profile', result.user, 5 * 60 * 1000);
 
+      // Fetch verification code in background (non-blocking)
+      if (result.user?.npub) {
+        VerificationService.fetchAndStoreCode(result.user.npub).catch((err) => {
+          console.warn('[Auth] Verification code fetch failed:', err);
+        });
+      }
+
       return { success: true };
     } catch (error) {
       console.error('❌ AuthContext: Amber Sign-In error:', error);
@@ -582,6 +604,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         refreshProfileInBackground();
       }, 1000);
 
+      // Fetch verification code in background (non-blocking)
+      if (result.user?.npub) {
+        VerificationService.fetchAndStoreCode(result.user.npub).catch((err) => {
+          console.warn('[Auth] Verification code fetch failed:', err);
+        });
+      }
+
       return { success: true };
     } catch (error) {
       console.error('❌ AuthContext: Apple Sign-In error:', error);
@@ -620,6 +649,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } catch (cleanupError) {
         console.warn('⚠️ AuthContext: Notification cleanup failed:', cleanupError);
       }
+
+      // Clear verification code
+      await VerificationService.clearCode();
+      console.log('✅ AuthContext: Verification code cleared');
 
       // Clear storage and caches
       await AuthService.signOut();

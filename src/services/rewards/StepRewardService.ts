@@ -1,33 +1,34 @@
 /**
  * StepRewardService - Automated step milestone rewards
  *
- * REWARD FLOW:
+ * REWARD FLOW (v2 - Server-Side):
  * 1. App polls steps periodically while active
- * 2. For each 1,000 step milestone crossed, check if already rewarded today
- * 3. If new milestone, request invoice from user's Lightning address
- * 4. Pay 5 sats per milestone via RewardSenderWallet
+ * 2. For each 1,000 step milestone crossed, check if already rewarded locally
+ * 3. Call Supabase claim-reward function (handles eligibility + payment)
+ * 4. Server enforces 50 sat daily cap and pays via NWC
  * 5. Show toast notification for each reward
  *
- * STORAGE:
- * - Milestones rewarded today stored per-date to auto-reset at midnight
- * - Weekly totals tracked separately for display
+ * ARCHITECTURE (v2):
+ * - NWC credentials stored SERVER-SIDE in Supabase env vars
+ * - Daily 50 sat cap enforced SERVER-SIDE by Lightning address hash
+ * - Local milestone tracking for UI only (server is source of truth)
  *
  * SILENT FAILURE: If payment fails, milestone is NOT marked as rewarded
  * so it will retry on next poll
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RewardSenderWallet } from './RewardSenderWallet';
 import { RewardLightningAddressService } from './RewardLightningAddressService';
 import { ProfileService } from '../user/profileService';
-import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import Toast from 'react-native-toast-message';
 import { REWARD_CONFIG } from '../../config/rewards';
+import { supabase } from '../../utils/supabase';
 
 // Step reward configuration
 const STEP_CONFIG = {
-  SATS_PER_MILESTONE: 5,      // 5 sats per 1k steps
-  MILESTONE_INCREMENT: 1000,  // Every 1,000 steps
+  SATS_PER_MILESTONE: 5,        // 5 sats per 1k steps
+  MILESTONE_INCREMENT: 1000,    // Every 1,000 steps
+  MAX_DAILY_SATS: 50,           // Server-enforced cap (10 milestones max)
   ENABLED: true,
 };
 
@@ -166,8 +167,50 @@ class StepRewardServiceClass {
   }
 
   /**
-   * Request invoice and pay a milestone reward
-   * Pays 100% to user (no donation split for step rewards)
+   * Call Supabase claim-reward edge function for step rewards
+   * Server handles: eligibility check (50 sat cap), LNURL invoice, NWC payment
+   */
+  private async claimStepRewardViaSupabase(
+    lightningAddress: string,
+    amountSats: number
+  ): Promise<{
+    success: boolean;
+    amount_paid?: number;
+    reason?: string;
+    remaining_step_allowance?: number;
+  }> {
+    try {
+      if (!supabase) {
+        console.error('[StepReward] Supabase not configured');
+        return { success: false, reason: 'supabase_not_configured' };
+      }
+
+      console.log(`[StepReward] Calling claim-reward: steps ${amountSats} sats`);
+
+      const { data, error } = await supabase.functions.invoke('claim-reward', {
+        body: {
+          lightning_address: lightningAddress,
+          reward_type: 'steps',
+          amount_sats: amountSats,
+        },
+      });
+
+      if (error) {
+        console.error('[StepReward] Supabase function error:', error);
+        return { success: false, reason: 'supabase_error' };
+      }
+
+      console.log('[StepReward] claim-reward response:', data);
+      return data;
+    } catch (error) {
+      console.error('[StepReward] Error calling claim-reward:', error);
+      return { success: false, reason: 'network_error' };
+    }
+  }
+
+  /**
+   * Pay a milestone reward via Supabase
+   * Server handles invoice request and NWC payment with 50 sat daily cap
    */
   private async payMilestoneReward(
     userPubkey: string,
@@ -188,41 +231,32 @@ class StepRewardServiceClass {
         };
       }
 
-      // Request invoice for full amount
-      console.log(`[StepReward] Requesting invoice for ${amount} sats (milestone ${milestone})`);
-      const { invoice } = await getInvoiceFromLightningAddress(
-        lightningAddress,
-        amount,
-        `RUNSTR step reward! ${milestone.toLocaleString()} steps`
-      );
-
-      if (!invoice) {
-        console.log('[StepReward] Failed to get invoice');
-        return {
-          milestone,
-          amount,
-          success: false,
-          error: 'Invoice request failed',
-        };
-      }
-
-      // Pay the invoice with forward tracking metadata
-      const result = await RewardSenderWallet.sendRewardPayment(
-        invoice,
-        undefined,
-        { type: 'step_reward', recipientLightningAddress: lightningAddress }
-      );
+      // Call Supabase to handle payment (server enforces 50 sat cap)
+      console.log(`[StepReward] Claiming ${amount} sats for milestone ${milestone}`);
+      const result = await this.claimStepRewardViaSupabase(lightningAddress, amount);
 
       if (result.success) {
-        console.log(`[StepReward] ✅ Milestone ${milestone} paid: ${amount} sats to user`);
-        return { milestone, amount, success: true };
+        const amountPaid = result.amount_paid || amount;
+        console.log(`[StepReward] ✅ Milestone ${milestone} paid: ${amountPaid} sats to user`);
+        return { milestone, amount: amountPaid, success: true };
+      }
+
+      // Check if daily cap reached
+      if (result.reason === 'daily_cap_reached') {
+        console.log('[StepReward] Daily step cap reached (50 sats)');
+        return {
+          milestone,
+          amount: 0,
+          success: false,
+          error: 'Daily cap reached',
+        };
       }
 
       return {
         milestone,
         amount,
         success: false,
-        error: result.error || 'Payment failed',
+        error: result.reason || 'Payment failed',
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -331,9 +365,17 @@ class StepRewardServiceClass {
 
       console.log(`[StepReward] New milestones to reward: ${newMilestones.join(', ')}`);
 
-      // Process each new milestone
+      // Process each new milestone (stop if daily cap reached)
       let totalEarned = 0;
+      let dailyCapReached = false;
+
       for (const milestone of newMilestones) {
+        // Skip remaining milestones if cap reached
+        if (dailyCapReached) {
+          console.log(`[StepReward] Skipping milestone ${milestone} - daily cap reached`);
+          break;
+        }
+
         const result = await this.payMilestoneReward(userPubkey, milestone);
         rewards.push(result);
 
@@ -344,6 +386,9 @@ class StepRewardServiceClass {
 
           // Show toast for successful reward
           this.showRewardToast(milestone, result.amount);
+        } else if (result.error === 'Daily cap reached') {
+          // Server said cap reached, stop processing
+          dailyCapReached = true;
         }
       }
 
@@ -418,6 +463,13 @@ class StepRewardServiceClass {
    */
   getMilestoneIncrement(): number {
     return STEP_CONFIG.MILESTONE_INCREMENT;
+  }
+
+  /**
+   * Get max daily sats from step rewards
+   */
+  getMaxDailySats(): number {
+    return STEP_CONFIG.MAX_DAILY_SATS;
   }
 }
 

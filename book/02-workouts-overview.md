@@ -1,5 +1,19 @@
 # Chapter 2: Workouts Overview
 
+## Summary
+
+RUNSTR transforms your smartphone into a powerful GPS fitness tracker for running, walking, and cycling. When you're ready to work out, simply select your activity type, hold the start button through a deliberate countdown, and begin moving. The app tracks your distance, duration, pace, elevation gain, and kilometer splits in real-time, giving you the metrics you need to understand your performance as it happens.
+
+The tracking experience prioritizes intentionality and reliability. The hold-to-start mechanism prevents accidental workout starts while giving your phone's GPS time to acquire a strong signal. During your workout, you can pause and resume freely without losing any data—perfect for stopping at traffic lights or taking a water break. The interface displays your most important metrics prominently, with secondary stats readily available.
+
+When you finish your workout, you're presented with two clear options: Compete or Post. Tapping Compete publishes your workout as a kind 1301 event to Nostr, making it visible to the decentralized network. Tapping Post opens the Enhanced Share Modal, where you can choose from different visual templates to create a social post celebrating your achievement. Leaderboard results are calculated outside of the app by aggregating kind 1301 events from Nostr, then displayed inside the app with updates every 2 minutes.
+
+Privacy sits at the core of RUNSTR's workout architecture. While the app uses GPS to calculate your metrics, your actual route coordinates never leave your device. Only aggregated data—total distance, duration, elevation gain—gets published if you choose to share. This means you can participate in competitions and share achievements without revealing where you run, walk, or cycle.
+
+RUNSTR also integrates with Apple Health on iOS and Health Connect on Android, allowing workouts tracked by other apps or wearables to sync into RUNSTR. These imported workouts qualify for rewards and can be published to competitions, giving you flexibility in how you track your fitness while still participating in the RUNSTR ecosystem.
+
+---
+
 ## What is a Workout in RUNSTR?
 
 A workout in RUNSTR is any fitness activity that a user tracks through the app. Workouts can be:
@@ -62,8 +76,8 @@ The standard Nostr event type for fitness data. Publishing a workout as kind 130
 - Allows other Nostr fitness apps to read your data
 
 ### Two Publishing Options
-1. **Save to Nostr** - Publishes kind 1301 event (for competitions)
-2. **Post to Nostr** - Creates social post with workout card (kind 1)
+1. **Compete** - Publishes kind 1301 event to Nostr (counts for competitions/leaderboards)
+2. **Post** - Opens Enhanced Share Modal with different style templates for social posting (kind 1)
 
 ---
 
@@ -115,16 +129,18 @@ RUNSTR syncs with external fitness platforms:
 - Automatic import of Apple Watch workouts
 - Step count integration
 - Heart rate data (when available)
+- **Imported workouts qualify for rewards**
 
 ### Android: Health Connect
 - Google Health Connect API (Android 14+)
 - Step count from phone sensors
 - Exercise sessions from other apps
+- **Imported workouts qualify for rewards**
 
-### Garmin
-- OAuth-based Garmin Connect sync
-- 7-day historical import
-- Automatic activity type mapping
+### Garmin & Other Wearables
+- No direct integration
+- Garmin data syncs through Apple Health or Health Connect
+- Workouts flow: Garmin → Apple Health → RUNSTR
 
 ---
 

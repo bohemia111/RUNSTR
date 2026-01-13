@@ -95,6 +95,13 @@ export interface LocalWorkout {
   routeId?: string; // Reference to RouteLabel.id if this workout is tagged with a route
   routeLabel?: string; // Route name for display convenience
 
+  // Card/template storage for sharing
+  savedCard?: {
+    templateId: 'achievement' | 'progress' | 'minimal' | 'stats' | 'elegant' | 'custom_photo';
+    customPhotoUri?: string; // Local file path if user took photo
+    generatedAt: string; // ISO timestamp
+  };
+
   // Metadata
   createdAt: string; // ISO timestamp
   syncedToNostr: boolean;
@@ -428,16 +435,17 @@ export class LocalWorkoutStorageService {
         );
       });
 
-      // REWARD TRIGGER: Only user-generated workouts on a new day trigger rewards
+      // REWARD TRIGGER: Only user-generated cardio workouts on a new day trigger rewards
       // Uses checkStreakAndReward() which:
-      // 1. Filters by source (only gps_tracker, manual_entry, daily_steps)
-      // 2. Uses atomic "streak incremented today" flag to prevent race conditions
+      // 1. Filters by source (only gps_tracker, manual_entry)
+      // 2. Filters by activity type (only running, walking, cycling)
+      // 3. Uses atomic "streak incremented today" flag to prevent race conditions
       try {
         const pubkey = await AsyncStorage.getItem('@runstr:hex_pubkey');
         if (pubkey) {
-          console.log(`[LocalWorkoutStorage] Checking streak reward for ${workout.source} workout...`);
+          console.log(`[LocalWorkoutStorage] Checking streak reward for ${workout.source} ${workout.type} workout...`);
           // Fire and forget - don't block workout save for reward
-          DailyRewardService.checkStreakAndReward(pubkey, workout.source).catch((rewardError) => {
+          DailyRewardService.checkStreakAndReward(pubkey, workout.source, workout.type).catch((rewardError) => {
             console.warn('[LocalWorkoutStorage] Reward error (silent):', rewardError);
           });
         }
@@ -506,6 +514,41 @@ export class LocalWorkoutStorageService {
       );
     } catch (error) {
       console.error('❌ Failed to mark workout as synced:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save workout card/template selection for sharing
+   */
+  async saveWorkoutCard(
+    workoutId: string,
+    card: {
+      templateId: 'achievement' | 'progress' | 'minimal' | 'stats' | 'elegant' | 'custom_photo';
+      customPhotoUri?: string;
+    }
+  ): Promise<void> {
+    try {
+      const workouts = await this.getAllWorkouts();
+      const workoutIndex = workouts.findIndex((w) => w.id === workoutId);
+
+      if (workoutIndex === -1) {
+        console.warn(`[LocalWorkoutStorage] Workout ${workoutId} not found`);
+        return;
+      }
+
+      workouts[workoutIndex].savedCard = {
+        ...card,
+        generatedAt: new Date().toISOString(),
+      };
+
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.LOCAL_WORKOUTS,
+        JSON.stringify(workouts)
+      );
+      console.log(`[LocalWorkoutStorage] Saved card for workout: ${workoutId} (template: ${card.templateId})`);
+    } catch (error) {
+      console.error('[LocalWorkoutStorage] Failed to save workout card:', error);
       throw error;
     }
   }

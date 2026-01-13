@@ -310,7 +310,7 @@ export const MeditationTrackerScreen: React.FC<MeditationTrackerScreenProps> = (
       if (!signer || !userId) {
         setAlertConfig({
           title: 'Authentication Required',
-          message: 'Please log in with your Nostr key to post workouts.',
+          message: 'Please log in to post workouts.',
           buttons: [{ text: 'OK', style: 'default' }],
         });
         setAlertVisible(true);
@@ -334,12 +334,12 @@ export const MeditationTrackerScreen: React.FC<MeditationTrackerScreenProps> = (
 
         setAlertConfig({
           title: 'Success!',
-          message: 'Your meditation session has been saved to Nostr!',
+          message: 'Your meditation session has been saved!',
           buttons: [{ text: 'OK', style: 'default' }],
         });
         setAlertVisible(true);
       } else {
-        throw new Error(result.error || 'Failed to save to Nostr');
+        throw new Error(result.error || 'Failed to save workout');
       }
     } catch (error) {
       console.error('❌ Failed to compete meditation:', error);
@@ -619,7 +619,7 @@ export const MeditationTrackerScreen: React.FC<MeditationTrackerScreenProps> = (
             setAlertConfig({
               title: 'Success!',
               message:
-                'Your meditation session has been shared to Nostr with a beautiful card!',
+                'Your meditation session has been shared with a beautiful card!',
               buttons: [{ text: 'OK', style: 'default', onPress: handleDone }],
             });
             setAlertVisible(true);

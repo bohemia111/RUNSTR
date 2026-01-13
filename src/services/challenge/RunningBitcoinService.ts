@@ -22,7 +22,7 @@ import {
 } from '../../constants/runningBitcoin';
 import { SEASON_2_PARTICIPANTS } from '../../constants/season2';
 import { RewardLightningAddressService } from '../rewards/RewardLightningAddressService';
-import { RewardSenderWallet } from '../rewards/RewardSenderWallet';
+import { NWCGatewayService } from '../rewards/NWCGatewayService';
 import { getInvoiceFromLightningAddress } from '../../utils/lnurl';
 import { GlobalNDKService } from '../nostr/GlobalNDKService';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
@@ -517,7 +517,7 @@ class RunningBitcoinServiceClass {
       }
 
       // Pay the invoice
-      const payResult = await RewardSenderWallet.sendRewardPayment(invoice);
+      const payResult = await NWCGatewayService.payInvoice(invoice);
 
       if (payResult.success) {
         // Mark reward as claimed
@@ -844,7 +844,7 @@ class RunningBitcoinServiceClass {
 
       // Step 6: Pay the invoice
       try {
-        const payResult = await RewardSenderWallet.sendRewardPayment(invoice);
+        const payResult = await NWCGatewayService.payInvoice(invoice);
         if (payResult.success) {
           // Mark reward as claimed
           await this.markRewardClaimed(pubkey);

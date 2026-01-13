@@ -1,5 +1,19 @@
 # Chapter 6: Events Overview
 
+## Summary
+
+RUNSTR hosts fitness competitions where participants compete on leaderboards for Bitcoin prize pools. Current events include RUNSTR Season II (a two-month competition from January through March with a 1 million sat prize pool), the January Walking Contest, the Running Bitcoin Challenge, and Daily Leaderboards. Each event focuses on specific activities and offers real satoshi rewards to top performers.
+
+Joining an event takes a single tap. Navigate to the Events page, select an event card to view details and the current leaderboard, then tap Join. There are no entry fees—participation is completely free. Once joined, any workouts you publish using the Compete button automatically count toward that event's leaderboard. Your ranking updates as you and other participants log more distance.
+
+The leaderboard system organizes competitors by activity type. In Season II, separate leaderboards track Running, Walking, and Cycling distances, ensuring fair competition within each category. You compete against others doing the same activity, not against cyclists when you're a runner. Leaderboards display participant names, total distances, workout counts, and rankings—calculated outside the app and updated every 2 minutes.
+
+Event participation is tracked through Supabase rather than purely on Nostr. This hybrid approach provides faster queries for participant lists, simpler management for event operations, and reliable tracking for prize distribution. When you tap Compete after a workout, the kind 1301 event publishes to Nostr, and leaderboard calculations happen externally before being displayed in the app.
+
+Prize distribution happens at event conclusion, with Bitcoin sent via Lightning to top performers. The transparent prize structure—displayed on each event card—lets you know exactly what you're competing for before joining. Whether you're chasing the grand prize in Season II or competing for daily leaderboard recognition, RUNSTR events add stakes and community to your fitness routine, transforming solitary workouts into shared competition with tangible rewards.
+
+---
+
 ## What are RUNSTR Events?
 
 Events are fitness competitions with Bitcoin prizes. Users join events, complete workouts, and compete on leaderboards for satoshi rewards.
@@ -10,6 +24,8 @@ Events are fitness competitions with Bitcoin prizes. Users join events, complete
 |-------|----------|-------|------------|
 | RUNSTR Season II | Jan 1 - Mar 1 | 1M sats pool | Running, Walking, Cycling |
 | January Walking Contest | Jan 1 - Jan 31 | 3,000 sats (top 3) | Walking |
+| Running Bitcoin Challenge | Ongoing | Varies | Running |
+| Daily Leaderboards | Daily reset | Recognition | All activities |
 
 ---
 
@@ -131,10 +147,12 @@ Navigates to Season2Screen (or similar)
         ↓
 Loads participant list from Supabase
         ↓
-Loads workout data from Nostr (kind 1301)
+Leaderboard data fetched (calculated externally, updated every 2 minutes)
         ↓
-Calculates and displays leaderboard
+Displays leaderboard rankings
 ```
+
+**Note:** Leaderboard calculations happen outside the app by aggregating kind 1301 events from Nostr. The app fetches and displays these pre-calculated results.
 
 ---
 

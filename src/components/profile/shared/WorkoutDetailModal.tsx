@@ -1,9 +1,10 @@
 /**
  * WorkoutDetailModal - Detailed workout view with splits, weather, and activity-specific data
  * Shows comprehensive workout information in a modal dialog
+ * Includes saved card preview with fullscreen option
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -17,6 +18,8 @@ import { theme } from '../../../styles/theme';
 import type { LocalWorkout } from '../../../services/fitness/LocalWorkoutStorageService';
 import type { Workout } from '../../../types/workout';
 import type { Split } from '../../../services/activity/SplitTrackingService';
+import type { PublishableWorkout } from '../../../services/nostr/workoutPublishingService';
+import { FullScreenCardModal } from './FullScreenCardModal';
 
 interface WorkoutDetailModalProps {
   visible: boolean;
@@ -29,7 +32,13 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
   workout,
   onClose,
 }) => {
+  const [showFullscreenCard, setShowFullscreenCard] = useState(false);
+
   if (!workout) return null;
+
+  // Check if this workout has a saved card
+  const localWorkout = workout as LocalWorkout;
+  const hasSavedCard = !!localWorkout.savedCard;
 
   // Format helpers
   const formatDuration = (seconds: number): string => {
@@ -592,6 +601,26 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
             style={styles.content}
             showsVerticalScrollIndicator={false}
           >
+            {/* Saved Card Section */}
+            {hasSavedCard && (
+              <TouchableOpacity
+                style={styles.savedCardSection}
+                onPress={() => setShowFullscreenCard(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="image" size={24} color={theme.colors.accent} />
+                <View style={styles.savedCardInfo}>
+                  <Text style={styles.savedCardTitle}>View Saved Card</Text>
+                  <Text style={styles.savedCardDescription}>
+                    {localWorkout.savedCard?.templateId === 'custom_photo'
+                      ? 'Tap to view your photo'
+                      : `Tap to view ${localWorkout.savedCard?.templateId} card`}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+
             {/* Weather Section */}
             {workout.weather && (
               <View style={styles.section}>
@@ -640,6 +669,17 @@ export const WorkoutDetailModal: React.FC<WorkoutDetailModalProps> = ({
           </ScrollView>
         </View>
       </View>
+
+      {/* Fullscreen Card Modal */}
+      {hasSavedCard && (
+        <FullScreenCardModal
+          visible={showFullscreenCard}
+          onClose={() => setShowFullscreenCard(false)}
+          workout={workout as PublishableWorkout}
+          templateId={localWorkout.savedCard?.templateId || 'elegant'}
+          customPhotoUri={localWorkout.savedCard?.customPhotoUri}
+        />
+      )}
     </Modal>
   );
 };
@@ -1003,5 +1043,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.text,
     fontWeight: theme.typography.weights.semiBold,
+  },
+  // Saved card styles
+  savedCardSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+  },
+  savedCardInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  savedCardTitle: {
+    fontSize: 16,
+    fontWeight: theme.typography.weights.semiBold,
+    color: theme.colors.text,
+    marginBottom: 2,
+  },
+  savedCardDescription: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
   },
 });

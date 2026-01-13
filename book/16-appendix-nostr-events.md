@@ -299,4 +299,6 @@ This document contains:
 
 **Previous:** [Chapter 15: Conclusion](./15-conclusion.md)
 
+**Next:** [Chapter 17: In-Person Events](./17-in-person-events.md)
+
 **Table of Contents:** [Back to TOC](./00-table-of-contents.md)

@@ -222,7 +222,7 @@ export const AntiCheatRequestModal: React.FC<AntiCheatRequestModalProps> = ({
                       contactMethod === 'nostr_dm' && styles.contactOptionTextSelected,
                     ]}
                   >
-                    Nostr DM
+                    Direct Message
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity

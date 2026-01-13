@@ -266,6 +266,256 @@ interface ValidationResult {
   reason?: string
 }
 
+// =============================================
+// VERIFICATION CODE VALIDATION
+// =============================================
+
+type VerificationStatus = 'verified' | 'unverified' | 'invalid' | 'legacy' | 'expired' | 'replay' | 'tampered'
+
+/**
+ * Extract verification data from kind 1301 event tags
+ */
+function extractVerificationData(rawEvent: Record<string, unknown>): {
+  verificationCode: string | null
+  clientVersion: string | null
+} {
+  const tags = rawEvent.tags as string[][] | undefined
+
+  if (!tags || !Array.isArray(tags)) {
+    return { verificationCode: null, clientVersion: null }
+  }
+
+  // Find ["v", "code"] tag
+  const vTag = tags.find(t => t[0] === 'v')
+  const verificationCode = vTag?.[1] || null
+
+  // Find ["client", "RUNSTR", "version"] tag
+  const clientTag = tags.find(t => t[0] === 'client' && t[1] === 'RUNSTR')
+  const clientVersion = clientTag?.[2] || null
+
+  return { verificationCode, clientVersion }
+}
+
+/**
+ * Extract workout data needed for per-workout verification
+ */
+function extractWorkoutDataForVerification(rawEvent: Record<string, unknown>): {
+  workoutId: string | null
+  exercise: string | null
+  distanceMeters: number
+  durationSeconds: number
+  startTimestamp: number
+} {
+  const tags = rawEvent.tags as string[][] | undefined
+
+  if (!tags || !Array.isArray(tags)) {
+    return { workoutId: null, exercise: null, distanceMeters: 0, durationSeconds: 0, startTimestamp: 0 }
+  }
+
+  // Find ["d", "workout_id"] tag
+  const dTag = tags.find(t => t[0] === 'd')
+  const workoutId = dTag?.[1] || null
+
+  // Find ["exercise", "type"] tag
+  const exerciseTag = tags.find(t => t[0] === 'exercise')
+  const exercise = exerciseTag?.[1]?.toLowerCase() || null
+
+  // Find ["distance", "value", "unit"] tag and convert to meters
+  const distanceTag = tags.find(t => t[0] === 'distance')
+  let distanceMeters = 0
+  if (distanceTag && distanceTag[1]) {
+    const value = parseFloat(distanceTag[1])
+    const unit = distanceTag[2]?.toLowerCase() || 'km'
+    if (!isNaN(value)) {
+      distanceMeters = unit === 'mi' ? Math.round(value * 1609.34) : Math.round(value * 1000)
+    }
+  }
+
+  // Find ["duration", "HH:MM:SS"] tag
+  const durationTag = tags.find(t => t[0] === 'duration')
+  const durationSeconds = durationTag?.[1] ? parseTimeToSeconds(durationTag[1]) : 0
+
+  // Find ["workout_start_time", "timestamp"] tag
+  const startTag = tags.find(t => t[0] === 'workout_start_time')
+  const startTimestamp = startTag?.[1] ? parseInt(startTag[1]) : 0
+
+  return { workoutId, exercise, distanceMeters, durationSeconds, startTimestamp }
+}
+
+/**
+ * Build canonical string for verification (must match get-workout-verification)
+ */
+function buildCanonicalString(
+  npub: string,
+  workoutId: string,
+  exercise: string,
+  distanceMeters: number,
+  durationSeconds: number,
+  startTimestamp: number
+): string {
+  return `${npub}:${workoutId}:${exercise}:${distanceMeters}:${durationSeconds}:${startTimestamp}`
+}
+
+/**
+ * Generate HMAC-SHA256 verification code (same as get-verification-code function)
+ */
+async function generateHmacCode(secret: string, npub: string, version: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const message = `${npub}:${version}`
+
+  const keyData = encoder.encode(secret)
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(message))
+
+  const hashArray = Array.from(new Uint8Array(signature))
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+  return hashHex.substring(0, 16)
+}
+
+/**
+ * Validate per-workout verification code against stored record
+ */
+async function validatePerWorkoutCode(
+  supabase: ReturnType<typeof createClient>,
+  npub: string,
+  rawEvent: Record<string, unknown>
+): Promise<{ status: VerificationStatus; code: string | null } | null> {
+  const { verificationCode } = extractVerificationData(rawEvent)
+  const workoutData = extractWorkoutDataForVerification(rawEvent)
+
+  // No workout_id means can't do per-workout validation
+  if (!workoutData.workoutId) {
+    return null
+  }
+
+  // Look up stored verification record
+  const { data: stored, error } = await supabase
+    .from('workout_verification_codes')
+    .select('*')
+    .eq('workout_id', workoutData.workoutId)
+    .single()
+
+  if (error || !stored) {
+    // No stored record - per-workout verification was not used
+    // Fall back to legacy validation
+    return null
+  }
+
+  // Check if code already used (replay attack)
+  if (stored.used) {
+    console.warn(`Replay attempt: workout ${workoutData.workoutId} code already used`)
+    return { status: 'replay', code: verificationCode }
+  }
+
+  // Check expiry
+  if (new Date() > new Date(stored.expires_at)) {
+    console.warn(`Expired verification code for workout ${workoutData.workoutId}`)
+    return { status: 'expired', code: verificationCode }
+  }
+
+  // Validate code matches stored code
+  if (verificationCode !== stored.verification_code) {
+    console.warn(`Code mismatch for workout ${workoutData.workoutId}`)
+    return { status: 'invalid', code: verificationCode }
+  }
+
+  // Recompute canonical hash from submitted data
+  const computedHash = buildCanonicalString(
+    npub,
+    workoutData.workoutId,
+    workoutData.exercise || '',
+    workoutData.distanceMeters,
+    workoutData.durationSeconds,
+    workoutData.startTimestamp
+  )
+
+  // Validate hash matches (detect data tampering)
+  if (computedHash !== stored.canonical_hash) {
+    console.warn(`Hash mismatch for workout ${workoutData.workoutId}:`)
+    console.warn(`  Stored: ${stored.canonical_hash}`)
+    console.warn(`  Computed: ${computedHash}`)
+    return { status: 'tampered', code: verificationCode }
+  }
+
+  // Mark code as used to prevent replay
+  const { error: updateError } = await supabase
+    .from('workout_verification_codes')
+    .update({ used: true })
+    .eq('workout_id', workoutData.workoutId)
+
+  if (updateError) {
+    console.error(`Failed to mark verification code as used: ${updateError.message}`)
+    // Continue anyway - better to accept than reject due to update failure
+  }
+
+  console.log(`Per-workout verification passed for workout ${workoutData.workoutId}`)
+  return { status: 'verified', code: verificationCode }
+}
+
+/**
+ * Validate verification code against server-side computed code
+ * First tries per-workout validation, then falls back to legacy per-user validation
+ */
+async function validateVerificationCode(
+  npub: string,
+  rawEvent: Record<string, unknown>,
+  supabase?: ReturnType<typeof createClient>
+): Promise<{ status: VerificationStatus; code: string | null }> {
+  const { verificationCode, clientVersion } = extractVerificationData(rawEvent)
+
+  // Try per-workout validation first (if supabase client provided)
+  if (supabase) {
+    const perWorkoutResult = await validatePerWorkoutCode(supabase, npub, rawEvent)
+    if (perWorkoutResult) {
+      return perWorkoutResult
+    }
+  }
+
+  // Fall back to legacy per-user validation
+  // No verification code provided - could be old app version or non-RUNSTR client
+  if (!verificationCode) {
+    return { status: 'unverified', code: null }
+  }
+
+  // No client version - can't validate
+  if (!clientVersion) {
+    return { status: 'unverified', code: verificationCode }
+  }
+
+  // Get secret for this version
+  const secretKey = `VERIFICATION_SECRET_${clientVersion.replace(/\./g, '_')}`
+  const secret = Deno.env.get(secretKey)
+
+  if (!secret) {
+    // Unknown version - treat as unverified (not invalid)
+    // This handles versions before verification was implemented
+    console.log(`No verification secret for version ${clientVersion}`)
+    return { status: 'unverified', code: verificationCode }
+  }
+
+  // Recompute expected code (legacy: per-user)
+  const expectedCode = await generateHmacCode(secret, npub, clientVersion)
+
+  // Compare codes
+  if (verificationCode === expectedCode) {
+    // Legacy verification passed - but this is now considered weaker
+    // Mark as 'legacy' instead of 'verified' for per-user codes
+    return { status: 'legacy', code: verificationCode }
+  }
+
+  // Code provided but doesn't match - likely forged
+  console.warn(`Verification code mismatch for ${npub.slice(0, 12)}... version ${clientVersion}`)
+  return { status: 'invalid', code: verificationCode }
+}
+
 function validateWorkout(workout: WorkoutSubmission): ValidationResult {
   const limits = VALIDATION_LIMITS[workout.activity_type]
 
@@ -454,6 +704,10 @@ serve(async (req) => {
       const targetTimes = calculateAllTargetTimes(splits, distanceKm, durationSeconds)
       const stepCount = parseStepCount(workout.raw_event)
 
+      // Validate verification code for anti-cheat (per-workout first, then legacy)
+      const verificationResult = await validateVerificationCode(workout.npub, workout.raw_event, supabase)
+      console.log(`Verification status: ${verificationResult.status} for ${workout.npub.slice(0, 12)}...`)
+
       // Calculate leaderboard_date from created_at
       const leaderboardDate = workout.created_at
         ? new Date(workout.created_at).toISOString().split('T')[0]
@@ -480,6 +734,9 @@ serve(async (req) => {
         leaderboard_date: leaderboardDate,
         profile_name: workout.profile_name || null,
         profile_picture: workout.profile_picture || null,
+        // Verification fields for anti-cheat leaderboard filtering
+        verification_code: verificationResult.code,
+        verification_status: verificationResult.status,
       })
 
       if (error) {

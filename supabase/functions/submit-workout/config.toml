@@ -1,0 +1,4 @@
+# Allow public access to submit-workout
+# The function validates the workout event signature via Nostr
+# Verification codes are validated server-side using HMAC
+verify_jwt = false

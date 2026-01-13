@@ -99,14 +99,14 @@ export const HelpSupportScreen: React.FC<{ navigation: any }> = ({
 • Workout History: Profile > Workouts tab shows your unified timeline.`,
     },
     {
-      id: 'bitcoin',
-      title: '₿ Bitcoin & Rewards',
-      content: `Earn Bitcoin through fitness:
+      id: 'rewards',
+      title: '₿ Sats & Rewards',
+      content: `Earn sats through fitness:
 
-• NutZap Wallet: Your built-in Lightning wallet for instant Bitcoin transactions.
-• Prize Pools: Competition winners receive automatic Bitcoin distributions.
+• NutZap Wallet: Your built-in Lightning wallet for instant transactions.
+• Prize Pools: Competition winners receive automatic sats distributions.
 • Entry Fees: Some competitions require small satoshi entry fees.
-• Sending/Receiving: Use the wallet buttons in your Profile to send or receive Bitcoin.
+• Sending/Receiving: Use the wallet buttons in your Profile to send or receive sats.
 • Balance: Your current balance shows in the Profile wallet section.
 • Withdrawals: Transfer to external Lightning wallets anytime.`,
     },
